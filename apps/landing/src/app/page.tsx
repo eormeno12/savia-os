@@ -1,5 +1,6 @@
 import { Box, Flex, Stack, Text } from '@chakra-ui/react';
 import { Sparkles } from 'lucide-react';
+import Image from 'next/image';
 import { AvatarStack } from '@/components/landing/avatar-stack';
 import { COMMUNITY_COUNT } from '@/lib/constants';
 import { FadeInUp } from '@/components/ui/animated-section';
@@ -46,33 +47,50 @@ export default function Home() {
               Diseñado para expertos que ya usan IA todos los días.
             </Text>
 
-            {/* Badge con avatar stack */}
-            <Flex
-              display="inline-flex"
-              alignItems="center"
-              bg="bg.inset"
-              borderWidth="1px"
-              borderColor="border.subtle"
-              borderRadius="full"
-              pl="1.5"
-              pr="4"
-              py="1.5"
-              gap="2.5"
-              boxShadow="soft"
-            >
-              <AvatarStack />
-              <Box w="px" h="3.5" bg="border.subtle" flexShrink={0} />
-              <Flex alignItems="center" gap="1.5">
-                <Sparkles
-                  size={11}
-                  color="#0A0A0A"
-                  fill="#E7FF18"
-                  stroke="#0A0A0A"
-                  strokeWidth={1.5}
-                />
-                <Text fontSize="xs" fontWeight="600" color="fg.muted" lineHeight="1">
-                  {COMMUNITY_COUNT} ya en la comunidad
+            {/* Social proof + incubadora */}
+            <Flex alignItems="center" gap="3" flexWrap="wrap" justifyContent="center">
+              {/* Badge con avatar stack */}
+              <Flex
+                display="inline-flex"
+                alignItems="center"
+                bg="bg.inset"
+                borderWidth="1px"
+                borderColor="border.subtle"
+                borderRadius="full"
+                pl="1.5"
+                pr="4"
+                py="1.5"
+                gap="2.5"
+                boxShadow="soft"
+              >
+                <AvatarStack />
+                <Box w="px" h="3.5" bg="border.subtle" flexShrink={0} />
+                <Flex alignItems="center" gap="1.5">
+                  <Sparkles
+                    size={11}
+                    color="#0A0A0A"
+                    fill="#E7FF18"
+                    stroke="#0A0A0A"
+                    strokeWidth={1.5}
+                  />
+                  <Text fontSize="xs" fontWeight="600" color="fg.muted" lineHeight="1">
+                    {COMMUNITY_COUNT} ya en la comunidad
+                  </Text>
+                </Flex>
+              </Flex>
+
+              {/* Incubadora */}
+              <Flex display="inline-flex" alignItems="center" gap="2">
+                <Text fontSize="xs" color="fg.muted" opacity={0.5} lineHeight="1" whiteSpace="nowrap">
+                  Incubados por
                 </Text>
+                <Image
+                  src="/logo-uv.png"
+                  alt="UTEC Ventures"
+                  width={64}
+                  height={20}
+                  style={{ objectFit: 'contain' }}
+                />
               </Flex>
             </Flex>
 
