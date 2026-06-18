@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "savia-landing-v3",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "name": "@savia-os/landing",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev"],
       "port": 4343
     }
   ]
