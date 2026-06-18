@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Savia — LinkedIn Company Banner · 1128 × 191</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0D0D0D;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 36px;
+      padding: 56px 48px;
+      font-family: system-ui, sans-serif;
+    }
+
+    .hint {
+      color: rgba(255,255,255,0.32);
+      font-size: 12px;
+      letter-spacing: 0.03em;
+      text-align: center;
+      line-height: 1.9;
+      max-width: 680px;
+    }
+    .hint strong { color: rgba(255,255,255,0.6); font-weight: 600; }
+    .hint code {
+      background: rgba(255,255,255,0.07);
+      padding: 2px 8px;
+      border-radius: 4px;
+      color: rgba(255,255,255,0.55);
+      font-size: 11px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+
+    /* ════════════════════ BANNER ════════════════════ */
+    #banner {
+      width: 1128px;
+      height: 191px;
+      background: #0B2529;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    /* Warm glow behind the decorative mark (left) */
+    #banner::after {
+      content: '';
+      position: absolute;
+      left: -40px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 420px;
+      height: 420px;
+      background: radial-gradient(circle, rgba(231,255,24,0.05) 0%, transparent 62%);
+      pointer-events: none;
+    }
+
+    /* Decorative mark — left side */
+    .mark-watermark {
+      position: absolute;
+      left: -60px;
+      top: 50%;
+      transform: translateY(-50%);
+      opacity: 0.20;
+    }
+
+    /* Content — right side */
+    .content {
+      position: absolute;
+      right: 72px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 12px;
+      text-align: right;
+    }
+
+    /* Logo row */
+    .logo-row {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+    }
+
+    .wordmark {
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      color: #F4F4F1;
+      text-transform: uppercase;
+    }
+
+    /* Tagline — single line at this height */
+    .tagline {
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 30px;
+      font-weight: 300;
+      line-height: 1.04;
+      letter-spacing: -0.02em;
+      color: #F4F4F1;
+    }
+
+    .tagline .lime { color: #E7FF18; }
+
+    /* Incubator section */
+    .incubator {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(244,244,241,0.12);
+    }
+
+    .incubator-label {
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      color: rgba(244,244,241,0.38);
+      text-transform: uppercase;
+    }
+
+    .incubator-badge {
+      background: #ffffff;
+      border-radius: 6px;
+      padding: 5px 10px;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    /* Preview scaling */
+    .banner-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+
+  <p class="hint">
+    <strong>Exportar como imagen · LinkedIn Company Page Banner · 1128 × 191 px</strong><br>
+    DevTools (F12) → panel Elements → clic derecho sobre <code>&lt;div id="banner"&gt;</code> → <strong>"Capture node screenshot"</strong>
+  </p>
+
+  <div class="banner-wrapper">
+    <div id="banner">
+
+      <!-- Decorative mark — left (partially clipped) -->
+      <svg class="mark-watermark" width="280" height="280" viewBox="0 0 148 148" fill="#E7FF18" aria-hidden="true">
+        <path d="M42.2 0H63.8A7.2 7.2 0 0 1 71 7.2V28.8A7.2 7.2 0 0 1 63.8 36H42.2C38.8 36 36 38.8 36 42.2V63.8A7.2 7.2 0 0 1 28.8 71H7.2A7.2 7.2 0 0 1 0 63.8V42.2A7.2 7.2 0 0 1 7.2 35H28.8C32.2 35 35 32.2 35 28.8V7.2A7.2 7.2 0 0 1 42.2 0Z"/>
+        <path d="M42.2 0H63.8A7.2 7.2 0 0 1 71 7.2V28.8A7.2 7.2 0 0 1 63.8 36H42.2C38.8 36 36 38.8 36 42.2V63.8A7.2 7.2 0 0 1 28.8 71H7.2A7.2 7.2 0 0 1 0 63.8V42.2A7.2 7.2 0 0 1 7.2 35H28.8C32.2 35 35 32.2 35 28.8V7.2A7.2 7.2 0 0 1 42.2 0Z" transform="rotate(90 74 74)"/>
+        <path d="M42.2 0H63.8A7.2 7.2 0 0 1 71 7.2V28.8A7.2 7.2 0 0 1 63.8 36H42.2C38.8 36 36 38.8 36 42.2V63.8A7.2 7.2 0 0 1 28.8 71H7.2A7.2 7.2 0 0 1 0 63.8V42.2A7.2 7.2 0 0 1 7.2 35H28.8C32.2 35 35 32.2 35 28.8V7.2A7.2 7.2 0 0 1 42.2 0Z" transform="rotate(180 74 74)"/>
+        <path d="M42.2 0H63.8A7.2 7.2 0 0 1 71 7.2V28.8A7.2 7.2 0 0 1 63.8 36H42.2C38.8 36 36 38.8 36 42.2V63.8A7.2 7.2 0 0 1 28.8 71H7.2A7.2 7.2 0 0 1 0 63.8V42.2A7.2 7.2 0 0 1 7.2 35H28.8C32.2 35 35 32.2 35 28.8V7.2A7.2 7.2 0 0 1 42.2 0Z" transform="rotate(270 74 74)"/>
+      </svg>
+
+      <!-- Content -->
+      <div class="content">
+
+        <!-- Logo row -->
+        <div class="logo-row">
+          <svg width="26" height="26" viewBox="0 0 148 148" fill="#E7FF18" aria-hidden="true">
+            <path d="M42.2 0H63.8A7.2 7.2 0 0 1 71 7.2V28.8A7.2 7.2 0 0 1 63.8 36H42.2C38.8 36 36 38.8 36 42.2V63.8A7.2 7.2 0 0 1 28.8 71H7.2A7.2 7.2 0 0 1 0 63.8V42.2A7.2 7.2 0 0 1 7.2 35H28.8C32.2 35 35 32.2 35 28.8V7.2A7.2 7.2 0 0 1 42.2 0Z"/>
+            <path d="M42.2 0H63.8A7.2 7.2 0 0 1 71 7.2V28.8A7.2 7.2 0 0 1 63.8 36H42.2C38.8 36 36 38.8 36 42.2V63.8A7.2 7.2 0 0 1 28.8 71H7.2A7.2 7.2 0 0 1 0 63.8V42.2A7.2 7.2 0 0 1 7.2 35H28.8C32.2 35 35 32.2 35 28.8V7.2A7.2 7.2 0 0 1 42.2 0Z" transform="rotate(90 74 74)"/>
+            <path d="M42.2 0H63.8A7.2 7.2 0 0 1 71 7.2V28.8A7.2 7.2 0 0 1 63.8 36H42.2C38.8 36 36 38.8 36 42.2V63.8A7.2 7.2 0 0 1 28.8 71H7.2A7.2 7.2 0 0 1 0 63.8V42.2A7.2 7.2 0 0 1 7.2 35H28.8C32.2 35 35 32.2 35 28.8V7.2A7.2 7.2 0 0 1 42.2 0Z" transform="rotate(180 74 74)"/>
+            <path d="M42.2 0H63.8A7.2 7.2 0 0 1 71 7.2V28.8A7.2 7.2 0 0 1 63.8 36H42.2C38.8 36 36 38.8 36 42.2V63.8A7.2 7.2 0 0 1 28.8 71H7.2A7.2 7.2 0 0 1 0 63.8V42.2A7.2 7.2 0 0 1 7.2 35H28.8C32.2 35 35 32.2 35 28.8V7.2A7.2 7.2 0 0 1 42.2 0Z" transform="rotate(270 74 74)"/>
+          </svg>
+          <span class="wordmark">Savia</span>
+        </div>
+
+        <!-- Tagline -->
+        <div class="tagline">
+          La <span class="lime">memoria</span> que conecta todas tus IAs.
+        </div>
+
+        <!-- Incubator badge -->
+        <div class="incubator">
+          <span class="incubator-label">Incubado por</span>
+          <div class="incubator-badge">
+            <img src="../../apps/landing/public/logo-uv.png" height="22" alt="UTEC Ventures">
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <p class="hint">
+    Alternativa desde terminal:<br>
+    <code>npx playwright screenshot --viewport-size=1128,191 linkedin-company-banner.html company-banner.png</code>
+  </p>
+
+  <script>
+    function scalePreview() {
+      const wrapper = document.querySelector('.banner-wrapper');
+      const scale = Math.min(1, (window.innerWidth - 96) / 1128);
+      wrapper.style.transform = `scale(${scale})`;
+      wrapper.style.transformOrigin = 'top center';
+      wrapper.style.marginBottom = `${(191 * scale) - 191}px`;
+    }
+    scalePreview();
+    window.addEventListener('resize', scalePreview);
+  </script>
+</body>
+</html>
