@@ -6,6 +6,7 @@ type SectionHeaderProps = {
   headline: React.ReactNode;
   description?: React.ReactNode;
   descriptionMaxW?: string;
+  maxW?: BoxProps['maxW'];
   mb?: BoxProps['mb'];
 };
 
@@ -14,10 +15,11 @@ export function SectionHeader({
   headline,
   description,
   descriptionMaxW = '32rem',
+  maxW = 'containerNarrow',
   mb,
 }: SectionHeaderProps) {
   return (
-    <Stack gap="5" maxW="containerNarrow" mb={mb}>
+    <Stack gap="5" maxW={maxW} mb={mb}>
       <Text
         textStyle="label"
         fontWeight="700"
@@ -27,7 +29,7 @@ export function SectionHeader({
       </Text>
       <Text
         as="h2"
-        fontSize={{ base: 'display2xl', lg: 'display3xl' }}
+        fontSize={{ base: 'displayLg', lg: 'display2xl' }}
         fontWeight="300"
         lineHeight="0.95"
         color="fg.muted"

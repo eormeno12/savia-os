@@ -24,6 +24,7 @@ export function WaitlistSection() {
           <Stack gap="5">
             <SectionHeader
               eyebrow="Early Access"
+              maxW="100%"
               headline={
                 <>
                   Diseñado{' '}
