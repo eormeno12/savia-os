@@ -1,26 +1,26 @@
 import { Box, Flex, Stack, Text } from '@chakra-ui/react';
 import { Sparkles } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import { AvatarStack } from '@/components/landing/avatar-stack';
+import { ControlSection } from '@/components/landing/control-section';
+import { CountdownBanner } from '@/components/landing/countdown-banner';
+import { CtaButton } from '@/components/landing/cta-button';
+import { HowItWorks } from '@/components/landing/how-it-works';
+import { IslandImage } from '@/components/landing/island-image';
+import { Pricing } from '@/components/landing/pricing';
+import { QuoteDivider } from '@/components/landing/quote-divider';
+import { SaviaParticles } from '@/components/landing/savia-particles';
+import { SiteFooter } from '@/components/landing/site-footer';
+import { SiteHeader } from '@/components/landing/site-header';
+import { WaitlistSection } from '@/components/landing/waitlist-section';
 import { COMMUNITY_COUNT } from '@/lib/constants';
 import { FadeInUp } from '@/components/ui/animated-section';
-import { SiteHeader } from '@/components/landing/site-header';
-import { SiteFooter } from '@/components/landing/site-footer';
-import { SaviaParticles } from '@/components/landing/savia-particles';
-import { IslandImage } from '@/components/landing/island-image';
-import dynamic from 'next/dynamic';
-import { HowItWorks } from '@/components/landing/how-it-works';
-import { Pricing } from '@/components/landing/pricing';
-import { WaitlistSection } from '@/components/landing/waitlist-section';
 
 const EcosystemScroll = dynamic(
   () => import('@/components/landing/ecosystem-scroll').then((m) => m.EcosystemScroll),
   { loading: () => <Box minH="100svh" /> }
 );
-import { CountdownBanner } from '@/components/landing/countdown-banner';
-import { ControlSection } from '@/components/landing/control-section';
-import { CtaButton } from '@/components/landing/cta-button';
-import { QuoteDivider } from '@/components/landing/quote-divider';
 
 export default function Home() {
   return (

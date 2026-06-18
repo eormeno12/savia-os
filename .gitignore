@@ -31,3 +31,6 @@ build/
 
 # pnpm
 .pnpm-store/
+
+# Auto-generated design system preview (regenerate with: pnpm export:ds)
+apps/landing/design-system-preview/

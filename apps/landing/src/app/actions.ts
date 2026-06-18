@@ -1,5 +1,7 @@
 "use server";
 
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
 import { headers } from "next/headers";
 import {
   appendWaitlistEntry,
@@ -15,6 +17,28 @@ export type WaitlistActionState = {
 };
 
 const localEmails = new Set<string>();
+
+function createRateLimiter(): Ratelimit | null {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) {
+    console.warn("[waitlist] Upstash not configured — rate limiting disabled");
+    return null;
+  }
+  return new Ratelimit({
+    redis: new Redis({ url, token }),
+    limiter: Ratelimit.slidingWindow(3, "1 h"),
+    prefix: "waitlist",
+  });
+}
+
+const rateLimiter = createRateLimiter();
+
+function extractIp(headersList: Awaited<ReturnType<typeof headers>>): string {
+  const forwarded = headersList.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0].trim();
+  return headersList.get("x-real-ip") ?? "anon";
+}
 
 function extractUtm(referer: string) {
   if (!referer) return { campaign: "", medium: "", source: "" };
@@ -39,6 +63,18 @@ export async function joinWaitlist(
   if (String(formData.get("website") ?? "").trim()) {
     await new Promise((r) => setTimeout(r, 300));
     return { message: "Ya eres parte del grupo inicial de SAVIA.", status: "success" };
+  }
+
+  if (rateLimiter) {
+    const rlHeaders = await headers();
+    const ip = extractIp(rlHeaders);
+    const { success } = await rateLimiter.limit(ip);
+    if (!success) {
+      return {
+        message: "Demasiados intentos. Espera un momento e inténtalo de nuevo.",
+        status: "error",
+      };
+    }
   }
 
   const parsed = waitlistSchema.safeParse({
@@ -125,15 +161,20 @@ export async function joinWaitlist(
     };
   }
 
-  // Local in-memory fallback (development only)
-  if (localEmails.has(input.email)) {
-    return { message: "Ese email ya forma parte de los primeros usuarios.", status: "duplicate" };
+  // Local in-memory fallback — dev only (ephemeral per-invocation in production)
+  if (process.env.NODE_ENV !== "production") {
+    if (localEmails.has(input.email)) {
+      return { message: "Ese email ya forma parte de los primeros usuarios.", status: "duplicate" };
+    }
+    localEmails.add(input.email);
+    return {
+      message: "Ya eres parte del grupo inicial. Te avisaremos cuando abramos el siguiente cupo.",
+      status: "success",
+    };
   }
 
-  localEmails.add(input.email);
-
   return {
-    message: "Ya eres parte del grupo inicial. Te avisaremos cuando abramos el siguiente cupo.",
-    status: "success",
+    message: "No pudimos guardar tu registro. Configura Google Sheets o WAITLIST_ENDPOINT.",
+    status: "error",
   };
 }
