@@ -1,0 +1,21 @@
+{
+  "name": "savia-os",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Savia OS — product monorepo",
+  "packageManager": "pnpm@11.7.0",
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "clean": "turbo clean && find . -name 'node_modules' -type d -prune -exec rm -rf '{}' + 2>/dev/null; true",
+    "landing:dev": "turbo dev --filter=@savia-os/landing",
+    "landing:build": "turbo build --filter=@savia-os/landing",
+    "landing:lint": "turbo lint --filter=@savia-os/landing",
+    "landing:typecheck": "turbo typecheck --filter=@savia-os/landing"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.4"
+  }
+}

@@ -1,0 +1,12 @@
+.dotActive {
+  animation: pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(231 255 24 / 0.35); }
+  50%       { box-shadow: 0 0 0 6px rgb(231 255 24 / 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dotActive { animation: none; }
+}

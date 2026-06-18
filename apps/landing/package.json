@@ -1,0 +1,36 @@
+{
+  "name": "@savia-os/landing",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Savia OS — landing page (Next.js 16 + Chakra UI v3)",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -H 127.0.0.1 -p 4343",
+    "build": "next build",
+    "start": "next start -H 127.0.0.1 -p 4343",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "clean": "rm -rf .next .turbo",
+    "export:ds": "node scripts/export-design-system.mjs"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "^3.21.0",
+    "@icons-pack/react-simple-icons": "^13.13.0",
+    "framer-motion": "^12.40.0",
+    "googleapis": "^173.0.0",
+    "lucide-react": "^1.16.0",
+    "next": "^16.2.6",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "simple-icons": "^16.23.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@savia-os/tsconfig": "workspace:*",
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.6",
+    "typescript": "^5.9.3"
+  }
+}

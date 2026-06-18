@@ -1,0 +1,79 @@
+/* ── Keyframe drift patterns ──────────────────────────────── */
+
+@keyframes float-a {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-22px); }
+}
+
+@keyframes float-b {
+  0%, 100% { transform: translate(0, 0); }
+  40%      { transform: translate(8px, -18px); }
+  80%      { transform: translate(-4px, -26px); }
+}
+
+@keyframes float-c {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(18px); }
+}
+
+@keyframes float-d {
+  0%, 100% { transform: translate(0, 0); }
+  35%      { transform: translate(-8px, -14px); }
+  70%      { transform: translate(6px, -24px); }
+}
+
+/* ── Base particle ────────────────────────────────────────── */
+
+.particle {
+  position: absolute;
+  pointer-events: none;
+}
+
+/* ── Animation classes ────────────────────────────────────── */
+
+.floatA {
+  animation-name: float-a;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+.floatB {
+  animation-name: float-b;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+.floatC {
+  animation-name: float-c;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+.floatD {
+  animation-name: float-d;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+/* ── Responsive ───────────────────────────────────────────── */
+
+.mobileHidden {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .mobileHidden {
+    display: block;
+  }
+}
+
+/* ── Accessibility ────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .floatA,
+  .floatB,
+  .floatC,
+  .floatD {
+    animation: none;
+  }
+}

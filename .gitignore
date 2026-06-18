@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+.next/
+dist/
+out/
+build/
+.turbo/
+
+# Environment
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# OS / Editor
+.DS_Store
+*.log
+.vscode/
+.idea/
+
+# TypeScript
+*.tsbuildinfo
+
+# Vercel
+.vercel
+
+# pnpm
+.pnpm-store/
