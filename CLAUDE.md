@@ -40,3 +40,7 @@ pnpm build              # build de todos los workspaces
 
 Savia OS es el monorepo de producto de Savia — la memoria que conecta todas tus IAs.
 Las reglas específicas de cada app están en su propio `CLAUDE.md` o `AGENTS.md`.
+
+## Referencias de librerías
+
+@.claude/llms/mem0.txt
