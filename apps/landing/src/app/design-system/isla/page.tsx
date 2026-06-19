@@ -13,7 +13,7 @@ const METAPHOR = [
   },
   {
     n: "02",
-    title: "Plataformas orbitales",
+    title: "Plataformas de contexto",
     desc: "Los anillos concéntricos de la isla son plataformas de contexto. Cada capa almacena un tipo de memoria distinto — chats, archivos, patrones de uso.",
   },
   {
@@ -41,7 +41,6 @@ const DO_DONT = [
   { type: "do", rule: "Una sola isla por página", detail: "Es el activo más potente de la marca. Si aparece dos veces en el mismo scroll, pierde completamente su impacto." },
   { type: "do", rule: "Mostrarla grande — heroica", detail: "La isla solo funciona a escala. Por debajo de 240px el detalle de la ciudad y las plataformas desaparece." },
   { type: "dont", rule: "No usar sobre fondo oscuro", detail: "La isla pierde su contorno y la niebla desaparece. En ink, los bordes son invisibles — el activo se destruye." },
-  { type: "dont", rule: "No combinar con OrbitalRings en el mismo contenedor", detail: "La isla ya tiene sus propios anillos en la estructura de la ciudad. Los orbitales externos crean conflicto visual y saturan el activo." },
   { type: "dont", rule: "No recortar la parte inferior", detail: "La niebla bajo la isla es parte del efecto de flotación. Cortarla hace que la isla parezca posada, no flotante." },
   { type: "dont", rule: "No usar por debajo de 240px", detail: "A tamaños pequeños los detalles de la ciudad y las plataformas se pierden — queda como una mancha circular sin lectura." },
 ];
@@ -245,56 +244,6 @@ export default function IslaPage() {
               </Box>
             </Box>
           </Grid>
-        </Box>
-
-        {/* ── Separación con las órbitas ────────────────────────────────── */}
-        <Box as="section" mb="sectionYTight">
-          <Box
-            bg="bg.inverse"
-            borderRadius="card"
-            p={{ base: "8", md: "10" }}
-          >
-            <Text
-              textStyle="label"
-              color="fg.inverse"
-              style={{ opacity: 0.35 }}
-              mb="4"
-            >
-              Relación con las órbitas
-            </Text>
-            <Text
-              fontSize="displayMd"
-              fontWeight="300"
-              color="fg.inverse"
-              maxW="28ch"
-              mb="4"
-              lineHeight="1.2"
-            >
-              La isla y los anillos orbitales son activos independientes.
-            </Text>
-            <Text
-              fontSize="sm"
-              color="fg.inverse"
-              maxW="64ch"
-              lineHeight="1.8"
-              style={{ opacity: 0.55 }}
-            >
-              La isla ya contiene sus propios anillos en su arquitectura visual — las
-              plataformas circulares de la ciudad son parte de su estructura. Superponer{" "}
-              <Code
-                fontSize="12px"
-                color="signalLime"
-                bg="transparent"
-                border="none"
-                px="0"
-              >
-                OrbitalRings
-              </Code>{" "}
-              sobre la isla crea dos sistemas visuales en conflicto y destruye la lectura
-              del activo. Úsalos en secciones distintas del mismo layout — nunca en el
-              mismo contenedor.
-            </Text>
-          </Box>
         </Box>
 
         {/* ── Cuándo y cómo ─────────────────────────────────────────────── */}

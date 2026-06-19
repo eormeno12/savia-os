@@ -47,12 +47,6 @@ const SECTIONS = [
     category: "Componentes",
   },
   {
-    href: "/design-system/island",
-    label: "Órbitas",
-    desc: "El motivo visual de Savia — cómo y dónde usar los anillos orbitales.",
-    category: "Identidad",
-  },
-  {
     href: "/design-system/isla",
     label: "Isla de memoria",
     desc: "El activo visual más distintivo de Savia — cuándo y cómo usarla.",
