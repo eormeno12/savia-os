@@ -2,9 +2,10 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Savia',
-    short_name: 'Savia',
+    name: 'SAVIA',
+    short_name: 'SAVIA',
     description: 'La memoria que conecta todas tus IAs.',
+    lang: 'es',
     start_url: '/',
     display: 'browser',
     background_color: '#F4F4F1',

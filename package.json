@@ -13,9 +13,11 @@
     "landing:dev": "turbo dev --filter=@savia-os/landing",
     "landing:build": "turbo build --filter=@savia-os/landing",
     "landing:lint": "turbo lint --filter=@savia-os/landing",
-    "landing:typecheck": "turbo typecheck --filter=@savia-os/landing"
+    "landing:typecheck": "turbo typecheck --filter=@savia-os/landing",
+    "generate:og": "node scripts/generate-og.mjs"
   },
   "devDependencies": {
+    "puppeteer-core": "^23.0.0",
     "turbo": "^2.5.4"
   }
 }

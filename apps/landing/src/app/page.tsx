@@ -15,7 +15,34 @@ import { SiteFooter } from '@/components/landing/site-footer';
 import { SiteHeader } from '@/components/landing/site-header';
 import { WaitlistSection } from '@/components/landing/waitlist-section';
 import { COMMUNITY_COUNT } from '@/lib/constants';
+import { siteConfig } from '@/lib/site';
 import { FadeInUp } from '@/components/ui/animated-section';
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Organization',
+      '@id': `${siteConfig.url}/#organization`,
+      name: siteConfig.name,
+      url: siteConfig.url,
+      logo: {
+        '@type': 'ImageObject',
+        url: `${siteConfig.url}/icon.svg`,
+      },
+      sameAs: ['https://www.linkedin.com/company/saviahq'],
+    },
+    {
+      '@type': 'WebSite',
+      '@id': `${siteConfig.url}/#website`,
+      url: siteConfig.url,
+      name: siteConfig.name,
+      description: siteConfig.description,
+      publisher: { '@id': `${siteConfig.url}/#organization` },
+      inLanguage: 'es',
+    },
+  ],
+};
 
 const EcosystemScroll = dynamic(
   () => import('@/components/landing/ecosystem-scroll').then((m) => m.EcosystemScroll),
@@ -25,6 +52,10 @@ const EcosystemScroll = dynamic(
 export default function Home() {
   return (
     <Box as="main" id="main-content" bg="bg" minH="100svh">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <a href="#main-content" className="skip-link">
         Ir al contenido principal
       </a>
