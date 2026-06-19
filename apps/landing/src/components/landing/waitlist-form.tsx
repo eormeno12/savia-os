@@ -145,7 +145,7 @@ export function WaitlistForm() {
 
           {/* IAs que usa (multi-select) */}
           <ChipField label="¿Qué IAs usas?" error={fieldError("aiTools")}>
-            <Grid templateColumns="repeat(4, 1fr)" gap="2" role="group" aria-label="¿Qué IAs usas?">
+            <Grid templateColumns={{ base: "repeat(2, 1fr)", sm: "repeat(4, 1fr)" }} gap="2" role="group" aria-label="¿Qué IAs usas?">
               {AI_TOOL_OPTIONS.map((tool) => (
                 <Chip
                   key={tool}
@@ -163,7 +163,7 @@ export function WaitlistForm() {
             label="¿Cuánto inviertes en IAs al mes?"
             error={fieldError("monthlySpend")}
           >
-            <Grid templateColumns="repeat(4, 1fr)" gap="2" role="radiogroup" aria-label="¿Cuánto inviertes en IAs al mes?">
+            <Grid templateColumns={{ base: "repeat(2, 1fr)", sm: "repeat(4, 1fr)" }} gap="2" role="radiogroup" aria-label="¿Cuánto inviertes en IAs al mes?">
               {MONTHLY_SPEND_CHIPS.map(({ value, label }) => (
                 <Chip
                   key={value}
@@ -269,6 +269,8 @@ function Chip({
       fontSize="sm"
       fontWeight="600"
       lineHeight="1.3"
+      whiteSpace="normal"
+      textAlign="center"
       userSelect="none"
       transition="background 160ms ease, color 160ms ease, border-color 160ms ease"
       _hover={{ bg: selected ? "bg.inverse" : "bg.inset" }}
