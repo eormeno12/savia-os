@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import { Provider } from "@/components/ui/provider";
 import { defaultLocale, siteConfig } from "@/lib/site";
 
@@ -59,6 +60,7 @@ export default function RootLayout({
     <html lang={defaultLocale} className={inter.variable} suppressHydrationWarning>
       <body>
         <Provider>{children}</Provider>
+        <Analytics />
       </body>
     </html>
   );

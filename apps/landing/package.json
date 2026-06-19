@@ -18,6 +18,7 @@
     "@icons-pack/react-simple-icons": "^13.13.0",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
+    "@vercel/analytics": "^2.0.1",
     "framer-motion": "^12.40.0",
     "googleapis": "^173.0.0",
     "lucide-react": "^1.16.0",
