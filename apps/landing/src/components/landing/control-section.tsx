@@ -28,7 +28,7 @@ const TEMAS = [
   { label: "Personal",       Icon: Lock,          permissions: [false, false, false, false] },
 ];
 
-const COL = "1fr repeat(4, minmax(80px, 88px))";
+const COL = { base: "1fr minmax(64px, 80px)", sm: "1fr repeat(2, minmax(64px, 80px))", md: "1fr repeat(4, minmax(80px, 88px))" };
 const ICON_COLOR = "#53606C";
 
 function ToggleVisual({ on }: { on: boolean }) {
@@ -76,15 +76,16 @@ export function ControlSection() {
           borderRadius="card"
           borderWidth="1px"
           borderColor="border"
-          overflowX="auto"
           role="table"
           aria-label="Permisos de memoria por plataforma de IA"
         >
           {/* Cabecera de plataformas */}
-          <Grid templateColumns={COL} px="4" py="3" bg="bg.subtle" minW="480px" role="row">
+          <Grid templateColumns={COL} px="4" py="3" bg="bg.subtle" role="row">
             <Box role="columnheader" aria-label="Tema" />
-            {PLATFORMS.map((p) => (
-              <Flex key={p.id} direction="column" align="center" gap="1" role="columnheader" aria-label={p.label}>
+            {PLATFORMS.map((p, i) => (
+              <Flex key={p.id} direction="column" align="center" gap="1" role="columnheader" aria-label={p.label}
+                display={{ base: i >= 1 ? "none" : "flex", sm: i >= 2 ? "none" : "flex", md: "flex" }}
+              >
                 <Box
                   borderRadius="full"
                   style={{
@@ -115,7 +116,6 @@ export function ControlSection() {
               alignItems="center"
               borderTopWidth="1px"
               borderColor="border"
-              minW="480px"
               role="row"
             >
               <HStack gap="2" role="rowheader">
@@ -131,6 +131,7 @@ export function ControlSection() {
                   align="center"
                   role="cell"
                   aria-label={`${platform.label}: ${tema.permissions[pi] ? 'permitido' : 'bloqueado'}`}
+                  display={{ base: pi >= 1 ? "none" : "flex", sm: pi >= 2 ? "none" : "flex", md: "flex" }}
                 >
                   <ToggleVisual on={tema.permissions[pi]} />
                 </Flex>
@@ -147,7 +148,6 @@ export function ControlSection() {
             alignItems="center"
             borderTopWidth="1px"
             borderColor="border.subtle"
-            minW="480px"
           >
             <HStack gap="2">
               <Plus size={14} color="rgb(11 37 41 / 0.3)" aria-hidden />
@@ -155,8 +155,8 @@ export function ControlSection() {
                 Añadir tema
               </Text>
             </HStack>
-            {PLATFORMS.map((platform) => (
-              <Box key={platform.id} />
+            {PLATFORMS.map((platform, i) => (
+              <Box key={platform.id} display={{ base: i >= 1 ? "none" : "block", sm: i >= 2 ? "none" : "block", md: "block" }} />
             ))}
           </Grid>
         </Box>
