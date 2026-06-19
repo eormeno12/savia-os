@@ -16,14 +16,15 @@ export default function AppleIcon() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: '#F4F4F1',
+          background: '#0B2529',
+        borderRadius: 40,
         }}
       >
-        <svg width="126" height="126" viewBox="0 0 148 148">
-          <path fill="#0B2529" d={PATH} />
-          <path fill="#0B2529" d={PATH} transform="rotate(90 74 74)" />
-          <path fill="#0B2529" d={PATH} transform="rotate(180 74 74)" />
-          <path fill="#0B2529" d={PATH} transform="rotate(270 74 74)" />
+        <svg width="108" height="108" viewBox="0 0 148 148">
+          <path fill="#E7FF18" d={PATH} />
+          <path fill="#E7FF18" d={PATH} transform="rotate(90 74 74)" />
+          <path fill="#E7FF18" d={PATH} transform="rotate(180 74 74)" />
+          <path fill="#E7FF18" d={PATH} transform="rotate(270 74 74)" />
         </svg>
       </div>
     ),
