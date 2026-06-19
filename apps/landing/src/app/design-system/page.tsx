@@ -6,7 +6,7 @@ const SECTIONS = [
   {
     href: "/design-system/brand",
     label: "Marca",
-    desc: "Posicionamiento, pilares y manifesto de la marca Savia.",
+    desc: "Posicionamiento, pilares y manifesto de la marca SAVIA.",
     category: "Identidad",
     featured: true,
   },
@@ -49,7 +49,7 @@ const SECTIONS = [
   {
     href: "/design-system/isla",
     label: "Isla de memoria",
-    desc: "El activo visual más distintivo de Savia — cuándo y cómo usarla.",
+    desc: "El activo visual más distintivo de SAVIA — cuándo y cómo usarla.",
     category: "Identidad",
   },
 ];
@@ -77,7 +77,7 @@ export default function DesignSystemIndex() {
           color="fg"
           maxW="18ch"
         >
-          La fundación visual de Savia.
+          La fundación visual de SAVIA.
         </Text>
         <Text
           fontSize="bodyLg"

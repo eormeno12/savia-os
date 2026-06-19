@@ -2,7 +2,7 @@
 
 import { Button as ChakraButton, type ButtonProps } from "@chakra-ui/react";
 
-// Savia defaults layered on top of Chakra's Button.
+// SAVIA defaults layered on top of Chakra's Button.
 // colorPalette drives the color — define "lime" | "ink" | "mist" in semantic-tokens.ts.
 // variant is Chakra's display mode — "solid" | "outline" | "ghost" | "subtle" | "surface" | "plain".
 // All Chakra features (loading state, ARIA, focus management) are preserved via the wrapper.

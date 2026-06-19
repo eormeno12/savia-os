@@ -1,5 +1,5 @@
 /**
- * Orbital rings — Savia's atmospheric visual motif.
+ * Orbital rings — SAVIA's atmospheric visual motif.
  *
  * Rendering model: fixed-px SVG, position:absolute, centered in parent.
  * Parent MUST have: position:relative + overflow:hidden

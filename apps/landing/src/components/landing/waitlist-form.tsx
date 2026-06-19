@@ -396,14 +396,14 @@ function SuccessCard({ email, status }: { email: string; status: "success" | "du
         >
           {isDuplicate ? (
             <>
-              Savia ya{" "}
+              SAVIA ya{" "}
               <Text as="span" fontWeight="700" color="signalLime">
                 te conoce.
               </Text>
             </>
           ) : (
             <>
-              Savia ya{" "}
+              SAVIA ya{" "}
               <Text as="span" fontWeight="700" color="signalLime">
                 te recuerda.
               </Text>

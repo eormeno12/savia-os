@@ -2,7 +2,7 @@ import { defineTokens } from "@chakra-ui/react";
 
 export const tokens = defineTokens({
   colors: {
-    // Savia brand palette — raw values, no alpha variants needed.
+    // SAVIA brand palette — raw values, no alpha variants needed.
     // Use CSS color-mix or inline opacity (e.g. bg="ink/8") for transparency.
     ink: { value: "#0B2529" },
     softInk: { value: "#152F34" },
@@ -32,7 +32,7 @@ export const tokens = defineTokens({
     bodyLg: { value: "clamp(16px, 1.1vw, 20px)" },
   },
 
-  // Savia-specific semantic radii.
+  // SAVIA-specific semantic radii.
   // Chakra already covers: none, sm(4px), md(6px), lg(8px), xl(12px),
   // 2xl(16px), 3xl(24px), full(9999px). Only add what's genuinely missing.
   radii: {
@@ -42,7 +42,7 @@ export const tokens = defineTokens({
     chip: { value: "16px" },
   },
 
-  // Savia depth vocabulary — supplements Chakra's xs/sm/md/lg/xl/2xl shadows.
+  // SAVIA depth vocabulary — supplements Chakra's xs/sm/md/lg/xl/2xl shadows.
   shadows: {
     soft: { value: "0 18px 70px rgb(11 37 41 / 0.08)" },
     float: { value: "0 34px 110px rgb(11 37 41 / 0.14)" },

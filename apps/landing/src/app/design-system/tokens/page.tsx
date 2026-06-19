@@ -82,7 +82,7 @@ export default function TokensPage() {
         <Box as="section" mb="sectionYTight">
           <SectionHead
             title="Radios"
-            desc="Cuatro radios específicos de Savia. Chakra ya cubre none → 3xl → full; solo definimos los que tienen significado semántico propio."
+            desc="Cuatro radios específicos de SAVIA. Chakra ya cubre none → 3xl → full; solo definimos los que tienen significado semántico propio."
           />
           {RADII.map(({ name, value, desc }) => (
             <Flex
@@ -126,7 +126,7 @@ export default function TokensPage() {
         <Box as="section" mb="sectionYTight">
           <SectionHead
             title="Sombras"
-            desc="Vocabulario de profundidad. Suplementa las sombras estándar de Chakra con el rango que usa Savia."
+            desc="Vocabulario de profundidad. Suplementa las sombras estándar de Chakra con el rango que usa SAVIA."
           />
           {SHADOWS.map(({ name, desc }) => (
             <Flex
@@ -205,7 +205,7 @@ export default function TokensPage() {
         <Box as="section">
           <SectionHead
             title="Motion"
-            desc="Una curva de easing propia y tres duraciones. La firma cinética de Savia es suave con un final brusco — rápido de responder, tranquilo al llegar."
+            desc="Una curva de easing propia y tres duraciones. La firma cinética de SAVIA es suave con un final brusco — rápido de responder, tranquilo al llegar."
           />
 
           {/* Easing */}
@@ -228,7 +228,7 @@ export default function TokensPage() {
                 cubic-bezier(0.22, 1, 0.36, 1)
               </Text>
               <Text fontSize="sm" color="fg.muted" mt="1">
-                La curva de todas las transiciones Savia
+                La curva de todas las transiciones SAVIA
               </Text>
             </Box>
           </Flex>

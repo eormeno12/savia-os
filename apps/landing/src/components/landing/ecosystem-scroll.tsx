@@ -22,7 +22,7 @@ const PHASES = [
     sub: 'Chats, apps y archivos en sitios diferentes.',
   },
   {
-    title: 'Savia crea una estructura inteligente',
+    title: 'SAVIA crea una estructura inteligente',
     sub: 'Toda tu información converge en una sola memoria.',
   },
   {
@@ -69,7 +69,7 @@ function AssembledStatic() {
         textAlign="center"
         maxW="md"
       >
-        Savia conecta tu conocimiento con todas tus IAs
+        SAVIA conecta tu conocimiento con todas tus IAs
       </Text>
       <svg viewBox="0 0 148 148" width={88} height={88} aria-hidden="true">
         <path d={PATH} fill="rgba(255,255,255,.82)" />
@@ -157,7 +157,7 @@ function EcosystemScrollAnimated() {
   //   ARCH (Archivos)        → top-right    x=+46, y=-46
   //   IA   (lime connector)  → bottom-right x=+46, y=+46
   //
-  // PIECE=84px (2× the original 42px quadrant of the 88px Savia logo)
+  // PIECE=84px (2× the original 42px quadrant of the 88px SAVIA logo)
   // At ±46 with HALF=42: gap between pieces = (46-42)×2 = 8px ≈ 2× logo gap
   // Four pieces at scale=1 tile a perfect 176×176 area.
 
@@ -216,7 +216,7 @@ function EcosystemScrollAnimated() {
 
   // ── Opacity / visibility ──────────────────────────────────────────────────
   // Pieces stay fully visible — they physically travel to logo positions.
-  // The 4 piece divs at assembled positions naturally form the 88×88 Savia logo.
+  // The 4 piece divs at assembled positions naturally form the 88×88 SAVIA logo.
   const labelOpacity = useTransform(scrollYProgress, (p) => interp(p, 0.15, 0.32, 1, 0));
   const glowOpacity = useTransform(scrollYProgress, (p) => interp(p, 0.65, 0.80, 0, 1));
   const iaFlowOpacity = useTransform(scrollYProgress, (p) => interp(p, 0.74, 0.88, 0, 1));
@@ -228,7 +228,7 @@ function EcosystemScrollAnimated() {
     return `rgba(${r},255,${b},${a})`;
   });
 
-  // ── Piece div size: one quadrant of the 88px assembled Savia logo ─────────
+  // ── Piece div size: one quadrant of the 88px assembled SAVIA logo ─────────
   // 42 ≈ 71/148×88 = 42.2px. At ±23: four pieces + 4px gap = 88px total.
   const PIECE = 84;
   const HALF = PIECE / 2; // 42
@@ -253,7 +253,7 @@ function EcosystemScrollAnimated() {
       id="flujo"
       ref={sectionRef as React.RefObject<HTMLElement>}
       style={{ height: '300vh', background: '#0B2529', position: 'relative' }}
-      aria-label="Cómo Savia une tu conocimiento y lo conecta con tus IAs"
+      aria-label="Cómo SAVIA une tu conocimiento y lo conecta con tus IAs"
     >
       {/* Sticky viewport */}
       <div

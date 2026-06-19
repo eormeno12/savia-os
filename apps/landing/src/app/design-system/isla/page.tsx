@@ -19,12 +19,12 @@ const METAPHOR = [
   {
     n: "03",
     title: "La niebla como base",
-    desc: "La isla no toca el suelo. Flota sobre la niebla — está por encima de la complejidad. Lo que ves debajo es lo que Savia absorbió y transformó en contexto.",
+    desc: "La isla no toca el suelo. Flota sobre la niebla — está por encima de la complejidad. Lo que ves debajo es lo que SAVIA absorbió y transformó en contexto.",
   },
   {
     n: "04",
     title: "Imponente e inmóvil",
-    desc: "La isla no se mueve. Es sólida, permanente, monumental. La IA bajo Savia responde desde esa solidez — con todo el contexto necesario ya disponible.",
+    desc: "La isla no se mueve. Es sólida, permanente, monumental. La IA bajo SAVIA responde desde esa solidez — con todo el contexto necesario ya disponible.",
   },
 ];
 
@@ -108,7 +108,7 @@ export default function IslaPage() {
             lineHeight="1.6"
             style={{ opacity: 0.7 }}
           >
-            El activo visual más distintivo de Savia. Una ciudad flotante y monumental
+            El activo visual más distintivo de SAVIA. Una ciudad flotante y monumental
             que representa el sistema de memoria — organizado en capas, sólido,
             permanente.
           </Text>

@@ -2,7 +2,7 @@ import { Box } from "@chakra-ui/react";
 import { DsNav } from "@/components/design-system/ds-nav";
 
 export const metadata = {
-  title: { default: "Design System", template: "%s · Savia DS" },
+  title: { default: "Design System", template: "%s · SAVIA DS" },
 };
 
 export default function DesignSystemLayout({
@@ -30,7 +30,7 @@ export default function DesignSystemLayout({
           fontWeight="500"
           textTransform="uppercase"
         >
-          Savia Design System · 2026
+          SAVIA Design System · 2026
         </Box>
       </Box>
     </>

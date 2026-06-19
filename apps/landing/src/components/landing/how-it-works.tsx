@@ -123,7 +123,7 @@ function McpConfigMini() {
           </div>
         </div>
 
-        {/* Savia server row — active */}
+        {/* SAVIA server row — active */}
         <div
           style={{
             display: 'flex',
@@ -153,7 +153,7 @@ function McpConfigMini() {
             S
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: '#0B2529' }}>Savia</div>
+            <div style={{ fontSize: 9, fontWeight: 700, color: '#0B2529' }}>SAVIA</div>
             <div style={{ fontSize: 7.5, color: 'rgb(11 37 41 / 0.4)', fontFamily: 'monospace' }}>
               mcp.savia.ai
             </div>
@@ -217,7 +217,7 @@ function ChatCaptureMini() {
           }}
         >
           <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#E7FF18' }} />
-          Savia activo
+          SAVIA activo
         </div>
       </div>
 
@@ -327,7 +327,7 @@ function MemoryBridgeMini() {
             whiteSpace: 'nowrap',
           }}
         >
-          Savia MCP
+          SAVIA MCP
         </div>
         <div
           style={{
@@ -394,8 +394,8 @@ const VISUAL_MAP: Record<VisualId, () => React.JSX.Element> = {
 };
 
 const STEPS: { num: string; visualId: VisualId; title: string; desc: string; active: boolean }[] = [
-  { num: '01', visualId: 'mcp-config',    title: 'Añade Savia como MCP',    desc: 'Una línea de configuración en tu cliente de IA. Compatible con Claude, Cursor, Windsurf y más.', active: true  },
-  { num: '02', visualId: 'chat-capture',  title: 'Sigue usando tus IAs',    desc: 'Nada cambia. Savia escucha en segundo plano y captura lo que importa.',                            active: false },
+  { num: '01', visualId: 'mcp-config',    title: 'Añade SAVIA como MCP',    desc: 'Una línea de configuración en tu cliente de IA. Compatible con Claude, Cursor, Windsurf y más.', active: true  },
+  { num: '02', visualId: 'chat-capture',  title: 'Sigue usando tus IAs',    desc: 'Nada cambia. SAVIA escucha en segundo plano y captura lo que importa.',                            active: false },
   { num: '03', visualId: 'memory-bridge', title: 'La memoria viaja contigo',desc: 'Cuando cambias de IA, el contexto ya está ahí. Sin repetirte, sin perder el hilo.',               active: false },
 ];
 
@@ -418,7 +418,7 @@ export function HowItWorks() {
                 </Text>
               </>
             }
-            description="Sin cambiar tu flujo. Savia se integra vía MCP — el protocolo que conecta IAs con herramientas externas."
+            description="Sin cambiar tu flujo. SAVIA se integra vía MCP — el protocolo que conecta IAs con herramientas externas."
           />
         </FadeInUp>
 

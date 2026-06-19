@@ -38,7 +38,7 @@ export function CountdownBanner() {
   if (!time) return null;
 
   return (
-    <Flex bg="signalLime" h="48px" align="center" justify="center" gap={{ base: 3, md: 5 }} px={{ base: 4, md: 6 }} borderBottomWidth="1px" borderBottomColor="border" role="timer" aria-live="off" aria-label="Cuenta regresiva para el lanzamiento de Savia">
+    <Flex bg="signalLime" h="48px" align="center" justify="center" gap={{ base: 3, md: 5 }} px={{ base: 4, md: 6 }} borderBottomWidth="1px" borderBottomColor="border" role="timer" aria-live="off" aria-label="Cuenta regresiva para el lanzamiento de SAVIA">
       <Text
         display={{ base: "none", md: "block" }}
         fontSize="sm"

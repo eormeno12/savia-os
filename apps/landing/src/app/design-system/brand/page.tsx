@@ -8,25 +8,25 @@ const PILLARS = [
     number: "01",
     word: "La memoria",
     title: "Una sola memoria",
-    desc: "No una por herramienta, no una por conversación. Savia es la memoria central de tu ecosistema de IA — disponible en todas partes, organizada en un solo lugar.",
+    desc: "No una por herramienta, no una por conversación. SAVIA es la memoria central de tu ecosistema de IA — disponible en todas partes, organizada en un solo lugar.",
   },
   {
     number: "02",
     word: "que conecta",
     title: "Conexión, no integración",
-    desc: "Savia no configura APIs ni mapea esquemas. Conecta tus IAs a través de contexto compartido — el tipo de conexión que transforma cómo responden.",
+    desc: "SAVIA no configura APIs ni mapea esquemas. Conecta tus IAs a través de contexto compartido — el tipo de conexión que transforma cómo responden.",
   },
   {
     number: "03",
     word: "todas",
     title: "Todas, sin excepción",
-    desc: "ChatGPT, Claude, Copilot, Cursor — Savia funciona con cualquier IA que uses. La memoria no discrimina herramientas.",
+    desc: "ChatGPT, Claude, Copilot, Cursor — SAVIA funciona con cualquier IA que uses. La memoria no discrimina herramientas.",
   },
   {
     number: "04",
     word: "tus IAs",
     title: "Control total",
-    desc: "Tu memoria es tuya. Tú decides qué se guarda, qué se comparte y cuándo se borra. Savia no aprende de tus datos — los custodia.",
+    desc: "Tu memoria es tuya. Tú decides qué se guarda, qué se comparte y cuándo se borra. SAVIA no aprende de tus datos — los custodia.",
   },
 ];
 
@@ -97,7 +97,7 @@ export default function BrandPage() {
               maxW="22ch"
               mb="8"
             >
-              Savia.{" "}
+              SAVIA.{" "}
               <Text as="span" color="fg.muted" fontWeight="300">
                 La memoria que conecta todas tus IAs.
               </Text>
@@ -105,7 +105,7 @@ export default function BrandPage() {
             <Box h="1px" bg="border" mb="6" maxW="8rem" />
             <Grid templateColumns={{ base: "1fr", md: "1fr 1fr 1fr" }} gap="8">
               {[
-                { word: "La memoria", meaning: "No 'una herramienta de memoria'. Savia ES la memoria — la función, no el contenedor. Artículo definido intencional." },
+                { word: "La memoria", meaning: "No 'una herramienta de memoria'. SAVIA ES la memoria — la función, no el contenedor. Artículo definido intencional." },
                 { word: "que conecta", meaning: "Conectar implica relación, no instalación. Las IAs pasan a compartir algo que antes estaba separado." },
                 { word: "todas tus IAs", meaning: "'Todas' elimina excepciones. 'Tus' hace la memoria personal y en control del usuario. 'IAs' es preciso sin ser técnico." },
               ].map(({ word, meaning }) => (
@@ -124,21 +124,21 @@ export default function BrandPage() {
             Posicionamiento
           </Text>
           <Text fontSize="sm" color="fg.muted" mb="8" maxW="56ch" lineHeight="1.65">
-            Tres afirmaciones sobre lo que Savia es — y lo que no es.
+            Tres afirmaciones sobre lo que SAVIA es — y lo que no es.
           </Text>
           <Grid templateColumns={{ base: "1fr", md: "1fr 1fr 1fr" }} gap="4">
             {[
               {
-                claim: "Savia es infraestructura.",
+                claim: "SAVIA es infraestructura.",
                 sub: "No una app, no un dashboard, no una feature. Es la capa que se sienta entre tú y tus IAs. Como el DNS del internet — invisible cuando funciona, crítica cuando falta.",
               },
               {
-                claim: "Savia no reemplaza.",
-                sub: "ChatGPT, Claude y Copilot siguen siendo tus IAs. Savia no compite con ellos — los hace mejores. Les da lo que necesitan saber antes de que respondas.",
+                claim: "SAVIA no reemplaza.",
+                sub: "ChatGPT, Claude y Copilot siguen siendo tus IAs. SAVIA no compite con ellos — los hace mejores. Les da lo que necesitan saber antes de que respondas.",
               },
               {
-                claim: "Savia recuerda por todas.",
-                sub: "Cada IA que usas opera en silos. Savia rompe ese silo — lo que le dijiste a Claude ayer, ChatGPT lo sabe hoy. Una memoria, muchas IAs.",
+                claim: "SAVIA recuerda por todas.",
+                sub: "Cada IA que usas opera en silos. SAVIA rompe ese silo — lo que le dijiste a Claude ayer, ChatGPT lo sabe hoy. Una memoria, muchas IAs.",
               },
             ].map(({ claim, sub }) => (
               <Box key={claim} bg="bg.subtle" borderRadius="card" p="8">
@@ -156,7 +156,7 @@ export default function BrandPage() {
           </Text>
           <Text fontSize="sm" color="fg.muted" mb="10" maxW="56ch" lineHeight="1.65">
             Cuatro principios derivados del one-liner — cada uno anclado a una
-            palabra clave de la promesa de Savia.
+            palabra clave de la promesa de SAVIA.
           </Text>
           <Grid templateColumns={{ base: "1fr", md: "1fr 1fr" }} gap="4">
             {PILLARS.map(({ number, word, title, desc }) => (
@@ -218,14 +218,14 @@ export default function BrandPage() {
               maxW="28ch"
               mt="8"
             >
-              Savia recuerda todo.{" "}
+              SAVIA recuerda todo.{" "}
               <Text as="span" color="fg.inverse">
                 Por todas.
               </Text>
             </Text>
             <Box mt="10" h="1px" bg="border.inverse" maxW="6rem" />
             <Text mt="6" fontSize="sm" color="fg.inverse" fontWeight="500" style={{ opacity: 0.4 }}>
-              Savia · 2026
+              SAVIA · 2026
             </Text>
           </Box>
         </Box>

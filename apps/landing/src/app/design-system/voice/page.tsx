@@ -5,8 +5,8 @@ export const metadata = { title: "Voz" };
 const ATTRIBUTES = [
   {
     title: "Declarativa",
-    desc: "Savia no vende ni convence — declara. 'La memoria que conecta todas tus IAs' es una descripción, no un pitch. Escribe como si la persona ya entendiera el problema y solo necesitara saber la solución.",
-    example: "Savia recuerda lo que le dijiste a Claude ayer.",
+    desc: "SAVIA no vende ni convence — declara. 'La memoria que conecta todas tus IAs' es una descripción, no un pitch. Escribe como si la persona ya entendiera el problema y solo necesitara saber la solución.",
+    example: "SAVIA recuerda lo que le dijiste a Claude ayer.",
   },
   {
     title: "Posesiva",
@@ -20,7 +20,7 @@ const ATTRIBUTES = [
   },
   {
     title: "Sin superlativos",
-    desc: "Nunca 'la mejor', 'más potente' ni 'revolucionaria'. Savia describe exactamente lo que hace. Los adjetivos vacíos son una señal de que la frase no confía en sí misma.",
+    desc: "Nunca 'la mejor', 'más potente' ni 'revolucionaria'. SAVIA describe exactamente lo que hace. Los adjetivos vacíos son una señal de que la frase no confía en sí misma.",
     example: "Una memoria. Todas tus IAs.",
   },
 ];
@@ -62,7 +62,7 @@ const LEXICON = [
   {
     use: "la memoria",
     avoid: "el sistema / la plataforma / la solución",
-    why: "Savia ES la memoria — no es un contenedor. Artículo definido intencional.",
+    why: "SAVIA ES la memoria — no es un contenedor. Artículo definido intencional.",
   },
   {
     use: "tus IAs",
@@ -130,11 +130,11 @@ export default function VoicePage() {
           >
             Cómo habla{" "}
             <Text as="em" fontWeight="600" fontStyle="normal">
-              Savia.
+              SAVIA.
             </Text>
           </Text>
           <Text fontSize="bodyLg" color="fg.muted" mt="6" maxW="52ch" lineHeight="1.6">
-            La voz de Savia parte del one-liner:{" "}
+            La voz de SAVIA parte del one-liner:{" "}
             <Text as="em" fontStyle="normal" fontWeight="500" color="fg">
               "La memoria que conecta todas tus IAs."
             </Text>{" "}
@@ -179,7 +179,7 @@ export default function VoicePage() {
             Sí / No
           </Text>
           <Text fontSize="sm" color="fg.muted" mb="10" maxW="56ch" lineHeight="1.65">
-            Cinco contextos reales de Savia. El lado izquierdo suena a Savia.
+            Cinco contextos reales de SAVIA. El lado izquierdo suena a SAVIA.
             El derecho suena a cualquier otro SaaS.
           </Text>
           <Box>
@@ -253,7 +253,7 @@ export default function VoicePage() {
             Léxico
           </Text>
           <Text fontSize="sm" color="fg.muted" mb="8" maxW="56ch" lineHeight="1.65">
-            Las palabras preferidas de Savia, derivadas del one-liner y su territorio de marca.
+            Las palabras preferidas de SAVIA, derivadas del one-liner y su territorio de marca.
           </Text>
           <Box border="1px solid" borderColor="border" borderRadius="card" overflow="hidden">
             <Box

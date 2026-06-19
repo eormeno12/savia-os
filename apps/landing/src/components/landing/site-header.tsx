@@ -75,7 +75,7 @@ function MobileMenu({ onClose }: { onClose: () => void }) {
           >
             <SaviaMark size={18} color={BRAND_COLORS.lime} />
             <Box as="span" color="fg.inverse" fontWeight="600" fontSize="sm" letterSpacing="0.06em">
-              Savia
+              SAVIA
             </Box>
           </Link>
           <Box

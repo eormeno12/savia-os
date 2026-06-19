@@ -43,7 +43,7 @@ export default function TypographyPage() {
             Pesos
           </Text>
           <Text fontSize="sm" color="fg.muted" mb="8" maxW="56ch" lineHeight="1.65">
-            Cuatro pesos cargados. Sin italics — la cursiva no es parte de la voz Savia.
+            Cuatro pesos cargados. Sin italics — la cursiva no es parte de la voz SAVIA.
           </Text>
           <Box
             display="grid"
@@ -306,7 +306,7 @@ export default function TypographyPage() {
               </Text>
             </Box>
             <Text textStyle="bodyLg" color="fg" maxW="52ch">
-              Savia indexa cada conversación y archivo que pasa por tu IA. Cuando
+              SAVIA indexa cada conversación y archivo que pasa por tu IA. Cuando
               preguntas algo nuevo, recupera el contexto relevante sin que tengas que
               recordarlo tú.
             </Text>
@@ -374,7 +374,7 @@ export default function TypographyPage() {
               tus chats.
             </Text>
             <Text textStyle="bodyLg" color="fg.muted" mt="8" maxW="56ch">
-              Savia organiza de manera inteligente tus conversaciones y archivos para
+              SAVIA organiza de manera inteligente tus conversaciones y archivos para
               que cada modelo responda con la precisión de uno que te conoce. Sin
               reentrenamiento. Sin pegar contexto cada vez.
             </Text>

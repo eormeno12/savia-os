@@ -2,7 +2,7 @@ import { defineSemanticTokens } from "@chakra-ui/react";
 
 export const semanticTokens = defineSemanticTokens({
   colors: {
-    // Override Chakra's defaults to map to Savia's palette.
+    // Override Chakra's defaults to map to SAVIA's palette.
     // Nested DEFAULT key preserves Chakra's sub-token structure (bg.subtle, fg.muted, etc.).
     bg: {
       DEFAULT: { value: "{colors.paper}" },
@@ -22,7 +22,7 @@ export const semanticTokens = defineSemanticTokens({
       inverse: { value: "rgb(255 255 255 / 0.12)" },
     },
 
-    // Savia colorPalettes — Chakra's Button recipe reads exactly these 8 keys.
+    // SAVIA colorPalettes — Chakra's Button recipe reads exactly these 8 keys.
     // solid      → background for `variant="solid"`
     // contrast   → text color on solid background
     // fg         → text color for outline / ghost / plain

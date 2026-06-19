@@ -8,7 +8,7 @@ const FEATURES = [
   'No repites lo que ya le contaste a otra IA',
   'Tu memoria se construye sola, desde donde ya trabajas',
   'Encuentra cualquier contexto aunque no recuerdes cómo lo llamaste',
-  'Lo que recuerdas es tuyo — Savia custodia, no aprende',
+  'Lo que recuerdas es tuyo — SAVIA custodia, no aprende',
   'Funciona con Claude, ChatGPT, Gemini, Cursor y las que vengan',
   'Sin límite de fuentes ni de IAs conectadas',
   'Acceso anticipado a todo lo que viene',

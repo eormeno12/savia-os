@@ -71,7 +71,7 @@ const ANIM_CLASS: Record<Anim, string> = {
   d: styles.floatD,
 };
 
-// A single shape layer (one rotated SVG of the Savia piece).
+// A single shape layer (one rotated SVG of the SAVIA piece).
 function Shape({ size, rot, fill, opacity }: { size: number; rot: number; fill: string; opacity: number }) {
   return (
     <svg

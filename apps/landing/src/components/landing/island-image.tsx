@@ -13,7 +13,7 @@ export function IslandImage({ size }: IslandImageProps) {
     return (
       <div
         style={{ position: "relative", width: size, height: size, flexShrink: 0 }}
-        aria-label="Isla de memoria Savia"
+        aria-label="Isla de memoria SAVIA"
       >
         <Image
           src="/hero/savia-island.png"
@@ -32,7 +32,7 @@ export function IslandImage({ size }: IslandImageProps) {
   return (
     <div
       style={{ position: "relative", width: "100%", paddingBottom: "59.22%" }}
-      aria-label="Isla de memoria Savia"
+      aria-label="Isla de memoria SAVIA"
     >
       <Image
         src="/hero/savia-island.png"
