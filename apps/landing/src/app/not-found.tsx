@@ -27,7 +27,7 @@ export default function NotFound() {
       <Stack alignItems="center" gap="10" textAlign="center" position="relative" zIndex={1}>
         <SaviaMark size={48} color="#E7FF18" />
 
-        <Stack gap="6" maxW="30rem" alignItems="center">
+        <Stack gap="6" alignItems="center">
           {/* Eyebrow de error */}
           <Text
             fontSize="xs"
@@ -39,21 +39,22 @@ export default function NotFound() {
             Error 404
           </Text>
 
-          <Stack gap="3">
+          <Stack gap="3" alignItems="center">
             <Text
               as="h1"
               fontSize={{ base: 'display2xl', lg: 'display3xl' }}
               fontWeight="300"
               lineHeight="0.92"
               color="fg.inverse"
-              textWrap="balance"
+              whiteSpace="nowrap"
             >
-              Esta página{' '}
+              Esta página
+              <br />
               <Text as="span" color="signalLime" fontWeight="700">
                 no existe.
               </Text>
             </Text>
-            <Text fontSize="bodyLg" color="fg.inverse/60" lineHeight="1.65">
+            <Text fontSize="bodyLg" color="fg.inverse/60" lineHeight="1.65" maxW="30rem">
               Pero tu memoria inteligente, sí.
             </Text>
           </Stack>
