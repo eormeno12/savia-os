@@ -1,0 +1,22 @@
+{
+  "name": "@savia-os/demo-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.x",
+    "dotenv": "^17.4.2",
+    "fastify": "^5.x",
+    "openai": "^4.x"
+  },
+  "devDependencies": {
+    "@savia-os/tsconfig": "workspace:*",
+    "tsx": "latest",
+    "typescript": "^5.x"
+  }
+}
