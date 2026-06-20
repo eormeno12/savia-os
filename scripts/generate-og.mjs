@@ -13,7 +13,7 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const htmlPath  = resolve(__dirname, 'og-design.html');
+const htmlPath  = resolve(__dirname, '../design/og-design.html');
 const publicDir = resolve(__dirname, '../apps/landing/public');
 const outPath   = resolve(publicDir, 'og.png');
 
