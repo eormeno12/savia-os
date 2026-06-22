@@ -17,25 +17,31 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
+    "@aws-sdk/client-ses": "^3.1073.0",
     "@nestjs/common": "^11",
+    "@nestjs/config": "^4",
     "@nestjs/core": "^11",
     "@nestjs/platform-express": "^11",
-    "@nestjs/config": "^4",
-    "nestjs-zod": "^4",
-    "ioredis": "^5",
+    "@prisma/client": "^6",
     "@qdrant/js-client-rest": "^1",
     "@savia-os/contracts": "workspace:*",
+    "argon2": "^0.44.0",
+    "cookie-parser": "^1.4.7",
+    "ioredis": "^5",
+    "jose": "^6.2.3",
+    "nestjs-zod": "^4",
     "reflect-metadata": "^0.2",
     "rxjs": "^7",
-    "zod": "^3.25.76",
-    "@prisma/client": "^6"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@savia-os/tsconfig": "workspace:*",
     "@nestjs/cli": "^11",
     "@nestjs/schematics": "^11",
+    "@savia-os/tsconfig": "workspace:*",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/express": "^5.0.6",
     "@types/node": "^22",
-    "typescript": "^5.9.3",
-    "prisma": "^6"
+    "prisma": "^6",
+    "typescript": "^5.9.3"
   }
 }
