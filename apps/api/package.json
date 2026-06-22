@@ -32,7 +32,9 @@
     "cookie-parser": "^1.4.7",
     "ioredis": "^5",
     "jose": "^6.2.3",
+    "mem0ai": "^3.0.9",
     "nestjs-zod": "^4",
+    "openai": "^4.104.0",
     "reflect-metadata": "^0.2",
     "rxjs": "^7",
     "zod": "^3.25.76"

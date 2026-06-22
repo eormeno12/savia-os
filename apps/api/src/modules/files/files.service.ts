@@ -7,6 +7,7 @@ import {
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../common/clients/prisma.service';
 import { S3Service } from './s3.service';
+import { MemoryService } from '../memory/memory.service';
 
 const MAX_BYTES = 20 * 1024 * 1024; // 20 MB
 const ALLOWED_MIMES = new Set([
@@ -23,6 +24,7 @@ export class FilesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly s3: S3Service,
+    private readonly memoryService: MemoryService,
   ) {}
 
   async presign(userId: string, name: string, mimeType: string, sizeBytes: number) {
@@ -85,6 +87,7 @@ export class FilesService {
     const file = await this.prisma.file.findFirst({ where: { id: fileId, userId } });
     if (!file) throw new NotFoundException('Archivo no encontrado.');
 
+    await this.memoryService.deleteByFile(fileId);
     if (this.s3.bucket) await this.s3.deleteObject(file.s3Key);
     await this.prisma.file.delete({ where: { id: fileId } });
   }
