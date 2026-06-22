@@ -61,4 +61,51 @@ export const api = {
     delete: (id: string) =>
       fetch(`${API_BASE}/files/${id}`, { method: 'DELETE', credentials: 'include' }),
   },
+
+  spaces: {
+    create: (description: string) =>
+      request<SpaceDto>('/spaces', {
+        method: 'POST',
+        body: JSON.stringify({ description }),
+      }),
+
+    list: () => request<SpaceDto[]>('/spaces'),
+
+    update: (id: string, data: { description?: string; name?: string }) =>
+      request<SpaceDto>(`/spaces/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+
+    delete: (id: string) =>
+      fetch(`${API_BASE}/spaces/${id}`, { method: 'DELETE', credentials: 'include' }),
+
+    memories: (id: string, cursor?: string, limit = 20) => {
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (cursor) params.set('cursor', cursor);
+      return request<SpaceMemoryDto[]>(`/spaces/${id}/memories?${params}`);
+    },
+
+    removeMemory: (spaceId: string, memoryId: string) =>
+      fetch(`${API_BASE}/spaces/${spaceId}/memories/${memoryId}`, {
+        method: 'DELETE', credentials: 'include',
+      }),
+
+    addMemory: (spaceId: string, memoryId: string) =>
+      fetch(`${API_BASE}/spaces/${spaceId}/memories/${memoryId}`, {
+        method: 'POST', credentials: 'include',
+      }),
+  },
 };
+
+interface SpaceDto {
+  id: string; name: string; description: string;
+  version: number; memoryCount: number; reclassifying: boolean;
+  createdAt: string; updatedAt: string;
+}
+
+interface SpaceMemoryDto {
+  memoryId: string; text: string; score?: number;
+  manualOverride: boolean;
+  otherSpaces: { id: string; name: string }[];
+}

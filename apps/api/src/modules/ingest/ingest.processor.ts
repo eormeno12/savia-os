@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { PrismaClient } from '@prisma/client';
 import { MemoryService } from '../memory/memory.service';
+import { ClassifierService } from '../spaces/classifier.service';
 import { parseFile } from './parsers';
 import { chunkText } from './chunk';
 import { INGEST_QUEUE, IngestJobData } from './ingest.queue';
@@ -21,6 +22,7 @@ export function startIngestWorker(
   config: ConfigService,
   prisma: PrismaClient,
   memoryService: MemoryService,
+  classifier?: ClassifierService,
 ): Worker<IngestJobData> {
   const logger = new Logger('IngestWorker');
   const redisUrl = config.get<string>('REDIS_URL', 'redis://localhost:6379');
@@ -75,7 +77,17 @@ export function startIngestWorker(
         const ids = await memoryService.add(userId, chunks[i], { fileId, source });
         memoryCount += ids.length;
 
-        // Emit growth events (one per extracted memory; spaceId assigned in step 07)
+        // Classify new memories into user's spaces (embedding-first, no extra LLM if clear)
+        if (ids.length > 0 && classifier) {
+          const chunkEmbedding = await classifier.embed(chunks[i]).catch(() => null);
+          if (chunkEmbedding) {
+            for (const memoryId of ids) {
+              await classifier.classifyOne(memoryId, chunkEmbedding, userId).catch(() => null);
+            }
+          }
+        }
+
+        // Emit growth events (one per extracted memory)
         if (ids.length > 0) {
           await prisma.growthEvent.createMany({
             data: ids.map((memoryId) => ({ userId, memoryId })),

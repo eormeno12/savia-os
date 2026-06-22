@@ -65,6 +65,7 @@ model Space {
   description          String
   descriptionEmbedding Float[]
   version              Int      @default(1)
+  reclassifying        Boolean  @default(false)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
   grants               Grant[]
@@ -105,9 +106,10 @@ model MemoryIndex {
   user          User     @relation(fields: [userId], references: [id])
   fileId        String?
   file          File?    @relation(fields: [fileId], references: [id], onDelete: SetNull)
-  spaceIds      String[]
-  spaceVersions Json
-  source        String   @default("upload")
+  spaceIds       String[]
+  spaceVersions  Json
+  manualOverride Boolean  @default(false)
+  source         String   @default("upload")
   createdAt     DateTime @default(now())
 
   @@index([userId])
