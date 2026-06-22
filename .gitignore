@@ -37,3 +37,4 @@ apps/landing/design-system-preview/
 
 # Claude Code local config (personal, no compartir)
 .claude/settings.local.json
+memory.db
