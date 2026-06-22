@@ -1,13 +1,16 @@
 import {
   Injectable,
+  Inject,
   NotFoundException,
   PayloadTooLargeException,
   UnsupportedMediaTypeException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { Queue } from 'bullmq';
 import { PrismaService } from '../../common/clients/prisma.service';
 import { S3Service } from './s3.service';
 import { MemoryService } from '../memory/memory.service';
+import { INGEST_QUEUE_TOKEN, IngestJobData } from '../ingest/ingest.queue';
 
 const MAX_BYTES = 20 * 1024 * 1024; // 20 MB
 const ALLOWED_MIMES = new Set([
@@ -25,6 +28,7 @@ export class FilesService {
     private readonly prisma: PrismaService,
     private readonly s3: S3Service,
     private readonly memoryService: MemoryService,
+    @Inject(INGEST_QUEUE_TOKEN) private readonly ingestQueue: Queue<IngestJobData>,
   ) {}
 
   async presign(userId: string, name: string, mimeType: string, sizeBytes: number) {
@@ -38,9 +42,11 @@ export class FilesService {
   }
 
   async create(userId: string, name: string, mimeType: string, sizeBytes: number, s3Key: string) {
-    return this.prisma.file.create({
+    const file = await this.prisma.file.create({
       data: { userId, name, mimeType, sizeBytes, s3Key, status: 'pending', source: 'upload' },
     });
+    await this.ingestQueue.add('ingest', { fileId: file.id, userId, source: 'upload' });
+    return file;
   }
 
   async list(userId: string) {

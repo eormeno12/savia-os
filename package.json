@@ -17,6 +17,7 @@
     "generate:og": "node scripts/generate-og.mjs",
     "demo-api:dev": "pnpm --filter @savia-os/demo-api dev",
     "api:dev": "turbo dev --filter=@savia-os/api",
+    "worker:dev": "pnpm --filter @savia-os/api worker:dev",
     "app:dev": "turbo dev --filter=@savia-os/app",
     "infra:up": "docker compose -f infra/docker-compose.yml up -d",
     "infra:down": "docker compose -f infra/docker-compose.yml down",

@@ -5,9 +5,10 @@ import { S3Service } from './s3.service';
 import { PrismaService } from '../../common/clients/prisma.service';
 import { AuthModule } from '../auth/auth.module';
 import { MemoryModule } from '../memory/memory.module';
+import { IngestModule } from '../ingest/ingest.module';
 
 @Module({
-  imports: [AuthModule, MemoryModule],
+  imports: [AuthModule, MemoryModule, IngestModule],
   controllers: [FilesController],
   providers: [FilesService, S3Service, PrismaService],
   exports: [FilesService],

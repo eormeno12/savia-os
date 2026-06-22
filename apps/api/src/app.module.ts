@@ -4,6 +4,7 @@ import { HealthModule } from './common/health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { FilesModule } from './modules/files/files.module';
 import { MemoryModule } from './modules/memory/memory.module';
+import { IngestModule } from './modules/ingest/ingest.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { MemoryModule } from './modules/memory/memory.module';
     AuthModule,
     FilesModule,
     MemoryModule,
+    IngestModule,
   ],
 })
 export class AppModule {}
