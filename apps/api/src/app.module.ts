@@ -6,6 +6,7 @@ import { FilesModule } from './modules/files/files.module';
 import { MemoryModule } from './modules/memory/memory.module';
 import { IngestModule } from './modules/ingest/ingest.module';
 import { SpacesModule } from './modules/spaces/spaces.module';
+import { ConnectionsModule } from './modules/connections/connections.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { SpacesModule } from './modules/spaces/spaces.module';
     MemoryModule,
     IngestModule,
     SpacesModule,
+    ConnectionsModule,
   ],
 })
 export class AppModule {}

@@ -96,6 +96,31 @@ export const api = {
         method: 'POST', credentials: 'include',
       }),
   },
+
+  connections: {
+    create: (label: string) =>
+      request<ConnectionCreateResponse>('/connections', {
+        method: 'POST',
+        body: JSON.stringify({ label }),
+      }),
+
+    list: () => request<ConnectionDto[]>('/connections'),
+
+    revoke: (id: string) =>
+      fetch(`${API_BASE}/connections/${id}`, { method: 'DELETE', credentials: 'include' }),
+
+    addGrant: (connectionId: string, spaceId: string) =>
+      fetch(`${API_BASE}/connections/${connectionId}/grants`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ spaceId }),
+      }),
+
+    removeGrant: (connectionId: string, spaceId: string) =>
+      fetch(`${API_BASE}/connections/${connectionId}/grants/${spaceId}`, {
+        method: 'DELETE', credentials: 'include',
+      }),
+  },
 };
 
 interface SpaceDto {
@@ -108,4 +133,14 @@ interface SpaceMemoryDto {
   memoryId: string; text: string; score?: number;
   manualOverride: boolean;
   otherSpaces: { id: string; name: string }[];
+}
+
+interface ConnectionDto {
+  id: string; label: string;
+  lastSeenAt: string | null; revoked: boolean;
+  spaceIds: string[]; createdAt: string;
+}
+
+interface ConnectionCreateResponse extends ConnectionDto {
+  token: string;
 }

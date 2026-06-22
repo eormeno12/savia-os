@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { SpacesService } from './spaces.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { CurrentUser, JwtPayload } from '../auth/decorators/current-user.decorator';
 import { ZodValidationPipe } from 'nestjs-zod';
 import {
   CreateSpaceSchema,
@@ -30,59 +30,59 @@ export class SpacesController {
 
   @Post()
   create(
-    @CurrentUser('sub') userId: string,
+    @CurrentUser() user: JwtPayload,
     @Body(new ZodValidationPipe(CreateSpaceSchema)) dto: CreateSpaceDto,
   ) {
-    return this.spaces.create(userId, dto);
+    return this.spaces.create(user.sub, dto);
   }
 
   @Get()
-  findAll(@CurrentUser('sub') userId: string) {
-    return this.spaces.findAll(userId);
+  findAll(@CurrentUser() user: JwtPayload) {
+    return this.spaces.findAll(user.sub);
   }
 
   @Patch(':id')
   update(
-    @CurrentUser('sub') userId: string,
+    @CurrentUser() user: JwtPayload,
     @Param('id') id: string,
     @Body(new ZodValidationPipe(UpdateSpaceSchema)) dto: UpdateSpaceDto,
   ) {
-    return this.spaces.update(userId, id, dto);
+    return this.spaces.update(user.sub, id, dto);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@CurrentUser('sub') userId: string, @Param('id') id: string) {
-    return this.spaces.remove(userId, id);
+  remove(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.spaces.remove(user.sub, id);
   }
 
   @Get(':id/memories')
   getMemories(
-    @CurrentUser('sub') userId: string,
+    @CurrentUser() user: JwtPayload,
     @Param('id') id: string,
     @Query('cursor') cursor?: string,
     @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
   ) {
-    return this.spaces.getMemories(userId, id, cursor, limit);
+    return this.spaces.getMemories(user.sub, id, cursor, limit);
   }
 
   @Delete(':id/memories/:memoryId')
   @HttpCode(HttpStatus.NO_CONTENT)
   removeMemory(
-    @CurrentUser('sub') userId: string,
+    @CurrentUser() user: JwtPayload,
     @Param('id') id: string,
     @Param('memoryId') memoryId: string,
   ) {
-    return this.spaces.removeMemoryFromSpace(userId, id, memoryId);
+    return this.spaces.removeMemoryFromSpace(user.sub, id, memoryId);
   }
 
   @Post(':id/memories/:memoryId')
   @HttpCode(HttpStatus.NO_CONTENT)
   addMemory(
-    @CurrentUser('sub') userId: string,
+    @CurrentUser() user: JwtPayload,
     @Param('id') id: string,
     @Param('memoryId') memoryId: string,
   ) {
-    return this.spaces.addMemoryToSpace(userId, id, memoryId);
+    return this.spaces.addMemoryToSpace(user.sub, id, memoryId);
   }
 }
