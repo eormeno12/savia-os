@@ -7,6 +7,7 @@ import { MemoryModule } from './modules/memory/memory.module';
 import { IngestModule } from './modules/ingest/ingest.module';
 import { SpacesModule } from './modules/spaces/spaces.module';
 import { ConnectionsModule } from './modules/connections/connections.module';
+import { OnboardingModule } from './modules/onboarding/onboarding.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { ConnectionsModule } from './modules/connections/connections.module';
     IngestModule,
     SpacesModule,
     ConnectionsModule,
+    OnboardingModule,
   ],
 })
 export class AppModule {}

@@ -121,6 +121,26 @@ export const api = {
         method: 'DELETE', credentials: 'include',
       }),
   },
+
+  onboarding: {
+    rescuePrompt: () =>
+      request<{ prompt: string }>('/onboarding/rescue-prompt'),
+
+    ingestRescue: (text: string) =>
+      request<{ count: number }>('/onboarding/rescue', {
+        method: 'POST',
+        body: JSON.stringify({ text }),
+      }),
+
+    importChatGpt: (content: string) =>
+      request<{ queued: number }>('/onboarding/import/chatgpt', {
+        method: 'POST',
+        body: JSON.stringify({ content }),
+      }),
+
+    suggestSpaces: () =>
+      request<SuggestedSpace[]>('/onboarding/suggest-spaces'),
+  },
 };
 
 interface SpaceDto {
@@ -144,3 +164,14 @@ interface ConnectionDto {
 interface ConnectionCreateResponse extends ConnectionDto {
   token: string;
 }
+
+export interface SuggestedSpace {
+  name: string;
+  description: string;
+  memoryCount: number;
+  examples: string[];
+}
+
+// onboarding namespace added to api object below
+declare global { interface Window {} }
+
