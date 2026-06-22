@@ -1,0 +1,3 @@
+[submodule "apps/openmemory"]
+	path = apps/openmemory
+	url = git@github.com:eormeno12/mem0.git

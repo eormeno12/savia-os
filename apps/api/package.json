@@ -10,7 +10,11 @@
     "start:mcp": "node dist/mcp.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:studio": "prisma studio"
   },
   "dependencies": {
     "@nestjs/common": "^11",
@@ -23,13 +27,15 @@
     "@savia-os/contracts": "workspace:*",
     "reflect-metadata": "^0.2",
     "rxjs": "^7",
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "@prisma/client": "^6"
   },
   "devDependencies": {
     "@savia-os/tsconfig": "workspace:*",
     "@nestjs/cli": "^11",
     "@nestjs/schematics": "^11",
     "@types/node": "^22",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "prisma": "^6"
   }
 }

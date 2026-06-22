@@ -1,15 +1,14 @@
 import { Controller, Get } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import * as net from 'net';
 import { RedisService } from '../clients/redis.service';
 import { QdrantService } from '../clients/qdrant.service';
+import { PrismaService } from '../clients/prisma.service';
 
 @Controller('health')
 export class HealthController {
   constructor(
     private readonly redis: RedisService,
     private readonly qdrant: QdrantService,
-    private readonly config: ConfigService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Get()
@@ -17,7 +16,7 @@ export class HealthController {
     const [redisResult, qdrantResult, postgresResult] = await Promise.allSettled([
       this.checkRedis(),
       this.checkQdrant(),
-      this.checkPostgresTcp(),
+      this.checkPostgres(),
     ]);
 
     const all = [redisResult, qdrantResult, postgresResult];
@@ -40,27 +39,7 @@ export class HealthController {
     if (!res.ok) throw new Error(`status ${res.status}`);
   }
 
-  private checkPostgresTcp(): Promise<void> {
-    const dbUrl = this.config.get<string>('DATABASE_URL', '');
-    const parsed = new URL(dbUrl.replace('postgresql://', 'http://').replace('postgres://', 'http://'));
-    const host = parsed.hostname || '127.0.0.1';
-    const port = parseInt(parsed.port || '5432', 10);
-
-    return new Promise((resolve, reject) => {
-      const socket = net.createConnection({ port, host });
-      const timer = setTimeout(() => {
-        socket.destroy();
-        reject(new Error('timeout'));
-      }, 2000);
-      socket.on('connect', () => {
-        clearTimeout(timer);
-        socket.destroy();
-        resolve();
-      });
-      socket.on('error', (err) => {
-        clearTimeout(timer);
-        reject(err);
-      });
-    });
+  private async checkPostgres() {
+    await this.prisma.$queryRaw`SELECT 1`;
   }
 }
