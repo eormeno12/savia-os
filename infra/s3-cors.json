@@ -1,0 +1,13 @@
+[
+  {
+    "AllowedHeaders": ["*"],
+    "AllowedMethods": ["PUT", "POST"],
+    "AllowedOrigins": [
+      "http://127.0.0.1:4345",
+      "http://localhost:4345",
+      "https://app.savia.com"
+    ],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3000
+  }
+]

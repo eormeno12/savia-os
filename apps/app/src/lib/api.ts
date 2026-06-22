@@ -37,4 +37,28 @@ export const api = {
   logout: () => request<{ message: string }>('/auth/logout', { method: 'POST' }),
 
   me: () => request<{ id: string; email: string }>('/auth/me'),
+
+  files: {
+    presign: (name: string, mimeType: string, sizeBytes: number) =>
+      request<{ uploadUrl: string; fields: Record<string, string>; s3Key: string }>('/files/presign', {
+        method: 'POST',
+        body: JSON.stringify({ name, mimeType, sizeBytes }),
+      }),
+
+    create: (name: string, mimeType: string, sizeBytes: number, s3Key: string) =>
+      request<{ id: string }>('/files', {
+        method: 'POST',
+        body: JSON.stringify({ name, mimeType, sizeBytes, s3Key }),
+      }),
+
+    list: () =>
+      request<Array<{
+        id: string; name: string; mimeType: string; sizeBytes: number;
+        status: 'pending' | 'processing' | 'indexed' | 'failed';
+        source: string; memoryCount?: number; createdAt: string; indexedAt: string | null;
+      }>>('/files'),
+
+    delete: (id: string) =>
+      fetch(`${API_BASE}/files/${id}`, { method: 'DELETE', credentials: 'include' }),
+  },
 };

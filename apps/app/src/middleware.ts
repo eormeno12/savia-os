@@ -16,6 +16,13 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  // redirect root to drive
+  if (pathname === "/") {
+    const driveUrl = req.nextUrl.clone();
+    driveUrl.pathname = "/drive";
+    return NextResponse.redirect(driveUrl);
+  }
+
   return NextResponse.next();
 }
 
