@@ -15,7 +15,12 @@
     "landing:lint": "turbo lint --filter=@savia-os/landing",
     "landing:typecheck": "turbo typecheck --filter=@savia-os/landing",
     "generate:og": "node scripts/generate-og.mjs",
-    "demo-api:dev": "pnpm --filter @savia-os/demo-api dev"
+    "demo-api:dev": "pnpm --filter @savia-os/demo-api dev",
+    "api:dev": "turbo dev --filter=@savia-os/api",
+    "app:dev": "turbo dev --filter=@savia-os/app",
+    "infra:up": "docker compose -f infra/docker-compose.yml up -d",
+    "infra:down": "docker compose -f infra/docker-compose.yml down",
+    "infra:logs": "docker compose -f infra/docker-compose.yml logs -f"
   },
   "devDependencies": {
     "puppeteer-core": "^23.0.0",

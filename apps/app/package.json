@@ -1,0 +1,33 @@
+{
+  "name": "@savia-os/app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -H 127.0.0.1 -p 4345",
+    "build": "next build",
+    "start": "next start -p 4345",
+    "typecheck": "tsc --noEmit",
+    "lint": "next lint",
+    "clean": "rm -rf .next"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "^3.21.0",
+    "@savia-os/contracts": "workspace:*",
+    "framer-motion": "^12.40.0",
+    "lucide-react": "^1.16.0",
+    "next": "^16.2.6",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@savia-os/tsconfig": "workspace:*",
+    "@types/node": "25.9.3",
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.6",
+    "typescript": "^5.9.3"
+  }
+}
