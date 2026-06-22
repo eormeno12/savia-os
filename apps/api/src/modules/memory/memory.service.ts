@@ -117,11 +117,26 @@ export class MemoryService implements OnModuleInit {
   }
 
   async deleteByFile(fileId: string): Promise<void> {
+    // Collect memoryIds before deleting MemoryIndex rows
+    const rows = await this.prisma.memoryIndex.findMany({
+      where: { fileId },
+      select: { memoryId: true },
+    });
+    const memoryIds = rows.map((r) => r.memoryId);
+
     await this.qdrant.deleteByFilter({
       must: [{ key: 'file_id', match: { value: fileId } }],
     });
     await this.prisma.memoryIndex.deleteMany({ where: { fileId } });
-    this.logger.log(`deleteByFile fileId=${fileId}`);
+
+    // Clean orphaned growth events
+    if (memoryIds.length > 0) {
+      await this.prisma.growthEvent.deleteMany({
+        where: { memoryId: { in: memoryIds } },
+      }).catch(() => null);
+    }
+
+    this.logger.log(`deleteByFile fileId=${fileId} cleared ${memoryIds.length} memories`);
   }
 
   async deleteByMemoryId(memoryId: string): Promise<void> {

@@ -1,0 +1,21 @@
+# Savia — production reverse proxy
+# Caddy handles TLS automatically via Let's Encrypt.
+# Only the gateway container is exposed; all other services are on the internal Docker network.
+
+api.savia.com {
+    reverse_proxy api:4400
+
+    # Extra rate-limit header for downstream services (Redis layer still applies per-token)
+    header X-Via-Gateway "1"
+}
+
+mcp.savia.com {
+    reverse_proxy mcp:4401
+
+    header X-Via-Gateway "1"
+}
+
+# If apps/app is served from this host (instead of Vercel), uncomment:
+# app.savia.com {
+#     reverse_proxy app:3000
+# }
