@@ -77,6 +77,11 @@ export class MemoryService implements OnModuleInit {
         })),
         skipDuplicates: true,
       });
+
+      // Emit growth events (one per memory, spaceId filled later by classifier)
+      await this.prisma.growthEvent.createMany({
+        data: memoryIds.map((memoryId) => ({ userId, memoryId })),
+      }).catch(() => null);
     }
 
     this.logger.log(`add userId=${userId} → ${memoryIds.length} memories`);

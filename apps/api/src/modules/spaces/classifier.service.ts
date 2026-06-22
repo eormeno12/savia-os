@@ -217,5 +217,13 @@ export class ClassifierService {
       payload: { submemories: merged },
       points: [memoryId],
     });
+
+    // Stamp GrowthEvent with primary space (first newly assigned space)
+    if (newSpaceIds.length > 0) {
+      await this.prisma.growthEvent.updateMany({
+        where: { memoryId, spaceId: null },
+        data: { spaceId: newSpaceIds[0] },
+      }).catch(() => null);
+    }
   }
 }

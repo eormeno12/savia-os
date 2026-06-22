@@ -8,6 +8,7 @@ import { IngestModule } from './modules/ingest/ingest.module';
 import { SpacesModule } from './modules/spaces/spaces.module';
 import { ConnectionsModule } from './modules/connections/connections.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
+import { GrowthModule } from './modules/growth/growth.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { OnboardingModule } from './modules/onboarding/onboarding.module';
     SpacesModule,
     ConnectionsModule,
     OnboardingModule,
+    GrowthModule,
   ],
 })
 export class AppModule {}

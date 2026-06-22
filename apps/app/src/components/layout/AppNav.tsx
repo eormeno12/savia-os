@@ -3,11 +3,12 @@
 import { Box, HStack, Text, Button } from "@chakra-ui/react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { HardDrive, LogOut, Layers, Link2, Zap, Sparkles } from "lucide-react";
+import { HardDrive, LogOut, Layers, Link2, Zap, Sparkles, LayoutDashboard } from "lucide-react";
 import { api } from "@/lib/api";
 
 const navItems = [
   { href: "/onboarding", label: "Inicio", icon: <Sparkles size={16} /> },
+  { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard size={16} /> },
   { href: "/drive", label: "Drive", icon: <HardDrive size={16} /> },
   { href: "/spaces", label: "Spaces", icon: <Layers size={16} /> },
   { href: "/connections", label: "Conexiones", icon: <Link2 size={16} /> },

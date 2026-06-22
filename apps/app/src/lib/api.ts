@@ -122,6 +122,16 @@ export const api = {
       }),
   },
 
+  growth: {
+    areas: () => request<AreaDto[]>('/growth/areas'),
+
+    summary: (range: 'day' | 'week' = 'week') =>
+      request<GrowthSummary>(`/growth?range=${range}`),
+
+    accessActivity: () =>
+      request<AccessActivity[]>('/growth/access-activity'),
+  },
+
   onboarding: {
     rescuePrompt: () =>
       request<{ prompt: string }>('/onboarding/rescue-prompt'),
@@ -163,6 +173,34 @@ interface ConnectionDto {
 
 interface ConnectionCreateResponse extends ConnectionDto {
   token: string;
+}
+
+export interface AreaDto {
+  spaceId: string;
+  name: string;
+  count: number;
+  share: number;
+}
+
+export interface GrowthPoint {
+  bucket: string;
+  spaceId: string;
+  spaceName: string;
+  count: number;
+}
+
+export interface GrowthSummary {
+  points: GrowthPoint[];
+  todayTotal: number;
+  weekTotal: number;
+  weekDelta: number;
+}
+
+export interface AccessActivity {
+  connectionId: string;
+  label: string;
+  totalCalls: number;
+  lastSeenAt: string | null;
 }
 
 export interface SuggestedSpace {
