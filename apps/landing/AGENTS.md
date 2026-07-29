@@ -11,7 +11,7 @@ Next.js 16 App Router · React 19 · Chakra UI v3 (Panda CSS) · Framer Motion 1
 - Never hardcode hex values. Use design tokens from `src/theme/`. Brand constants from `src/lib/constants.ts`.
 - `overflowX: "hidden"` on `html`, not `body` (breaks sticky positioning).
 - Copy language: Spanish. One-liner: "El cerebro ejecutable de cada empresa." (B2B —
-  see `docs/product/savia-b2b/01-vision.md`; the old "La memoria que conecta todas tus IAs"
+  see `docs/product/savia-b2b-legacy/01-vision.md` (being rewritten clean in `docs/product/savia-b2b/`); the old "La memoria que conecta todas tus IAs"
   one-liner is retired as the product pitch, it now only describes the bottom-up entry layer).
 
 ## Commands (from monorepo root)

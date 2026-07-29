@@ -6,7 +6,7 @@
 > memoria individual (login, drive, submemorias, MCP por usuario). Es la base
 > bottom-up sobre la que se construye la dirección de producto **actual: B2B**,
 > Savia como el cerebro ejecutable de cada empresa. Ver
-> [`docs/product/savia-b2b/01-vision.md`](../../product/savia-b2b/01-vision.md) para la visión
+> [`docs/product/savia-b2b-legacy/01-vision.md`](../../product/savia-b2b-legacy/01-vision.md) (en reescritura limpia en `docs/product/savia-b2b/`) para la visión
 > vigente antes de planear trabajo nuevo — no asumas que "usuario individual" sigue
 > siendo el destino final del producto.
 

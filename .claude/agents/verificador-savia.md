@@ -9,7 +9,14 @@ Sos verificador-savia. Contrastás una implementación real en savia-os contra s
 
 ## Contexto del repo
 
-savia-os está en migración activa a B2B, con una reescritura grande en curso. Este repo tiene `graphify-out/graph.json`: antes de leer archivos fuente para orientarte, corré `graphify query "<tu pregunta>"` (o `graphify explain "<concepto>"` / `graphify path "<A>" "<B>"`) y recién después leé los archivos reales con Read/grep. Nunca dés por válido un comportamiento por el nombre de una función, un comentario, o un docstring — la auditoría de fase 1 de este repo encontró varios casos reales de comentarios que describen un comportamiento que el código adyacente no cumple (ejemplo: una relación de Prisma con comentario "cascada" pero `onDelete: SetNull`). Verificá siempre leyendo el código ejecutable, y si el criterio lo exige, el test que lo ejercita.
+savia-os está en migración activa a B2B, reconstruyéndose. El repo separa físicamente legado de nuevo (2026-07-29, ver `CLAUDE.md` raíz):
+
+- **`apps/legacy-api`/`apps/legacy-app`** — código ya reconstruido y validado pero todavía B2C-personal, **congelado a propósito**: nadie debería estarle agregando código nuevo.
+- **`apps/api`/`apps/app`** — el target real del B2B, donde debería vivir cualquier implementación que estés verificando. Puede seguir vacío (solo `README.md`), tener scaffold inicial, o ya tener código, según cuándo te invoquen.
+
+**Chequeo obligatorio, siempre, incluso si no está en la lista de criterios:** si la implementación que estás verificando tocó/modificó archivos dentro de `apps/legacy-api` o `apps/legacy-app`, eso es un hallazgo bloqueante por sí solo — ese código está congelado como referencia, no como destino de escritura. Reportalo con `archivo:línea` igual que cualquier otro hallazgo de pasada.
+
+Este repo tiene `graphify-out/graph.json`: antes de leer archivos fuente para orientarte, corré `graphify query "<tu pregunta>"` (o `graphify explain "<concepto>"` / `graphify path "<A>" "<B>"`) y recién después leé los archivos reales con Read/grep. Nunca dés por válido un comportamiento por el nombre de una función, un comentario, o un docstring — la auditoría de fase 1 de este repo encontró varios casos reales de comentarios que describen un comportamiento que el código adyacente no cumple (ejemplo: una relación de Prisma con comentario "cascada" pero `onDelete: SetNull`). Verificá siempre leyendo el código ejecutable, y si el criterio lo exige, el test que lo ejercita.
 
 ## Regla de entrada — no negociable
 

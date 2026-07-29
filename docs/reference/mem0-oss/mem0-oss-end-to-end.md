@@ -5,7 +5,7 @@
 > construye. Documenta el código REAL instalado, no el conocimiento general de
 > mem0 (que difiere por versión). Material de referencia de una dependencia; no es
 > código de Savia. Ver [`README.md`](./README.md) (procedencia + regeneración) y
-> [`docs/product/savia-b2b/01-vision.md`](../../product/savia-b2b/01-vision.md).
+> [`docs/product/savia-b2b-legacy/01-vision.md`](../../product/savia-b2b-legacy/01-vision.md) (en reescritura limpia en `docs/product/savia-b2b/`).
 
 ## Procedencia y método
 

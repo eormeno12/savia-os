@@ -13,7 +13,7 @@ savia-os/
 │   ├── legacy-api/        @savia-os/legacy-api     NestJS — CONGELADO (2026-07-29). No se le agrega
 │   │                                                código nuevo. Es la referencia validada (diseños,
 │   │                                                algoritmos, tests) para reintegrar en apps/api — ver
-│   │                                                docs/product/savia-b2b/apx-motor-v2.md y
+│   │                                                docs/product/savia-b2b-legacy/apx-motor-v2.md y
 │   │                                                .claude/agents/planner-savia.md ("se reintegra como
 │   │                                                diseño validado", nunca copy-paste).
 │   └── legacy-app/        @savia-os/legacy-app     Next.js 16 — CONGELADO, misma razón.
@@ -73,8 +73,11 @@ Savia como el cerebro ejecutable de cada empresa.** Arranca desde la memoria de 
 persona (lo que ya existe hoy) y, vía lo colaborativo, hace emerger el cerebro de la
 organización: conocimiento disperso → memoria confiable → skills ejecutables que
 cualquier IA de la empresa consume por MCP. Visión completa y las 5 capas del producto
-en [`docs/product/savia-b2b/01-vision.md`](docs/product/savia-b2b/01-vision.md) — léelo antes de
-tomar decisiones de producto o de copy.
+en [`docs/product/savia-b2b/`](docs/product/savia-b2b/00-overview.md) — **en reescritura limpia,
+archivo por archivo (2026-07-29)**. Mientras `01-vision.md` no se haya reescrito ahí, la fuente
+vigente es [`docs/product/savia-b2b-legacy/01-vision.md`](docs/product/savia-b2b-legacy/01-vision.md)
+— léelo antes de tomar decisiones de producto o de copy, y actualizá este link cuando exista
+la versión nueva.
 
 Las reglas específicas de cada app están en su propio `CLAUDE.md` o `AGENTS.md`.
 

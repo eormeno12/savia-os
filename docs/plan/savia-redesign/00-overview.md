@@ -12,7 +12,7 @@
 > resto ⏳. Detalle en [03-roadmap.md → Estado de avance](03-roadmap.md#estado-de-avance).
 >
 > 🏢 **Dirección de producto actual: B2B** (Savia como el cerebro ejecutable de cada
-> empresa — ver [`docs/product/savia-b2b/01-vision.md`](../../product/savia-b2b/01-vision.md)). Las
+> empresa — ver [`docs/product/savia-b2b-legacy/01-vision.md`](../../product/savia-b2b-legacy/01-vision.md), en reescritura limpia en `docs/product/savia-b2b/`). Las
 > pantallas de este plan (`apps/app` de hoy) son la capa de memoria personal, el wedge
 > bottom-up hacia el cerebro organizacional — no asumas que el usuario individual es
 > el destino final al proponer superficies nuevas.

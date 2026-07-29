@@ -85,4 +85,4 @@ instalado.
 
 Detalle completo y verificado en [`mem0-oss-end-to-end.md`](./mem0-oss-end-to-end.md).
 
-Ver `docs/product/savia-b2b/01-vision.md` para cómo esto afecta el diseño de Savia.
+Ver `docs/product/savia-b2b-legacy/01-vision.md` (en reescritura limpia en `docs/product/savia-b2b/`) para cómo esto afecta el diseño de Savia.

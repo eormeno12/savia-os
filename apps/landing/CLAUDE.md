@@ -173,7 +173,7 @@ Nunca usar `href="#"` para links pendientes.
 ## Copy
 
 > **Dirección de producto: B2B.** Savia pivotó de memoria personal a "cerebro
-> ejecutable de cada empresa" — ver [`docs/product/savia-b2b/01-vision.md`](../../docs/product/savia-b2b/01-vision.md)
+> ejecutable de cada empresa" — ver [`docs/product/savia-b2b-legacy/01-vision.md`](../../docs/product/savia-b2b-legacy/01-vision.md) (en reescritura limpia en `docs/product/savia-b2b/`)
 > antes de escribir o tocar copy. El one-liner y el léxico de abajo ya reflejan
 > ese pivot; la landing en `src/` todavía tiene copy B2C sin migrar — si tocás
 > una sección con copy viejo ("tu memoria", "vos"/"tus IAs" en singular personal),
