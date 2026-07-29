@@ -5,7 +5,7 @@
  * producto, en vez de un token del design system (`@savia-os/design-tokens`).
  *
  * Cubre el app **y** los paquetes compartidos (la auditoría 2026-06-27 detectó
- * que solo se escaneaba `apps/app/src`). Además **reporta** (sin fallar todavía)
+ * que solo se escaneaba `apps/legacy-app/src`). Además **reporta** (sin fallar todavía)
  * la tipografía suelta (`fontSize`/`fontWeight` en vez de `textStyle`) para que
  * la migración a los componentes de texto de `@savia-os/ui` se mida y tienda a
  * cero — cuando llegue a cero, este reporte pasa a ser un hard-fail.
@@ -20,7 +20,7 @@ import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const ROOT = process.cwd();
-const SCAN_DIRS = ["apps/app/src", "packages/ui/src"];
+const SCAN_DIRS = ["apps/legacy-app/src", "packages/ui/src"];
 
 const HEX6 = /#[0-9a-fA-F]{6}\b/;
 const HEX3 = /#[0-9a-fA-F]{3}\b/;
@@ -31,7 +31,7 @@ const LOOSE_TYPE = /\bfont(Size|Weight)=/;
 
 // Excepciones legítimas / deuda con step.
 const ALLOWLIST = new Set([
-  "apps/app/src/app/layout.tsx", // themeColor en metadata de Next (no es token Chakra)
+  "apps/legacy-app/src/app/layout.tsx", // themeColor en metadata de Next (no es token Chakra)
   "packages/ui/src/constants.ts", // BRAND_COLORS: fuente de marca para Framer/no-Chakra
   "packages/ui/src/brand/savia-particles.tsx", // color de partículas (canvas/SVG)
 ]);

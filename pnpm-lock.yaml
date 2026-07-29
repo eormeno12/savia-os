@@ -15,7 +15,111 @@ importers:
         specifier: ^2.5.4
         version: 2.9.18
 
-  apps/api:
+  apps/demo-api:
+    dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.x
+        version: 1.29.0(@cfworker/json-schema@4.1.1)(zod@3.25.76)
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
+      fastify:
+        specifier: ^5.x
+        version: 5.8.5
+      openai:
+        specifier: ^4.x
+        version: 4.104.0(ws@8.21.0)(zod@3.25.76)
+    devDependencies:
+      '@savia-os/tsconfig':
+        specifier: workspace:*
+        version: link:../../packages/tsconfig
+      tsx:
+        specifier: latest
+        version: 4.23.1
+      typescript:
+        specifier: ^5.x
+        version: 5.9.3
+
+  apps/landing:
+    dependencies:
+      '@chakra-ui/react':
+        specifier: ^3.21.0
+        version: 3.36.0(@emotion/react@11.14.0(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@icons-pack/react-simple-icons':
+        specifier: ^13.13.0
+        version: 13.13.0(react@19.2.7)
+      '@savia-os/design-tokens':
+        specifier: workspace:*
+        version: link:../../packages/design-tokens
+      '@savia-os/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      '@upstash/ratelimit':
+        specifier: ^2.0.8
+        version: 2.0.8(@upstash/redis@1.38.0)
+      '@upstash/redis':
+        specifier: ^1.38.0
+        version: 1.38.0
+      '@vercel/analytics':
+        specifier: ^2.0.1
+        version: 2.0.1(next@16.2.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
+      framer-motion:
+        specifier: ^12.40.0
+        version: 12.40.0(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      googleapis:
+        specifier: ^173.0.0
+        version: 173.0.0
+      lucide-react:
+        specifier: ^1.16.0
+        version: 1.20.0(react@19.2.7)
+      next:
+        specifier: ^16.2.6
+        version: 16.2.9(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      react:
+        specifier: ^19.2.6
+        version: 19.2.7
+      react-dom:
+        specifier: ^19.2.6
+        version: 19.2.7(react@19.2.7)
+      react-force-graph-2d:
+        specifier: ^1.29.1
+        version: 1.29.1(react@19.2.7)
+      react-markdown:
+        specifier: ^10.1.0
+        version: 10.1.0(@types/react@19.2.17)(react@19.2.7)
+      remark-gfm:
+        specifier: ^4.0.1
+        version: 4.0.1
+      simple-icons:
+        specifier: ^16.23.0
+        version: 16.23.0
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@savia-os/tsconfig':
+        specifier: workspace:*
+        version: link:../../packages/tsconfig
+      '@types/node':
+        specifier: 25.9.3
+        version: 25.9.3
+      '@types/react':
+        specifier: ^19.2.15
+        version: 19.2.17
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.3(@types/react@19.2.17)
+      eslint:
+        specifier: ^9.39.4
+        version: 9.39.4(jiti@2.7.0)
+      eslint-config-next:
+        specifier: ^16.2.6
+        version: 16.2.9(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  apps/legacy-api:
     dependencies:
       '@aws-sdk/client-s3':
         specifier: ^3.1073.0
@@ -178,7 +282,7 @@ importers:
         specifier: 8.61.1
         version: 8.61.1(eslint@10.6.0(jiti@2.7.0))(typescript@5.9.3)
 
-  apps/app:
+  apps/legacy-app:
     dependencies:
       '@chakra-ui/react':
         specifier: ^3.21.0
@@ -256,110 +360,6 @@ importers:
       typescript-eslint:
         specifier: 8.61.1
         version: 8.61.1(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)
-
-  apps/demo-api:
-    dependencies:
-      '@modelcontextprotocol/sdk':
-        specifier: ^1.x
-        version: 1.29.0(@cfworker/json-schema@4.1.1)(zod@3.25.76)
-      dotenv:
-        specifier: ^17.4.2
-        version: 17.4.2
-      fastify:
-        specifier: ^5.x
-        version: 5.8.5
-      openai:
-        specifier: ^4.x
-        version: 4.104.0(ws@8.21.0)(zod@3.25.76)
-    devDependencies:
-      '@savia-os/tsconfig':
-        specifier: workspace:*
-        version: link:../../packages/tsconfig
-      tsx:
-        specifier: latest
-        version: 4.23.0
-      typescript:
-        specifier: ^5.x
-        version: 5.9.3
-
-  apps/landing:
-    dependencies:
-      '@chakra-ui/react':
-        specifier: ^3.21.0
-        version: 3.36.0(@emotion/react@11.14.0(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@icons-pack/react-simple-icons':
-        specifier: ^13.13.0
-        version: 13.13.0(react@19.2.7)
-      '@savia-os/design-tokens':
-        specifier: workspace:*
-        version: link:../../packages/design-tokens
-      '@savia-os/ui':
-        specifier: workspace:*
-        version: link:../../packages/ui
-      '@upstash/ratelimit':
-        specifier: ^2.0.8
-        version: 2.0.8(@upstash/redis@1.38.0)
-      '@upstash/redis':
-        specifier: ^1.38.0
-        version: 1.38.0
-      '@vercel/analytics':
-        specifier: ^2.0.1
-        version: 2.0.1(next@16.2.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
-      framer-motion:
-        specifier: ^12.40.0
-        version: 12.40.0(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      googleapis:
-        specifier: ^173.0.0
-        version: 173.0.0
-      lucide-react:
-        specifier: ^1.16.0
-        version: 1.20.0(react@19.2.7)
-      next:
-        specifier: ^16.2.6
-        version: 16.2.9(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      react:
-        specifier: ^19.2.6
-        version: 19.2.7
-      react-dom:
-        specifier: ^19.2.6
-        version: 19.2.7(react@19.2.7)
-      react-force-graph-2d:
-        specifier: ^1.29.1
-        version: 1.29.1(react@19.2.7)
-      react-markdown:
-        specifier: ^10.1.0
-        version: 10.1.0(@types/react@19.2.17)(react@19.2.7)
-      remark-gfm:
-        specifier: ^4.0.1
-        version: 4.0.1
-      simple-icons:
-        specifier: ^16.23.0
-        version: 16.23.0
-      zod:
-        specifier: ^3.25.76
-        version: 3.25.76
-    devDependencies:
-      '@savia-os/tsconfig':
-        specifier: workspace:*
-        version: link:../../packages/tsconfig
-      '@types/node':
-        specifier: 25.9.3
-        version: 25.9.3
-      '@types/react':
-        specifier: ^19.2.15
-        version: 19.2.17
-      '@types/react-dom':
-        specifier: ^19.2.3
-        version: 19.2.3(@types/react@19.2.17)
-      eslint:
-        specifier: ^9.39.4
-        version: 9.39.4(jiti@2.7.0)
-      eslint-config-next:
-        specifier: ^16.2.6
-        version: 16.2.9(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
 
   packages/contracts:
     dependencies:
@@ -7004,8 +7004,8 @@ packages:
   tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
 
-  tsx@4.23.0:
-    resolution: {integrity: sha512-eUdUIaCr963q2h5u3+QwvYp0+eqPvn+egeqZUm0hwERCqqx1E3kK5ehbGCvqSE5MQAULr67ww0cA3jKc3YkM1w==}
+  tsx@4.23.1:
+    resolution: {integrity: sha512-GQHnkIfxyx1wYCOS/wonik5MVRZU9hi1TEZmzGZSCJB1y9YgoZ8H6itNE/u4suE+yLmOzuE4E5S4TZ/ZX2wcWQ==}
     engines: {node: '>=18.0.0'}
     hasBin: true
 
@@ -11642,7 +11642,7 @@ snapshots:
       '@next/eslint-plugin-next': 16.2.9
       eslint: 9.39.4(jiti@2.7.0)
       eslint-import-resolver-node: 0.3.10
-      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0(eslint@9.39.4(jiti@2.7.0)))(eslint@9.39.4(jiti@2.7.0))
+      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0)(eslint@9.39.4(jiti@2.7.0))
       eslint-plugin-import: 2.32.0(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.4(jiti@2.7.0))
       eslint-plugin-jsx-a11y: 6.10.2(eslint@9.39.4(jiti@2.7.0))
       eslint-plugin-react: 7.37.5(eslint@9.39.4(jiti@2.7.0))
@@ -11665,7 +11665,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@9.39.4(jiti@2.7.0)))(eslint@9.39.4(jiti@2.7.0)):
+  eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0)(eslint@9.39.4(jiti@2.7.0)):
     dependencies:
       '@nolyfill/is-core-module': 1.0.39
       debug: 4.4.3
@@ -11690,13 +11690,13 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  eslint-module-utils@2.13.0(eslint-import-resolver-node@0.3.10)(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@9.39.4(jiti@2.7.0)))(eslint@9.39.4(jiti@2.7.0)))(eslint@9.39.4(jiti@2.7.0)):
+  eslint-module-utils@2.13.0(eslint-import-resolver-node@0.3.10)(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.4(jiti@2.7.0)):
     dependencies:
       debug: 3.2.7
     optionalDependencies:
       eslint: 9.39.4(jiti@2.7.0)
       eslint-import-resolver-node: 0.3.10
-      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0(eslint@9.39.4(jiti@2.7.0)))(eslint@9.39.4(jiti@2.7.0))
+      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0)(eslint@9.39.4(jiti@2.7.0))
     transitivePeerDependencies:
       - supports-color
 
@@ -11740,7 +11740,7 @@ snapshots:
       doctrine: 2.1.0
       eslint: 9.39.4(jiti@2.7.0)
       eslint-import-resolver-node: 0.3.10
-      eslint-module-utils: 2.13.0(eslint-import-resolver-node@0.3.10)(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@9.39.4(jiti@2.7.0)))(eslint@9.39.4(jiti@2.7.0)))(eslint@9.39.4(jiti@2.7.0))
+      eslint-module-utils: 2.13.0(eslint-import-resolver-node@0.3.10)(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.4(jiti@2.7.0))
       hasown: 2.0.4
       is-core-module: 2.16.2
       is-glob: 4.0.3
@@ -15545,7 +15545,7 @@ snapshots:
 
   tslib@2.8.1: {}
 
-  tsx@4.23.0:
+  tsx@4.23.1:
     dependencies:
       esbuild: 0.28.1
     optionalDependencies:

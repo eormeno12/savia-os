@@ -60,4 +60,12 @@ en el mundo real.
 
 ## Decisiones tomadas
 
-_(vacío)_
+- **2026-07-29** — Qué dispara la formalización de una organización: los
+  **tres** caminos evaluados quedan habilitados, no uno solo. (a) Umbral
+  automático (N personas del mismo dominio de email compartiendo memoria)
+  **sugiere** formalizar — nunca formaliza solo, requiere confirmación
+  explícita de alguien (mantiene el motor bottom-up/PLG sin forzar nada sin
+  consentimiento). (b) Acción explícita del usuario ("convertir en
+  organización"). (c) Venta top-down directa — un admin arranca una
+  organización desde cero sin que haya habido individuos usando Savia antes.
+  Ver [decisión #5](19-decisiones-abiertas.md).

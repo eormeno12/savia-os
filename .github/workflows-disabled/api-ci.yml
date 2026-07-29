@@ -1,3 +1,10 @@
+# DISABLED (2026-07-29): apps/legacy-api quedó congelado como referencia
+# durante el rebuild B2B — ya no se le agrega código, así que no tiene sentido
+# gastar minutos de CI en algo que no cambia. Este archivo vive fuera de
+# .github/workflows/ a propósito (GitHub Actions solo escanea esa carpeta) por
+# eso no corre. Cuando el rebuild tenga su propio apps/api, este workflow es
+# la referencia de qué gates tenía el legado — adaptar y mover de vuelta a
+# .github/workflows/, actualizando los paths de legacy-api al nuevo apps/api.
 name: api-ci
 
 on:
@@ -5,16 +12,16 @@ on:
     branches: [main]
   pull_request:
     paths:
-      - 'apps/api/**'
+      - 'apps/legacy-api/**'
       - 'packages/contracts/**'
-      - '.github/workflows/api-ci.yml'
+      - '.github/workflows-disabled/api-ci.yml'
 
 jobs:
   build:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: apps/api
+        working-directory: apps/legacy-api
     services:
       postgres:
         image: postgres:16
@@ -60,7 +67,7 @@ jobs:
       - name: no-dead-code gate (no legacy patterns)
         working-directory: .
         run: |
-          if grep -rnE "submemories|homeSpaceId|manualOverride|queryHash|kind=collective|@deprecated|dense-only" apps/api/src --include='*.ts' | grep -v '\.spec\.ts'; then
+          if grep -rnE "submemories|homeSpaceId|manualOverride|queryHash|kind=collective|@deprecated|dense-only" apps/legacy-api/src --include='*.ts' | grep -v '\.spec\.ts'; then
             echo "::error::legacy/obsolete pattern found — the rebuild must be clean"; exit 1
           fi
       - name: migrate deploy (fresh DB)

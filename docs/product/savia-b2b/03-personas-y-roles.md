@@ -54,4 +54,6 @@ o permisos ([08](08-capa3-gobernanza-modelo.md)/[09](09-capa3-gobernanza-impleme
 
 ## Decisiones tomadas
 
-_(vacío)_
+- **2026-07-29** — Una persona puede pertenecer a **más de una** organización
+  a la vez (como Slack/Notion) — cubre el caso freelancer/consultor
+  multi-cliente. Ver [decisión #8](19-decisiones-abiertas.md).

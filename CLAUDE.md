@@ -2,12 +2,21 @@
 
 ## Estructura
 
+**Savia B2B se está reconstruyendo (ver "Contexto del proyecto" abajo). El repo tiene código legado y código nuevo — no asumas cuál es cuál por el nombre solo, leé esta sección.**
+
 ```
 savia-os/
 ├── apps/
 │   ├── landing/          @savia-os/landing        Next.js 16, puerto 4343 (marketing + showcase DS)
-│   ├── app/              @savia-os/app            Next.js 16, puerto 4345 (producto/dashboard)
-│   └── api/              @savia-os/api            NestJS
+│   ├── api/               (vacío — el B2B nuevo va acá; scaffold pendiente)
+│   ├── app/                (vacío — el B2B nuevo va acá; scaffold pendiente)
+│   ├── legacy-api/        @savia-os/legacy-api     NestJS — CONGELADO (2026-07-29). No se le agrega
+│   │                                                código nuevo. Es la referencia validada (diseños,
+│   │                                                algoritmos, tests) para reintegrar en apps/api — ver
+│   │                                                docs/product/savia-b2b/apx-motor-v2.md y
+│   │                                                .claude/agents/planner-savia.md ("se reintegra como
+│   │                                                diseño validado", nunca copy-paste).
+│   └── legacy-app/        @savia-os/legacy-app     Next.js 16 — CONGELADO, misma razón.
 ├── packages/
 │   ├── ui/               @savia-os/ui             sistema de diseño (Atomic Design) sobre Chakra v3
 │   ├── design-tokens/    @savia-os/design-tokens  foundations: tokens Chakra (createSystem)
@@ -17,6 +26,8 @@ savia-os/
 ├── pnpm-workspace.yaml
 └── turbo.json
 ```
+
+Comandos legado: `legacy-api:dev`, `legacy-worker:dev`, `legacy-mcp:dev`, `legacy-app:dev`, `legacy-db:migrate`, `legacy-db:deploy` (antes `api:dev`/`worker:dev`/`mcp:dev`/`app:dev`/`db:migrate`/`db:deploy` — renombrados el 2026-07-29 para dejar `api:dev`/`app:dev` libres para cuando exista el B2B nuevo). El CI de `legacy-api` está deshabilitado a propósito en `.github/workflows-disabled/api-ci.yml` (movido fuera de `.github/workflows/`, que es lo que GitHub Actions escanea) — código congelado no necesita gastar minutos de CI.
 
 ## Comandos desde la raíz
 
@@ -48,10 +59,12 @@ Detalle completo e inventario en [`packages/ui/README.md`](packages/ui/README.md
 
 ## Apps actuales
 
-| Workspace | Ruta | Puerto |
-|-----------|------|--------|
-| `@savia-os/landing` | `apps/landing/` | 4343 |
-| `@savia-os/app` | `apps/app/` | 4345 |
+| Workspace | Ruta | Puerto | Estado |
+|-----------|------|--------|--------|
+| `@savia-os/landing` | `apps/landing/` | 4343 | activo |
+| `@savia-os/legacy-app` | `apps/legacy-app/` | 4345 | congelado — referencia, no tocar |
+| `@savia-os/legacy-api` | `apps/legacy-api/` | 4400 (main) / 4401 (mcp) | congelado — referencia, no tocar |
+| — | `apps/app/`, `apps/api/` | — | B2B nuevo, scaffold pendiente |
 
 ## Contexto del proyecto
 

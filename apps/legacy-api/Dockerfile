@@ -12,7 +12,7 @@ RUN corepack enable && corepack prepare pnpm@11.7.0 --activate
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml .npmrc ./
 COPY packages/tsconfig/package.json packages/tsconfig/
 COPY packages/contracts/package.json packages/contracts/
-COPY apps/api/package.json apps/api/
+COPY apps/legacy-api/package.json apps/legacy-api/
 
 # Install all deps (including devDeps needed for build + prisma CLI)
 RUN pnpm install --frozen-lockfile
@@ -20,26 +20,26 @@ RUN pnpm install --frozen-lockfile
 # Copy source
 COPY packages/tsconfig/ packages/tsconfig/
 COPY packages/contracts/ packages/contracts/
-COPY apps/api/ apps/api/
+COPY apps/legacy-api/ apps/legacy-api/
 
 # Generate Prisma client before compiling (nest build needs the generated types)
-RUN pnpm --filter @savia-os/api exec prisma generate
+RUN pnpm --filter @savia-os/legacy-api exec prisma generate
 
 # Build contracts, then api
 RUN pnpm --filter @savia-os/contracts build
-RUN pnpm --filter @savia-os/api exec nest build
+RUN pnpm --filter @savia-os/legacy-api exec nest build
 
 # Produce a self-contained production bundle: flattened node_modules with
 # prod-only deps + the built dist + the contracts workspace package.
 # Roughly halves the dependency footprint vs copying the full workspace.
-RUN pnpm --filter @savia-os/api deploy --prod --legacy /prod
+RUN pnpm --filter @savia-os/legacy-api deploy --prod --legacy /prod
 
 # pnpm deploy re-runs @prisma/client's postinstall, which resets the generated
 # client to a stub (no schema in scope). Regenerate it into the deployed
 # node_modules — Prisma resolves @prisma/client from the bundled schema's dir.
 # Invoke the prisma bin directly: `pnpm exec` would trigger a deps-status check
 # that tries to reinstall and fails.
-RUN /workspace/apps/api/node_modules/.bin/prisma generate --schema=/prod/prisma/schema.prisma
+RUN /workspace/apps/legacy-api/node_modules/.bin/prisma generate --schema=/prod/prisma/schema.prisma
 
 # ---- runtime stage ----
 FROM node:22-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb9c86130c3e2 AS api

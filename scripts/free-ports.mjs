@@ -2,8 +2,8 @@
 /**
  * Pre-start cleanup: free the ports (and kill the port-less stale processes)
  * that a set of dev services is about to (re)start on, so a previous run never
- * lingers. Invoked by the `pre<script>` hooks of dev / dev:stack / api:dev /
- * worker:dev / mcp:dev / app:dev / landing:dev (and from dev-stack.mjs directly).
+ * lingers. Invoked by the `pre<script>` hooks of dev / dev:stack / legacy-api:dev /
+ * legacy-worker:dev / legacy-mcp:dev / legacy-app:dev / landing:dev (and from dev-stack.mjs directly).
  *
  * Why not just `lsof -ti :PORT | xargs kill` (the old predev:stack): the ingest
  * WORKER has no port at all, so a port-only sweep can never reap a stale worker —
@@ -16,8 +16,8 @@
  * has running elsewhere. Port matches are inherently scoped (whoever holds our
  * port must go). Graceful: SIGTERM first, then SIGKILL for anything still alive.
  *
- *   node scripts/free-ports.mjs worker            # just the worker
- *   node scripts/free-ports.mjs api worker mcp app
+ *   node scripts/free-ports.mjs legacy-worker            # just the worker
+ *   node scripts/free-ports.mjs legacy-api legacy-worker legacy-mcp legacy-app
  *   node scripts/free-ports.mjs                    # every known service
  */
 import { execSync } from 'node:child_process';
@@ -30,10 +30,10 @@ const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url)).replace(/\/$/, '
  * against a process's full command line (already known to contain REPO_ROOT).
  */
 const SERVICES = {
-  api: { port: 4400, sig: (c) => (c.includes('nest') && c.includes('start') && c.includes('--watch') && !c.includes('--entryFile')) || c.includes('dist/main') },
-  mcp: { port: 4401, sig: (c) => c.includes('--entryFile mcp') || c.includes('dist/mcp') },
-  worker: { port: null, sig: (c) => c.includes('--entryFile worker') || c.includes('dist/worker') },
-  app: { port: 4345, sig: (c) => c.includes('apps/app') && c.includes('next') },
+  'legacy-api': { port: 4400, sig: (c) => (c.includes('nest') && c.includes('start') && c.includes('--watch') && !c.includes('--entryFile')) || c.includes('dist/main') },
+  'legacy-mcp': { port: 4401, sig: (c) => c.includes('--entryFile mcp') || c.includes('dist/mcp') },
+  'legacy-worker': { port: null, sig: (c) => c.includes('--entryFile worker') || c.includes('dist/worker') },
+  'legacy-app': { port: 4345, sig: (c) => c.includes('apps/legacy-app') && c.includes('next') },
   landing: { port: 4343, sig: (c) => c.includes('apps/landing') && c.includes('next') },
   'demo-api': { port: 4344, sig: (c) => c.includes('apps/demo-api') },
 };

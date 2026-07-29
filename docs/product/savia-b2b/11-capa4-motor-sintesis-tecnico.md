@@ -91,4 +91,21 @@ memorias individuales dispersas" a "un skill publicado".
 
 ## Decisiones tomadas
 
-_(vacío)_
+- **2026-07-29** — El motor de síntesis es un **servicio nuevo**, no una
+  evolución de `organization/` (motor v2): el invariante de diseño del motor
+  v2 es nunca cruzar `userId`, mientras que síntesis es inherentemente
+  cross-boundary (reconcilia memoria de varias personas). El servicio nuevo
+  reusa el chokepoint cross-boundary ya construido y auditado en `access/`
+  (`compileReadPlan` / `CrossBoundaryReadService`, el mismo que usan MCP y
+  federación de colectivo) para leer entre personas de una organización, y
+  puede consumir los clusters de `organization/` como **señal opcional** de
+  candidatos a proceso repetido — no como motor de reconciliación. Ver
+  [decisión #3](19-decisiones-abiertas.md).
+- **2026-07-29** — Colisión de nombres `organization`/`Organization`: resuelta
+  en [02-glosario-y-entidades.md](02-glosario-y-entidades.md) — se renombra el
+  módulo de código, no la entidad de negocio. Ver
+  [decisión #1](19-decisiones-abiertas.md).
+- **Sigue abierto** (discutido y diferido a propósito, 2026-07-29): qué
+  dispara un intento de síntesis (cron / umbral de actividad / pedido de
+  admin / detección de conflicto) — falta criterio de producto, revisar con
+  datos de uso real. Ver [decisión #2](19-decisiones-abiertas.md).

@@ -205,6 +205,18 @@ de esa medición, no de una justificación elaborada sin dato.
   junto a `motor-v2.md` (mismo formato as-built/diseño verificado). Queda
   persistido con el proyecto.
 
-_(vacío — el diseño de arriba está validado pero no implementado; pasa acá
-cuando el código exista en `apps/demo-pipeline` y, más adelante, en
-`apps/api`)_
+_(el diseño de arriba está validado pero no implementado; pasa acá cuando el
+código exista en `apps/demo-pipeline` y, más adelante, en `apps/api`)_
+
+- **2026-07-29** — Confirmado: reemplazo completo del parsing actual
+  (`chunk.ts`/`parsers.ts`, que hoy aplana todo a texto plano y corta a
+  ciegas por caracteres) por el patrón Adapter + IR de este documento. Se
+  **conserva** la infraestructura de colas/reintentos (`ingest.worker.ts`/
+  `ingest.queue.ts` — BullMQ, backoff exponencial, idempotencia "wipe and
+  redo"), que la auditoría técnica de fase 1 (2026-07-29) encontró sólida.
+  Ver [decisión #4](19-decisiones-abiertas.md).
+- **Sigue abierto** (discutido y diferido a propósito, 2026-07-29):
+  `DocumentLineageId` — el usuario quiere pensar más antes de aceptar la
+  recomendación original de este diseño (diferir para la prueba en
+  `apps/demo-pipeline`, declarado por el usuario para producción). Ver
+  [decisión #9](19-decisiones-abiertas.md).

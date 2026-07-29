@@ -88,4 +88,10 @@ ingesta sino conectados al resto del vocabulario del producto:
 
 ## Decisiones tomadas
 
-_(vacío — se llena a medida que se resuelve cada término)_
+- **2026-07-29** — Colisión `organization`/`Organization` resuelta: se renombra el
+  módulo de código (`apps/api/src/modules/organization/` → un nombre interno
+  tipo `engine/`, a definir al implementar). `Organization` queda como la
+  entidad de negocio (empresa). Ver [decisión #1](19-decisiones-abiertas.md).
+- **2026-07-29** — `Membership`: una persona puede pertenecer a **más de una**
+  organización a la vez (como Slack/Notion — cubre freelancers/consultores
+  multi-cliente). Ver [decisión #8](19-decisiones-abiertas.md).

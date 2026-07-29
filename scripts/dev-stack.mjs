@@ -45,19 +45,19 @@ function shutdown(code = 0) {
 process.on("SIGINT", () => shutdown(0));
 process.on("SIGTERM", () => shutdown(0));
 
-// API stack: api + ingest worker + mcp (NestJS watch mode), via turbo.
-run("api-stack", "pnpm", [
+// Legacy API stack: api + ingest worker + mcp (NestJS watch mode), via turbo.
+run("legacy-api-stack", "pnpm", [
   "exec",
   "turbo",
   "run",
   "dev",
   "worker:dev",
   "mcp:dev",
-  "--filter=@savia-os/api",
+  "--filter=@savia-os/legacy-api",
 ]);
 
 // App: its own process so Turbopack's watcher doesn't compete with the Nest
 // watchers for the kernel watcher limit. Polling is a belt-and-suspenders guard.
-run("app", "pnpm", ["--filter", "@savia-os/app", "dev"], {
+run("legacy-app", "pnpm", ["--filter", "@savia-os/legacy-app", "dev"], {
   WATCHPACK_POLLING: "true",
 });

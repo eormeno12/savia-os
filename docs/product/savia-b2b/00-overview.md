@@ -4,6 +4,18 @@
 > arquitectura técnica viven todas en esta carpeta. Se completa en
 > iteraciones sucesivas.
 
+## Nota de estructura del repo (2026-07-29)
+
+`apps/api`/`apps/app` se renombraron a `apps/legacy-api`/`apps/legacy-app` — quedan
+congelados como referencia validada (diseños, algoritmos, tests reales), sin
+código nuevo. `apps/api`/`apps/app` quedan libres para el B2B real (scaffold
+pendiente). **Las citas `archivo:línea` de los apéndices as-built de esta
+carpeta (`apx-motor-v2.md`, `apx-ingesta-pipeline-adapter-ir.md`) todavía dicen
+`apps/api/...` tal como se verificaron — leer como `apps/legacy-api/...`.** No
+se reescribieron esas citas para no arriesgar precisión en una edición masiva;
+el contenido de cada archivo no cambió, solo el directorio que lo contiene.
+Detalle completo del rename y la lógica de legado-vs-nuevo: `CLAUDE.md` raíz.
+
 ## Qué es esta carpeta
 
 **Todo lo que hay que saber sobre Savia B2B vive acá — nada repartido entre
