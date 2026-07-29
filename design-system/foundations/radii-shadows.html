@@ -1,0 +1,62 @@
+<!-- @dsCard group="Espaciado" title="Radios y profundidad" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Savia · Radios y sombras</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root { --ink:#0B2529; --paper:#F4F4F1; --lime:#E7FF18; --slate:#53606C; --line:#DDDFDC; --mist:#ECEDEA; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter', system-ui, sans-serif; background:var(--paper); color:var(--ink); -webkit-font-smoothing:antialiased; padding:64px 48px; }
+  .wrap { max-width:1100px; margin:0 auto; }
+  .eyebrow { font-size:12px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--slate); margin-bottom:24px; }
+  h1 { font-size:clamp(40px,4.8vw,72px); font-weight:300; line-height:0.92; max-width:16ch; }
+  .lede { font-size:clamp(16px,1.1vw,20px); line-height:1.6; color:var(--slate); margin-top:24px; max-width:54ch; }
+  .label { font-size:12px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--slate); margin:64px 0 24px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:20px; }
+  .radii .box { height:120px; background:var(--mist); border:1px solid var(--line); }
+  .cell .name { font-family:ui-monospace,monospace; font-size:13px; font-weight:600; margin-top:16px; }
+  .cell .v { font-family:ui-monospace,monospace; font-size:11px; color:var(--slate); margin-top:4px; }
+  .cell .role { font-size:13px; color:var(--slate); margin-top:6px; line-height:1.5; }
+  .shadows { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:28px; }
+  .shadows .box { height:120px; background:#fff; border-radius:18px; }
+  .dark-row { background:var(--ink); border-radius:28px; padding:40px; margin-top:28px; }
+  .dark-row .box { height:120px; background:#152F34; border-radius:18px; box-shadow:0 30px 90px rgba(0,0,0,0.45); max-width:280px; }
+  .dark-row .name { color:var(--paper); }
+  .dark-row .role { color:rgba(244,244,241,0.7); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Fundamentos · Forma y profundidad</div>
+  <h1>Esquinas suaves, profundidad calmada.</h1>
+  <p class="lede">Cuatro radios con significado semántico propio y un vocabulario de sombras que suplementa lo estándar. La profundidad sugiere capas — nunca grita.</p>
+
+  <div class="label">Radios</div>
+  <div class="grid radii">
+    <div class="cell"><div class="box" style="border-radius:28px"></div><div class="name">card</div><div class="v">28px</div><div class="role">Tarjetas principales</div></div>
+    <div class="cell"><div class="box" style="border-radius:40px"></div><div class="name">panel</div><div class="v">40px</div><div class="role">Paneles y modales</div></div>
+    <div class="cell"><div class="box" style="border-radius:22px"></div><div class="name">message</div><div class="v">22px</div><div class="role">Burbujas de mensaje</div></div>
+    <div class="cell"><div class="box" style="border-radius:16px"></div><div class="name">chip</div><div class="v">16px</div><div class="role">Chips y tags</div></div>
+  </div>
+
+  <div class="label">Sombras — sobre claro</div>
+  <div class="shadows">
+    <div class="cell"><div class="box" style="box-shadow:0 18px 70px rgba(11,37,41,0.08)"></div><div class="name">soft</div><div class="role">Cards, superficies flotantes</div></div>
+    <div class="cell"><div class="box" style="box-shadow:0 34px 110px rgba(11,37,41,0.14)"></div><div class="name">float</div><div class="role">Popover, hero, dropdown</div></div>
+    <div class="cell"><div class="box" style="box-shadow:inset 0 1px 0 rgba(255,255,255,0.72), 0 1px 4px rgba(11,37,41,0.16)"></div><div class="name">inset / controlKnob</div><div class="role">Botones, inputs, knobs</div></div>
+  </div>
+
+  <div class="label">Profundidad sobre oscuro</div>
+  <div class="dark-row">
+    <div class="box"></div>
+    <div class="name" style="font-family:ui-monospace,monospace;font-size:13px;font-weight:600;margin-top:16px">floatDark</div>
+    <div class="role" style="font-size:13px;margin-top:6px">0 30px 90px rgb(0 0 0 / 0.45) — para elevar superficies sobre paneles ink.</div>
+  </div>
+</div>
+</body>
+</html>

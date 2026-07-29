@@ -1,20 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-  Box,
-  Text,
-  Button,
-  VStack,
-  HStack,
-  Badge,
-  Input,
-  Spinner,
-} from "@chakra-ui/react";
+import { Text, Button, VStack, HStack, Badge, Input, Center } from "@chakra-ui/react";
 import { Check, X } from "lucide-react";
-import { api, SuggestedSpace } from "@/lib/api";
+import { Card, CardSkeleton, EmptyState, notify } from "@savia-os/ui";
+import { SpaceGlyph } from "@/components/ui/SpaceGlyph";
+import type { SuggestedSpace } from "@savia-os/contracts";
+import { api } from "@/lib/api";
 
-interface SpaceCard extends SuggestedSpace {
+interface SpaceCardModel extends SuggestedSpace {
   accepted: boolean;
   customName: string;
 }
@@ -25,42 +19,41 @@ interface Props {
 
 export function SuggestedSpaces({ onDone }: Props) {
   const [loading, setLoading] = useState(true);
-  const [cards, setCards] = useState<SpaceCard[]>([]);
+  const [cards, setCards] = useState<SpaceCardModel[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.onboarding.suggestSpaces()
-      .then((suggestions) => {
-        setCards(suggestions.map((s) => ({
-          ...s,
-          accepted: true,
-          customName: s.name,
-        })));
-      })
-      .catch((err) => setError(err.message))
+    api.onboarding
+      .suggestSpaces()
+      .then((suggestions) =>
+        setCards(suggestions.map((s) => ({ ...s, accepted: true, customName: s.name }))),
+      )
+      .catch((err) => setError(err instanceof Error ? err.message : "Error"))
       .finally(() => setLoading(false));
   }, []);
 
   function toggle(i: number) {
-    setCards((prev) => prev.map((c, idx) => idx === i ? { ...c, accepted: !c.accepted } : c));
+    setCards((prev) => prev.map((c, idx) => (idx === i ? { ...c, accepted: !c.accepted } : c)));
   }
 
   function rename(i: number, name: string) {
-    setCards((prev) => prev.map((c, idx) => idx === i ? { ...c, customName: name } : c));
+    setCards((prev) => prev.map((c, idx) => (idx === i ? { ...c, customName: name } : c)));
   }
 
   async function handleSave() {
     const toCreate = cards.filter((c) => c.accepted && c.customName.trim());
-    if (toCreate.length === 0) { onDone(); return; }
+    if (toCreate.length === 0) {
+      onDone();
+      return;
+    }
     setSaving(true);
     try {
-      await Promise.all(
-        toCreate.map((c) => api.spaces.create(c.description)),
-      );
+      await Promise.all(toCreate.map((c) => api.areas.create(c.description)));
+      notify.success(`${toCreate.length} spaces creados`);
       onDone();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error");
     } finally {
       setSaving(false);
     }
@@ -68,32 +61,40 @@ export function SuggestedSpaces({ onDone }: Props) {
 
   if (loading) {
     return (
-      <VStack gap="3" py="6">
-        <Spinner size="md" />
+      <VStack align="stretch" gap="3">
         <Text fontSize="sm" color="fg.muted">
           Analizando tus memorias y sugiriendo spaces…
         </Text>
+        <CardSkeleton count={3} height="92px" />
       </VStack>
     );
   }
 
   if (error) {
     return (
-      <VStack align="flex-start" gap="3">
-        <Text fontSize="sm" color="red.500">{error}</Text>
-        <Button size="sm" onClick={onDone} variant="outline">Saltar</Button>
-      </VStack>
+      <EmptyState
+        title="No pudimos sugerir spaces"
+        description={error}
+        action={
+          <Button variant="outline" onClick={onDone}>
+            Continuar de todas formas
+          </Button>
+        }
+      />
     );
   }
 
   if (cards.length === 0) {
     return (
-      <VStack align="flex-start" gap="3">
-        <Text fontSize="sm" color="fg.muted">
-          Aún no hay suficientes memorias para sugerir spaces. Puedes crearlos manualmente.
-        </Text>
-        <Button size="sm" onClick={onDone}>Continuar</Button>
-      </VStack>
+      <EmptyState
+        title="Aún no hay suficientes memorias"
+        description="Cuando importes o conectes más, Savia sugerirá áreas. Por ahora puedes crearlas a mano."
+        action={
+          <Button colorPalette="ink" onClick={onDone}>
+            Continuar
+          </Button>
+        }
+      />
     );
   }
 
@@ -102,82 +103,66 @@ export function SuggestedSpaces({ onDone }: Props) {
   return (
     <VStack align="stretch" gap="4">
       <Text fontSize="sm" color="fg.muted">
-        Savia detectó <strong>{cards.length}</strong> áreas en tu memoria.
-        Acepta o rechaza cada una — puedes editarlas luego.
+        Savia detectó <strong>{cards.length}</strong> áreas en tu memoria. Acepta, renombra
+        o rechaza cada una — puedes editarlas luego.
       </Text>
 
       <VStack align="stretch" gap="3">
         {cards.map((card, i) => (
-          <Box
+          <Card
             key={i}
-            border="1px solid"
-            borderColor={card.accepted ? "brand.solid" : "border.subtle"}
-            borderRadius="lg"
+            variant="flat"
             p="4"
-            opacity={card.accepted ? 1 : 0.5}
-            transition="all 0.15s"
+            opacity={card.accepted ? 1 : 0.55}
+            borderColor={card.accepted ? "ink" : "border.subtle"}
+            transition="opacity 160ms, border-color 160ms"
           >
-            <HStack justify="space-between" mb="2">
-              <HStack gap="2">
+            <HStack justify="space-between" mb="2" gap="3">
+              <HStack gap="3" flex="1" minW="0">
+                <SpaceGlyph spaceId={card.name + i} name={card.customName} size={36} />
                 <Input
                   value={card.customName}
                   onChange={(e) => rename(i, e.target.value)}
-                  fontSize="sm"
                   fontWeight="600"
-                  border="none"
-                  p="0"
-                  h="auto"
-                  bg="transparent"
-                  color="fg"
-                  _focus={{ outline: "none" }}
+                  variant="flushed"
                   disabled={!card.accepted}
+                  maxW="14rem"
                 />
-                <Badge
-                  colorPalette="blue"
-                  variant="subtle"
-                  size="sm"
-                  flexShrink={0}
-                >
+                <Badge colorPalette="mist" variant="subtle" size="sm" flexShrink="0">
                   {card.memoryCount} mem.
                 </Badge>
               </HStack>
-              <Button
-                size="xs"
-                variant="ghost"
+              <Center
+                as="button"
                 onClick={() => toggle(i)}
-                color={card.accepted ? "green.500" : "fg.muted"}
+                w="32px"
+                h="32px"
+                borderRadius="full"
+                flexShrink="0"
+                bg={card.accepted ? "ink" : "bg.subtle"}
+                color={card.accepted ? "signalLime" : "fg.muted"}
+                aria-label={card.accepted ? "Rechazar" : "Aceptar"}
               >
-                {card.accepted ? <Check size={14} /> : <X size={14} />}
-              </Button>
+                {card.accepted ? <Check size={16} /> : <X size={16} />}
+              </Center>
             </HStack>
-
-            <VStack align="stretch" gap="1">
-              {card.examples.map((ex, j) => (
-                <Text
-                  key={j}
-                  fontSize="xs"
-                  color="fg.muted"
-                  overflow="hidden"
-                  textOverflow="ellipsis"
-                  whiteSpace="nowrap"
-                >
+            <VStack align="stretch" gap="1" pl="12">
+              {card.examples.slice(0, 3).map((ex, j) => (
+                <Text key={j} fontSize="xs" color="fg.muted" lineClamp={1}>
                   · {ex}
                 </Text>
               ))}
             </VStack>
-          </Box>
+          </Card>
         ))}
       </VStack>
 
-      <HStack justify="flex-end" gap="2">
-        <Button variant="ghost" size="sm" onClick={onDone}>Saltar</Button>
-        <Button
-          size="sm"
-          onClick={handleSave}
-          loading={saving}
-          disabled={accepted === 0}
-        >
-          Crear {accepted} space{accepted !== 1 ? 's' : ''}
+      <HStack justify="space-between">
+        <Button variant="plain" color="fg.muted" onClick={onDone}>
+          Saltar
+        </Button>
+        <Button colorPalette="ink" onClick={handleSave} loading={saving} disabled={accepted === 0}>
+          Crear {accepted} space{accepted !== 1 ? "s" : ""}
         </Button>
       </HStack>
     </VStack>

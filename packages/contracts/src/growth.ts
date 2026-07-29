@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-export const AreaDtoSchema = z.object({
+// Pulso dashboard area-share row (distinct from the canonical AreaDto in areas.ts).
+export const GrowthAreaDtoSchema = z.object({
   spaceId: z.string(),
   name: z.string(),
   count: z.number(),
@@ -9,8 +10,6 @@ export const AreaDtoSchema = z.object({
 
 export const GrowthPointSchema = z.object({
   bucket: z.string(),
-  spaceId: z.string(),
-  spaceName: z.string(),
   count: z.number(),
 });
 
@@ -21,6 +20,24 @@ export const GrowthSummarySchema = z.object({
   weekDelta: z.number(),
 });
 
-export type AreaDto = z.infer<typeof AreaDtoSchema>;
+// Pulso event feed (event-sourced from MemoryEvent) + revert.
+export const GrowthEventSchema = z.object({
+  id: z.string(),
+  action: z.enum(['create', 'move', 'split', 'merge', 'decay', 'sensitivity', 'supersede']),
+  spaceId: z.string().nullable(),
+  memoryId: z.string().nullable(),
+  reverted: z.boolean(),
+  revertable: z.boolean(),
+  createdAt: z.string(),
+});
+
+export const GrowthEventsPageSchema = z.object({
+  items: z.array(GrowthEventSchema),
+  nextCursor: z.string().nullable(),
+});
+
+export type GrowthAreaDto = z.infer<typeof GrowthAreaDtoSchema>;
 export type GrowthPoint = z.infer<typeof GrowthPointSchema>;
 export type GrowthSummary = z.infer<typeof GrowthSummarySchema>;
+export type GrowthEvent = z.infer<typeof GrowthEventSchema>;
+export type GrowthEventsPage = z.infer<typeof GrowthEventsPageSchema>;

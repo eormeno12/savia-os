@@ -1,5 +1,5 @@
 import { Box, Flex, Grid, Text } from "@chakra-ui/react";
-import { SaviaMark } from "@/components/design-system/savia-mark";
+import { SaviaMark } from "@savia-os/ui";
 
 export const metadata = { title: "Logo" };
 

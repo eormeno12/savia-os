@@ -8,12 +8,15 @@
     "build": "next build",
     "start": "next start -p 4345",
     "typecheck": "tsc --noEmit",
-    "lint": "next lint",
+    "lint": "eslint .",
     "clean": "rm -rf .next"
   },
   "dependencies": {
     "@chakra-ui/react": "^3.21.0",
     "@savia-os/contracts": "workspace:*",
+    "@savia-os/design-tokens": "workspace:*",
+    "@savia-os/ui": "workspace:*",
+    "d3-hierarchy": "^3.1.2",
     "framer-motion": "^12.40.0",
     "lucide-react": "^1.16.0",
     "next": "^16.2.6",
@@ -22,12 +25,19 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@eslint/js": "9.39.4",
+    "@next/eslint-plugin-next": "^16.2.9",
     "@savia-os/tsconfig": "workspace:*",
+    "@types/d3-hierarchy": "^3.1.7",
     "@types/node": "25.9.3",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.6",
-    "typescript": "^5.9.3"
+    "eslint-plugin-react": "7.37.5",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "16.4.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "8.61.1"
   }
 }

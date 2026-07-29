@@ -1,0 +1,70 @@
+<!-- @dsCard group="Tipografía" title="Escala tipográfica (Inter)" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Savia · Tipografía</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root { --ink:#0B2529; --paper:#F4F4F1; --lime:#E7FF18; --slate:#53606C; --line:#DDDFDC; --mist:#ECEDEA; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter', system-ui, sans-serif; background:var(--paper); color:var(--ink); -webkit-font-smoothing:antialiased; padding:64px 48px; }
+  .wrap { max-width:1100px; margin:0 auto; }
+  .eyebrow { font-size:12px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--slate); margin-bottom:24px; }
+  h1 { font-size:clamp(40px,4.8vw,72px); font-weight:300; line-height:0.92; }
+  h1 em { font-weight:600; font-style:normal; }
+  .lede { font-size:clamp(16px,1.1vw,20px); line-height:1.6; color:var(--slate); margin-top:24px; max-width:56ch; }
+  .label { font-size:12px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--slate); margin:64px 0 24px; }
+  .weights { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; }
+  .weights .w { border:1px solid var(--line); border-radius:18px; padding:24px; background:#fff; }
+  .weights .aa { font-size:48px; line-height:1; letter-spacing:-0.01em; }
+  .weights .wn { font-family:ui-monospace,monospace; font-size:12px; color:var(--slate); margin-top:18px; }
+  .row { display:flex; gap:40px; align-items:baseline; flex-wrap:wrap; padding:28px 0; border-bottom:1px solid var(--line); }
+  .row .spec { width:200px; flex-shrink:0; }
+  .row .spec code { font-family:ui-monospace,monospace; font-size:13px; font-weight:600; }
+  .row .spec .m { font-family:ui-monospace,monospace; font-size:11px; color:var(--slate); margin-top:6px; line-height:1.5; }
+  .specimen { color:var(--ink); }
+  .pairing { border:1px solid var(--line); border-radius:28px; padding:48px; margin-top:24px; background:#fff; }
+  .pairing .e { font-size:12px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--slate); margin-bottom:24px; }
+  .pairing h3 { font-weight:300; font-size:clamp(36px,4.4vw,60px); line-height:0.94; max-width:16ch; }
+  .hl { display:inline-block; background:var(--ink); color:var(--lime); font-weight:400; line-height:1; padding:0.03em 0.14em; border-radius:0.07em; }
+  .pairing p { font-size:clamp(16px,1.1vw,20px); line-height:1.75; color:var(--slate); margin-top:28px; max-width:54ch; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Fundamentos · Tipografía</div>
+  <h1>Una sola fuente: <em>Inter.</em></h1>
+  <p class="lede">Cuatro pesos. Display ligero (300) para el aire, semibold (600) para el énfasis. Sin cursivas — no son parte de la voz. Todos los tamaños de display escalan con <code>clamp()</code>: el texto respira con el viewport, sin saltos de breakpoint.</p>
+
+  <div class="label">Pesos</div>
+  <div class="weights">
+    <div class="w"><div class="aa" style="font-weight:300">Aa</div><div class="wn">300 · light · display</div></div>
+    <div class="w"><div class="aa" style="font-weight:400">Aa</div><div class="wn">400 · regular · cuerpo</div></div>
+    <div class="w"><div class="aa" style="font-weight:500">Aa</div><div class="wn">500 · medium · nav</div></div>
+    <div class="w"><div class="aa" style="font-weight:600">Aa</div><div class="wn">600 · semibold · énfasis</div></div>
+  </div>
+
+  <div class="label">Escala — textStyles del tema</div>
+  <div class="row"><div class="spec"><code>display3xl</code><div class="m">clamp(2.75rem,6vw,6rem)<br>300 · lh 0.92</div></div><div class="specimen" style="font-weight:300;font-size:clamp(2.75rem,6vw,6rem);line-height:0.92">Una sola señal</div></div>
+  <div class="row"><div class="spec"><code>display2xl</code><div class="m">clamp(2.35rem,5vw,5rem)<br>300 · lh 0.88</div></div><div class="specimen" style="font-weight:300;font-size:clamp(2.35rem,5vw,5rem);line-height:0.88">Tu segunda capa</div></div>
+  <div class="row"><div class="spec"><code>displayXl</code><div class="m">clamp(40px,4.8vw,80px)<br>300 · lh 0.92</div></div><div class="specimen" style="font-weight:300;font-size:clamp(40px,4.8vw,80px);line-height:0.92">Memoria para tu IA</div></div>
+  <div class="row"><div class="spec"><code>displayMd / pageTitle</code><div class="m">clamp(2rem,3.4vw,3.35rem)<br>600 · lh 1.02</div></div><div class="specimen" style="font-weight:600;font-size:clamp(2rem,3.4vw,3.35rem);line-height:1.02;letter-spacing:-0.01em">Recuerda por ti</div></div>
+  <div class="row"><div class="spec"><code>titleLg</code><div class="m">clamp(20px,1.6vw,32px)<br>600 · lh 1.1</div></div><div class="specimen" style="font-weight:600;font-size:clamp(20px,1.6vw,32px);line-height:1.1">Cómo funciona la memoria</div></div>
+  <div class="row"><div class="spec"><code>cardTitle</code><div class="m">18px (lg) · 600<br>lh 1.2 · ls -0.01em</div></div><div class="specimen" style="font-weight:600;font-size:18px;line-height:1.2;letter-spacing:-0.01em">Título de card o sección</div></div>
+  <div class="row"><div class="spec"><code>metric</code><div class="m">30px (3xl) · 700<br>tabular-nums</div></div><div class="specimen" style="font-weight:700;font-size:30px;line-height:1;letter-spacing:-0.02em;font-variant-numeric:tabular-nums">47 recuerdos</div></div>
+  <div class="row"><div class="spec"><code>bodyLg</code><div class="m">clamp(16px,1.1vw,20px)<br>400 · lh 1.75</div></div><div class="specimen" style="font-weight:400;font-size:clamp(16px,1.1vw,20px);line-height:1.75;max-width:48ch">Savia reúne cada conversación que pasa por tus IAs y la conecta de vuelta, sin que tengas que recordarlo tú.</div></div>
+  <div class="row" style="border-bottom:none"><div class="spec"><code>label</code><div class="m">12px · 600<br>ls 0.12em · uppercase</div></div><div class="specimen" style="font-weight:600;font-size:12px;letter-spacing:0.12em;text-transform:uppercase">Acceso anticipado</div></div>
+
+  <div class="label">Jerarquía + highlight ink</div>
+  <div class="pairing">
+    <div class="e">Cómo funciona</div>
+    <h3>La memoria que <span class="hl">conecta</span> todas tus IAs.</h3>
+    <p>El patrón estándar: label + headline ligero (300) con la palabra de énfasis en highlight ink, y cuerpo en slate. El lima vive sobre el bloque oscuro, nunca como texto suelto sobre claro.</p>
+  </div>
+</div>
+</body>
+</html>

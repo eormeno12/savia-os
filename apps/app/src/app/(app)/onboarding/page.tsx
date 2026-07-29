@@ -1,232 +1,270 @@
 "use client";
 
 import { useState } from "react";
-import { Box, Text, VStack, HStack, Button, Badge, Separator } from "@chakra-ui/react";
 import { useRouter } from "next/navigation";
-import { RescueStep } from "@/components/onboarding/RescueStep";
-import { ImportStep } from "@/components/onboarding/ImportStep";
-import { SuggestedSpaces } from "@/components/onboarding/SuggestedSpaces";
-import { MessageSquare, Upload, Layers, Zap } from "lucide-react";
+import { Box, Button, HStack, Stack, Text, Textarea } from "@chakra-ui/react";
+import { ArrowLeft, ArrowRight, Check, Copy, Plus, Sparkles, Upload } from "lucide-react";
+import { CopyBlock, notify } from "@savia-os/ui";
+import { api, ApiError } from "@/lib/api";
 
-type WizardStep = "welcome" | "rescue" | "import" | "suggest" | "done";
+type Step = "welcome" | "import" | "rescue";
+const STEPS = ["Bienvenida", "Poblar", "Conectar", "Listo"];
 
-const STEPS = [
-  { id: "welcome", label: "Bienvenida" },
-  { id: "import", label: "Importar" },
-  { id: "suggest", label: "Spaces" },
-  { id: "done", label: "Conectar" },
-] as const;
-
+/**
+ * O1–O3 — Onboarding: welcome (choose how to start), then import a ChatGPT
+ * export or rescue memory via a prompt. "Empezar vacío" jumps straight to the
+ * map; connecting an IA happens in Conexiones.
+ */
 export default function OnboardingPage() {
   const router = useRouter();
-  const [step, setStep] = useState<WizardStep>("welcome");
-  const [importMode, setImportMode] = useState<"rescue" | "chatgpt" | null>(null);
-
-  const stepIndex = STEPS.findIndex((s) => s.id === step || (step === "rescue" && s.id === "import"));
-
-  function goSuggest() { setStep("suggest"); }
-  function goDone() { setStep("done"); }
+  const [step, setStep] = useState<Step>("welcome");
+  const stepIndex = step === "welcome" ? 0 : 1;
 
   return (
-    <Box maxW="600px" mx="auto" py="10" px="4">
-      {/* Progress */}
-      <HStack gap="1" mb="8">
-        {STEPS.map((s, i) => (
-          <HStack key={s.id} gap="1" flex="1" align="center">
-            <Box
-              h="2"
-              flex="1"
-              borderRadius="full"
-              bg={i <= stepIndex ? "brand.solid" : "border.subtle"}
-              transition="background 0.2s"
-            />
-            <Text fontSize="xs" color={i <= stepIndex ? "fg" : "fg.muted"} whiteSpace="nowrap">
-              {s.label}
-            </Text>
-          </HStack>
-        ))}
+    <Stack gap="8" maxW="980px" mx="auto">
+      <HStack gap="2.5" justify="center">
+        {STEPS.map((label, i) => {
+          const done = i < stepIndex;
+          const here = i === stepIndex;
+          return (
+            <HStack key={label} gap="2.5">
+              <HStack gap="2">
+                <Box
+                  w="2.5"
+                  h="2.5"
+                  rounded="full"
+                  bg={done || here ? "ink.solid" : "transparent"}
+                  borderWidth={done || here ? "0" : "1.5px"}
+                  borderColor="border"
+                />
+                <Text fontSize="13px" fontWeight={here ? "600" : "500"} color={here || done ? "fg" : "fg.muted"}>
+                  {label}
+                </Text>
+              </HStack>
+              {i < STEPS.length - 1 ? <Box w="7" h="1px" bg="border" /> : null}
+            </HStack>
+          );
+        })}
       </HStack>
 
-      <VStack align="stretch" gap="6">
-        {/* STEP: Welcome */}
-        {step === "welcome" && (
-          <>
-            <Box>
-              <Text fontSize="2xl" fontWeight="800" color="fg" mb="2">
-                Bienvenido a Savia
-              </Text>
-              <Text color="fg.muted">
-                La memoria que conecta todas tus IAs. Empieza importando lo que ya
-                saben de ti — o conéctate directamente y Savia irá aprendiendo.
-              </Text>
-            </Box>
+      {step === "welcome" ? (
+        <WelcomeStep
+          onImport={() => setStep("import")}
+          onRescue={() => setStep("rescue")}
+          onSkip={() => router.push("/memoria")}
+        />
+      ) : step === "import" ? (
+        <ImportStep onBack={() => setStep("welcome")} onDone={() => router.push("/memoria")} />
+      ) : (
+        <RescueStep onBack={() => setStep("welcome")} onDone={() => router.push("/memoria")} />
+      )}
+    </Stack>
+  );
+}
 
-            <Separator />
+function WelcomeStep({
+  onImport,
+  onRescue,
+  onSkip,
+}: {
+  onImport: () => void;
+  onRescue: () => void;
+  onSkip: () => void;
+}) {
+  return (
+    <Stack gap="0">
+      <Text fontWeight="300" fontSize="displayLg" lineHeight="1" color="fg">
+        Hola.
+      </Text>
+      <Text fontSize="18px" color="fg.muted" mt="4" maxW="52ch" lineHeight="1.6">
+        Vamos a darle vida a tu memoria. Elige cómo arrancar — luego Savia la organiza sola.
+      </Text>
 
-            <VStack align="stretch" gap="3">
-              <Text fontSize="sm" fontWeight="600" color="fg">¿Cómo quieres empezar?</Text>
+      <HStack gap="4.5" mt="9" align="stretch" flexDirection={{ base: "column", md: "row" }}>
+        <Stack flex="1" bg="bg.inverse" color="fg.inverse" rounded="3xl" p="7" position="relative" overflow="hidden" gap="0">
+          <Box position="absolute" w="220px" h="220px" rounded="full" bg="lime.solid" filter="blur(90px)" opacity="0.12" top="-90px" insetEnd="-60px" />
+          <Box position="relative" as="span" alignSelf="flex-start" textStyle="label" color="ink.solid" bg="lime.solid" px="2.5" py="1.5" rounded="full">
+            Recomendado
+          </Box>
+          <Box position="relative" color="lime.solid" mt="5.5">
+            <Upload size={30} strokeWidth={1.6} />
+          </Box>
+          <Text position="relative" fontSize="20px" fontWeight="600" mt="4.5">
+            Importar conversaciones
+          </Text>
+          <Text position="relative" fontSize="14px" color="fg.inverse" opacity="0.72" mt="2.5" lineHeight="1.55">
+            Sube tus exports de ChatGPT, Claude o Gemini y extraemos tus recuerdos.
+          </Text>
+          <Button position="relative" colorPalette="lime" mt="6" onClick={onImport}>
+            Importar
+          </Button>
+        </Stack>
 
-              <Box
-                border="1px solid"
-                borderColor={importMode === "rescue" ? "brand.solid" : "border.subtle"}
-                borderRadius="lg"
-                p="4"
-                cursor="pointer"
-                onClick={() => setImportMode("rescue")}
-                _hover={{ borderColor: "brand.solid" }}
-                transition="border-color 0.15s"
-              >
-                <HStack gap="3">
-                  <MessageSquare size={20} />
-                  <Box>
-                    <Text fontSize="sm" fontWeight="600" color="fg">
-                      Prompt de rescate
-                    </Text>
-                    <Text fontSize="xs" color="fg.muted">
-                      Pídele a tu IA actual que resuma todo lo que sabe de ti.
-                      El camino más rápido.
-                    </Text>
-                  </Box>
-                  <Badge colorPalette="green" variant="subtle" size="sm" ml="auto">
-                    Recomendado
-                  </Badge>
-                </HStack>
-              </Box>
+        <OnbCard
+          icon={<Copy size={30} strokeWidth={1.6} />}
+          title="Rescatar con un prompt"
+          body="Copia un prompt, pégalo en tu IA y trae la respuesta aquí."
+          action={
+            <Button variant="outline" onClick={onRescue}>
+              Rescatar
+            </Button>
+          }
+        />
 
-              <Box
-                border="1px solid"
-                borderColor={importMode === "chatgpt" ? "brand.solid" : "border.subtle"}
-                borderRadius="lg"
-                p="4"
-                cursor="pointer"
-                onClick={() => setImportMode("chatgpt")}
-                _hover={{ borderColor: "brand.solid" }}
-                transition="border-color 0.15s"
-              >
-                <HStack gap="3">
-                  <Upload size={20} />
-                  <Box>
-                    <Text fontSize="sm" fontWeight="600" color="fg">
-                      Export de ChatGPT
-                    </Text>
-                    <Text fontSize="xs" color="fg.muted">
-                      Importa tu historial completo de conversaciones.
-                    </Text>
-                  </Box>
-                </HStack>
-              </Box>
-            </VStack>
+        <OnbCard
+          icon={<Plus size={30} strokeWidth={1.6} />}
+          title="Empezar vacío"
+          body="Salta este paso. Tu memoria se construye sola cuando conectes tus IAs."
+          action={
+            <Button variant="ghost" onClick={onSkip}>
+              Saltar por ahora <ArrowRight size={15} />
+            </Button>
+          }
+        />
+      </HStack>
+    </Stack>
+  );
+}
 
-            <HStack justify="flex-end" gap="2">
-              <Button variant="ghost" size="sm" onClick={() => setStep("suggest")}>
-                Saltar por ahora
-              </Button>
-              <Button
-                size="sm"
-                disabled={!importMode}
-                onClick={() => setStep(importMode === "rescue" ? "rescue" : "import")}
-              >
-                Continuar
-              </Button>
-            </HStack>
-          </>
-        )}
+function OnbCard({
+  icon,
+  title,
+  body,
+  action,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  body: string;
+  action: React.ReactNode;
+}) {
+  return (
+    <Stack flex="1" bg="bg.panel" borderWidth="1px" borderColor="border" rounded="3xl" p="7" gap="0">
+      <Box color="fg">{icon}</Box>
+      <Text fontSize="20px" fontWeight="600" color="fg" mt="4.5">
+        {title}
+      </Text>
+      <Text fontSize="14px" color="fg.muted" mt="2.5" lineHeight="1.55" flex="1">
+        {body}
+      </Text>
+      <Box mt="6">{action}</Box>
+    </Stack>
+  );
+}
 
-        {/* STEP: Rescue */}
-        {step === "rescue" && (
-          <>
-            <Box>
-              <Text fontSize="lg" fontWeight="700" color="fg" mb="1">
-                Prompt de rescate
-              </Text>
-              <Text fontSize="sm" color="fg.muted">
-                Copia el prompt, pégalo en tu IA, y pega aquí la respuesta.
-              </Text>
-            </Box>
-            <RescueStep onDone={goSuggest} />
-          </>
-        )}
+function ImportStep({ onBack, onDone }: { onBack: () => void; onDone: () => void }) {
+  const [content, setContent] = useState("");
+  const [busy, setBusy] = useState(false);
 
-        {/* STEP: ChatGPT import */}
-        {step === "import" && (
-          <>
-            <Box>
-              <HStack gap="2" mb="1">
-                <Text fontSize="lg" fontWeight="700" color="fg">
-                  Import ChatGPT
-                </Text>
-                <Badge colorPalette="orange" variant="subtle" size="sm">Beta</Badge>
-              </HStack>
-              <Text fontSize="sm" color="fg.muted">
-                Sube tu conversations.json. Savia extrae los hechos relevantes —
-                no guarda las conversaciones completas.
-              </Text>
-            </Box>
-            <ImportStep onDone={goSuggest} />
-          </>
-        )}
+  async function submit() {
+    if (content.trim().length < 20) return notify.error("Pega el contenido de tu export.");
+    setBusy(true);
+    try {
+      const { queued } = await api.onboarding.importChatGpt(content);
+      notify.success("Importación en marcha", `${queued} conversaciones en cola.`);
+      onDone();
+    } catch (err) {
+      notify.error(err instanceof ApiError ? err.message : "No pudimos importar.");
+      setBusy(false);
+    }
+  }
 
-        {/* STEP: Suggest spaces */}
-        {step === "suggest" && (
-          <>
-            <Box>
-              <HStack gap="2" mb="1">
-                <Layers size={18} />
-                <Text fontSize="lg" fontWeight="700" color="fg">
-                  Tus spaces sugeridos
-                </Text>
-              </HStack>
-              <Text fontSize="sm" color="fg.muted">
-                Savia agrupó tus memorias y sugiere estas categorías.
-              </Text>
-            </Box>
-            <SuggestedSpaces onDone={goDone} />
-          </>
-        )}
+  return (
+    <Stack gap="5" maxW="680px" mx="auto" w="full">
+      <Box>
+        <Text fontWeight="300" fontSize="displayMd" lineHeight="1" color="fg">
+          Importa tus conversaciones.
+        </Text>
+        <Text fontSize="15px" color="fg.muted" mt="3" lineHeight="1.6" maxW="56ch">
+          Pega el JSON de tu export de ChatGPT (o súbelo luego en Fuentes). Extraemos lo que importa
+          y lo clasificamos en áreas.
+        </Text>
+      </Box>
+      <Textarea
+        value={content}
+        onChange={(e) => setContent(e.target.value)}
+        placeholder="Pega aquí el contenido de tu export…"
+        rows={8}
+        resize="none"
+      />
+      <HStack>
+        <Button variant="outline" onClick={onBack}>
+          <ArrowLeft size={15} /> Atrás
+        </Button>
+        <Button colorPalette="ink" ms="auto" onClick={submit} loading={busy}>
+          Importar <ArrowRight size={15} />
+        </Button>
+      </HStack>
+    </Stack>
+  );
+}
 
-        {/* STEP: Done */}
-        {step === "done" && (
-          <VStack align="flex-start" gap="5">
-            <Box>
-              <Text fontSize="2xl" fontWeight="800" color="fg" mb="2">
-                ¡Todo listo!
-              </Text>
-              <Text color="fg.muted">
-                Tu memoria está en Savia. El siguiente paso es conectar tu IA
-                favorita para que pueda buscar en ella.
-              </Text>
-            </Box>
+function RescueStep({ onBack, onDone }: { onBack: () => void; onDone: () => void }) {
+  const [prompt, setPrompt] = useState<string | null>(null);
+  const [answer, setAnswer] = useState("");
+  const [busy, setBusy] = useState(false);
 
-            <Box
-              border="1px solid"
-              borderColor="border.subtle"
-              borderRadius="lg"
-              p="5"
-              w="full"
-              bg="bg.subtle"
-            >
-              <HStack gap="3" mb="3">
-                <Zap size={18} />
-                <Text fontSize="sm" fontWeight="600" color="fg">
-                  Conectar tu IA
-                </Text>
-              </HStack>
-              <Text fontSize="xs" color="fg.muted" mb="3">
-                Crea una conexión, asigna spaces y copia la config MCP en
-                Claude Code, Cursor, o cualquier cliente compatible.
-              </Text>
-              <HStack gap="2">
-                <Button size="sm" onClick={() => router.push("/connections")}>
-                  Ir a Conexiones
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => router.push("/drive")}>
-                  Ver Drive
-                </Button>
-              </HStack>
-            </Box>
-          </VStack>
-        )}
-      </VStack>
-    </Box>
+  async function loadPrompt() {
+    setBusy(true);
+    try {
+      const { prompt: p } = await api.onboarding.rescuePrompt();
+      setPrompt(p);
+    } catch {
+      notify.error("No pudimos generar el prompt.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submit() {
+    if (answer.trim().length < 20) return notify.error("Pega la respuesta de tu IA.");
+    setBusy(true);
+    try {
+      const { count } = await api.onboarding.ingestRescue(answer);
+      notify.success("Memoria rescatada", `${count} recuerdos sumados.`);
+      onDone();
+    } catch {
+      notify.error("No pudimos rescatar.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Stack gap="5" maxW="680px" mx="auto" w="full">
+      <Box>
+        <Text fontWeight="300" fontSize="displayMd" lineHeight="1" color="fg">
+          Rescata lo que tu IA ya sabe.
+        </Text>
+        <Text fontSize="15px" color="fg.muted" mt="3" lineHeight="1.6" maxW="56ch">
+          Copia este prompt, pégalo en tu IA y trae la respuesta. Savia la convierte en recuerdos.
+        </Text>
+      </Box>
+
+      {!prompt ? (
+        <Button colorPalette="ink" alignSelf="flex-start" onClick={loadPrompt} loading={busy}>
+          <Sparkles size={16} /> Generar prompt
+        </Button>
+      ) : (
+        <>
+          <CopyBlock value={prompt} copyLabel="Copiar prompt" />
+          <Box>
+            <Text fontSize="14px" fontWeight="600" color="fg" mb="2">
+              Pega aquí la respuesta de tu IA
+            </Text>
+            <Textarea value={answer} onChange={(e) => setAnswer(e.target.value)} rows={7} resize="none" placeholder="Pega la respuesta…" />
+          </Box>
+        </>
+      )}
+
+      <HStack>
+        <Button variant="outline" onClick={onBack}>
+          <ArrowLeft size={15} /> Atrás
+        </Button>
+        {prompt ? (
+          <Button colorPalette="ink" ms="auto" onClick={submit} loading={busy}>
+            <Check size={15} /> Rescatar
+          </Button>
+        ) : null}
+      </HStack>
+    </Stack>
   );
 }

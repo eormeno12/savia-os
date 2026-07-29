@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Box, Flex, Link } from '@chakra-ui/react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { CtaButton } from '@/components/landing/cta-button';
-import { SaviaMark } from '@/components/design-system/savia-mark';
+import { SaviaMark } from '@savia-os/ui';
 import { AppHeader } from '@/components/ui/app-header';
 import { NAV_ITEMS, BRAND_COLORS, EASE_SAVIA } from '@/lib/constants';
 

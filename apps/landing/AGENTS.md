@@ -10,7 +10,9 @@ Next.js 16 App Router · React 19 · Chakra UI v3 (Panda CSS) · Framer Motion 1
 - `next/dynamic` with `ssr: false` is NOT allowed in Server Components — Turbopack build error.
 - Never hardcode hex values. Use design tokens from `src/theme/`. Brand constants from `src/lib/constants.ts`.
 - `overflowX: "hidden"` on `html`, not `body` (breaks sticky positioning).
-- Copy language: Spanish. One-liner: "La memoria que conecta todas tus IAs."
+- Copy language: Spanish. One-liner: "El cerebro ejecutable de cada empresa." (B2B —
+  see `docs/product/savia-b2b/01-vision.md`; the old "La memoria que conecta todas tus IAs"
+  one-liner is retired as the product pitch, it now only describes the bottom-up entry layer).
 
 ## Commands (from monorepo root)
 pnpm landing:dev · pnpm landing:build · pnpm landing:typecheck · pnpm landing:lint

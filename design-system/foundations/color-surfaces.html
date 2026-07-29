@@ -1,0 +1,83 @@
+<!-- @dsCard group="Color" title="Superficies y tokens semánticos" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Savia · Superficies</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root { --ink:#0B2529; --softInk:#152F34; --paper:#F4F4F1; --lime:#E7FF18; --mist:#ECEDEA; --line:#DDDFDC; --slate:#53606C; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter', system-ui, sans-serif; background:var(--paper); color:var(--ink); -webkit-font-smoothing:antialiased; padding:64px 48px; }
+  .wrap { max-width:1100px; margin:0 auto; }
+  .eyebrow { font-size:12px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--slate); margin-bottom:24px; }
+  h1 { font-size:clamp(40px,4.8vw,72px); font-weight:300; line-height:0.92; max-width:18ch; }
+  .lede { font-size:clamp(16px,1.1vw,20px); line-height:1.6; color:var(--slate); margin-top:24px; max-width:54ch; }
+  .duo { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:56px; }
+  @media (max-width:720px){ .duo{ grid-template-columns:1fr; } }
+  .surface { border-radius:28px; padding:32px; min-height:240px; }
+  .light { background:var(--paper); border:1px solid var(--line); }
+  .dark { background:var(--ink); position:relative; overflow:hidden; }
+  .glow { position:absolute; width:300px; height:300px; border-radius:50%; background:var(--lime); filter:blur(110px); opacity:0.08; bottom:-100px; left:-40px; }
+  .stag { font-size:11px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; }
+  .light .stag { color:var(--slate); }
+  .dark .stag { color:rgba(244,244,241,0.6); }
+  .surface h3 { font-weight:300; font-size:30px; line-height:1; margin-top:18px; }
+  .light h3 { color:var(--ink); }
+  .dark h3 { color:var(--paper); }
+  .surface p { font-size:14px; line-height:1.65; margin-top:14px; max-width:34ch; }
+  .light p { color:var(--slate); }
+  .dark p { color:rgba(244,244,241,0.7); }
+  .pill { margin-top:24px; display:inline-block; font-size:14px; font-weight:600; padding:12px 20px; border-radius:14px; }
+  .light .pill { background:var(--ink); color:var(--paper); }
+  .dark .pill { background:var(--lime); color:var(--ink); }
+  .label { font-size:12px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--slate); margin:64px 0 18px; }
+  table { width:100%; border-collapse:collapse; border:1px solid var(--line); border-radius:16px; overflow:hidden; }
+  th { text-align:left; font-size:11px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:var(--slate); padding:12px 18px; background:var(--mist); }
+  td { padding:12px 18px; font-size:13px; border-top:1px solid var(--line); }
+  td code { font-family:ui-monospace,monospace; font-size:12px; font-weight:600; }
+  td .role { color:var(--slate); }
+  .sw { display:inline-block; width:16px; height:16px; border-radius:4px; vertical-align:middle; margin-right:8px; box-shadow:inset 0 0 0 1px rgba(11,37,41,0.12); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Fundamentos · Color</div>
+  <h1>Contraste dramático: claro de trabajo, oscuro de firma.</h1>
+  <p class="lede">No es un producto oscuro ni un SaaS claro plano. Es la tensión entre un lienzo claro y superficies oscuras de firma — donde vive la marca y brilla el lima.</p>
+
+  <div class="duo">
+    <div class="surface light">
+      <div class="stag">Claro · trabajo y contenido</div>
+      <h3>Áreas de trabajo</h3>
+      <p>Listas, formularios, tablas. Texto en ink / slate. El primario aquí es ink (no lima).</p>
+      <span class="pill">Acción primaria (ink)</span>
+    </div>
+    <div class="surface dark">
+      <div class="glow"></div>
+      <div class="stag">Oscuro · firma</div>
+      <h3>Momentos «wow»</h3>
+      <p>Heroes, formularios con CTA, resultados celebrados. Es donde vive el lima.</p>
+      <span class="pill">Acción primaria (lima)</span>
+    </div>
+  </div>
+
+  <div class="label">Tokens semánticos — mapean al contexto</div>
+  <table>
+    <thead><tr><th style="width:30%">Token</th><th style="width:34%">Valor</th><th>Rol</th></tr></thead>
+    <tbody>
+      <tr><td><code>bg</code></td><td><span class="sw" style="background:#F4F4F1"></span>paper</td><td class="role">Fondo de página</td></tr>
+      <tr><td><code>bg.subtle</code></td><td><span class="sw" style="background:#ECEDEA"></span>mist</td><td class="role">Cards y secciones</td></tr>
+      <tr><td><code>bg.inverse</code></td><td><span class="sw" style="background:#0B2529"></span>ink</td><td class="role">Superficie oscura de firma</td></tr>
+      <tr><td><code>fg</code></td><td><span class="sw" style="background:#0B2529"></span>ink</td><td class="role">Texto principal</td></tr>
+      <tr><td><code>fg.muted</code></td><td><span class="sw" style="background:#53606C"></span>slateText</td><td class="role">Texto secundario</td></tr>
+      <tr><td><code>fg.inverse</code></td><td><span class="sw" style="background:#F4F4F1"></span>paper</td><td class="role">Texto sobre oscuro</td></tr>
+      <tr><td><code>border</code></td><td><span class="sw" style="background:#DDDFDC"></span>line</td><td class="role">Bordes y divisores</td></tr>
+    </tbody>
+  </table>
+</div>
+</body>
+</html>

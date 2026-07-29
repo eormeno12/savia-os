@@ -1,6 +1,6 @@
 import { Box, Grid, Text } from "@chakra-ui/react";
 import Link from "next/link";
-import { SaviaMark } from "@/components/design-system/savia-mark";
+import { SaviaMark } from "@savia-os/ui";
 
 const SECTIONS = [
   {

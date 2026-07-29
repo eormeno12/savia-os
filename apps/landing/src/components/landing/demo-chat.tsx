@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Box, Flex, Grid, Input, Stack, Text } from '@chakra-ui/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, CornerDownLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@savia-os/ui';
 import { EASE_SAVIA, BRAND_COLORS } from '@/lib/constants';
 import { MemoryGraph } from './memory-graph';
 import { PersonaCard, type PersonaDisplay } from './persona-card';
@@ -651,7 +651,6 @@ function ChatPanel({
           />
           <Button
             colorPalette={accent ? 'lime' : 'ink'}
-            borderRadius="full"
             h="10"
             px="4"
             onClick={onSend}

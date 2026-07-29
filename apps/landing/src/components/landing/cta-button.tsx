@@ -1,4 +1,4 @@
-import { LinkButton } from '@/components/ui/button';
+import { LinkButton } from '@savia-os/ui';
 import type { ButtonProps } from '@chakra-ui/react';
 
 type CtaButtonProps = Pick<ButtonProps, 'size' | 'w' | 'onClick'> & {

@@ -1,0 +1,439 @@
+<meta charset="utf-8">
+<title>Savia B2B — Estrategia de gobernanza de memoria (v1, revisada por panel)</title>
+<style>
+  :root {
+    --ink: #0B2529;
+    --soft-ink: #152F34;
+    --paper: #F4F4F1;
+    --mist: #ECEDEA;
+    --line: #DDDFDC;
+    --slate: #53606C;
+    --lime: #E7FF18;
+    --lime-soft: #F1FF67;
+    --ease-savia: cubic-bezier(0.22, 1, 0.36, 1);
+
+    --success: #4A7C59;
+    --success-bg: #E4EEE3;
+    --warning: #8A6A2A;
+    --warning-bg: #F3E9D3;
+    --danger: #A23B32;
+    --danger-bg: #F5E2DF;
+    --info: #3D6B8A;
+    --info-bg: #E1EBF1;
+    --new-work: #B5541F;
+    --new-work-bg: #FBE7D8;
+
+    --ramp-2: #17434A;
+    --ramp-3: #1F6E63;
+    --ramp-4: #3D9B7C;
+
+    --chrome-bg: #fbfaf8;
+    --chrome-border: #e4e1d8;
+    --chrome-fg: #14171a;
+    --chrome-muted: #6b6f76;
+  }
+  :root[data-theme="dark"] {
+    --chrome-bg: #17181a; --chrome-border: #2c2e31; --chrome-fg: #f0efec; --chrome-muted: #9a9ea6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --chrome-bg: #17181a; --chrome-border: #2c2e31; --chrome-fg: #f0efec; --chrome-muted: #9a9ea6; }
+  }
+  * { box-sizing: border-box; }
+  @media (prefers-reduced-motion: reduce) { * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
+  html, body { margin: 0; background: var(--paper); }
+  body { font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color: var(--ink); }
+  button, summary { font-family: inherit; }
+  :focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+  h1, h2, h3 { text-wrap: balance; }
+  .tabular { font-variant-numeric: tabular-nums; }
+
+  /* ---------- chrome bar ---------- */
+  #chrome {
+    position: sticky; top: 0; z-index: 80; display: flex; align-items: center; gap: 14px;
+    padding: 11px 22px; background: color-mix(in srgb, var(--chrome-bg) 92%, transparent);
+    backdrop-filter: blur(8px); border-bottom: 1px solid var(--chrome-border); font-size: 12.5px; color: var(--chrome-fg);
+  }
+  #chrome .tag { font-weight: 700; letter-spacing: .04em; text-transform: uppercase; font-size: 10.5px; background: var(--ink); color: var(--lime); border-radius: 999px; padding: 4px 10px; }
+  #chrome .desc { color: var(--chrome-muted); }
+  #chrome nav { display: flex; gap: 2px; margin-left: 10px; flex-wrap: wrap; }
+  #chrome nav a { font-size: 12px; font-weight: 600; color: var(--chrome-muted); text-decoration: none; padding: 6px 10px; border-radius: 999px; }
+  #chrome nav a:hover { background: var(--mist); color: var(--ink); }
+  #chrome .spacer { flex: 1; }
+  #chrome button { border: 1px solid var(--chrome-border); background: transparent; color: var(--chrome-fg); border-radius: 999px; padding: 7px 13px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  #chrome button:hover { border-color: var(--chrome-muted); }
+  #chrome button.active { background: var(--new-work); color: #fff; border-color: var(--new-work); }
+
+  /* toggled "what's new" highlighting */
+  body.show-new .new-work-mark { outline: 2px dashed var(--new-work); outline-offset: 3px; border-radius: 10px; }
+  body.show-new .new-badge { display: inline-flex; }
+  .new-badge { display: none; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; background: var(--new-work-bg); color: var(--new-work); border-radius: 999px; padding: 3px 8px; text-transform: uppercase; letter-spacing: .03em; }
+  .exists-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; background: var(--success-bg); color: var(--success); border-radius: 999px; padding: 3px 8px; text-transform: uppercase; letter-spacing: .03em; }
+
+  main { max-width: 980px; margin: 0 auto; padding: 0 28px 100px; }
+  section { padding-top: 62px; margin-top: -22px; }
+  .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--slate); }
+  .lede { font-size: 15.5px; color: var(--slate); line-height: 1.6; max-width: 66ch; }
+  h2 { font-size: 22px; margin: 6px 0 4px; }
+  h3 { font-size: 15px; margin: 0 0 8px; }
+
+  /* ---------- hero ---------- */
+  #hero { padding-top: 54px; }
+  #hero h1 { font-size: 32px; font-weight: 300; line-height: 1.2; margin: 8px 0 10px; max-width: 20ch; }
+  #hero h1 b { font-weight: 700; }
+  #hero .principle {
+    margin-top: 22px; background: var(--ink); color: var(--paper); border-radius: 20px; padding: 22px 26px;
+    display: flex; align-items: center; gap: 16px;
+  }
+  #hero .principle .mark { flex-shrink: 0; color: var(--lime); }
+  #hero .principle p { margin: 0; font-size: 15px; line-height: 1.55; }
+  #hero .principle b { color: var(--lime-soft); }
+
+  /* ---------- pyramid diagram ---------- */
+  .pyramid-wrap { margin: 30px 0 10px; border: 2px dashed var(--new-work); border-radius: 24px; padding: 20px; position: relative; }
+  .pyramid-wrap .tenant-label {
+    position: absolute; top: -13px; left: 20px; background: var(--paper); padding: 0 10px; display: flex; align-items: center; gap: 6px;
+    font-size: 11.5px; font-weight: 700; color: var(--new-work);
+  }
+  .pyramid { display: flex; flex-direction: column-reverse; gap: 10px; }
+  .p-tier { border-radius: 16px; padding: 14px 18px; display: flex; align-items: center; gap: 14px; }
+  .p-tier .n { font-size: 11px; font-weight: 700; opacity: .55; flex-shrink: 0; width: 16px; }
+  .p-tier .t { flex: 1; min-width: 0; }
+  .p-tier .t .name { font-weight: 700; font-size: 14.5px; }
+  .p-tier .t .sub { font-size: 12px; opacity: .8; margin-top: 2px; }
+  .p-tier.personal { background: var(--mist); width: 46%; align-self: flex-start; }
+  .p-tier.canal { background: var(--ramp-3); color: #fff; width: 66%; align-self: flex-start; }
+  .p-tier.canal .sub { color: rgba(255,255,255,.75); }
+  .p-tier.empresa { background: var(--ink); color: var(--paper); width: 100%; }
+  .p-tier.empresa .sub { color: rgba(244,244,241,.65); }
+
+  /* ---------- status legend ---------- */
+  .legend-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 16px 0 28px; }
+  .legend-row .item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--slate); }
+
+  /* ---------- card / detail blocks ---------- */
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 20px 22px; margin: 16px 0; }
+  .card.tinted { background: var(--mist); }
+  .card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+
+  details.tech { margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 12px; }
+  details.tech summary { cursor: pointer; font-size: 12.5px; font-weight: 700; color: var(--info); list-style: none; display: flex; align-items: center; gap: 6px; }
+  details.tech summary::-webkit-details-marker { display: none; }
+  details.tech summary::before { content: '▸'; transition: transform .15s var(--ease-savia); }
+  details.tech[open] summary::before { transform: rotate(90deg); }
+  details.tech .body { font-size: 12.5px; color: var(--slate); line-height: 1.7; padding: 10px 2px 2px; }
+  details.tech code { background: var(--mist); border-radius: 5px; padding: 1px 5px; font-size: 11.5px; color: var(--ink); }
+  details.tech .cite { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: var(--info); }
+
+  /* ---------- tree / cascade diagram ---------- */
+  .tree { display: flex; gap: 40px; align-items: flex-start; margin: 20px 0; flex-wrap: wrap; }
+  .tree-col { flex: 1; min-width: 260px; }
+  .node { border-radius: 14px; padding: 10px 14px; font-size: 13px; font-weight: 700; display: inline-block; }
+  .node.shared { background: var(--ramp-3); color: #fff; }
+  .node.inherit { background: var(--ramp-4); color: #fff; margin-top: 10px; margin-left: 28px; position: relative; }
+  .node.inherit::before { content: '↳ hereda'; position: absolute; top: -16px; left: 2px; font-size: 9.5px; font-weight: 700; color: var(--ramp-3); text-transform: uppercase; }
+  .node-stack { display: flex; flex-direction: column; gap: 14px; }
+  .closure-tags { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .closure-tags .tag { font-size: 10.5px; font-weight: 700; background: var(--lime-soft); color: var(--ink); border-radius: 999px; padding: 3px 9px; }
+  .memory-chip { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-size: 12.5px; color: var(--slate); }
+  .memory-chip b { color: var(--ink); }
+
+  /* ---------- discoverability comparison ---------- */
+  .disc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin: 18px 0; }
+  .disc-card { border-radius: 16px; padding: 16px 18px; border: 1px solid var(--line); }
+  .disc-card .icon { font-size: 20px; }
+  .disc-card h4 { font-size: 13.5px; margin: 8px 0 4px; }
+  .disc-card p { font-size: 12px; color: var(--slate); line-height: 1.5; margin: 0; }
+
+  /* ---------- pipeline ---------- */
+  .pipeline { display: flex; align-items: stretch; gap: 0; margin: 24px 0; overflow-x: auto; padding-bottom: 6px; }
+  .pipe-step { flex: 1; min-width: 150px; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 14px 15px; position: relative; margin-right: 26px; }
+  .pipe-step:last-child { margin-right: 0; }
+  .pipe-step::after {
+    content: '→'; position: absolute; right: -24px; top: 50%; transform: translateY(-50%); color: var(--slate); font-size: 16px;
+  }
+  .pipe-step:last-child::after { content: ''; }
+  .pipe-step .k { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--slate); }
+  .pipe-step .v { font-size: 12.5px; font-weight: 700; margin-top: 4px; line-height: 1.4; }
+  .pipe-step.canonical { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .pipe-step.canonical .k { color: var(--lime-soft); }
+  .pipe-not-admin { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 12px; color: var(--success); font-weight: 600; }
+
+  /* ---------- before/after flow ---------- */
+  .flow-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 20px 0; }
+  @media (max-width: 720px) { .flow-compare { grid-template-columns: 1fr; } }
+  .flow-col { border-radius: 18px; padding: 18px 20px; }
+  .flow-col.bad { background: var(--danger-bg); border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent); }
+  .flow-col.good { background: var(--success-bg); border: 1px solid color-mix(in srgb, var(--success) 30%, transparent); }
+  .flow-col .flow-title { font-weight: 700; font-size: 13.5px; display: flex; align-items: center; gap: 7px; margin-bottom: 12px; }
+  .flow-col.bad .flow-title { color: var(--danger); }
+  .flow-col.good .flow-title { color: var(--success); }
+  .flow-step { background: rgba(255,255,255,.6); border-radius: 10px; padding: 8px 11px; font-size: 12px; margin-bottom: 7px; line-height: 1.45; }
+  :root[data-theme="dark"] .flow-step, :root:not([data-theme="light"]) .flow-step { background: rgba(0,0,0,.18); }
+  .flow-step:last-child { margin-bottom: 0; }
+  .flow-step .x { color: var(--danger); font-weight: 700; }
+  .flow-step .ok { color: var(--success); font-weight: 700; }
+
+  /* ---------- nav before/after ---------- */
+  .nav-compare { display: flex; gap: 24px; align-items: center; margin: 20px 0; flex-wrap: wrap; }
+  .mini-rail { width: 160px; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 12px; flex-shrink: 0; }
+  .mini-rail .item { font-size: 11.5px; font-weight: 600; color: var(--slate); padding: 6px 8px; border-radius: 8px; margin-bottom: 2px; }
+  .mini-rail .item.ghost { color: var(--line); font-style: italic; }
+  .mini-rail .item.hi { background: var(--ink); color: var(--lime); }
+  .mini-rail-label { font-size: 11px; font-weight: 700; text-align: center; margin-top: 8px; color: var(--slate); }
+  .nav-arrow { font-size: 20px; color: var(--slate); }
+
+  footer { border-top: 1px solid var(--line); margin-top: 50px; padding: 30px 0; display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; font-size: 12.5px; color: var(--slate); }
+  footer a { color: var(--info); text-decoration: none; font-weight: 600; }
+  footer a:hover { text-decoration: underline; }
+</style>
+
+<div id="chrome">
+  <span class="tag">Prototipo</span>
+  <span class="desc">Estrategia de gobernanza de memoria — B2B, v1 post-panel</span>
+  <nav>
+    <a href="#tenant">Tenant</a>
+    <a href="#cascada">Cascada</a>
+    <a href="#canal">Canal</a>
+    <a href="#sintesis">Síntesis</a>
+    <a href="#pull">Pull puntual</a>
+    <a href="#nav">Navegación</a>
+  </nav>
+  <div class="spacer"></div>
+  <button id="btn-new">🟠 Mostrar qué falta construir</button>
+  <button id="btn-theme">◐ tema</button>
+</div>
+
+<main>
+  <section id="hero">
+    <div class="eyebrow">Savia B2B · redesign · v1</div>
+    <h1>Cómo fluye el conocimiento entre <b>vos</b>, tu <b>equipo</b> y <b>toda la empresa</b> — sin que nadie pierda el control de lo suyo.</h1>
+    <p class="lede">Revisada por un panel de 5 lecturas independientes (gobernanza, adopción, ingeniería contra el código real, benchmark de industria, fidelidad a la tesis bottom-up). Esto ya incorpora sus correcciones — no es la propuesta original.</p>
+
+    <div class="principle">
+      <svg class="mark" width="34" height="34" viewBox="0 0 148 148" fill="currentColor" aria-hidden="true">
+        <path d="M42.2 0H63.8A7.2 7.2 0 0 1 71 7.2V28.8A7.2 7.2 0 0 1 63.8 36H42.2C38.8 36 36 38.8 36 42.2V63.8A7.2 7.2 0 0 1 28.8 71H7.2A7.2 7.2 0 0 1 0 63.8V42.2A7.2 7.2 0 0 1 7.2 35H28.8C32.2 35 35 32.2 35 28.8V7.2A7.2 7.2 0 0 1 42.2 0Z"/>
+        <path d="M42.2 0H63.8A7.2 7.2 0 0 1 71 7.2V28.8A7.2 7.2 0 0 1 63.8 36H42.2C38.8 36 36 38.8 36 42.2V63.8A7.2 7.2 0 0 1 28.8 71H7.2A7.2 7.2 0 0 1 0 63.8V42.2A7.2 7.2 0 0 1 7.2 35H28.8C32.2 35 35 32.2 35 28.8V7.2A7.2 7.2 0 0 1 42.2 0Z" transform="rotate(90 74 74)"/>
+        <path d="M42.2 0H63.8A7.2 7.2 0 0 1 71 7.2V28.8A7.2 7.2 0 0 1 63.8 36H42.2C38.8 36 36 38.8 36 42.2V63.8A7.2 7.2 0 0 1 28.8 71H7.2A7.2 7.2 0 0 1 0 63.8V42.2A7.2 7.2 0 0 1 7.2 35H28.8C32.2 35 35 32.2 35 28.8V7.2A7.2 7.2 0 0 1 42.2 0Z" transform="rotate(180 74 74)"/>
+        <path d="M42.2 0H63.8A7.2 7.2 0 0 1 71 7.2V28.8A7.2 7.2 0 0 1 63.8 36H42.2C38.8 36 36 38.8 36 42.2V63.8A7.2 7.2 0 0 1 28.8 71H7.2A7.2 7.2 0 0 1 0 63.8V42.2A7.2 7.2 0 0 1 7.2 35H28.8C32.2 35 35 32.2 35 28.8V7.2A7.2 7.2 0 0 1 42.2 0Z" transform="rotate(270 74 74)"/>
+      </svg>
+      <p><b>Principio rector:</b> la memoria es siempre del usuario. Canal, síntesis y "toda la empresa" son overlays de acceso sobre datos que nunca dejan de pertenecer a quien los escribió. Nada de lo que sigue mueve un dato fuera de la partición de su autor.</p>
+    </div>
+
+    <div class="pyramid-wrap new-work-mark">
+      <div class="tenant-label">⬜ <span>Organización / Tenant — el límite que hoy no existe en el schema</span></div>
+      <div class="pyramid">
+        <div class="p-tier empresa">
+          <span class="n tabular">3</span>
+          <div class="t"><div class="name">Toda la empresa</div><div class="sub">Recibe SÍNTESIS (Capa 4), nunca el crudo día a día de un canal ajeno</div></div>
+          <span class="new-badge">⬜ nuevo</span>
+        </div>
+        <div class="p-tier canal">
+          <span class="n tabular">2</span>
+          <div class="t"><div class="name">Canal (equipo / área)</div><div class="sub">Memoria activa, cruda, del día a día — FragmentShare + cascada</div></div>
+          <span class="exists-badge">✅ ya existe</span>
+        </div>
+        <div class="p-tier personal">
+          <span class="n tabular">1</span>
+          <div class="t"><div class="name">Personal</div><div class="sub">Privada, escritura libre, el wedge bottom-up</div></div>
+          <span class="exists-badge">✅ ya existe</span>
+        </div>
+      </div>
+    </div>
+    <div class="legend-row">
+      <span class="item"><span class="exists-badge">✅ ya existe</span> mecanismo verificado en el código real</span>
+      <span class="item"><span class="new-badge" style="display:inline-flex">⬜ nuevo</span> hay que construirlo — no es un flag</span>
+    </div>
+  </section>
+
+  <section id="tenant">
+    <div class="eyebrow">Antes que nada</div>
+    <h2>El primitivo que falta: Organización / Tenant</h2>
+    <p class="lede">Es más urgente que la síntesis. Sin un límite de organización, "toda la empresa" no tiene a quién referirse — y el día que Savia tenga más de un cliente B2B en la misma base de datos, un atajo bajo presión de tiempo (ej. "todos los <code>User</code> de la tabla") filtra conocimiento entre empresas distintas.</p>
+    <div class="card new-work-mark">
+      <div class="card-head">
+        <h3>Qué hace falta</h3>
+        <span class="new-badge">⬜ nuevo</span>
+      </div>
+      <p style="font-size:13px; color:var(--slate); line-height:1.6; margin:0;">Un modelo <code>Organization</code> real, un tercer valor <code>'org'</code> en <code>GrantScope</code> (hoy solo admite <code>space</code> y <code>group</code>), y que cada <code>CollectiveGroup</code>/canal declare a qué organización pertenece. Esto no es una extensión incremental de la federación actual — es la pieza que le da un borde a todo lo demás.</p>
+      <details class="tech">
+        <summary>Detalle técnico verificado</summary>
+        <div class="body">
+          <span class="cite">apps/api/prisma/schema.prisma</span> — grep completo sobre el schema no encuentra <code>Organization</code>/<code>Tenant</code>/<code>Company</code> en ningún lado. El enum <code>GrantScope</code> (líneas 41-44) solo admite <code>{space, group}</code>.<br><br>
+          <span class="cite">docs/vision/company-brain.md</span> — la propia tabla de estado ya lo marca: <em>"Eje bottom-up: ⬜ síntesis entre personas + tenant org-first"</em>.
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <section id="cascada">
+    <div class="eyebrow">Mecánica ya construida</div>
+    <h2>Compartir un área cascada a sus hijas — automático, sin acción extra</h2>
+    <p class="lede">Esto no hay que diseñarlo, ya funciona así. Cada memoria carga su área <b>más todos sus ancestros</b> ("closure"). Compartir "Trabajo" cascada a "Aurora" y "Reuniones" porque los recuerdos que viven ahí ya llevan "trabajo" en su propia etiqueta — nunca a hermanos ni al padre.</p>
+
+    <div class="tree">
+      <div class="tree-col">
+        <div class="node shared">Trabajo <span style="font-weight:400; opacity:.8;">· compartida al canal</span></div>
+        <div class="node-stack">
+          <div class="node inherit">Aurora</div>
+          <div class="node inherit">Reuniones</div>
+        </div>
+      </div>
+      <div class="tree-col">
+        <div class="memory-chip">
+          Un recuerdo que vive en <b>Aurora</b> lleva esta etiqueta (closure):
+          <div class="closure-tags"><span class="tag">aurora</span><span class="tag">trabajo</span><span class="tag">general</span></div>
+          Por eso compartir "Trabajo" ya alcanza este recuerdo — sin compartir Aurora por separado.
+        </div>
+      </div>
+    </div>
+
+    <details class="tech">
+      <summary>Detalle técnico verificado</summary>
+      <div class="body">
+        <span class="cite">apps/api/src/modules/organization/structure-executor.service.ts:60</span> — <code>const membership = leafSpaces.length ? await this.areas.closure(leafSpaces) : [general.id]</code>.<br>
+        <span class="cite">apps/api/src/modules/access/read-plan.ts:25</span> — <em>"membership carries ancestors, so a grant on an area matches its descendants (via areaIdsAny) but not its siblings."</em><br>
+        <span class="cite">apps/api/prisma/schema.prisma:240</span> — corrección: no existe un "área primaria" única por recuerdo, el motor v2 permite membership múltiple sin lugar canónico. La agrupación visual de un canal debe basarse en esa membership completa, no en un campo <code>isPrimary</code> que no existe.
+      </div>
+    </details>
+  </section>
+
+  <section id="canal">
+    <div class="eyebrow">Capa 2 · revisado</div>
+    <h2>El canal hereda como carpetas, se descubre como Slack</h2>
+    <p class="lede">La analogía "canal estilo Slack" confundía a dos de cinco revisores — con razón: el mecanismo real es herencia de árbol (como páginas anidadas de Notion), no canales planos. Lo que sí toma de Slack son los <b>tres niveles de descubribilidad</b>. Eso sí es una feature nueva del tamaño del sistema de invites actual — no un flag gratis.</p>
+
+    <div class="disc-grid">
+      <div class="disc-card" style="border-color: var(--success);">
+        <div class="icon">🌐</div>
+        <h4>Abierto</h4>
+        <p>Se lista, cualquiera del canal padre se une solo (self-join), sin aprobación. El default esperable para la mayoría de las áreas de trabajo.</p>
+      </div>
+      <div class="disc-card" style="border-color: var(--warning);">
+        <div class="icon">🔒</div>
+        <h4>Restringido, listado</h4>
+        <p>Se ve que existe (nombre, cuántos recuerdos, quién administra) pero no se lee sin aprobación — botón "Solicitar acceso", aprueba un admin del canal.</p>
+      </div>
+      <div class="disc-card" style="border-color: var(--slate);">
+        <div class="icon">🚫</div>
+        <h4>Invisible</h4>
+        <p>Ni existencia ni contenido, salvo para miembros invitados directamente. Para lo genuinamente sensible — nunca admite pull puntual (ver más abajo).</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>La herencia se muestra en el momento de unirse — no se descubre después</h3>
+      <p style="font-size:13px; color:var(--slate); line-height:1.6; margin:0;">"Sumarte a Trabajo también te da acceso a sus 2 sub-áreas: Aurora, Reuniones" — visible antes de confirmar, no una sorpresa. Evita el malentendido de "pensé que esto era un compromiso acotado".</p>
+    </div>
+
+    <div class="card new-work-mark">
+      <div class="card-head"><h3>Qué hace falta</h3><span class="new-badge">⬜ nuevo</span></div>
+      <p style="font-size:13px; color:var(--slate); line-height:1.6; margin:0;">Campo de visibilidad en <code>CollectiveGroup</code>, endpoint de exploración/listado, modelo <code>JoinRequest</code> (pedir → aprobar/rechazar), y un tipo de notificación para "acceso solicitado" — hoy la membresía es 100% por invitación con email+token.</p>
+      <details class="tech">
+        <summary>Detalle técnico verificado</summary>
+        <div class="body">
+          <span class="cite">apps/api/src/modules/collective/collective.service.ts</span> + <span class="cite">collective.controller.ts</span> — unirse a un <code>CollectiveGroup</code> hoy es 100% por <code>GroupInvite</code> (token emailado, TTL 7 días). Sin campo de visibilidad, sin endpoint de exploración pública, sin modelo de solicitud. El enum <code>NotificationKind</code> no tiene un valor para "acceso solicitado".
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <section id="sintesis">
+    <div class="eyebrow">Capa 3 · el camino a "toda la empresa"</div>
+    <h2>La síntesis se propone entre pares — nunca la cura un admin en nombre de otros</h2>
+    <p class="lede">Esto es lo que el panel marcó como el vacío más grave: si el mecanismo de promoción no se define explícitamente como <b>peer-driven</b>, la implementación bajo presión de tiempo termina siendo "un knowledge manager escribe la wiki de la empresa" — exactamente la curación top-down que la tesis bottom-up quiere evitar.</p>
+
+    <div class="pipeline">
+      <div class="pipe-step"><div class="k">1 · Bea</div><div class="v">Fragmento personal compartido al canal</div></div>
+      <div class="pipe-step"><div class="k">2 · Marco</div><div class="v">Fragmento personal compartido al mismo canal</div></div>
+      <div class="pipe-step"><div class="k">3 · motor</div><div class="v">Detecta convergencia — o cualquier contribuyente promueve manual</div></div>
+      <div class="pipe-step canonical"><div class="k">4 · borrador</div><div class="v">Skill con procedencia hacia Bea y Marco, versionado</div></div>
+      <div class="pipe-step canonical"><div class="k">5 · confirmado</div><div class="v">Por los propios contribuyentes, no por un admin externo</div></div>
+    </div>
+    <div class="pipe-not-admin">✓ Ningún paso tiene un botón de "publicar" que un solo admin apriete en nombre de otros.</div>
+
+    <div class="card tinted">
+      <h3>Mientras la Capa 4 no exista</h3>
+      <p style="font-size:13px; color:var(--slate); line-height:1.6; margin:0 0 8px;">El stopgap tiene que ser <b>"un miembro promueve su propio fragmento"</b> (como "pin to Company Home" de Notion), nunca "un curador de empresa escribe a mano lo que otros dijeron". Y todo skill publicado queda <b>disputable</b>: re-derivable desde memoria nueva de cualquiera que contribuyó — para que lo canónico nunca pese más que la persona que lo originó.</p>
+      <span class="new-badge" style="display:inline-flex;">⬜ nuevo — 0% construido hoy</span>
+    </div>
+  </section>
+
+  <section id="pull">
+    <div class="eyebrow">4b · rediseñado por el panel</div>
+    <h2>Pull puntual: de puerta trasera a excepción auditable</h2>
+    <p class="lede">La versión original ("una query externa corre <code>savia_search</code> sobre el canal sin unirse") rompía el único punto de control de acceso del sistema. Cuatro de cinco revisores lo encontraron, independientemente. Esta es la versión que sobrevive.</p>
+
+    <div class="flow-compare">
+      <div class="flow-col bad">
+        <div class="flow-title">✕ Diseño original</div>
+        <div class="flow-step"><span class="x">✕</span> Ruta de lectura paralela — no pasa por <code>compileReadPlan</code>, la única autoridad de acceso del sistema</div>
+        <div class="flow-step"><span class="x">✕</span> Un solo booleano por admin de canal expone lo de N dueños sin su re-consentimiento</div>
+        <div class="flow-step"><span class="x">✕</span> "Audit log" prometido que el sistema no puede generar — <code>queryDigest</code> es un hash SHA-256, nunca el texto</div>
+        <div class="flow-step"><span class="x">✕</span> Sin rate limit en el camino humano — reconstrucción del canal por fuerza bruta, sin unirse nunca</div>
+        <div class="flow-step"><span class="x">✕</span> Self-service total — menos fricción que el propio tier "restringido" (que sí pide aprobación)</div>
+      </div>
+      <div class="flow-col good">
+        <div class="flow-title">✓ Diseño revisado</div>
+        <div class="flow-step"><span class="ok">✓</span> Se materializa como un grant efímero real, pasa por <code>compileReadPlan</code>/<code>fragmentScope</code> igual que cualquier lectura</div>
+        <div class="flow-step"><span class="ok">✓</span> Sensibilidad en dos niveles: "visible a miembros" vs. "visible en pull externo" — nunca el mismo booleano</div>
+        <div class="flow-step"><span class="ok">✓</span> Aprobación liviana de un clic (async) al menos en canales restringidos — nunca en invisibles</div>
+        <div class="flow-step"><span class="ok">✓</span> Rate limit real por (solicitante, canal), y un audit log con atribución real, visible al dueño del canal</div>
+        <div class="flow-step"><span class="ok">✓</span> Respuesta = hecho citado con fuente, no navegación libre del canal ajeno</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Lo que ya estaba bien en la idea original</h3>
+      <p style="font-size:13px; color:var(--slate); line-height:1.6; margin:0;">Devolver "el hecho con su fuente" en vez de acceso de lectura completo es, según el benchmark de industria, <b>más seguro que el break-glass clásico</b> de sistemas como Epic/Cerner (que sí da lectura completa). El instinto de citar en vez de exponer todo era correcto — solo faltaba que pasara por la autoridad de acceso existente.</p>
+    </div>
+  </section>
+
+  <section id="nav">
+    <div class="eyebrow">Fuera del backend</div>
+    <h2>Nada de esto importa si el canal sigue enterrado</h2>
+    <p class="lede">Tres de cinco revisores lo marcaron como precondición, no como pulido: hoy "Colectivo" no tiene entrada en el sidebar, ⌘K ni el botón de conectar IA. Si el canal (Capa 2) sigue así de escondido, no hay material fluyendo del paso 1 al paso 2 — y "toda la empresa" nunca tiene qué sintetizar, sin importar qué tan bien diseñada esté la gobernanza.</p>
+
+    <div class="nav-compare">
+      <div>
+        <div class="mini-rail">
+          <div class="item">Memoria</div>
+          <div class="item">Pulso</div>
+          <div class="item">Conexiones</div>
+          <div class="item">Fuentes</div>
+          <div class="item ghost">(Colectivo — ausente)</div>
+        </div>
+        <div class="mini-rail-label">Hoy (B2C)</div>
+      </div>
+      <span class="nav-arrow">→</span>
+      <div>
+        <div class="mini-rail">
+          <div class="item hi">Organización</div>
+          <div class="item">Mi memoria</div>
+          <div class="item">Pulso</div>
+          <div class="item">Conexiones</div>
+          <div class="item">Fuentes</div>
+        </div>
+        <div class="mini-rail-label">Propuesto (B2B) — ver prototipo</div>
+      </div>
+    </div>
+
+    <p style="font-size:13px; color:var(--slate);">Ya explorado visualmente en <a href="org-home-v1.html" style="color:var(--info); font-weight:600;">org-home-v1.html</a> — el home de organización con canales, síntesis y equipo como protagonistas del día 1.</p>
+  </section>
+
+  <footer>
+    <div>Panel de revisión: gobernanza · adopción/PLG · ingeniería vs. código real · benchmark de industria · fidelidad bottom-up. 5 lecturas independientes, 0 delegadas sin verificar.</div>
+    <div><a href="../../../vision/company-brain.md">docs/vision/company-brain.md</a> · <a href="org-home-v1.html">prototipo: home de organización</a></div>
+  </footer>
+</main>
+
+<script>
+  document.getElementById('btn-new').addEventListener('click', function () {
+    document.body.classList.toggle('show-new');
+    this.classList.toggle('active');
+  });
+  document.getElementById('btn-theme').addEventListener('click', () => {
+    const root = document.documentElement;
+    const cur = root.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    root.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+  });
+</script>

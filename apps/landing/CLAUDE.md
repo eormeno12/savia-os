@@ -172,10 +172,21 @@ Nunca usar `href="#"` para links pendientes.
 
 ## Copy
 
+> **Dirección de producto: B2B.** Savia pivotó de memoria personal a "cerebro
+> ejecutable de cada empresa" — ver [`docs/product/savia-b2b/01-vision.md`](../../docs/product/savia-b2b/01-vision.md)
+> antes de escribir o tocar copy. El one-liner y el léxico de abajo ya reflejan
+> ese pivot; la landing en `src/` todavía tiene copy B2C sin migrar — si tocás
+> una sección con copy viejo ("tu memoria", "vos"/"tus IAs" en singular personal),
+> alineala a la voz B2B en vez de solo copiar el patrón existente.
+
 - Idioma por defecto: **español**, voz premium y precisa.
 - Nunca metáforas de plantas, hojas, verde, naturaleza. Savia = continuidad de la memoria.
-- One-liner oficial: **"La memoria que conecta todas tus IAs."**
-- Léxico preferido: "memoria", "conecta", "recuerda", "tus IAs", "la capa", "contexto".
+- One-liner oficial: **"El cerebro ejecutable de cada empresa."** (reemplaza al
+  one-liner B2C anterior, "La memoria que conecta todas tus IAs" — esa frase ahora
+  describe solo la capa de entrada bottom-up, no el producto completo).
+- Léxico preferido: "cerebro de la empresa", "conocimiento", "equipo", "procesos",
+  "memoria", "conecta", "la capa", "contexto". La memoria personal sigue siendo el
+  wedge — no se elimina del copy, pero ya no es el destino final del mensaje.
 - Evitar: "plataforma", "solución", "integra", "sincroniza", "almacena".
 
 ## Tipografía

@@ -1,6 +1,6 @@
 import { Box, Flex, Grid, HStack, Link, Stack, Text } from '@chakra-ui/react';
 import { ArrowUpRight } from 'lucide-react';
-import { SaviaMark } from '@/components/design-system/savia-mark';
+import { SaviaMark } from '@savia-os/ui';
 import { CtaButton } from '@/components/landing/cta-button';
 import { NAV_ITEMS, BRAND_COLORS } from '@/lib/constants';
 

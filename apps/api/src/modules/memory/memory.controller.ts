@@ -1,33 +1,46 @@
-import { Body, Controller, Delete, Param, Post, UseGuards } from '@nestjs/common';
-import { createZodDto } from 'nestjs-zod';
-import { AddMemorySchema, MemorySearchQuerySchema } from '@savia-os/contracts';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser, JwtPayload } from '../auth/decorators/current-user.decorator';
+import { Body, Controller, Delete, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
+import { ZodValidationPipe } from 'nestjs-zod';
+import { AddMemorySchema, MemorySearchSchema, UpdateMemorySchema } from '@savia-os/contracts';
+import type { AddMemoryDto, MemorySearchDto, UpdateMemoryDto } from '@savia-os/contracts';
 import { MemoryService } from './memory.service';
-
-class AddMemoryDto extends createZodDto(AddMemorySchema) {}
-class MemorySearchDto extends createZodDto(MemorySearchQuerySchema) {}
+import { CurrentUser, JwtPayload } from '../auth/decorators/current-user.decorator';
 
 @Controller('memory')
-@UseGuards(JwtAuthGuard)
 export class MemoryController {
   constructor(private readonly memory: MemoryService) {}
 
-  @Post('add')
-  add(@Body() dto: AddMemoryDto, @CurrentUser() user: JwtPayload) {
-    return this.memory.add(user.sub, dto.text, { fileId: dto.fileId, source: dto.source });
+  @Post()
+  @HttpCode(HttpStatus.CREATED)
+  async add(
+    @CurrentUser() user: JwtPayload,
+    @Body(new ZodValidationPipe(AddMemorySchema)) dto: AddMemoryDto,
+  ) {
+    const ids = await this.memory.add(user.sub, dto.text, { source: 'manual', areaId: dto.areaId });
+    return { stored: ids.length, ids };
   }
 
   @Post('search')
-  search(@Body() dto: MemorySearchDto, @CurrentUser() user: JwtPayload) {
-    return this.memory.search(user.sub, dto.query, {
-      submemories: dto.submemories,
-      limit: dto.limit,
-    });
+  @HttpCode(HttpStatus.OK)
+  search(
+    @CurrentUser() user: JwtPayload,
+    @Body(new ZodValidationPipe(MemorySearchSchema)) dto: MemorySearchDto,
+  ) {
+    return this.memory.searchPersonal(user.sub, dto.query, dto.areaIds, dto.limit);
   }
 
   @Delete(':id')
-  deleteOne(@Param('id') id: string) {
-    return this.memory.deleteByMemoryId(id);
+  @HttpCode(HttpStatus.NO_CONTENT)
+  remove(@CurrentUser() user: JwtPayload, @Param('id', ParseUUIDPipe) id: string) {
+    return this.memory.deleteOwn(user.sub, id);
+  }
+
+  @Patch(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  update(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(UpdateMemorySchema)) dto: UpdateMemoryDto,
+  ) {
+    return this.memory.update(user.sub, id, dto);
   }
 }

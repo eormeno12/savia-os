@@ -1,7 +1,7 @@
 import { Box, Flex, Grid, Stack, Text } from '@chakra-ui/react';
 import { Check, Sparkles } from 'lucide-react';
 import { CtaButton } from '@/components/landing/cta-button';
-import { SectionHeader } from '@/components/ui/section-header';
+import { SectionHeader } from '@savia-os/ui';
 
 const FEATURES = [
   'Tus IAs responden mejor — comparten el mismo contexto',

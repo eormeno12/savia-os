@@ -1,0 +1,82 @@
+<!-- @dsCard group="Voz" title="Voz y léxico" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Savia · Voz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root { --ink:#0B2529; --paper:#F4F4F1; --lime:#E7FF18; --slate:#53606C; --line:#DDDFDC; --mist:#ECEDEA; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter', system-ui, sans-serif; background:var(--paper); color:var(--ink); -webkit-font-smoothing:antialiased; padding:64px 48px; }
+  .wrap { max-width:1100px; margin:0 auto; }
+  .eyebrow { font-size:12px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--slate); margin-bottom:24px; }
+  h1 { font-size:clamp(40px,4.8vw,72px); font-weight:300; line-height:0.92; max-width:14ch; }
+  h1 em { font-weight:600; font-style:normal; }
+  .lede { font-size:clamp(16px,1.1vw,20px); line-height:1.6; color:var(--slate); margin-top:24px; max-width:54ch; }
+  .lede em { font-style:normal; font-weight:500; color:var(--ink); }
+  .label { font-size:12px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--slate); margin:64px 0 24px; }
+  .attrs { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:720px){ .attrs{ grid-template-columns:1fr; } }
+  .attr { background:var(--mist); border-radius:24px; padding:28px; }
+  .attr h3 { font-size:20px; font-weight:600; margin-bottom:12px; }
+  .attr p { font-size:13px; color:var(--slate); line-height:1.7; }
+  .attr .ex { background:rgba(11,37,41,0.04); border-left:2px solid var(--line); border-radius:14px; padding:14px 16px; margin-top:18px; }
+  .attr .ex .t { font-size:10px; font-weight:600; letter-spacing:0.08em; color:var(--slate); margin-bottom:6px; }
+  .attr .ex .q { font-size:14px; font-weight:500; }
+  .dd { padding:24px 0; border-bottom:1px solid var(--line); }
+  .dd .type { font-size:12px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--slate); margin-bottom:16px; }
+  .dd .pair { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media (max-width:720px){ .dd .pair{ grid-template-columns:1fr; } }
+  .yes { background:rgba(231,255,24,0.08); border-left:3px solid rgba(231,255,24,0.4); border-radius:14px; padding:16px; }
+  .no { background:var(--mist); border-left:3px solid var(--line); border-radius:14px; padding:16px; }
+  .tag { font-size:10px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:8px; }
+  .yes .tag { color:#357A4C; }
+  .no .tag { color:var(--slate); }
+  .yes .q { font-size:14px; font-weight:500; }
+  .no .q { font-size:14px; color:var(--slate); text-decoration:line-through; }
+  table { width:100%; border-collapse:collapse; border:1px solid var(--line); border-radius:16px; overflow:hidden; }
+  th { text-align:left; font-size:11px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:var(--slate); padding:12px 18px; background:var(--mist); }
+  td { padding:12px 18px; font-size:13px; border-top:1px solid var(--line); vertical-align:top; }
+  td.use { font-weight:600; }
+  td.avoid { color:var(--slate); text-decoration:line-through; }
+  td.why { color:var(--slate); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Identidad · Voz</div>
+  <h1>Cómo habla <em>Savia.</em></h1>
+  <p class="lede">Todo parte del one-liner: <em>«La memoria que conecta todas tus IAs.»</em> Declarativa, posesiva, precisa. Español, premium. Sin superlativos, sin pitch, sin metáforas de plantas o naturaleza.</p>
+
+  <div class="label">Atributos</div>
+  <div class="attrs">
+    <div class="attr"><h3>Declarativa</h3><p>No vende ni convence — declara. Escribe como si la persona ya entendiera el problema y solo necesitara la solución.</p><div class="ex"><div class="t">EJEMPLO</div><div class="q">Savia recuerda lo que le dijiste a Claude ayer.</div></div></div>
+    <div class="attr"><h3>Posesiva</h3><p>Siempre «tus IAs», «tu memoria». Nunca «el usuario» o «su cuenta». La persona es el centro — la gramática lo refleja.</p><div class="ex"><div class="t">EJEMPLO</div><div class="q">Tu primera memoria ya está conectada.</div></div></div>
+    <div class="attr"><h3>Técnica sin jerga</h3><p>Hablamos de contexto, modelos e índices — en el idioma de quien los usa, no de quien los construye.</p><div class="ex"><div class="t">EJEMPLO</div><div class="q">Claude ahora tiene el contexto de tu reunión.</div></div></div>
+    <div class="attr"><h3>Sin superlativos</h3><p>Nunca «la mejor», «revolucionaria». Describe exactamente lo que hace. El adjetivo vacío delata que la frase no confía en sí misma.</p><div class="ex"><div class="t">EJEMPLO</div><div class="q">Una memoria. Todas tus IAs.</div></div></div>
+  </div>
+
+  <div class="label">Sí / No</div>
+  <div class="dd"><div class="type">Headline</div><div class="pair"><div class="yes"><div class="tag">Sí</div><div class="q">La memoria que conecta todas tus IAs.</div></div><div class="no"><div class="tag">No</div><div class="q">La plataforma de memoria AI que revoluciona tu productividad.</div></div></div></div>
+  <div class="dd"><div class="type">Estado vacío</div><div class="pair"><div class="yes"><div class="tag">Sí</div><div class="q">No hay memoria para esta IA todavía. Empieza una conversación.</div></div><div class="no"><div class="tag">No</div><div class="q">Error: no se encontraron registros en el índice contextual.</div></div></div></div>
+  <div class="dd" style="border-bottom:none"><div class="type">CTA</div><div class="pair"><div class="yes"><div class="tag">Sí</div><div class="q">Conectar mi primera IA</div></div><div class="no"><div class="tag">No</div><div class="q">Activar mi plan y transformar mi workflow con IA</div></div></div></div>
+
+  <div class="label">Léxico</div>
+  <table>
+    <thead><tr><th style="width:22%">Usar</th><th style="width:28%">Evitar</th><th>Por qué</th></tr></thead>
+    <tbody>
+      <tr><td class="use">la memoria</td><td class="avoid">el sistema / la plataforma</td><td class="why">Savia ES la memoria, no un contenedor.</td></tr>
+      <tr><td class="use">tus IAs</td><td class="avoid">tus herramientas / el ecosistema</td><td class="why">Posesivo y humano; preciso sin ser técnico.</td></tr>
+      <tr><td class="use">conecta</td><td class="avoid">integra / sincroniza</td><td class="why">Conectar implica relación; integrar, instalación.</td></tr>
+      <tr><td class="use">recuerda</td><td class="avoid">almacena / indexa</td><td class="why">Humano y orientado al propósito.</td></tr>
+      <tr><td class="use">la capa</td><td class="avoid">el middleware / el backend</td><td class="why">Visual e intuitivo, no jerga de ingeniería.</td></tr>
+      <tr><td class="use">contexto</td><td class="avoid">datos / información</td><td class="why">Implica relevancia para una situación concreta.</td></tr>
+    </tbody>
+  </table>
+</div>
+</body>
+</html>

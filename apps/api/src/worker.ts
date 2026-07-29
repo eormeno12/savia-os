@@ -1,44 +1,50 @@
 import 'reflect-metadata';
-import { NestFactory } from '@nestjs/core';
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { PrismaService } from './common/clients/prisma.service';
-import { QdrantService } from './common/clients/qdrant.service';
+import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
+import { NestFactory } from '@nestjs/core';
+import { Logger } from 'nestjs-pino';
+import { validateEnv } from './common/config/env.schema';
+import { LoggingModule } from './common/logging/logging.module';
+import { InfraModule } from './common/infra/infra.module';
+import { OutboxModule } from './modules/outbox/outbox.module';
+import { OrganizationModule } from './modules/organization/organization.module';
+import { EngineWorker } from './modules/organization/engine.worker';
 import { MemoryModule } from './modules/memory/memory.module';
-import { MemoryService } from './modules/memory/memory.service';
-import { startIngestWorker } from './modules/ingest/ingest.processor';
-import { ClassifierService } from './modules/spaces/classifier.service';
-import { startReclassifyWorker } from './modules/spaces/reclassify.processor';
+import { FilesModule } from './modules/files/files.module';
+import { JobsModule } from './modules/jobs/jobs.module';
+import { IngestWorker } from './modules/ingest/ingest.worker';
+import { ImportWorker } from './modules/import/import.worker';
+import { RetentionWorker } from './modules/retention/retention.worker';
+import { AccountWorkerModule } from './modules/account/account.worker';
 
+/**
+ * Background worker process. Runs the reconciliation timers (outbox relay +
+ * vector GC) and the v2 dynamic engine (EngineWorker: drains the persona-graph /
+ * encoding-tree work queue). Shares the validated config + infra with the API.
+ */
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, cache: true, validate: validateEnv }),
+    ScheduleModule.forRoot(),
+    LoggingModule,
+    InfraModule,
+    OutboxModule,
+    OrganizationModule,
     MemoryModule,
+    FilesModule,
+    JobsModule,
+    AccountWorkerModule,
   ],
-  providers: [PrismaService, QdrantService, ClassifierService],
+  providers: [EngineWorker, IngestWorker, ImportWorker, RetentionWorker],
 })
-class WorkerAppModule {}
+class WorkerModule {}
 
-async function bootstrap() {
-  const app = await NestFactory.createApplicationContext(WorkerAppModule, {
-    logger: ['log', 'warn', 'error'],
-  });
-
-  const config = app.get(ConfigService);
-  const prismaService = app.get(PrismaService);
-  const memoryService = app.get(MemoryService);
-  const classifierService = app.get(ClassifierService);
-
-  startIngestWorker(config, prismaService, memoryService, classifierService);
-  startReclassifyWorker(config, prismaService, classifierService);
-
-  console.log('[worker] Savia ingest + reclassify workers running');
-
-  // keep process alive
-  process.on('SIGTERM', async () => {
-    await app.close();
-    process.exit(0);
-  });
+async function bootstrap(): Promise<void> {
+  const app = await NestFactory.createApplicationContext(WorkerModule, { bufferLogs: true });
+  app.useLogger(app.get(Logger));
+  app.enableShutdownHooks();
+  app.get(Logger).log('Savia worker running (outbox relay + vector GC + dynamic engine)');
 }
 
-bootstrap();
+void bootstrap();

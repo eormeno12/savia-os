@@ -3,9 +3,8 @@
 import { useActionState, useState } from "react";
 import { Box, Button as ChakraButton, Field, Grid, Input, Stack, Text } from "@chakra-ui/react";
 import { ArrowUpRight } from "lucide-react";
-import { SaviaMark } from "@/components/design-system/savia-mark";
+import { Button, SaviaMark } from "@savia-os/ui";
 import { joinWaitlist, type WaitlistActionState } from "@/app/actions";
-import { Button } from "@/components/ui/button";
 import { experienceOptions as EXPERIENCE_CHIPS, AI_TOOL_OPTIONS, monthlySpendOptions as MONTHLY_SPEND_CHIPS, waitlistSchema } from "@/lib/waitlist";
 
 

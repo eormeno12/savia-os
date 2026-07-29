@@ -1,20 +1,21 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
+import { AppConfig } from '../config/app.config';
 
 @Injectable()
 export class RedisService extends Redis implements OnModuleInit, OnModuleDestroy {
-  constructor(config: ConfigService) {
-    super(config.get<string>('REDIS_URL', 'redis://localhost:6379'), {
+  constructor(config: AppConfig) {
+    super(config.redisUrl, {
       lazyConnect: true,
+      maxRetriesPerRequest: null, // safe to share with BullMQ-style consumers
     });
   }
 
-  async onModuleInit() {
+  async onModuleInit(): Promise<void> {
     await this.connect();
   }
 
-  async onModuleDestroy() {
+  async onModuleDestroy(): Promise<void> {
     await this.quit();
   }
 }

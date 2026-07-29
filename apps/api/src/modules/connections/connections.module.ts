@@ -3,14 +3,13 @@ import { ConnectionsController } from './connections.controller';
 import { ConnectionsService } from './connections.service';
 import { TokenService } from './token.service';
 import { GrantsCache } from './grants.cache';
-import { PrismaService } from '../../common/clients/prisma.service';
-import { RedisService } from '../../common/clients/redis.service';
-import { AuthModule } from '../auth/auth.module';
+import { AccessModule } from '../access/access.module';
+import { BillingModule } from '../billing/billing.module';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AccessModule, BillingModule],
   controllers: [ConnectionsController],
-  providers: [PrismaService, RedisService, TokenService, GrantsCache, ConnectionsService],
-  exports: [ConnectionsService, GrantsCache],
+  providers: [ConnectionsService, TokenService, GrantsCache],
+  exports: [ConnectionsService, TokenService, GrantsCache],
 })
 export class ConnectionsModule {}

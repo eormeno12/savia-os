@@ -1,0 +1,1893 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Savia · Brief de Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --ink: #0B2529;
+  --softInk: #152F34;
+  --paper: #F4F4F1;
+  --lime: #E7FF18;
+  --limeSoft: #F1FF67;
+  --mist: #ECEDEA;
+  --line: #DDDFDC;
+  --slate: #53606C;
+  --success: #3E8E5A;
+  --warning: #C9852A;
+  --danger: #D6483B;
+  --nav-w: 220px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── SIDEBAR NAV ── */
+.nav {
+  position: fixed;
+  top: 0; left: 0;
+  width: var(--nav-w);
+  height: 100vh;
+  background: var(--ink);
+  overflow-y: auto;
+  padding: 32px 0 32px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+}
+
+.nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 20px 24px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  margin-bottom: 16px;
+}
+
+.nav-logo-word {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--paper);
+}
+
+.nav-section {
+  padding: 4px 20px 2px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(244,244,241,0.35);
+  margin-top: 12px;
+}
+
+.nav a {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 20px;
+  font-size: 12.5px;
+  color: rgba(244,244,241,0.6);
+  text-decoration: none;
+  transition: color 0.15s, background 0.15s;
+  border-radius: 0;
+}
+
+.nav a:hover {
+  color: var(--paper);
+  background: rgba(255,255,255,0.06);
+}
+
+.nav a .code {
+  font-size: 10px;
+  font-weight: 600;
+  font-family: ui-monospace, monospace;
+  color: var(--lime);
+  min-width: 22px;
+}
+
+/* ── MAIN ── */
+.main {
+  margin-left: var(--nav-w);
+  min-height: 100vh;
+}
+
+/* ── HERO ── */
+.hero {
+  background: var(--ink);
+  padding: 72px 64px 80px;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-glow {
+  position: absolute;
+  width: 500px; height: 500px;
+  border-radius: 50%;
+  background: var(--lime);
+  filter: blur(150px);
+  opacity: 0.08;
+  top: -100px; right: -80px;
+  pointer-events: none;
+}
+
+.hero-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--lime);
+  margin-bottom: 20px;
+}
+
+.hero h1 {
+  font-size: clamp(36px, 4.5vw, 64px);
+  font-weight: 300;
+  line-height: 0.95;
+  color: var(--paper);
+  max-width: 20ch;
+}
+
+.hero h1 em {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--lime);
+}
+
+.hero-lede {
+  font-size: 16px;
+  line-height: 1.65;
+  color: rgba(244,244,241,0.62);
+  margin-top: 24px;
+  max-width: 56ch;
+}
+
+.hero-meta {
+  display: flex;
+  gap: 8px;
+  margin-top: 36px;
+  flex-wrap: wrap;
+}
+
+.hero-badge {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--lime);
+  color: var(--ink);
+  padding: 6px 14px;
+  border-radius: 999px;
+}
+
+/* ── ARCHITECTURE BOX ── */
+.arch-box {
+  background: var(--mist);
+  border-bottom: 1px solid var(--line);
+  padding: 40px 64px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+}
+
+.arch-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--slate);
+  margin-bottom: 16px;
+}
+
+.arch-surfaces {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.arch-surfaces li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.arch-surf-name {
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink);
+  min-width: 100px;
+}
+
+.arch-surf-desc {
+  color: var(--slate);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.arch-principles {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.arch-principle {
+  border-left: 2px solid var(--line);
+  padding-left: 14px;
+}
+
+.arch-principle strong {
+  font-size: 13px;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 3px;
+}
+
+.arch-principle span {
+  font-size: 12.5px;
+  color: var(--slate);
+  line-height: 1.55;
+}
+
+/* ── SECTION HEADER ── */
+.section-wrap {
+  padding: 0 64px;
+}
+
+.section-header {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 52px 0 24px;
+  border-bottom: 2px solid var(--ink);
+  margin-bottom: 40px;
+}
+
+.section-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  background: var(--ink);
+  color: var(--lime);
+  padding: 4px 10px;
+  border-radius: 4px;
+}
+
+.section-header h2 {
+  font-size: clamp(26px, 3vw, 40px);
+  font-weight: 300;
+  line-height: 1;
+}
+
+.section-header h2 strong {
+  font-weight: 600;
+}
+
+.section-intro {
+  font-size: 14px;
+  color: var(--slate);
+  line-height: 1.65;
+  max-width: 64ch;
+  margin-bottom: 40px;
+  padding: 16px 20px;
+  background: var(--mist);
+  border-radius: 10px;
+  border-left: 3px solid var(--line);
+}
+
+/* ── SCREEN CARDS ── */
+.screens {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding-bottom: 64px;
+}
+
+.screen {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.screen-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 28px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.screen-code {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  background: var(--ink);
+  color: var(--lime);
+  padding: 4px 9px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.screen-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.screen-subtitle {
+  font-size: 13px;
+  color: var(--slate);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.screen-body {
+  padding: 24px 28px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+}
+
+.screen-body.single {
+  grid-template-columns: 1fr;
+}
+
+.screen-col-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--slate);
+  margin-bottom: 12px;
+}
+
+.screen-purpose {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.elements-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.elements-list li {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--slate);
+  padding-left: 18px;
+  position: relative;
+}
+
+.elements-list li::before {
+  content: '—';
+  position: absolute;
+  left: 0;
+  color: var(--line);
+  font-weight: 400;
+}
+
+.elements-list li strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.elements-list li em {
+  color: var(--slate);
+  font-style: italic;
+}
+
+/* Screen with ink hero (protagonist screens) */
+.screen.protagonist .screen-head {
+  background: var(--ink);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.screen.protagonist .screen-code {
+  background: var(--lime);
+  color: var(--ink);
+}
+
+.screen.protagonist .screen-title {
+  color: var(--paper);
+}
+
+.screen.protagonist .screen-subtitle {
+  color: rgba(244,244,241,0.5);
+}
+
+.screen.protagonist .screen-body {
+  background: var(--softInk);
+}
+
+.screen.protagonist .screen-col-label {
+  color: rgba(244,244,241,0.4);
+}
+
+.screen.protagonist .screen-purpose {
+  color: var(--paper);
+}
+
+.screen.protagonist .elements-list li {
+  color: rgba(244,244,241,0.65);
+}
+
+.screen.protagonist .elements-list li::before {
+  color: rgba(255,255,255,0.15);
+}
+
+.screen.protagonist .elements-list li strong {
+  color: var(--lime);
+}
+
+/* States row */
+.states-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 28px 20px;
+  border-top: 1px solid var(--line);
+  background: var(--mist);
+}
+
+.screen.protagonist .states-row {
+  background: rgba(255,255,255,0.04);
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.state-pill {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--slate);
+  background: #fff;
+}
+
+.screen.protagonist .state-pill {
+  border-color: rgba(255,255,255,0.12);
+  color: rgba(244,244,241,0.55);
+  background: rgba(255,255,255,0.05);
+}
+
+.flow-arrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--lime);
+  background: rgba(231,255,24,0.12);
+  border: 1px solid rgba(231,255,24,0.25);
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-weight: 500;
+}
+
+/* Role chips for CO */
+.role-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.role-chip {
+  background: var(--mist);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12px;
+}
+
+.role-chip strong {
+  display: block;
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 3px;
+}
+
+.role-chip span {
+  color: var(--slate);
+  font-size: 11.5px;
+}
+
+/* Pattern pills */
+.pattern-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  padding-bottom: 64px;
+}
+
+.pattern-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px 20px;
+  background: #fff;
+}
+
+.pattern-card .p-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.pattern-card .p-desc {
+  font-size: 12.5px;
+  color: var(--slate);
+  line-height: 1.55;
+}
+
+/* Section divider */
+.section-divider {
+  height: 1px;
+  background: var(--line);
+  margin: 0 64px;
+}
+
+/* Big section intro (dark band) */
+.dark-band {
+  background: var(--ink);
+  margin: 0 0 0 0;
+  padding: 32px 64px;
+  position: relative;
+  overflow: hidden;
+}
+
+.dark-band::before {
+  content: '';
+  position: absolute;
+  width: 300px; height: 300px;
+  background: var(--lime);
+  filter: blur(100px);
+  opacity: 0.06;
+  top: -60px; right: 40px;
+  border-radius: 50%;
+}
+
+.dark-band h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--lime);
+  margin-bottom: 8px;
+  position: relative;
+}
+
+.dark-band p {
+  font-size: 14px;
+  color: rgba(244,244,241,0.62);
+  line-height: 1.65;
+  max-width: 64ch;
+  position: relative;
+}
+
+/* Scrollbar */
+.nav::-webkit-scrollbar { width: 4px; }
+.nav::-webkit-scrollbar-track { background: transparent; }
+.nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
+
+/* Footer */
+.footer {
+  background: var(--ink);
+  padding: 40px 64px;
+  color: rgba(244,244,241,0.4);
+  font-size: 12px;
+  margin-top: 64px;
+}
+</style>
+</head>
+<body>
+
+<!-- ══ SIDEBAR NAV ══ -->
+<nav class="nav">
+  <div class="nav-logo">
+    <svg width="22" height="22" viewBox="0 0 148 148" fill="#E7FF18" aria-hidden="true">
+      <path id="p" d="M42.2 0H63.8A7.2 7.2 0 0 1 71 7.2V28.8A7.2 7.2 0 0 1 63.8 36H42.2C38.8 36 36 38.8 36 42.2V63.8A7.2 7.2 0 0 1 28.8 71H7.2A7.2 7.2 0 0 1 0 63.8V42.2A7.2 7.2 0 0 1 7.2 35H28.8C32.2 35 35 32.2 35 28.8V7.2A7.2 7.2 0 0 1 42.2 0Z"/>
+      <use href="#p" transform="rotate(90 74 74)"/><use href="#p" transform="rotate(180 74 74)"/><use href="#p" transform="rotate(270 74 74)"/>
+    </svg>
+    <span class="nav-logo-word">Brief de Mockup</span>
+  </div>
+
+  <div class="nav-section">Auth</div>
+  <a href="#auth"><span class="code">A1</span> Login email</a>
+  <a href="#auth"><span class="code">A2</span> Login código</a>
+
+  <div class="nav-section">Suscripción</div>
+  <a href="#suscripcion"><span class="code">SB1</span> Paywall</a>
+
+  <div class="nav-section">Shell</div>
+  <a href="#shell"><span class="code">S1</span> Estructura</a>
+
+  <div class="nav-section">Onboarding</div>
+  <a href="#onboarding"><span class="code">O1</span> Bienvenida</a>
+  <a href="#onboarding"><span class="code">O2</span> Importar</a>
+  <a href="#onboarding"><span class="code">O3</span> Rescatar</a>
+  <a href="#onboarding"><span class="code">O4</span> Conectar IA ★</a>
+  <a href="#onboarding"><span class="code">O5</span> Listo</a>
+
+  <div class="nav-section">Memoria</div>
+  <a href="#memoria"><span class="code">M1</span> Mapa / buscar</a>
+  <a href="#memoria"><span class="code">M2</span> Panel de área</a>
+  <a href="#memoria"><span class="code">M3</span> Crear área</a>
+  <a href="#memoria"><span class="code">M4</span> Búsquedas guardadas</a>
+  <a href="#memoria"><span class="code">M5</span> Búsqueda</a>
+  <a href="#memoria"><span class="code">M6</span> Recuerdo</a>
+
+  <div class="nav-section">Pulso</div>
+  <a href="#pulso"><span class="code">P1</span> Actividad en vivo ★</a>
+  <a href="#pulso"><span class="code">P2</span> Acceso / auditoría</a>
+
+  <div class="nav-section">Conexiones</div>
+  <a href="#conexiones"><span class="code">C1</span> Lista</a>
+  <a href="#conexiones"><span class="code">C2</span> Nueva conexión</a>
+  <a href="#conexiones"><span class="code">C3</span> Guía por cliente</a>
+
+  <div class="nav-section">Fuentes</div>
+  <a href="#fuentes"><span class="code">F1</span> Fuentes</a>
+
+  <div class="nav-section">Bandeja</div>
+  <a href="#bandeja"><span class="code">N1</span> Notificaciones</a>
+
+  <div class="nav-section">Colectivo</div>
+  <a href="#colectivo"><span class="code">CO1</span> Área colectiva</a>
+  <a href="#colectivo"><span class="code">CO2</span> Personas</a>
+  <a href="#colectivo"><span class="code">CO3</span> Política de IAs</a>
+  <a href="#colectivo"><span class="code">CO4</span> Conectar mis IAs</a>
+  <a href="#colectivo"><span class="code">CO5</span> Invitar persona</a>
+  <a href="#colectivo"><span class="code">CO6</span> Convertir a colectiva</a>
+  <a href="#colectivo"><span class="code">CO7</span> Aceptar invitación</a>
+
+  <div class="nav-section">Cuenta</div>
+  <a href="#cuenta"><span class="code">CT1</span> Perfil</a>
+  <a href="#cuenta"><span class="code">CT2</span> Plan</a>
+  <a href="#cuenta"><span class="code">CT3</span> Exportar datos</a>
+  <a href="#cuenta"><span class="code">CT4</span> Ayuda y soporte</a>
+
+  <div class="nav-section">Transversal</div>
+  <a href="#patrones"><span class="code">—</span> Patrones</a>
+</nav>
+
+<!-- ══ MAIN ══ -->
+<main class="main">
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="hero-glow"></div>
+    <div class="hero-eyebrow">Brief para Claude Design</div>
+    <h1>Savia — <em>Brief</em> de mockup</h1>
+    <p class="hero-lede">Autocontenido. Describe qué es Savia, cómo se siente, y los requisitos funcionales por pantalla. No prescribe el diseño visual — esa es la libertad del mockup. Solo el <strong style="color:var(--paper)">comportamiento, el contenido y la personalidad</strong>.</p>
+    <div class="hero-meta">
+      <span class="hero-badge">Español</span>
+      <span class="hero-badge">Primera persona</span>
+      <span class="hero-badge">Sin jerga técnica</span>
+      <span class="hero-badge">Contraste dramático</span>
+    </div>
+  </header>
+
+  <!-- ARCHITECTURE -->
+  <div class="arch-box">
+    <div>
+      <div class="arch-title">Superficies del app</div>
+      <ul class="arch-surfaces">
+        <li><span class="arch-surf-name">MEMORIA</span><span class="arch-surf-desc">Buscar · mapa/lista de áreas · búsquedas guardadas</span></li>
+        <li><span class="arch-surf-name">PULSO</span><span class="arch-surf-desc">Actividad en vivo · crecimiento · acceso/auditoría</span></li>
+        <li><span class="arch-surf-name">CONEXIONES</span><span class="arch-surf-desc">Conectar tus IAs (guía paso a paso por cliente)</span></li>
+        <li><span class="arch-surf-name">FUENTES</span><span class="arch-surf-desc">Drag & drop → memoria organizada</span></li>
+        <li><span class="arch-surf-name">CUENTA</span><span class="arch-surf-desc">Perfil y plan</span></li>
+      </ul>
+      <div style="margin-top:16px; font-size:12.5px; color:var(--slate); padding:10px 14px; background:#fff; border-radius:8px; border:1px solid var(--line);">
+        <strong style="color:var(--ink)">Globales en el shell:</strong> Búsqueda omnipresente · Salto rápido Cmd+K · Bandeja de notificaciones
+      </div>
+    </div>
+    <div>
+      <div class="arch-title">La idea que define toda la UI</div>
+      <div class="arch-principles">
+        <div class="arch-principle">
+          <strong>Áreas vivas, no carpetas</strong>
+          <span>La memoria como mapa dimensionado por volumen, no como explorador de archivos.</span>
+        </div>
+        <div class="arch-principle">
+          <strong>Buscar para encontrar · el mapa para entender</strong>
+          <span>Preguntas y Savia sabe dónde está. El mapa es comprensión, no navegación.</span>
+        </div>
+        <div class="arch-principle">
+          <strong>Corregir, no configurar</strong>
+          <span>Renombrar, dividir, fusionar, mover. Cada corrección enseña a Savia.</span>
+        </div>
+        <div class="arch-principle">
+          <strong>Acceso explícito, nunca automático</strong>
+          <span>Savia sugiere defaults y marca lo sensible. La decisión es siempre tuya.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ AUTH ══ -->
+  <div id="auth" class="section-wrap">
+    <div class="section-header">
+      <span class="section-tag">AUTH</span>
+      <h2><strong>Autenticación</strong></h2>
+    </div>
+    <div class="screens">
+
+      <div class="screen">
+        <div class="screen-head">
+          <span class="screen-code">A1</span>
+          <span class="screen-title">Login — email</span>
+          <span class="screen-subtitle">Entrada al producto</span>
+        </div>
+        <div class="screen-body">
+          <div>
+            <div class="screen-col-label">Propósito</div>
+            <p class="screen-purpose">El usuario ingresa su email para recibir un código. Es el inicio de construir su memoria, y debe entenderlo así.</p>
+          </div>
+          <div>
+            <div class="screen-col-label">Elementos</div>
+            <ul class="elements-list">
+              <li><strong>Marca y nombre del producto</strong> + one-liner "la memoria que conecta todas tus IAs"</li>
+              <li><strong>Journey en pasos:</strong> Entra → Reúne tu memoria → Conecta tus IAs — con el paso actual marcado. El usuario nuevo debe entender que el objetivo es conectar sus IAs</li>
+              <li><strong>Campo de email con label</strong> — sin contraseñas (se explica que llega un código)</li>
+              <li>Acción principal · error (email inválido / red) · indicador de carga</li>
+            </ul>
+          </div>
+        </div>
+        <div class="states-row">
+          <span class="state-pill">Vacío</span>
+          <span class="state-pill">Con email</span>
+          <span class="state-pill">Cargando</span>
+          <span class="state-pill">Error</span>
+          <span class="flow-arrow">→ A2</span>
+        </div>
+      </div>
+
+      <div class="screen">
+        <div class="screen-head">
+          <span class="screen-code">A2</span>
+          <span class="screen-title">Login — código</span>
+          <span class="screen-subtitle">6 dígitos por email</span>
+        </div>
+        <div class="screen-body">
+          <div>
+            <div class="screen-col-label">Propósito</div>
+            <p class="screen-purpose">Ingresar el código de 6 dígitos recibido por email para autenticarse.</p>
+          </div>
+          <div>
+            <div class="screen-col-label">Elementos</div>
+            <ul class="elements-list">
+              <li>Indicación de <strong>a qué email</strong> se envió el código</li>
+              <li><strong>6 campos numéricos</strong> (uno por dígito): avance automático al tipear, soporte de pegar el código completo, debe caber sin desbordar en móvil</li>
+              <li><strong>Reenvío con cuenta regresiva</strong> → al terminar se habilita "Reenviar"</li>
+              <li>Error (código incorrecto / expirado) · indicador de validación</li>
+            </ul>
+          </div>
+        </div>
+        <div class="states-row">
+          <span class="state-pill">Esperando</span>
+          <span class="state-pill">Validando</span>
+          <span class="state-pill">Error incorrecto</span>
+          <span class="state-pill">Error expirado</span>
+          <span class="flow-arrow">→ O1 (nuevo) o M1 (existente)</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section-divider"></div>
+
+  <!-- ══ SUSCRIPCIÓN ══ -->
+  <div id="suscripcion" class="section-wrap">
+    <div class="section-header">
+      <span class="section-tag">SUSCRIPCIÓN</span>
+      <h2><strong>Paywall</strong></h2>
+    </div>
+    <div class="screens">
+
+      <div class="screen protagonist">
+        <div class="screen-head">
+          <span class="screen-code">SB1</span>
+          <span class="screen-title">Suscribirse</span>
+          <span class="screen-subtitle">Puente entre A2 y el onboarding — sin free trial</span>
+        </div>
+        <div class="screen-body">
+          <div>
+            <div class="screen-col-label">Propósito + cuándo aparece</div>
+            <p class="screen-purpose">Gate contextual — aparece cuando el usuario intenta conectar una IA sin suscripción activa (desde O4 o C1/C2). El producto es gratis para organizar memoria; la suscripción desbloquea las conexiones con IAs.</p>
+            <div style="margin-top:16px; border:1px solid rgba(231,255,24,0.25); border-radius:12px; padding:18px 20px; background:rgba(255,255,255,0.04);">
+              <div style="font-size:11px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:rgba(244,244,241,0.4); margin-bottom:10px;">El único plan</div>
+              <div style="font-size:32px; font-weight:300; color:var(--paper); line-height:1;">$11.99</div>
+              <div style="font-size:13px; color:rgba(244,244,241,0.5); margin-top:4px;">por mes · cancela cuando quieras</div>
+              <div style="margin-top:14px; font-size:12px; color:rgba(244,244,241,0.45); font-style:italic;">"Savia es gratis para organizar tu memoria. Para conectar tus IAs, activa tu suscripción."</div>
+            </div>
+          </div>
+          <div>
+            <div class="screen-col-label">Elementos</div>
+            <ul class="elements-list">
+              <li><strong>Qué desbloquea:</strong> conectar Claude, Cursor, ChatGPT… · que tus IAs busquen y recuerden · actividad en vivo</li>
+              <li><strong>Qué sigue gratis</strong> (transparencia): organizar memoria · importar fuentes · áreas automáticas · búsquedas guardadas · colectivo</li>
+              <li>CTA primario <strong>"Suscribirme — $11.99/mes"</strong> → Mercado Pago</li>
+              <li><em>"Cancela cuando quieras. Sin permanencia."</em></li>
+              <li><em>"Tus datos son tuyos — puedes exportarlos en cualquier momento."</em></li>
+            </ul>
+          </div>
+        </div>
+        <div class="states-row">
+          <span class="state-pill">Sin suscripción (propuesta, no bloqueo)</span>
+          <span class="state-pill">Cancelada ("te guardamos todo")</span>
+          <span class="state-pill">Procesando pago</span>
+          <span class="state-pill">Pago fallido ("sin cargo")</span>
+          <span class="state-pill">Pago exitoso → retoma flujo</span>
+          <span class="flow-arrow">→ O4 o C2 según origen</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section-divider"></div>
+
+  <!-- ══ SHELL ══ -->
+  <div id="shell" class="section-wrap">
+    <div class="section-header">
+      <span class="section-tag">SHELL</span>
+      <h2><strong>Estructura</strong> del app</h2>
+    </div>
+    <div class="screens">
+
+      <div class="screen">
+        <div class="screen-head">
+          <span class="screen-code">S1</span>
+          <span class="screen-title">Estructura del app autenticado</span>
+          <span class="screen-subtitle">Navegación persistente + elementos globales</span>
+        </div>
+        <div class="screen-body">
+          <div>
+            <div class="screen-col-label">Propósito</div>
+            <p class="screen-purpose">El contenedor que persiste en toda la experiencia autenticada. Los elementos globales viven aquí — nunca deben desaparecer.</p>
+          </div>
+          <div>
+            <div class="screen-col-label">Elementos</div>
+            <ul class="elements-list">
+              <li><strong>Marca + nombre</strong></li>
+              <li><strong>Navegación:</strong> Memoria · Pulso · Conexiones · Fuentes — indicador de sección activa</li>
+              <li><strong>Búsqueda siempre visible</strong> (la navegación primaria): campo prominente para encontrar cualquier recuerdo o área desde cualquier pantalla</li>
+              <li><strong>Salto rápido Cmd/Ctrl-K</strong>: paleta de comandos para ir a un área, búsqueda guardada o lo reciente — power user</li>
+              <li><strong>Bandeja de notificaciones</strong> (campana): invitaciones, sugerencias de Savia, importaciones terminadas, actividad — con badge de no leídas</li>
+              <li><strong>"Conectar IA"</strong> siempre accesible (alta frecuencia)</li>
+              <li>Acceso a cuenta</li>
+              <li><strong>Icono "?" de ayuda</strong> (junto a la campana): abre el panel de soporte como slide-over sin abandonar la pantalla actual — para cuando el problema es ahora mismo</li>
+            </ul>
+          </div>
+        </div>
+        <div class="states-row">
+          <span class="state-pill">Sin conexiones → "Conectar IA" prominente</span>
+          <span class="state-pill">Con conexiones → señal de actividad reciente</span>
+          <span class="state-pill">Móvil: drawer + búsqueda siempre accesible</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section-divider"></div>
+
+  <!-- ══ ONBOARDING ══ -->
+  <div class="dark-band">
+    <h3>Onboarding — el primer "wow" y la activación real</h3>
+    <p>Recorrido de activación. El progreso se persiste (recargar no lo pierde). Lleva al usuario al momento que Savia cobra sentido: <strong style="color:var(--paper)">conectar su primera IA</strong>. Pasos: Bienvenida · Poblar · Conectar · Listo.</p>
+  </div>
+
+  <div id="onboarding" class="section-wrap">
+    <div class="section-header" style="padding-top:40px">
+      <span class="section-tag">ONBOARDING</span>
+      <h2><strong>Activación</strong></h2>
+    </div>
+    <div class="screens">
+
+      <div class="screen">
+        <div class="screen-head">
+          <span class="screen-code">O1</span>
+          <span class="screen-title">Bienvenida</span>
+          <span class="screen-subtitle">Paso 1 · elegir cómo arrancar</span>
+        </div>
+        <div class="screen-body">
+          <div>
+            <div class="screen-col-label">Propósito</div>
+            <p class="screen-purpose">Dar la bienvenida y elegir cómo alimentar la memoria por primera vez. Tres caminos claros, uno recomendado.</p>
+          </div>
+          <div>
+            <div class="screen-col-label">Elementos</div>
+            <ul class="elements-list">
+              <li><strong>Bienvenida personalizada</strong> + explicación breve del recorrido</li>
+              <li>Tres caminos como tarjetas: <strong>Importar conversaciones</strong> (recomendado) · <strong>Rescatar con prompt</strong> · <strong>Empezar vacío</strong> (saltar y construir sola)</li>
+              <li>Cuál es la recomendada — visualmente marcado</li>
+              <li>Indicador de progreso: <em>Bienvenida · Poblar · Conectar · Listo</em></li>
+              <li><strong>Disclaimer discreto al pie</strong> (texto muted, no intrusivo): "Savia es gratis para organizar y explorar tu memoria. Conectar tus IAs requiere suscripción ($11.99/mes)."</li>
+            </ul>
+          </div>
+        </div>
+        <div class="states-row">
+          <span class="flow-arrow">→ O2 (importar)</span>
+          <span class="flow-arrow">→ O3 (rescatar)</span>
+          <span class="flow-arrow">→ O4 (saltar vacío)</span>
+        </div>
+      </div>
+
+      <div class="screen">
+        <div class="screen-head">
+          <span class="screen-code">O2</span>
+          <span class="screen-title">Importar conversaciones</span>
+          <span class="screen-subtitle">Paso 2 · Poblar</span>
+        </div>
+        <div class="screen-body">
+          <div>
+            <div class="screen-col-label">Propósito</div>
+            <p class="screen-purpose">Subir exports de chats de ChatGPT, Claude, Gemini… Savia los procesa y extrae recuerdos. La memoria se "enciende" visualmente.</p>
+          </div>
+          <div>
+            <div class="screen-col-label">Elementos</div>
+            <ul class="elements-list">
+              <li><strong>Zona de carga con drag & drop</strong></li>
+              <li><strong>Guía de cómo exportar de cada origen</strong> (ChatGPT, Claude, Gemini…) — porque cada uno es distinto, hay que guiarlo</li>
+              <li>Cola con estado por archivo: pendiente / procesando / listo / error — con progreso</li>
+              <li>Al terminar: <strong>recuerdos aparecen de a uno, animados</strong> (no un bloque seco) — la memoria "encendiéndose"</li>
+              <li>Resumen celebrado "X recuerdos" · continuar (habilita cuando ≥1 archivo terminó)</li>
+            </ul>
+          </div>
+        </div>
+        <div class="states-row">
+          <span class="state-pill">Sin archivos</span>
+          <span class="state-pill">Procesando</span>
+          <span class="state-pill">Éxito celebrado</span>
+          <span class="state-pill">Error con reintento</span>
+          <span class="flow-arrow">→ O4</span>
+        </div>
+      </div>
+
+      <div class="screen">
+        <div class="screen-head">
+          <span class="screen-code">O3</span>
+          <span class="screen-title">Rescatar con prompt</span>
+          <span class="screen-subtitle">Paso 2 · Poblar (alternativa)</span>
+        </div>
+        <div class="screen-body">
+          <div>
+            <div class="screen-col-label">Propósito</div>
+            <p class="screen-purpose">El usuario copia un prompt, lo pega en su IA favorita y trae la respuesta a Savia. Extrae recuerdos de esa respuesta.</p>
+          </div>
+          <div>
+            <div class="screen-col-label">Elementos</div>
+            <ul class="elements-list">
+              <li>Explicación en 2 pasos: <em>copiar el prompt → pegarlo en tu IA → traer la respuesta</em></li>
+              <li><strong>Bloque con el prompt + copiar</strong> (con confirmación visual)</li>
+              <li>Campo grande para pegar la respuesta de la IA</li>
+              <li>Al terminar: <strong>resultado celebrado</strong> ("X recuerdos creados" como número grande)</li>
+            </ul>
+          </div>
+        </div>
+        <div class="states-row">
+          <span class="state-pill">Vacío</span>
+          <span class="state-pill">Procesando</span>
+          <span class="state-pill">Resultado celebrado</span>
+          <span class="flow-arrow">→ O4</span>
+        </div>
+      </div>
+
+      <!-- O4 — PROTAGONISTA -->
+      <div class="screen protagonist">
+        <div class="screen-head">
+          <span class="screen-code">O4</span>
+          <span class="screen-title">Conectar tu primera IA</span>
+          <span class="screen-subtitle">Paso 3 · Conectar — EL PASO CLAVE</span>
+        </div>
+        <div class="screen-body">
+          <div>
+            <div class="screen-col-label">Propósito</div>
+            <p class="screen-purpose">El paso de activación real. Sin una IA conectada, Savia no sirve. Aquí "se enchufa" la memoria a la IA. Protagonista, no un extra.</p>
+          </div>
+          <div>
+            <div class="screen-col-label">Elementos</div>
+            <ul class="elements-list">
+              <li>Explicación de <strong>por qué este paso importa</strong></li>
+              <li><strong>Selector de cliente + pasos específicos</strong> por cliente (reutiliza C3)</li>
+              <li><strong>Verificación en vivo:</strong> "esperando la primera llamada de tu IA → ¡conectada!" — el momento de éxito</li>
+              <li>Opción de <strong>"hacerlo más tarde"</strong> (se puede conectar desde Conexiones)</li>
+            </ul>
+          </div>
+        </div>
+        <div class="states-row">
+          <span class="state-pill">Sin conectar</span>
+          <span class="state-pill">Gate suscripción → SB1</span>
+          <span class="state-pill">Esperando verificación</span>
+          <span class="state-pill">¡Conectada! (celebración)</span>
+          <span class="state-pill">"Más tarde" (avanza sin conectar)</span>
+          <span class="flow-arrow">→ O5</span>
+        </div>
+      </div>
+
+      <!-- O5 -->
+      <div class="screen protagonist">
+        <div class="screen-head">
+          <span class="screen-code">O5</span>
+          <span class="screen-title">Listo — Tu memoria está viva</span>
+          <span class="screen-subtitle">Paso 4 · cierre celebrado</span>
+        </div>
+        <div class="screen-body">
+          <div>
+            <div class="screen-col-label">Propósito</div>
+            <p class="screen-purpose">Cerrar mostrando que la memoria ya existe y está organizada. El momento <em>se organizó sola</em> — el mapa naciente.</p>
+          </div>
+          <div>
+            <div class="screen-col-label">Elementos</div>
+            <ul class="elements-list">
+              <li>Celebración: <strong>"Tu memoria está viva"</strong></li>
+              <li><strong>Vista previa del mapa</strong>: las áreas que Savia organizó sola</li>
+              <li>Resumen: total de recuerdos · número de áreas · IA conectada (si hay)</li>
+              <li>Acciones: <strong>Explorar mi memoria</strong> (→ M1) · <strong>Sumar más fuentes</strong> (→ F1)</li>
+            </ul>
+          </div>
+        </div>
+        <div class="states-row">
+          <span class="flow-arrow">→ M1 Memoria</span>
+          <span class="flow-arrow">→ F1 Fuentes</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section-divider"></div>
+
+  <!-- ══ MEMORIA ══ -->
+  <div class="dark-band">
+    <h3>Memoria — la superficie central</h3>
+    <p>Encontrar, ver y gestionar tu memoria. <strong style="color:var(--paper)">Buscar es la navegación primaria; el mapa es para entender.</strong> El usuario no navega la estructura para hallar algo — pregunta y Savia sabe dónde está.</p>
+  </div>
+
+  <div id="memoria" class="section-wrap">
+    <div class="section-header" style="padding-top:40px">
+      <span class="section-tag">MEMORIA</span>
+      <h2><strong>Tu</strong> memoria</h2>
+    </div>
+    <div class="screens">
+
+      <div class="screen">
+        <div class="screen-head">
+          <span class="screen-code">M1</span>
+          <span class="screen-title">Memoria — buscar + mapa/lista</span>
+          <span class="screen-subtitle">La pantalla principal</span>
+        </div>
+        <div class="screen-body">
+          <div>
+            <div class="screen-col-label">Propósito</div>
+            <p class="screen-purpose">Encontrar cualquier cosa al instante (búsqueda) y ver el retrato completo de tu memoria (mapa). Son dos cosas distintas con dos UX distintas.</p>
+          </div>
+          <div>
+            <div class="screen-col-label">Elementos</div>
+            <ul class="elements-list">
+              <li><strong>Búsqueda prominente</strong> (lo primero, la acción principal): lenguaje natural, encuentra recuerdos y áreas sin saber dónde están</li>
+              <li><strong>Hero:</strong> "Tu memoria" + total de recuerdos como número grande + sub-texto (áreas, crecimiento)</li>
+              <li><strong>Mapa de áreas</strong> (comprensión/exploración): formas dimensionadas por volumen, anidables, con migas de pan. Seleccionar → M2</li>
+              <li><strong>Toggle mapa / lista:</strong> lista ordenable de áreas como alternativa rápida. En móvil: lista por defecto</li>
+              <li><strong>Recientes:</strong> lo último que tú o tus IAs agregaron — navegar por tiempo, no solo por tema</li>
+              <li>Señales sutiles: <strong>sensible</strong> · <strong>viva</strong> (creció hace poco)</li>
+              <li>Accesos: Crear área (M3) · Búsquedas guardadas (M4)</li>
+            </ul>
+          </div>
+        </div>
+        <div class="states-row">
+          <span class="state-pill">Sin memoria (CTA a onboarding)</span>
+          <span class="state-pill">Con datos</span>
+          <span class="state-pill">Cargando (placeholder del mapa)</span>
+          <span class="state-pill">Una sola área ("General; irá creciendo")</span>
+          <span class="state-pill">Móvil: lista por defecto</span>
+        </div>
+      </div>
+
+      <div class="screen">
+        <div class="screen-head">
+          <span class="screen-code">M2</span>
+          <span class="screen-title">Panel de área</span>
+          <span class="screen-subtitle">Explorar y gestionar corrigiendo</span>
+        </div>
+        <div class="screen-body">
+          <div>
+            <div class="screen-col-label">Propósito</div>
+            <p class="screen-purpose">Ver los recuerdos de un área, controlar quién la ve, y corregirla. Corregir enseña a Savia — no repite el error.</p>
+          </div>
+          <div>
+            <div class="screen-col-label">Elementos</div>
+            <ul class="elements-list">
+              <li><strong>Encabezado:</strong> nombre (editable en línea) · descripción · conteo · origen (Savia / creada por ti) · tipo (privada / colectiva) · sensibilidad</li>
+              <li><strong>Sub-áreas</strong> (si tiene): forma de entrar a ellas</li>
+              <li><strong>Recuerdos:</strong> lista paginada · texto · fecha · origen (archivo o qué IA) · otras áreas donde vive · <strong>selección múltiple</strong> para mover/eliminar · acción mover</li>
+              <li><strong>¿Quién ve esta área?</strong> Control por IA (dar/quitar), Savia sugiere defaults — mismo modelo que P2, atajo en contexto</li>
+              <li><strong>Acciones de corrección:</strong> renombrar · dividir · fusionar · marcar sensible · compartir con personas (→ CO6) · eliminar</li>
+            </ul>
+          </div>
+        </div>
+        <div class="states-row">
+          <span class="state-pill">Sin recuerdos</span>
+          <span class="state-pill">Con recuerdos</span>
+          <span class="state-pill">Cargando</span>
+          <span class="flow-arrow">→ CO6 para compartir</span>
+        </div>
+      </div>
+
+      <div class="screen">
+        <div class="screen-head">
+          <span class="screen-code">M3</span>
+          <span class="screen-title">Crear área</span>
+          <span class="screen-subtitle">Solo nombrar un lugar — sin elegir "tipos"</span>
+        </div>
+        <div class="screen-body single">
+          <div>
+            <div class="screen-col-label">Propósito + Elementos</div>
+            <ul class="elements-list">
+              <li>Crear un lugar propio en la memoria cuando se quiera. El resto emerge solo — no hay que elegir "tipo de área"</li>
+              <li><strong>Nombre</strong> y una descripción breve de qué va ahí; Savia la va llenando por clasificación</li>
+              <li>Para juntar recuerdos por tema <em>sin crear un lugar</em>, está "guardar una búsqueda" (M5 → M4)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen">
+        <div class="screen-head">
+          <span class="screen-code">M4</span>
+          <span class="screen-title">Búsquedas guardadas</span>
+          <span class="screen-subtitle">Vistas que cruzan áreas — no lugares</span>
+        </div>
+        <div class="screen-body">
+          <div>
+            <div class="screen-col-label">Propósito</div>
+            <p class="screen-purpose">Búsquedas que se actualizan solas ("todo sobre Fredd, esté donde esté"). Son vistas, no lugares en el mapa. Se crean desde una búsqueda.</p>
+          </div>
+          <div>
+            <div class="screen-col-label">Elementos</div>
+            <ul class="elements-list">
+              <li>Lista de búsquedas guardadas: nombre + conteo de coincidencias (que se actualiza solo)</li>
+              <li>Abrir una → sus recuerdos de distintas áreas</li>
+              <li><strong>Editar la búsqueda en lenguaje natural</strong></li>
+              <li><strong>Control de acceso por IA</strong> (mismo modelo, atajo en contexto)</li>
+              <li>Eliminar · queda claro que <strong>no son lugares en el mapa</strong>: son cortes transversales</li>
+              <li>Se crean <strong>desde M5</strong> ("guardar esta búsqueda como grupo")</li>
+            </ul>
+          </div>
+        </div>
+        <div class="states-row">
+          <span class="state-pill">Sin búsquedas (qué son + CTA)</span>
+          <span class="state-pill">Con varias</span>
+        </div>
+      </div>
+
+      <div class="screen">
+        <div class="screen-head">
+          <span class="screen-code">M5</span>
+          <span class="screen-title">Búsqueda</span>
+          <span class="screen-subtitle">La navegación primaria</span>
+        </div>
+        <div class="screen-body">
+          <div>
+            <div class="screen-col-label">Propósito</div>
+            <p class="screen-purpose">Encontrar cualquier cosa en lenguaje natural. No se navega la estructura — se pregunta.</p>
+          </div>
+          <div>
+            <div class="screen-col-label">Elementos</div>
+            <ul class="elements-list">
+              <li>Campo de búsqueda en lenguaje natural</li>
+              <li>Resultados como recuerdos (texto · área · origen), <strong>agrupados por área</strong></li>
+              <li><strong>Filtros:</strong> por área · por origen (archivo o IA) · por fecha</li>
+              <li>Abrir resultado → M6</li>
+              <li>Acción <strong>"guardar esta búsqueda como grupo"</strong> → M4</li>
+              <li>Estado sin resultados con sugerencia</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen">
+        <div class="screen-head">
+          <span class="screen-code">M6</span>
+          <span class="screen-title">Recuerdo individual</span>
+          <span class="screen-subtitle">Ver y gestionar uno</span>
+        </div>
+        <div class="screen-body">
+          <div>
+            <div class="screen-col-label">Propósito</div>
+            <p class="screen-purpose">Ver y gestionar un recuerdo puntual: su contenido, su origen, dónde vive.</p>
+          </div>
+          <div>
+            <div class="screen-col-label">Elementos</div>
+            <ul class="elements-list">
+              <li>Texto completo · fecha · <strong>origen</strong> (archivo o IA que lo escribió)</li>
+              <li>Áreas a las que pertenece: lugar principal marcado + otras como links</li>
+              <li>Señal de sensibilidad si aplica</li>
+              <li>Acciones: mover de área · marcar sensible · eliminar (con confirmación)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section-divider"></div>
+
+  <!-- ══ PULSO ══ -->
+  <div class="dark-band">
+    <h3>Pulso — la vida de tu memoria</h3>
+    <p>Lo que tus IAs hacen con ella en vivo, cómo crece, y quién ve qué. Es donde el <strong style="color:var(--paper)">loop del producto se siente</strong> y donde se gana la confianza para delegar la organización en Savia.</p>
+  </div>
+
+  <div id="pulso" class="section-wrap">
+    <div class="section-header" style="padding-top:40px">
+      <span class="section-tag">PULSO</span>
+      <h2><strong>Vida</strong> y acceso</h2>
+    </div>
+    <div class="screens">
+
+      <!-- P1 — PROTAGONISTA -->
+      <div class="screen protagonist">
+        <div class="screen-head">
+          <span class="screen-code">P1</span>
+          <span class="screen-title">Actividad en vivo</span>
+          <span class="screen-subtitle">El corazón del producto</span>
+        </div>
+        <div class="screen-body">
+          <div>
+            <div class="screen-col-label">Propósito</div>
+            <p class="screen-purpose">Ver tu memoria viva: lo que tus IAs consultan y contribuyen, y lo que Savia organiza. Aquí se siente la magia del producto.</p>
+          </div>
+          <div>
+            <div class="screen-col-label">Elementos</div>
+            <ul class="elements-list">
+              <li><strong>Feed de actividad</strong> (legible, no técnico):
+                <br>"Claude recordó 3 cosas nuevas en Trabajo" (una IA contribuyó)
+                <br>"Cursor consultó tu memoria de Proyectos" (una IA leyó)
+                <br>"Savia separó 'Pricing' de Savia" (reorganizó) — con opción de <strong>revertir</strong>
+              </li>
+              <li><strong>Recientes:</strong> los últimos recuerdos agregados — de quién/qué — navegables</li>
+              <li><strong>Crecimiento:</strong> recuerdos hoy/semana · variación · gráfico diario (7–14 días)</li>
+              <li><strong>Resumen de IAs:</strong> cada conexión con última consulta y señal de actividad</li>
+            </ul>
+          </div>
+        </div>
+        <div class="states-row">
+          <span class="state-pill">Sin actividad aún (qué aparecerá)</span>
+          <span class="state-pill">Con actividad</span>
+          <span class="state-pill">Cargando (placeholder por sección)</span>
+        </div>
+      </div>
+
+      <div class="screen">
+        <div class="screen-head">
+          <span class="screen-code">P2</span>
+          <span class="screen-title">Acceso — ¿qué ve cada IA?</span>
+          <span class="screen-subtitle">Configuración + auditoría — el hogar del acceso</span>
+        </div>
+        <div class="screen-body">
+          <div>
+            <div class="screen-col-label">Propósito</div>
+            <p class="screen-purpose">La vista consolidada del acceso: qué ve cada IA, configurable aquí mismo, con su historial. Los controles en M2/M4 son atajos del mismo modelo.</p>
+          </div>
+          <div>
+            <div class="screen-col-label">Elementos</div>
+            <ul class="elements-list">
+              <li>Por cada IA: <strong>qué puede leer</strong> (áreas y búsquedas guardadas) en lenguaje del usuario + <strong>control de acceso ahí mismo</strong> (dar/quitar)</li>
+              <li><strong>Capacidad de contribución:</strong> si esa IA puede agregar memoria — visible y configurable</li>
+              <li><strong>Señal de cuidado:</strong> si una IA tiene acceso a algo sensible, se resalta</li>
+              <li><strong>Sugerencias de Savia:</strong> defaults sensatos y avisos ("la nueva área 'Fredd' se parece a lo que Claude ya ve, ¿le das acceso?") — aceptar o ignorar; <strong>el acceso nunca se amplía sin tu decisión</strong></li>
+              <li><strong>Historial / auditoría:</strong> qué pudo leer cada IA y cuándo</li>
+            </ul>
+          </div>
+        </div>
+        <div class="states-row">
+          <span class="state-pill">Sin conexiones</span>
+          <span class="state-pill">Con accesos configurados</span>
+          <span class="state-pill">Cargando</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section-divider"></div>
+
+  <!-- ══ CONEXIONES ══ -->
+  <div id="conexiones" class="section-wrap">
+    <div class="section-header">
+      <span class="section-tag">CONEXIONES</span>
+      <h2>Solo <strong>conectar</strong> IAs</h2>
+    </div>
+    <p class="section-intro">Los permisos de lectura se gestionan en Memoria (M2/M4) y Pulso (P2) — no aquí. Mentalmente: decides "¿quién ve esta memoria?" parado en el área, no en una matriz de conexiones.</p>
+    <div class="screens">
+
+      <div class="screen">
+        <div class="screen-head">
+          <span class="screen-code">C1</span>
+          <span class="screen-title">Lista de conexiones</span>
+          <span class="screen-subtitle">Ver estado + conectar nuevas</span>
+        </div>
+        <div class="screen-body">
+          <div>
+            <div class="screen-col-label">Propósito</div>
+            <p class="screen-purpose">Ver las IAs conectadas, su estado de salud, y conectar nuevas. Una conexión con problema debe resaltarse con instrucciones de cómo arreglarla.</p>
+          </div>
+          <div>
+            <div class="screen-col-label">Elementos (por ítem)</div>
+            <ul class="elements-list">
+              <li>Nombre · <strong>estado de salud:</strong> conectada y activa / sin actividad / <strong>con problema</strong> (token inválido, bloqueada por límite)</li>
+              <li>Última actividad (tiempo relativo) · señal de actividad reciente</li>
+              <li>Resumen de solo lectura: qué puede ver + si puede contribuir</li>
+              <li>Revocar (con confirmación) · acceso a la guía (C3)</li>
+            </ul>
+          </div>
+        </div>
+        <div class="states-row">
+          <span class="state-pill">Sin conexiones (CTA + qué es)</span>
+          <span class="state-pill">Con conexiones activas</span>
+          <span class="state-pill">Con problema (resaltada + cómo arreglar)</span>
+          <span class="state-pill">Cargando (placeholder por ítem)</span>
+        </div>
+      </div>
+
+      <div class="screen">
+        <div class="screen-head">
+          <span class="screen-code">C2</span>
+          <span class="screen-title">Nueva conexión</span>
+          <span class="screen-subtitle">2 pasos: nombre → config</span>
+        </div>
+        <div class="screen-body single">
+          <div>
+            <ul class="elements-list">
+              <li><strong>Paso 1:</strong> nombre de la conexión (ej. "Claude del trabajo") → siguiente</li>
+              <li><strong>Paso 2:</strong> la configuración lista · botón "Ver cómo instalarla" → C3 · nota de que el acceso se configura en Memoria/Pulso · cerrar</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen protagonist">
+        <div class="screen-head">
+          <span class="screen-code">C3</span>
+          <span class="screen-title">Guía de conexión por cliente</span>
+          <span class="screen-subtitle">Cada IA se conecta distinto — pasos específicos por cliente</span>
+        </div>
+        <div class="screen-body">
+          <div>
+            <div class="screen-col-label">Propósito</div>
+            <p class="screen-purpose">Guiar paso a paso reconociendo que Claude Code, Claude Desktop, Cursor, Windsurf y ChatGPT tienen procesos distintos. Un bloque genérico no alcanza.</p>
+          </div>
+          <div>
+            <div class="screen-col-label">Elementos</div>
+            <ul class="elements-list">
+              <li><strong>Selector de cliente:</strong> Claude Code · Claude Desktop · Cursor · Windsurf · ChatGPT · otro compatible</li>
+              <li>Según el cliente: pasos específicos (la ruta del archivo / el comando a correr / la ruta en la interfaz)</li>
+              <li><strong>Bloque de config</strong> exacto para ese cliente, listo para copiar + opción de descargar</li>
+              <li>Referencia visual de dónde pegarlo</li>
+              <li><strong>Verificación en vivo:</strong> "esperando la primera llamada → conectada"</li>
+              <li>Sección "Qué podrá hacer tu IA con Savia"</li>
+            </ul>
+          </div>
+        </div>
+        <div class="states-row">
+          <span class="state-pill">Sin cliente elegido</span>
+          <span class="state-pill">Cliente elegido (sus pasos)</span>
+          <span class="state-pill">Esperando verificación</span>
+          <span class="state-pill">Conectada</span>
+          <span class="flow-arrow">→ C1 al terminar</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section-divider"></div>
+
+  <!-- ══ FUENTES ══ -->
+  <div class="dark-band">
+    <h3>Fuentes — lo que echas se convierte en memoria</h3>
+    <p>No es un gestor de archivos sueltos. La interacción central es <strong style="color:var(--paper)">arrastrar y soltar</strong>; Savia extrae recuerdos y los organiza solo. El usuario nunca ve "archivos sueltos" — ve cómo lo que aporta se vuelve memoria organizada.</p>
+  </div>
+
+  <div id="fuentes" class="section-wrap">
+    <div class="section-header" style="padding-top:40px">
+      <span class="section-tag">FUENTES</span>
+      <h2>Lo que echas se <strong>absorbe</strong></h2>
+    </div>
+    <div class="screens">
+
+      <div class="screen">
+        <div class="screen-head">
+          <span class="screen-code">F1</span>
+          <span class="screen-title">Fuentes</span>
+          <span class="screen-subtitle">Drag & drop → memoria organizada</span>
+        </div>
+        <div class="screen-body">
+          <div>
+            <div class="screen-col-label">Propósito</div>
+            <p class="screen-purpose">Alimentar la memoria arrastrando lo que se quiera recordar. Savia lo absorbe y organiza solo. El usuario puede opcionalmente sugerir a qué área pertenece.</p>
+          </div>
+          <div>
+            <div class="screen-col-label">Elementos</div>
+            <ul class="elements-list">
+              <li><strong>Zona de soltar protagonista</strong> (centro de pantalla): "Arrastra aquí — Savia lo organiza en tu memoria." También se puede soltar sobre toda el app (overlay al arrastrar)</li>
+              <li>Al soltar: <strong>sugerencia opcional de área</strong> — nunca obligatorio; por defecto "que Savia lo organice"</li>
+              <li><strong>Absorción visible, no "archivo subido":</strong> cada fuente muestra que se está convirtiendo en recuerdos + al terminar cuántos generó y en qué áreas aterrizaron</li>
+              <li><strong>Vista por contribución, no por archivos:</strong> fuentes agrupadas por las áreas que alimentaron</li>
+              <li><strong>Selección múltiple</strong> para reintentar/eliminar varias</li>
+              <li>Por fuente: estado (procesando / absorbida / fallida) · recuerdos generados · áreas destino · re-sugerir área · reintentar · eliminar</li>
+            </ul>
+          </div>
+        </div>
+        <div class="states-row">
+          <span class="state-pill">Vacío (zona protagonista + concepto fuente→memoria)</span>
+          <span class="state-pill">Absorbiendo</span>
+          <span class="state-pill">Con fuentes organizadas</span>
+          <span class="state-pill">Cargando</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section-divider"></div>
+
+  <!-- ══ BANDEJA ══ -->
+  <div id="bandeja" class="section-wrap">
+    <div class="section-header">
+      <span class="section-tag">BANDEJA</span>
+      <h2><strong>Notificaciones</strong></h2>
+    </div>
+    <div class="screens">
+
+      <div class="screen">
+        <div class="screen-head">
+          <span class="screen-code">N1</span>
+          <span class="screen-title">Notificaciones / Bandeja</span>
+          <span class="screen-subtitle">Accesible desde la campana del shell — nada bloqueante</span>
+        </div>
+        <div class="screen-body">
+          <div>
+            <div class="screen-col-label">Propósito</div>
+            <p class="screen-purpose">Un único lugar para lo que requiere la atención del usuario. Nada bloqueante; todo revisable cuando quiera. Un usuario logueado acepta invitaciones aquí (no desde un link).</p>
+          </div>
+          <div>
+            <div class="screen-col-label">Tipos de notificación</div>
+            <ul class="elements-list">
+              <li><strong>Invitaciones recibidas</strong> a áreas colectivas: quién · a qué área · con qué rol → <strong>aceptar / rechazar</strong> desde aquí</li>
+              <li><strong>Sugerencias de Savia:</strong> "¿compartir 'Fredd' con Claude?", "encontré sub-temas en Trabajo, ¿los separo?" → aceptar / ignorar — <strong>nunca expande acceso sola</strong></li>
+              <li><strong>Procesos terminados:</strong> "tu importación de ChatGPT terminó: 240 recuerdos"</li>
+              <li><strong>Hitos de actividad:</strong> "tus IAs agregaron 50 recuerdos esta semana"</li>
+              <li>Marcar como leídas · vaciar · cada ítem lleva a su contexto</li>
+            </ul>
+          </div>
+        </div>
+        <div class="states-row">
+          <span class="state-pill">Sin notificaciones (al día)</span>
+          <span class="state-pill">Con no leídas (resaltadas)</span>
+          <span class="state-pill">Cargando</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section-divider"></div>
+
+  <!-- ══ COLECTIVO ══ -->
+  <div class="dark-band">
+    <h3>Colectivo — memoria compartida</h3>
+    <p>Un área colectiva es una memoria compartida entre personas — un cerebro de equipo. Dos capas: <strong style="color:var(--paper)">quién (personas)</strong> participa y <strong style="color:var(--paper)">qué IAs</strong> pueden conectarse. Se inicia desde M2 → "compartir con personas" → CO6.</p>
+  </div>
+
+  <div id="colectivo" class="section-wrap">
+    <div class="section-header" style="padding-top:40px">
+      <span class="section-tag">COLECTIVO</span>
+      <h2>Memoria <strong>colaborativa</strong></h2>
+    </div>
+    <div class="screens">
+
+      <div class="screen">
+        <div class="screen-head">
+          <span class="screen-code">CO1</span>
+          <span class="screen-title">Área colectiva</span>
+          <span class="screen-subtitle">La memoria compartida del equipo</span>
+        </div>
+        <div class="screen-body">
+          <div>
+            <div class="screen-col-label">Propósito</div>
+            <p class="screen-purpose">Explorar la memoria compartida y ver quién/qué participa. Debe sentirse claramente distinto a un área privada.</p>
+          </div>
+          <div>
+            <div class="screen-col-label">Elementos</div>
+            <ul class="elements-list">
+              <li><strong>Encabezado de equipo:</strong> nombre · avatares apilados de miembros · tu rol · señal clara de colectiva</li>
+              <li>Recuerdos compartidos: cada uno indica <strong>quién contribuyó</strong> (persona o IA)</li>
+              <li>Dos accesos visibles: las <strong>personas</strong> (→ CO2) y las <strong>IAs según la política</strong> (→ CO3)</li>
+              <li>Acciones según rol: contribuir · gestionar miembros/invitar (admin) · configurar política de IAs (admin) · editar (admin)</li>
+            </ul>
+          </div>
+        </div>
+        <div class="states-row">
+          <span class="state-pill">Vacía (invitar + fuentes)</span>
+          <span class="state-pill">Con recuerdos</span>
+          <span class="state-pill">Cargando</span>
+        </div>
+      </div>
+
+      <div class="screen">
+        <div class="screen-head">
+          <span class="screen-code">CO2</span>
+          <span class="screen-title">Personas del área</span>
+          <span class="screen-subtitle">Gestionar miembros y roles</span>
+        </div>
+        <div class="screen-body">
+          <div>
+            <div class="screen-col-label">Propósito</div>
+            <p class="screen-purpose">Gestionar quién participa y con qué rol. El admin puede cambiar roles y quitar miembros.</p>
+          </div>
+          <div>
+            <div class="screen-col-label">Elementos + Roles</div>
+            <ul class="elements-list">
+              <li>Lista: avatar · email · rol · cambiar rol en línea (admin) · quitar (admin, con confirmación)</li>
+              <li>El propio usuario aparece — no puede quitarse si es el único admin</li>
+              <li>"Invitar persona" → CO5</li>
+            </ul>
+            <div class="role-grid" style="margin-top:16px">
+              <div class="role-chip"><strong>viewer</strong><span>Solo lee la memoria</span></div>
+              <div class="role-chip"><strong>contributor</strong><span>Lee y agrega recuerdos</span></div>
+              <div class="role-chip"><strong>admin</strong><span>Lee, agrega, gestiona y configura</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen">
+        <div class="screen-head">
+          <span class="screen-code">CO3</span>
+          <span class="screen-title">Política de acceso de IAs</span>
+          <span class="screen-subtitle">El admin decide cómo entran las IAs — de abierto a cerrado</span>
+        </div>
+        <div class="screen-body">
+          <div>
+            <div class="screen-col-label">Propósito</div>
+            <p class="screen-purpose">El admin controla qué IAs pueden acceder a la memoria compartida. Cuatro modos desde libre hasta cerrado total.</p>
+          </div>
+          <div>
+            <div class="screen-col-label">Elementos</div>
+            <ul class="elements-list">
+              <li><strong>Modo de acceso</strong> (selector con explicación):
+                <br><strong>Abierto</strong> — cada miembro conecta sus IAs libremente
+                <br><strong>Restringido</strong> — solo IAs de una lista aprobada por el admin
+                <br><strong>Con aprobación</strong> — el admin aprueba cada IA que un miembro quiere conectar
+                <br><strong>Solo personas</strong> — ninguna IA accede
+              </li>
+              <li>Si restringido/aprobación: lista de IAs aprobadas o pendientes (aprobar/rechazar/quitar)</li>
+              <li><strong>IAs conectadas ahora</strong> (de cualquier miembro): el admin puede revocar cualquiera</li>
+              <li>Señal de cuidado si el área es sensible y el modo es abierto</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen">
+        <div class="screen-head">
+          <span class="screen-code">CO4</span>
+          <span class="screen-title">Conectar mis IAs al área</span>
+          <span class="screen-subtitle">Cada miembro elige sus IAs — dentro de la política del admin</span>
+        </div>
+        <div class="screen-body single">
+          <div>
+            <ul class="elements-list">
+              <li>Lista de las conexiones propias con control por IA (conectar/desconectar de este área)</li>
+              <li>Si "con aprobación": la IA queda <strong>pendiente</strong> hasta que el admin apruebe</li>
+              <li>Si "solo personas": se explica que las IAs no pueden conectarse aquí</li>
+            </ul>
+          </div>
+        </div>
+        <div class="states-row">
+          <span class="state-pill">Abierto (control directo)</span>
+          <span class="state-pill">Pendiente de aprobación</span>
+          <span class="state-pill">Bloqueado (solo personas)</span>
+        </div>
+      </div>
+
+      <div class="screen">
+        <div class="screen-head">
+          <span class="screen-code">CO5</span>
+          <span class="screen-title">Invitar persona</span>
+          <span class="screen-subtitle">Invitar a alguien con un rol</span>
+        </div>
+        <div class="screen-body single">
+          <div>
+            <ul class="elements-list">
+              <li>Email del invitado · selector de rol con descripción breve · "Enviar invitación"</li>
+              <li>Resultado: link generado con copiar · cuándo vence · lista de invitaciones pendientes con opción de revocar</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen protagonist">
+        <div class="screen-head">
+          <span class="screen-code">CO6</span>
+          <span class="screen-title">Convertir un área en colectiva</span>
+          <span class="screen-subtitle">Wizard — irreversible, consecuencias clarísimas</span>
+        </div>
+        <div class="screen-body">
+          <div>
+            <div class="screen-col-label">Propósito</div>
+            <p class="screen-purpose">Guiar la conversión dejando absolutamente claro qué cambia. Es irreversible — alguien más verá esta memoria.</p>
+          </div>
+          <div>
+            <div class="screen-col-label">Pasos del wizard</div>
+            <ul class="elements-list">
+              <li><strong>Paso 1 — Consecuencias:</strong> qué cambia; decisión sobre los recuerdos: <strong>Mover</strong> (pasan al colectivo, dejan de ser solo tuyos) o <strong>Copiar</strong> (quedan en tu área privada Y también en la colectiva)</li>
+              <li><strong>Paso 2 — Config inicial:</strong> nombre editable · modo de acceso de IAs por defecto (CO3)</li>
+              <li><strong>Paso 3 — Confirmación:</strong> resumen · "Convertir" (irreversible, advertencia explícita) · cancelar</li>
+            </ul>
+          </div>
+        </div>
+        <div class="states-row">
+          <span class="flow-arrow">→ CO1 al completar</span>
+        </div>
+      </div>
+
+      <div class="screen">
+        <div class="screen-head">
+          <span class="screen-code">CO7</span>
+          <span class="screen-title">Aceptar invitación</span>
+          <span class="screen-subtitle">Página pública — sin estar logueado</span>
+        </div>
+        <div class="screen-body single">
+          <div>
+            <p class="screen-purpose" style="margin-bottom:16px">Lo que ve alguien que recibió un link de invitación <em>sin estar logueado</em>. Los usuarios logueados aceptan desde la Bandeja (N1).</p>
+            <ul class="elements-list">
+              <li>Marca + nombre del producto · a qué área lo invitaron · quién invitó · rol y su descripción</li>
+              <li>Sin cuenta → "Crear cuenta y unirme" (→ login) · Con cuenta → "Unirme"</li>
+              <li>Link expirado o revocado → mensaje de error + CTA</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section-divider"></div>
+
+  <!-- ══ CUENTA ══ -->
+  <div id="cuenta" class="section-wrap">
+    <div class="section-header">
+      <span class="section-tag">CUENTA</span>
+      <h2><strong>Perfil</strong> y plan</h2>
+    </div>
+    <div class="screens">
+
+      <div class="screen">
+        <div class="screen-head">
+          <span class="screen-code">CT1</span>
+          <span class="screen-title">Perfil</span>
+        </div>
+        <div class="screen-body single">
+          <ul class="elements-list">
+            <li>Email (solo lectura) · fecha de creación · cerrar sesión</li>
+            <li><strong>Zona peligrosa:</strong> eliminar cuenta — advertencia de que borra toda tu memoria (irreversible) · confirmación en dos pasos escribiendo el email</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="screen">
+        <div class="screen-head">
+          <span class="screen-code">CT2</span>
+          <span class="screen-title">Plan / Suscripción</span>
+          <span class="screen-subtitle">Ver el plan y gestionar con pasarela de pago</span>
+        </div>
+        <div class="screen-body">
+          <div>
+            <div class="screen-col-label">Elementos</div>
+            <ul class="elements-list">
+              <li>Plan actual: nombre · precio · qué incluye (límites de memoria/áreas/conexiones)</li>
+              <li>Estado: activa / cancelada / en gracia · fecha de renovación o vencimiento</li>
+              <li>Acción según estado: Suscribirme / Gestionar / Reactivar</li>
+              <li>Historial de pagos: fecha · monto · estado · comprobante</li>
+              <li>Comparativa de planes si hay más de uno</li>
+            </ul>
+          </div>
+          <div>
+            <div class="screen-col-label">Estados</div>
+            <ul class="elements-list">
+              <li><strong>Sin suscripción:</strong> énfasis en el CTA y qué desbloquea</li>
+              <li><strong>Activa:</strong> énfasis en la renovación</li>
+              <li><strong>Pago fallido:</strong> alerta prominente + actualizar método de pago</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen">
+        <div class="screen-head">
+          <span class="screen-code">CT4</span>
+          <span class="screen-title">Ayuda y soporte</span>
+          <span class="screen-subtitle">Slide-over desde "?" en el shell · pantalla completa desde Cuenta</span>
+        </div>
+        <div class="screen-body">
+          <div>
+            <div class="screen-col-label">Propósito</div>
+            <p class="screen-purpose">Auto-servicio primero (FAQ), ticket si no se resuelve. Dos puntos de entrada, mismo panel. Desde el shell no interrumpe el contexto actual.</p>
+            <div style="margin-top:16px; display:flex; flex-direction:column; gap:8px;">
+              <div style="background:var(--mist); border:1px solid var(--line); border-radius:8px; padding:10px 14px; font-size:12px; color:var(--slate);">
+                <strong style="color:var(--ink); display:block; margin-bottom:2px;">¿Por qué mi IA no ve ciertos recuerdos?</strong>
+                Cada área tiene su propio control de acceso. Ve a Pulso → Acceso para ver qué puede leer cada IA.
+              </div>
+              <div style="background:var(--mist); border:1px solid var(--line); border-radius:8px; padding:10px 14px; font-size:12px; color:var(--slate);">
+                <strong style="color:var(--ink); display:block; margin-bottom:2px;">¿Cómo cancelo mi suscripción?</strong>
+                Desde Cuenta → Plan → Gestionar. Tus datos se conservan.
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="screen-col-label">Formulario de ticket</div>
+            <ul class="elements-list">
+              <li><strong>Categoría:</strong> Algo no funciona · Tengo una pregunta · Quiero sugerir algo</li>
+              <li>Asunto (texto corto) · Mensaje (campo amplio) · Screenshot adjunto (opcional)</li>
+              <li>CTA: "Enviar" con indicador de carga</li>
+              <li><strong>Confirmación:</strong> nº de ticket + "Te responderemos a pablo@ejemplo.com en menos de 48 h"</li>
+              <li><strong>Solo en Cuenta:</strong> historial de tickets — asunto · estado (abierto/resuelto) · fecha</li>
+            </ul>
+          </div>
+        </div>
+        <div class="states-row">
+          <span class="state-pill">Vacío (FAQ primero)</span>
+          <span class="state-pill">Enviando</span>
+          <span class="state-pill">Enviado (nº de ticket)</span>
+          <span class="state-pill">Error (reintentar)</span>
+        </div>
+      </div>
+
+      <div class="screen protagonist">
+        <div class="screen-head">
+          <span class="screen-code">CT3</span>
+          <span class="screen-title">Exportar mis datos</span>
+          <span class="screen-subtitle">Tus datos, en bruto, siempre tuyos</span>
+        </div>
+        <div class="screen-body">
+          <div>
+            <div class="screen-col-label">Propósito</div>
+            <p class="screen-purpose">El usuario puede descargar toda su memoria en bruto. Señal inequívoca de que sus datos le pertenecen y que Savia no los retiene. Si puedes llevarte tus datos, no dependes de nosotros.</p>
+            <div style="margin-top:16px; padding:14px 16px; background:rgba(231,255,24,0.08); border:1px solid rgba(231,255,24,0.2); border-radius:10px;">
+              <div style="font-size:11px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:var(--lime); margin-bottom:6px;">Mensaje de contexto</div>
+              <div style="font-size:13px; color:rgba(244,244,241,0.75); line-height:1.55; font-style:italic;">"Estos son tus datos, en bruto. Savia los procesa para organizarlos, pero siempre son tuyos."</div>
+            </div>
+          </div>
+          <div>
+            <div class="screen-col-label">Elementos</div>
+            <ul class="elements-list">
+              <li><strong>Qué incluye</strong> (en lenguaje del usuario, no técnico): recuerdos con texto/fecha/área/origen · estructura de áreas · búsquedas guardadas · registro de actividad (qué IA leyó qué y cuándo)</li>
+              <li><strong>Formato:</strong> JSON (legible por máquina) y CSV (recuerdos, apto para hojear) — ambos opcionales</li>
+              <li><strong>Proceso asíncrono:</strong> solicitar → Savia prepara en segundo plano → notificación en Bandeja cuando esté listo → descargar. No se espera en pantalla</li>
+              <li><strong>Validez del link:</strong> vence en 48 h — se muestra el tiempo restante</li>
+              <li><strong>Historial de exportaciones:</strong> fecha · estado (preparando / listo / vencido) · re-descargar si sigue vigente</li>
+            </ul>
+          </div>
+        </div>
+        <div class="states-row">
+          <span class="state-pill">Sin exportaciones previas</span>
+          <span class="state-pill">Preparando (+ "te avisamos")</span>
+          <span class="state-pill">Listo para descargar</span>
+          <span class="state-pill">Link vencido (solicitar de nuevo)</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section-divider"></div>
+
+  <!-- ══ PATRONES ══ -->
+  <div id="patrones" class="section-wrap">
+    <div class="section-header">
+      <span class="section-tag">TRANSVERSAL</span>
+      <h2><strong>Patrones</strong> globales</h2>
+    </div>
+    <div class="pattern-grid">
+      <div class="pattern-card">
+        <div class="p-title">Organización automática, acceso configurable</div>
+        <div class="p-desc">Savia organiza sola y aprende de las correcciones. El acceso lo configura el usuario — la organización no pide aprobar nada. El acceso nunca se amplía sin su decisión.</div>
+      </div>
+      <div class="pattern-card">
+        <div class="p-title">Navegación: buscar primero</div>
+        <div class="p-desc">Buscar para encontrar (no se navega la estructura). El mapa para entender. Salto rápido Cmd+K para ir a un destino conocido. Recientes para navegar por tiempo.</div>
+      </div>
+      <div class="pattern-card">
+        <div class="p-title">Transparencia</div>
+        <div class="p-desc">El usuario siempre ve lo que Savia organizó y puede corregirlo. Siempre puede auditar qué vio cada IA y cuándo.</div>
+      </div>
+      <div class="pattern-card">
+        <div class="p-title">Acciones en lote</div>
+        <div class="p-desc">En listas (recuerdos, fuentes) se puede seleccionar varios y actuar sobre todos a la vez.</div>
+      </div>
+      <div class="pattern-card">
+        <div class="p-title">Carga independiente</div>
+        <div class="p-desc">Cada sección carga independiente con placeholder (skeleton). Nunca un spinner global que bloquee toda la pantalla.</div>
+      </div>
+      <div class="pattern-card">
+        <div class="p-title">Estados vacíos diseñados</div>
+        <div class="p-desc">Toda lista o sección vacía tiene un mensaje explicativo y una acción clara. No hay secciones que desaparecen silenciosamente.</div>
+      </div>
+      <div class="pattern-card">
+        <div class="p-title">Errores contextuales</div>
+        <div class="p-desc">En lenguaje del usuario, no códigos. Los errores globales aparecen como notificación no bloqueante. Siempre con una acción de recuperación.</div>
+      </div>
+      <div class="pattern-card">
+        <div class="p-title">Confirmaciones</div>
+        <div class="p-desc">Las acciones destructivas o irreversibles siempre piden confirmación explícita. Nunca window.confirm() — modal de marca con consecuencias claras.</div>
+      </div>
+      <div class="pattern-card">
+        <div class="p-title">Feedback de acción</div>
+        <div class="p-desc">Toda acción exitosa tiene una confirmación visual breve. El usuario nunca se pregunta si algo funcionó.</div>
+      </div>
+      <div class="pattern-card">
+        <div class="p-title">Seguridad visible</div>
+        <div class="p-desc">Lo sensible se marca. "¿Qué ve cada IA?" siempre accesible desde P2 y como atajo en cada área/búsqueda guardada.</div>
+      </div>
+      <div class="pattern-card">
+        <div class="p-title">Voz Savia</div>
+        <div class="p-desc">Español · primera persona ("tu memoria", "tus IAs") · sin jerga técnica · sin metáforas de plantas/naturaleza. Preciso, cálido, adulto.</div>
+      </div>
+      <div class="pattern-card">
+        <div class="p-title">Responsive</div>
+        <div class="p-desc">320px → desktop. Búsqueda siempre accesible. En móvil, el mapa puede ceder a lista como vista por defecto. Nunca ocultar sin alternativa.</div>
+      </div>
+      <div class="pattern-card" style="border-color:#0B2529; background:#0B2529; grid-column: 1 / -1;">
+        <div style="font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:#E7FF18; margin-bottom:10px;">Micro-mensajes de confianza</div>
+        <div style="font-size:13px; color:rgba(244,244,241,0.7); line-height:1.6; margin-bottom:16px;">Cada acción relevante lleva un mensaje que cumple una de tres funciones. Nunca burocrático ni alarmista — claro, cuidadoso, en primera persona.</div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); gap:10px;">
+          <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:12px 14px;">
+            <div style="font-size:10px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:#E7FF18; margin-bottom:8px;">Delimitar — "solo esto, nada más"</div>
+            <div style="font-size:12px; color:rgba(244,244,241,0.6); line-height:1.55;">"Claude ya puede ver tu memoria de Trabajo — solo los recuerdos que acabas de autorizar. Nada más."<br><br>"Tu IA está conectada. No puede ver nada hasta que tú le des acceso."</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:12px 14px;">
+            <div style="font-size:10px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:#E7FF18; margin-bottom:8px;">Confirmar — "efectivo de inmediato"</div>
+            <div style="font-size:12px; color:rgba(244,244,241,0.6); line-height:1.55;">"Claude ya no tiene acceso a Trabajo. Efectivo de inmediato."<br><br>"Entendido — Savia no volverá a clasificar contenido similar ahí."<br><br>"Destilando recuerdos. Los archivos originales no los guardamos."</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:12px 14px;">
+            <div style="font-size:10px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:#E7FF18; margin-bottom:8px;">Devolver control — "puedes revertirlo"</div>
+            <div style="font-size:12px; color:rgba(244,244,241,0.6); line-height:1.55;">"Savia separó 'Pricing' de 'Savia OS'. ← Revertir"<br><br>"X recuerdos guardados — y solo tuyos hasta que decidas compartirlos."<br><br>"No pudimos leer este archivo. Tus demás recuerdos están intactos."</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    Savia · Brief de mockup — generado para Claude Design · <strong style="color:rgba(244,244,241,0.6)">28 pantallas · 8 superficies</strong>
+  </footer>
+
+</main>
+
+</body>
+</html>

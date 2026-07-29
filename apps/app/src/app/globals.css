@@ -1,0 +1,20 @@
+/*
+ * Resting control border = brand `line` token (#DDDFDC).
+ *
+ * Chakra 3.36 with our custom system renders inputs/textareas with a generic
+ * gray border in the `:focus` (non-keyboard) state — the login email field is
+ * `autoFocus`, so it loads focused and showed gray, even though
+ * `--chakra-colors-border` resolves to #DDDFDC everywhere and the input recipe
+ * references it. The override that produced the gray isn't reachable from the
+ * token, the recipe, or Chakra's `globalCss` (which strips `!important`), so we
+ * pin it here. Verified: only `!important` wins this cascade.
+ *
+ * Guard is `:not([data-invalid])` only — NOT `:not(:focus)`, which would exclude
+ * the autofocused field. Keyboard focus is still shown by the recipe's
+ * box-shadow focus ring (we only override border-color, not the ring); invalid
+ * fields keep their error border.
+ */
+input.chakra-input:not([data-invalid]),
+textarea.chakra-textarea:not([data-invalid]) {
+  border-color: var(--chakra-colors-border) !important;
+}

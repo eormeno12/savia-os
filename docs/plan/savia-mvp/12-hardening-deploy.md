@@ -42,18 +42,18 @@ Añadir a los backings (postgres/redis/qdrant) los servicios de aplicación:
 ## 2. `infra/Caddyfile` (TLS + reverse proxy)
 
 ```
-app.savia.com  { reverse_proxy ... }    # (o Vercel sirve app; ver nota)
-api.savia.com  { reverse_proxy api:4400 }
-mcp.savia.com  { reverse_proxy mcp:4401 }
+app.savia.uno  { reverse_proxy ... }    # (o Vercel sirve app; ver nota)
+api.savia.uno  { reverse_proxy api:4400 }
+mcp.savia.uno  { reverse_proxy mcp:4401 }
 ```
 
 - TLS automático (Let's Encrypt) vía Caddy.
-- Subdominios bajo `savia.com` para que las cookies `Domain=.savia.com` funcionen
+- Subdominios bajo `savia.uno` para que las cookies `Domain=.savia.uno` funcionen
   entre `app` (frontend) y `api`.
 - Rate limit a nivel gateway (capa extra sobre el de Redis).
 
 > Nota frontend: `apps/app` puede ir en **Vercel** (como landing) apuntando a
-> `api.savia.com`/`mcp.savia.com`, o dockerizarse tras el gateway. Para el MVP, Vercel
+> `api.savia.uno`/`mcp.savia.uno`, o dockerizarse tras el gateway. Para el MVP, Vercel
 > para `app` + backend self-hosted es lo más simple; documentar la opción elegida.
 
 ## 3. Secretos y config
@@ -61,7 +61,7 @@ mcp.savia.com  { reverse_proxy mcp:4401 }
 - Producción: `OPENAI_API_KEY`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, credenciales
   AWS, `INTERNAL_TOKEN` vía **AWS SSM Parameter Store / Secrets Manager** (o `.env`
   cifrado fuera del repo). Nunca en git.
-- `COOKIE_DOMAIN=.savia.com`, CORS de `api` permitiendo `https://app.savia.com`.
+- `COOKIE_DOMAIN=.savia.uno`, CORS de `api` permitiendo `https://app.savia.uno`.
 - `INTERNAL_TOKEN` para llamadas entre procesos (endpoints internos de memoria).
 
 ## 4. Borrado en cascada (verificar de punta a punta)
@@ -101,10 +101,10 @@ mcp.savia.com  { reverse_proxy mcp:4401 }
 ## Verificación (end-to-end en EC2)
 
 1. `docker compose up -d` en la EC2; todos los servicios healthy; solo gateway expuesto.
-2. `https://api.savia.com/health` = 200.
-3. Login OTP (SES real) desde `https://app.savia.com`.
+2. `https://api.savia.uno/health` = 200.
+3. Login OTP (SES real) desde `https://app.savia.uno`.
 4. Subir archivo → ingesta → `indexed`; memorias clasificadas.
-5. Conectar una IA externa a `https://mcp.savia.com` con un token; `savia_search`
+5. Conectar una IA externa a `https://mcp.savia.uno` con un token; `savia_search`
    respeta los grants; `AccessLog` registra.
 6. Dashboard muestra áreas + crecimiento.
 7. Borrar archivo → memorias eliminadas de Qdrant + `MemoryIndex` (cascada).

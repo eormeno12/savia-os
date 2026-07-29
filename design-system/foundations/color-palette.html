@@ -1,0 +1,69 @@
+<!-- @dsCard group="Color" title="Paleta de marca" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Savia · Paleta de marca</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ink: #0B2529; --softInk: #152F34; --paper: #F4F4F1;
+    --lime: #E7FF18; --limeSoft: #F1FF67; --mist: #ECEDEA;
+    --line: #DDDFDC; --slate: #53606C;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--paper); color: var(--ink);
+    -webkit-font-smoothing: antialiased; padding: 64px 48px;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--slate); margin-bottom: 24px; }
+  h1 { font-size: clamp(40px, 4.8vw, 72px); font-weight: 300; line-height: 0.92; letter-spacing: 0; max-width: 16ch; }
+  .lede { font-size: clamp(16px, 1.1vw, 20px); font-weight: 400; line-height: 1.6; color: var(--slate); margin-top: 24px; max-width: 52ch; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; margin-top: 56px; }
+  .chip { border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: #fff; }
+  .chip .swatch { height: 88px; }
+  .chip .meta { padding: 14px 16px; }
+  .chip .name { font-size: 13px; font-weight: 600; font-feature-settings: 'tnum'; }
+  .chip .hex { font-family: ui-monospace, monospace; font-size: 11px; color: var(--slate); margin-top: 3px; }
+  .chip .role { font-size: 12px; color: var(--slate); margin-top: 8px; line-height: 1.45; }
+  .section-label { font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--slate); margin: 64px 0 8px; }
+  .section-desc { font-size: 14px; color: var(--slate); line-height: 1.65; max-width: 56ch; }
+  .ring { box-shadow: inset 0 0 0 1px rgba(11,37,41,0.08); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Fundamentos · Color</div>
+  <h1>Una paleta corta, intencional.</h1>
+  <p class="lede">Ocho tonos de marca. Sin colores de relleno: cada uno tiene un trabajo. El lima es la única señal eléctrica — y solo brilla sobre lo oscuro.</p>
+
+  <div class="section-label">Marca</div>
+  <p class="section-desc">El núcleo. Teal profundo (ink) como tinta y superficie de firma; paper como lienzo cálido; lima como el acento de acción.</p>
+  <div class="grid">
+    <div class="chip"><div class="swatch ring" style="background:#0B2529"></div><div class="meta"><div class="name">ink</div><div class="hex">#0B2529</div><div class="role">Texto sobre claro · superficies oscuras de firma</div></div></div>
+    <div class="chip"><div class="swatch ring" style="background:#152F34"></div><div class="meta"><div class="name">softInk</div><div class="hex">#152F34</div><div class="role">Capa secundaria sobre ink</div></div></div>
+    <div class="chip"><div class="swatch ring" style="background:#F4F4F1"></div><div class="meta"><div class="name">paper</div><div class="hex">#F4F4F1</div><div class="role">Fondo claro cálido · texto sobre oscuro</div></div></div>
+    <div class="chip"><div class="swatch ring" style="background:#E7FF18"></div><div class="meta"><div class="name">signalLime</div><div class="hex">#E7FF18</div><div class="role">Acento eléctrico · solo sobre oscuro</div></div></div>
+    <div class="chip"><div class="swatch ring" style="background:#F1FF67"></div><div class="meta"><div class="name">signalLimeSoft</div><div class="hex">#F1FF67</div><div class="role">Variante tenue del lima (hover)</div></div></div>
+    <div class="chip"><div class="swatch ring" style="background:#ECEDEA"></div><div class="meta"><div class="name">mist</div><div class="hex">#ECEDEA</div><div class="role">Fondo claro sutil (bg.subtle)</div></div></div>
+    <div class="chip"><div class="swatch ring" style="background:#DDDFDC"></div><div class="meta"><div class="name">line</div><div class="hex">#DDDFDC</div><div class="role">Bordes y divisores</div></div></div>
+    <div class="chip"><div class="swatch ring" style="background:#53606C"></div><div class="meta"><div class="name">slateText</div><div class="hex">#53606C</div><div class="role">Texto secundario (fg.muted)</div></div></div>
+  </div>
+
+  <div class="section-label">Estados</div>
+  <p class="section-desc">Calmos y de marca — nunca los rojos/verdes default. Cada estado tiene un tono <em>Ink</em> (legible como texto/ícono sobre claro) y una base (fill sutil). <code>dangerSoft</code> es el rojo legible sobre ink.</p>
+  <div class="grid">
+    <div class="chip"><div class="swatch ring" style="background:#3E8E5A"></div><div class="meta"><div class="name">success</div><div class="hex">#3E8E5A · ink #2F7048</div><div class="role">Indexado · validación ok</div></div></div>
+    <div class="chip"><div class="swatch ring" style="background:#C9852A"></div><div class="meta"><div class="name">warning</div><div class="hex">#C9852A · ink #8A5A12</div><div class="role">Procesando · atención</div></div></div>
+    <div class="chip"><div class="swatch ring" style="background:#D6483B"></div><div class="meta"><div class="name">danger</div><div class="hex">#D6483B · ink #B23529</div><div class="role">Error · destructivo</div></div></div>
+    <div class="chip"><div class="swatch ring" style="background:#2E6B7A"></div><div class="meta"><div class="name">info</div><div class="hex">#2E6B7A · ink #1C4A57</div><div class="role">Informativo · neutro</div></div></div>
+    <div class="chip"><div class="swatch" style="background:#0B2529"><div style="height:100%;display:flex;align-items:center;justify-content:center;color:#F2A99E;font-size:13px;font-weight:600">dangerSoft</div></div><div class="meta"><div class="name">dangerSoft</div><div class="hex">#F2A99E</div><div class="role">Rojo legible <strong>sobre ink</strong></div></div></div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,12 +1,14 @@
 import { z } from 'zod';
 
 export const PresignRequestSchema = z.object({
+  areaId: z.string(),
   name: z.string().min(1),
   mimeType: z.string().min(1),
   sizeBytes: z.number().int().positive(),
 });
 
 export const CreateFileSchema = z.object({
+  areaId: z.string(),
   name: z.string().min(1),
   mimeType: z.string().min(1),
   sizeBytes: z.number().int().positive(),
@@ -15,11 +17,13 @@ export const CreateFileSchema = z.object({
 
 export const FileDtoSchema = z.object({
   id: z.string(),
+  areaId: z.string(),
   name: z.string(),
   mimeType: z.string(),
   sizeBytes: z.number(),
   status: z.enum(['pending', 'processing', 'indexed', 'failed']),
   source: z.string(),
+  uploaderUserId: z.string(),
   memoryCount: z.number().optional(),
   createdAt: z.string(),
   indexedAt: z.string().nullable(),

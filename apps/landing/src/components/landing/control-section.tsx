@@ -1,5 +1,5 @@
 import { Box, Flex, Grid, HStack, Text } from "@chakra-ui/react";
-import { SectionHeader } from '@/components/ui/section-header';
+import { SectionHeader } from '@savia-os/ui';
 import {
   Briefcase,
   MessageCircle,

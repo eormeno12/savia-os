@@ -1,8 +1,7 @@
 'use client';
 
 import { Box, Stack, Text } from '@chakra-ui/react';
-import { SaviaMark } from '@/components/design-system/savia-mark';
-import { Button } from '@/components/ui/button';
+import { Button, SaviaMark } from '@savia-os/ui';
 
 export default function Error({
   reset,

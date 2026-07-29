@@ -1,3 +1,9 @@
+// Brand atoms (BRAND_COLORS, EASE_SAVIA) now live in the shared package —
+// re-exported here so existing `@/lib/constants` import sites keep working with
+// a single source of truth.
+export { BRAND_COLORS, EASE_SAVIA } from '@savia-os/ui';
+
+// Landing-specific content stays local.
 export const NAV_ITEMS = [
   { label: 'Inicio', href: '#inicio' },
   { label: 'Cómo funciona', href: '#flujo' },
@@ -13,12 +19,4 @@ export const COMMUNITY_AVATARS = [
   { label: 'DV', bg: '#53606C', fg: '#F4F4F1' },
 ] as const;
 
-export const BRAND_COLORS = {
-  lime: '#E7FF18',
-  ink: '#0B2529',
-  paper: '#F4F4F1',
-} as const;
-
 export const COMMUNITY_COUNT = '+1,000';
-
-export const EASE_SAVIA = [0.22, 1, 0.36, 1] as const;

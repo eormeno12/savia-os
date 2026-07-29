@@ -1,29 +1,28 @@
+import { Provider } from '@nestjs/common';
 import { Queue } from 'bullmq';
-import { ConfigService } from '@nestjs/config';
-
-export const INGEST_QUEUE = 'ingest';
+import { AppConfig } from '../../common/config/app.config';
+import { bullConnection, QUEUES } from '../../common/queues/bull';
 
 export interface IngestJobData {
   fileId: string;
   userId: string;
+  areaId: string;
   source: string;
 }
 
-export function createIngestQueue(config: ConfigService): Queue<IngestJobData> {
-  const redisUrl = config.get<string>('REDIS_URL', 'redis://localhost:6379');
-  const url = new URL(redisUrl);
-  return new Queue<IngestJobData>(INGEST_QUEUE, {
-    connection: {
-      host: url.hostname,
-      port: parseInt(url.port || '6379', 10),
-    },
-    defaultJobOptions: {
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 5000 },
-      removeOnComplete: { count: 100 },
-      removeOnFail: { count: 50 },
-    },
-  });
-}
+export const INGEST_QUEUE = 'INGEST_QUEUE';
 
-export const INGEST_QUEUE_TOKEN = 'INGEST_QUEUE';
+export const ingestQueueProvider: Provider = {
+  provide: INGEST_QUEUE,
+  inject: [AppConfig],
+  useFactory: (config: AppConfig) =>
+    new Queue<IngestJobData>(QUEUES.ingest, {
+      connection: bullConnection(config.redisUrl),
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+        removeOnComplete: { count: 100 },
+        removeOnFail: { count: 200 }, // keep failures → the DLQ surface
+      },
+    }),
+};

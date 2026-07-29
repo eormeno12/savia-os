@@ -1,0 +1,84 @@
+<!-- @dsCard group="Marca" title="Mark y lockup del logo" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Savia · Marca</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root { --ink:#0B2529; --paper:#F4F4F1; --lime:#E7FF18; --slate:#53606C; --line:#DDDFDC; --mist:#ECEDEA; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter', system-ui, sans-serif; background:var(--paper); color:var(--ink); -webkit-font-smoothing:antialiased; padding:64px 48px; }
+  .wrap { max-width:1100px; margin:0 auto; }
+  .eyebrow { font-size:12px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--slate); margin-bottom:24px; }
+  h1 { font-size:clamp(40px,4.8vw,72px); font-weight:300; line-height:0.92; max-width:16ch; }
+  .lede { font-size:clamp(16px,1.1vw,20px); line-height:1.6; color:var(--slate); margin-top:24px; max-width:54ch; }
+  .label { font-size:12px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--slate); margin:64px 0 24px; }
+  .duo { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  @media (max-width:720px){ .duo{ grid-template-columns:1fr; } }
+  .tile { border-radius:28px; min-height:240px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; position:relative; overflow:hidden; }
+  .on-dark { background:var(--ink); }
+  .on-light { background:var(--paper); border:1px solid var(--line); }
+  .glow { position:absolute; width:300px; height:300px; border-radius:50%; background:var(--lime); filter:blur(120px); opacity:0.1; }
+  .lockup { display:flex; align-items:center; gap:14px; position:relative; }
+  .word { font-weight:600; letter-spacing:0.08em; font-size:26px; }
+  .on-dark .word { color:var(--paper); }
+  .on-light .word { color:var(--ink); }
+  .cap { font-size:12px; position:relative; }
+  .on-dark .cap { color:rgba(244,244,241,0.6); }
+  .on-light .cap { color:var(--slate); }
+  .sizes { display:flex; align-items:flex-end; gap:40px; flex-wrap:wrap; background:var(--ink); border-radius:28px; padding:48px; }
+  .note { margin-top:40px; font-size:14px; color:var(--slate); line-height:1.7; max-width:62ch; border-left:2px solid var(--line); padding-left:18px; }
+  .note strong { color:var(--ink); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Identidad · Marca</div>
+  <h1>Cuatro pliegues que se abrazan.</h1>
+  <p class="lede">El mark de Savia: una forma geométrica de cuatro piezas rotadas — continuidad que se conecta consigo misma. Sobre oscuro el mark va en lima (brilla); el wordmark en paper.</p>
+
+  <div class="label">Mark + lockup</div>
+  <div class="duo">
+    <div class="tile on-dark">
+      <div class="glow"></div>
+      <div class="lockup">
+        <svg width="40" height="40" viewBox="0 0 148 148" fill="#E7FF18" aria-hidden="true">
+          <path id="p" d="M42.2 0H63.8A7.2 7.2 0 0 1 71 7.2V28.8A7.2 7.2 0 0 1 63.8 36H42.2C38.8 36 36 38.8 36 42.2V63.8A7.2 7.2 0 0 1 28.8 71H7.2A7.2 7.2 0 0 1 0 63.8V42.2A7.2 7.2 0 0 1 7.2 35H28.8C32.2 35 35 32.2 35 28.8V7.2A7.2 7.2 0 0 1 42.2 0Z"/>
+          <use href="#p" transform="rotate(90 74 74)"/>
+          <use href="#p" transform="rotate(180 74 74)"/>
+          <use href="#p" transform="rotate(270 74 74)"/>
+        </svg>
+        <span class="word">SAVIA</span>
+      </div>
+      <div class="cap">Sobre ink · mark en lima</div>
+    </div>
+    <div class="tile on-light">
+      <div class="lockup">
+        <svg width="40" height="40" viewBox="0 0 148 148" fill="#0B2529" aria-hidden="true">
+          <path id="p2" d="M42.2 0H63.8A7.2 7.2 0 0 1 71 7.2V28.8A7.2 7.2 0 0 1 63.8 36H42.2C38.8 36 36 38.8 36 42.2V63.8A7.2 7.2 0 0 1 28.8 71H7.2A7.2 7.2 0 0 1 0 63.8V42.2A7.2 7.2 0 0 1 7.2 35H28.8C32.2 35 35 32.2 35 28.8V7.2A7.2 7.2 0 0 1 42.2 0Z"/>
+          <use href="#p2" transform="rotate(90 74 74)"/>
+          <use href="#p2" transform="rotate(180 74 74)"/>
+          <use href="#p2" transform="rotate(270 74 74)"/>
+        </svg>
+        <span class="word">SAVIA</span>
+      </div>
+      <div class="cap">Sobre claro · todo en ink (sin lima)</div>
+    </div>
+  </div>
+
+  <div class="label">Escalas del mark</div>
+  <div class="sizes">
+    <svg width="18" height="18" viewBox="0 0 148 148" fill="#E7FF18"><path id="s1" d="M42.2 0H63.8A7.2 7.2 0 0 1 71 7.2V28.8A7.2 7.2 0 0 1 63.8 36H42.2C38.8 36 36 38.8 36 42.2V63.8A7.2 7.2 0 0 1 28.8 71H7.2A7.2 7.2 0 0 1 0 63.8V42.2A7.2 7.2 0 0 1 7.2 35H28.8C32.2 35 35 32.2 35 28.8V7.2A7.2 7.2 0 0 1 42.2 0Z"/><use href="#s1" transform="rotate(90 74 74)"/><use href="#s1" transform="rotate(180 74 74)"/><use href="#s1" transform="rotate(270 74 74)"/></svg>
+    <svg width="32" height="32" viewBox="0 0 148 148" fill="#E7FF18"><use href="#s1"/><use href="#s1" transform="rotate(90 74 74)"/><use href="#s1" transform="rotate(180 74 74)"/><use href="#s1" transform="rotate(270 74 74)"/></svg>
+    <svg width="56" height="56" viewBox="0 0 148 148" fill="#E7FF18"><use href="#s1"/><use href="#s1" transform="rotate(90 74 74)"/><use href="#s1" transform="rotate(180 74 74)"/><use href="#s1" transform="rotate(270 74 74)"/></svg>
+    <svg width="88" height="88" viewBox="0 0 148 148" fill="#E7FF18"><use href="#s1"/><use href="#s1" transform="rotate(90 74 74)"/><use href="#s1" transform="rotate(180 74 74)"/><use href="#s1" transform="rotate(270 74 74)"/></svg>
+  </div>
+
+  <p class="note"><strong>Uso:</strong> el mark sirve como logo, loader y acento. Lockup = mark + wordmark «SAVIA» (uppercase, letter-spacing 0.08em). Nunca pongas el mark en lima sobre claro — ahí va en ink.</p>
+</div>
+</body>
+</html>

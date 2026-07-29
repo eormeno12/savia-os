@@ -1,5 +1,5 @@
 import { Box, Flex, Link } from '@chakra-ui/react';
-import { SaviaMark } from '@/components/design-system/savia-mark';
+import { SaviaMark } from '@savia-os/ui';
 import { BRAND_COLORS } from '@/lib/constants';
 
 type AppHeaderProps = {

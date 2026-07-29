@@ -1,201 +1,268 @@
+import type {
+  AreaDto,
+  AreaMemoriesPage,
+  AreaTreeNode,
+  BillingRow,
+  ConnectionDto,
+  CreateConnectionResponse,
+  CreateGrantDto,
+  FileDto,
+  GrantDto,
+  GroupDto,
+  GroupMemberDto,
+  GroupMemoryDto,
+  GroupRole,
+  GrowthAreaDto,
+  GrowthEventsPage,
+  GrowthSummary,
+  InboxItem,
+  JobDto,
+  LensDto,
+  MemoryResult,
+  MeResponse,
+  PendingInviteDto,
+  SubscriptionDto,
+  SuggestedSpace,
+  SuggestionDto,
+  UpdateMemoryDto,
+} from '@savia-os/contracts';
+import { mockApi } from './api.mock';
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:4400';
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(
+    public status: number,
+    message: string,
+    /** Stable machine code from the API (e.g. "PlanRequired" → show the SB1 gate). */
+    public code?: string,
+  ) {
     super(message);
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+async function doFetch(path: string, init?: RequestInit) {
+  return fetch(`${API_BASE}${path}`, {
     headers: { 'Content-Type': 'application/json', ...init?.headers },
     credentials: 'include',
     ...init,
   });
+}
+
+/**
+ * Single request pipeline: every call (reads AND mutations) goes through here so
+ * failures always surface as `ApiError`. A 401 outside /auth retries once after
+ * a silent token refresh — the access cookie only lives 15 minutes.
+ */
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  let res = await doFetch(path, init);
+
+  if (res.status === 401 && !path.startsWith('/auth/')) {
+    const refreshed = await doFetch('/auth/refresh', { method: 'POST' });
+    if (refreshed.ok) res = await doFetch(path, init);
+  }
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new ApiError(res.status, body?.message ?? res.statusText);
+    throw new ApiError(res.status, body?.message ?? res.statusText, body?.code);
   }
 
-  return res.json() as Promise<T>;
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
-export const api = {
-  requestOtp: (email: string) =>
-    request<{ message: string }>('/auth/request-otp', {
-      method: 'POST',
-      body: JSON.stringify({ email }),
-    }),
+const json = (body: unknown): RequestInit => ({ method: 'POST', body: JSON.stringify(body) });
 
-  verifyOtp: (email: string, code: string) =>
-    request<{ id: string; email: string; createdAt: string }>('/auth/verify-otp', {
-      method: 'POST',
-      body: JSON.stringify({ email, code }),
-    }),
+const realApi = {
+  requestOtp: (email: string) => request<{ message: string }>('/auth/request-otp', json({ email })),
+
+  verifyOtp: (email: string, code: string) => request<MeResponse>('/auth/verify-otp', json({ email, code })),
 
   logout: () => request<{ message: string }>('/auth/logout', { method: 'POST' }),
 
-  me: () => request<{ id: string; email: string }>('/auth/me'),
+  me: () => request<MeResponse>('/auth/me'),
 
-  files: {
-    presign: (name: string, mimeType: string, sizeBytes: number) =>
-      request<{ uploadUrl: string; fields: Record<string, string>; s3Key: string }>('/files/presign', {
-        method: 'POST',
-        body: JSON.stringify({ name, mimeType, sizeBytes }),
-      }),
+  areas: {
+    list: () => request<AreaDto[]>('/areas'),
 
-    create: (name: string, mimeType: string, sizeBytes: number, s3Key: string) =>
-      request<{ id: string }>('/files', {
-        method: 'POST',
-        body: JSON.stringify({ name, mimeType, sizeBytes, s3Key }),
-      }),
+    tree: () => request<AreaTreeNode[]>('/areas/tree'),
 
-    list: () =>
-      request<Array<{
-        id: string; name: string; mimeType: string; sizeBytes: number;
-        status: 'pending' | 'processing' | 'indexed' | 'failed';
-        source: string; memoryCount?: number; createdAt: string; indexedAt: string | null;
-      }>>('/files'),
+    create: (description: string, opts?: { parentId?: string; memoryIds?: string[] }) =>
+      request<AreaDto>('/areas', json({ description, ...opts })),
 
-    delete: (id: string) =>
-      fetch(`${API_BASE}/files/${id}`, { method: 'DELETE', credentials: 'include' }),
-  },
+    update: (id: string, data: { name?: string; description?: string }) =>
+      request<AreaDto>(`/areas/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
 
-  spaces: {
-    create: (description: string) =>
-      request<SpaceDto>('/spaces', {
-        method: 'POST',
-        body: JSON.stringify({ description }),
-      }),
-
-    list: () => request<SpaceDto[]>('/spaces'),
-
-    update: (id: string, data: { description?: string; name?: string }) =>
-      request<SpaceDto>(`/spaces/${id}`, {
-        method: 'PATCH',
-        body: JSON.stringify(data),
-      }),
-
-    delete: (id: string) =>
-      fetch(`${API_BASE}/spaces/${id}`, { method: 'DELETE', credentials: 'include' }),
+    delete: (id: string) => request<void>(`/areas/${id}`, { method: 'DELETE' }),
 
     memories: (id: string, cursor?: string, limit = 20) => {
       const params = new URLSearchParams({ limit: String(limit) });
       if (cursor) params.set('cursor', cursor);
-      return request<SpaceMemoryDto[]>(`/spaces/${id}/memories?${params}`);
+      return request<AreaMemoriesPage>(`/areas/${id}/memories?${params}`);
     },
 
-    removeMemory: (spaceId: string, memoryId: string) =>
-      fetch(`${API_BASE}/spaces/${spaceId}/memories/${memoryId}`, {
-        method: 'DELETE', credentials: 'include',
-      }),
+    /** Representative memories of an area (previews, hover cards). */
+    sample: (id: string) => request<AreaMemoriesPage['items']>(`/areas/${id}/sample`),
+  },
 
-    addMemory: (spaceId: string, memoryId: string) =>
-      fetch(`${API_BASE}/spaces/${spaceId}/memories/${memoryId}`, {
-        method: 'POST', credentials: 'include',
-      }),
+  memory: {
+    add: (text: string, areaId?: string) => request<MemoryResult>('/memory', json({ text, areaId })),
+
+    /** Semantic search across the user's areas (default-deny on server). */
+    search: (query: string, opts?: { areaIds?: string[]; limit?: number }) =>
+      request<MemoryResult[]>('/memory/search', json({ query, areaIds: opts?.areaIds, limit: opts?.limit })),
+
+    /** Edit membership (multi-area) and/or sensitivity. */
+    update: (id: string, data: UpdateMemoryDto) =>
+      request<MemoryResult>(`/memory/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+    delete: (id: string) => request<void>(`/memory/${id}`, { method: 'DELETE' }),
   },
 
   connections: {
-    create: (label: string) =>
-      request<ConnectionCreateResponse>('/connections', {
-        method: 'POST',
-        body: JSON.stringify({ label }),
-      }),
+    create: (label: string) => request<CreateConnectionResponse>('/connections', json({ label })),
 
     list: () => request<ConnectionDto[]>('/connections'),
 
-    revoke: (id: string) =>
-      fetch(`${API_BASE}/connections/${id}`, { method: 'DELETE', credentials: 'include' }),
+    revoke: (id: string) => request<void>(`/connections/${id}`, { method: 'DELETE' }),
 
-    addGrant: (connectionId: string, spaceId: string) =>
-      fetch(`${API_BASE}/connections/${connectionId}/grants`, {
-        method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ spaceId }),
-      }),
+    addGrant: (connectionId: string, grant: CreateGrantDto) =>
+      request<GrantDto>(`/connections/${connectionId}/grants`, json(grant)),
 
-    removeGrant: (connectionId: string, spaceId: string) =>
-      fetch(`${API_BASE}/connections/${connectionId}/grants/${spaceId}`, {
-        method: 'DELETE', credentials: 'include',
-      }),
+    removeGrant: (connectionId: string, grantId: string) =>
+      request<void>(`/connections/${connectionId}/grants/${grantId}`, { method: 'DELETE' }),
+  },
+
+  groups: {
+    create: (name: string) => request<GroupDto>('/groups', json({ name })),
+
+    list: () => request<GroupDto[]>('/groups'),
+
+    get: (id: string) => request<GroupDto>(`/groups/${id}`),
+
+    memories: (id: string) => request<GroupMemoryDto[]>(`/groups/${id}/memories`),
+
+    /** Share one of my area subtrees into the group (creates my fragment). */
+    shareFragment: (id: string, areaId: string) => request<void>(`/groups/${id}/fragments`, json({ areaId })),
+
+    invite: (id: string, email: string, role: GroupRole) =>
+      request<{ token: string; expiresAt: string }>(`/groups/${id}/invites`, json({ email, role })),
+
+    members: (id: string) => request<GroupMemberDto[]>(`/groups/${id}/members`),
+
+    setRole: (id: string, userId: string, role: GroupRole) =>
+      request<GroupMemberDto>(`/groups/${id}/members/${userId}`, { method: 'PATCH', body: JSON.stringify({ role }) }),
+
+    removeMember: (id: string, userId: string) =>
+      request<void>(`/groups/${id}/members/${userId}`, { method: 'DELETE' }),
+
+    leave: (id: string) => request<void>(`/groups/${id}/leave`, { method: 'POST' }),
+  },
+
+  invites: {
+    /** Pending invites for the logged-in user (Bandeja). */
+    listPending: () => request<PendingInviteDto[]>('/invites'),
+
+    accept: (token: string) => request<{ groupId: string }>(`/invites/${token}/accept`, { method: 'POST' }),
   },
 
   growth: {
-    areas: () => request<AreaDto[]>('/growth/areas'),
+    summary: (range: 'day' | 'week' = 'week') => request<GrowthSummary>(`/growth?range=${range}`),
 
-    summary: (range: 'day' | 'week' = 'week') =>
-      request<GrowthSummary>(`/growth?range=${range}`),
+    areas: () => request<GrowthAreaDto[]>('/growth/areas'),
 
-    accessActivity: () =>
-      request<AccessActivity[]>('/growth/access-activity'),
+    events: (cursor?: string, limit = 30) => {
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (cursor) params.set('cursor', cursor);
+      return request<GrowthEventsPage>(`/growth/events?${params}`);
+    },
+
+    revertEvent: (id: string) => request<void>(`/growth/events/${id}/revert`, { method: 'POST' }),
+
+    accessActivity: () => request<AccessActivity[]>('/growth/access-activity'),
+  },
+
+  inbox: {
+    list: () => request<InboxItem[]>('/inbox'),
+
+    markSeen: (id: string) => request<void>(`/inbox/${id}/seen`, { method: 'POST' }),
+
+    jobs: () => request<JobDto[]>('/jobs'),
+
+    job: (id: string) => request<JobDto>(`/jobs/${id}`),
+
+    suggestions: () => request<SuggestionDto[]>('/suggestions'),
+
+    acceptSuggestion: (id: string) => request<void>(`/suggestions/${id}/accept`, { method: 'POST' }),
+
+    dismissSuggestion: (id: string) => request<void>(`/suggestions/${id}/dismiss`, { method: 'POST' }),
+  },
+
+  lenses: {
+    /** Saved searches (M4): live views that cut across areas. */
+    create: (data: { name: string; query: string; radius?: number; sourceAreaIds?: string[] }) =>
+      request<LensDto>('/lenses', json(data)),
+
+    list: () => request<LensDto[]>('/lenses'),
+
+    memories: (id: string) => request<MemoryResult[]>(`/lenses/${id}/memories`),
+
+    delete: (id: string) => request<void>(`/lenses/${id}`, { method: 'DELETE' }),
+  },
+
+  billing: {
+    subscription: () => request<SubscriptionDto>('/billing/subscription'),
+
+    /** Starts checkout; the API returns the Mercado Pago hosted URL to redirect to. */
+    subscribe: (plan: 'monthly' | 'annual' = 'monthly') =>
+      request<{ checkoutUrl: string }>('/billing/subscription', json({ plan })),
+
+    cancel: () => request<SubscriptionDto>('/billing/subscription/cancel', { method: 'POST' }),
+
+    reactivate: () => request<SubscriptionDto>('/billing/subscription/reactivate', { method: 'POST' }),
+
+    payments: () => request<BillingRow[]>('/billing/payments'),
+  },
+
+  account: {
+    /** Async export; progress arrives as an inbox `job` notification. */
+    requestExport: () => request<{ jobId: string; status: string }>('/account/export', { method: 'POST' }),
+
+    delete: (emailConfirmation: string) => request<void>('/account/delete', json({ email: emailConfirmation })),
   },
 
   onboarding: {
-    rescuePrompt: () =>
-      request<{ prompt: string }>('/onboarding/rescue-prompt'),
+    saveProfile: (displayName: string) => request<MeResponse>('/onboarding/profile', json({ displayName })),
 
-    ingestRescue: (text: string) =>
-      request<{ count: number }>('/onboarding/rescue', {
-        method: 'POST',
-        body: JSON.stringify({ text }),
-      }),
+    rescuePrompt: () => request<{ prompt: string }>('/onboarding/rescue-prompt'),
 
-    importChatGpt: (content: string) =>
-      request<{ queued: number }>('/onboarding/import/chatgpt', {
-        method: 'POST',
-        body: JSON.stringify({ content }),
-      }),
+    ingestRescue: (text: string) => request<{ count: number }>('/onboarding/rescue', json({ text })),
 
-    suggestSpaces: () =>
-      request<SuggestedSpace[]>('/onboarding/suggest-spaces'),
+    importChatGpt: (content: string) => request<{ queued: number }>('/onboarding/import/chatgpt', json({ content })),
+
+    suggestSpaces: () => request<SuggestedSpace[]>('/onboarding/suggest-spaces'),
+  },
+
+  files: {
+    presign: (areaId: string, name: string, mimeType: string, sizeBytes: number) =>
+      request<{ uploadUrl: string; fields: Record<string, string>; s3Key: string }>(
+        '/files/presign',
+        json({ areaId, name, mimeType, sizeBytes }),
+      ),
+
+    create: (areaId: string, name: string, mimeType: string, sizeBytes: number, s3Key: string) =>
+      request<FileDto>('/files', json({ areaId, name, mimeType, sizeBytes, s3Key })),
+
+    list: () => request<FileDto[]>('/files'),
+
+    delete: (id: string) => request<void>(`/files/${id}`, { method: 'DELETE' }),
   },
 };
 
-interface SpaceDto {
-  id: string; name: string; description: string;
-  version: number; memoryCount: number; reclassifying: boolean;
-  createdAt: string; updatedAt: string;
-}
+/** The full client surface. `api.mock.ts` implements this exact shape. */
+export type Api = typeof realApi;
 
-interface SpaceMemoryDto {
-  memoryId: string; text: string; score?: number;
-  manualOverride: boolean;
-  otherSpaces: { id: string; name: string }[];
-}
-
-interface ConnectionDto {
-  id: string; label: string;
-  lastSeenAt: string | null; revoked: boolean;
-  spaceIds: string[]; createdAt: string;
-}
-
-interface ConnectionCreateResponse extends ConnectionDto {
-  token: string;
-}
-
-export interface AreaDto {
-  spaceId: string;
-  name: string;
-  count: number;
-  share: number;
-}
-
-export interface GrowthPoint {
-  bucket: string;
-  spaceId: string;
-  spaceName: string;
-  count: number;
-}
-
-export interface GrowthSummary {
-  points: GrowthPoint[];
-  todayTotal: number;
-  weekTotal: number;
-  weekDelta: number;
-}
-
+/** Per-connection usage rollup for Pulso — shape defined by GET /growth/access-activity. */
 export interface AccessActivity {
   connectionId: string;
   label: string;
@@ -203,13 +270,8 @@ export interface AccessActivity {
   lastSeenAt: string | null;
 }
 
-export interface SuggestedSpace {
-  name: string;
-  description: string;
-  memoryCount: number;
-  examples: string[];
-}
+// Flip NEXT_PUBLIC_MOCK=1 to browse the whole UI with synthetic data and no
+// backend (see api.mock.ts). Any other value keeps the real, cookie-authed API.
+const USE_MOCK = process.env.NEXT_PUBLIC_MOCK === '1';
 
-// onboarding namespace added to api object below
-declare global { interface Window {} }
-
+export const api: Api = USE_MOCK ? (mockApi as Api) : realApi;

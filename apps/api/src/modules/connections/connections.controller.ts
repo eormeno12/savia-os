@@ -1,31 +1,19 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Delete,
-  Body,
-  Param,
-  UseGuards,
-  HttpCode,
-  HttpStatus,
-} from '@nestjs/common';
-import { ConnectionsService } from './connections.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser, JwtPayload } from '../auth/decorators/current-user.decorator';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
 import { ZodValidationPipe } from 'nestjs-zod';
-import {
-  CreateConnectionSchema,
-  GrantSchema,
-  type CreateConnectionDto,
-  type GrantDto,
-} from '@savia-os/contracts';
+import { CreateConnectionSchema, CreateGrantSchema } from '@savia-os/contracts';
+import type { CreateConnectionDto, CreateGrantDto } from '@savia-os/contracts';
+import { ConnectionsService } from './connections.service';
+import { RequirePlan, RequirePlanGuard } from '../billing/require-plan.guard';
+import { CurrentUser, JwtPayload } from '../auth/decorators/current-user.decorator';
 
-@UseGuards(JwtAuthGuard)
 @Controller('connections')
 export class ConnectionsController {
   constructor(private readonly connections: ConnectionsService) {}
 
+  // Connecting an AI is a Pro capability (server-side freemium, not the modal).
   @Post()
+  @UseGuards(RequirePlanGuard)
+  @RequirePlan('pro')
   create(
     @CurrentUser() user: JwtPayload,
     @Body(new ZodValidationPipe(CreateConnectionSchema)) dto: CreateConnectionDto,
@@ -40,27 +28,26 @@ export class ConnectionsController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  revoke(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+  revoke(@CurrentUser() user: JwtPayload, @Param('id', ParseUUIDPipe) id: string) {
     return this.connections.revoke(user.sub, id);
   }
 
   @Post(':id/grants')
-  @HttpCode(HttpStatus.NO_CONTENT)
   addGrant(
     @CurrentUser() user: JwtPayload,
-    @Param('id') id: string,
-    @Body(new ZodValidationPipe(GrantSchema)) dto: GrantDto,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(CreateGrantSchema)) dto: CreateGrantDto,
   ) {
-    return this.connections.addGrant(user.sub, id, dto.spaceId);
+    return this.connections.addGrant(user.sub, id, dto);
   }
 
-  @Delete(':id/grants/:spaceId')
+  @Delete(':id/grants/:grantId')
   @HttpCode(HttpStatus.NO_CONTENT)
   removeGrant(
     @CurrentUser() user: JwtPayload,
-    @Param('id') id: string,
-    @Param('spaceId') spaceId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('grantId', ParseUUIDPipe) grantId: string,
   ) {
-    return this.connections.removeGrant(user.sub, id, spaceId);
+    return this.connections.removeGrant(user.sub, id, grantId);
   }
 }

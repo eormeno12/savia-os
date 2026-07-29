@@ -1,7 +1,7 @@
 import { Box, Flex, Stack, Text } from '@chakra-ui/react';
 import { Sparkles } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { SectionHeader } from '@/components/ui/section-header';
+import { SectionHeader } from '@savia-os/ui';
 
 const WaitlistForm = dynamic(
   () => import('./waitlist-form').then((m) => m.WaitlistForm),

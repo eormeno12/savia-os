@@ -1,5 +1,5 @@
 import { Box, Flex, Grid, Text } from "@chakra-ui/react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@savia-os/ui";
 
 export const metadata = { title: "Botones" };
 

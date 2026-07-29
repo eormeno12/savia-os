@@ -58,7 +58,7 @@ components/drive/FileCard.tsx     # nombre, tipo, tamaño, estado, nº memorias
 ## S3 / CORS bucket
 
 El bucket S3 necesita CORS que permita `PUT` desde el origin del frontend
-(`app.savia.com` / `127.0.0.1:4345`). Documentar la policy en `infra/` (referencia,
+(`app.savia.uno` / `127.0.0.1:4345`). Documentar la policy en `infra/` (referencia,
 no se aplica desde código).
 
 ## UX del "gap" Drive vs memoria

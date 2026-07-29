@@ -16,6 +16,8 @@
   "dependencies": {
     "@chakra-ui/react": "^3.21.0",
     "@icons-pack/react-simple-icons": "^13.13.0",
+    "@savia-os/design-tokens": "workspace:*",
+    "@savia-os/ui": "workspace:*",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
     "@vercel/analytics": "^2.0.1",

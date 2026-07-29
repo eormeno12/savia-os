@@ -1,0 +1,73 @@
+name: api-ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'apps/api/**'
+      - 'packages/contracts/**'
+      - '.github/workflows/api-ci.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: savia
+          POSTGRES_PASSWORD: savia
+          POSTGRES_DB: savia
+        ports: ['5433:5432']
+        options: >-
+          --health-cmd "pg_isready -U savia"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+      qdrant:
+        image: qdrant/qdrant:latest
+        ports: ['6333:6333']
+    env:
+      DATABASE_URL: postgresql://savia:savia@localhost:5433/savia
+      REDIS_URL: redis://localhost:6379
+      QDRANT_URL: http://localhost:6333
+      OPENAI_API_KEY: ci-test-key
+      JWT_SECRET: ci
+      JWT_REFRESH_SECRET: ci
+      MCP_TOKEN_HMAC_KEY: ci-hmac
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        working-directory: .
+      - name: prisma generate
+        run: pnpm db:generate
+      - name: typecheck
+        run: pnpm typecheck
+      - name: lint
+        run: pnpm lint
+      - name: no-dead-code gate (no legacy patterns)
+        working-directory: .
+        run: |
+          if grep -rnE "submemories|homeSpaceId|manualOverride|queryHash|kind=collective|@deprecated|dense-only" apps/api/src --include='*.ts' | grep -v '\.spec\.ts'; then
+            echo "::error::legacy/obsolete pattern found — the rebuild must be clean"; exit 1
+          fi
+      - name: migrate deploy (fresh DB)
+        run: pnpm db:deploy
+      - name: migration drift check
+        run: npx prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --exit-code
+      - name: test
+        run: pnpm test
+      - name: e2e (live services)
+        run: pnpm test:e2e

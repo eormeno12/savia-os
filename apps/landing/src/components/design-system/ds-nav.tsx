@@ -3,7 +3,7 @@
 import { Box, Flex, Text } from "@chakra-ui/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { SaviaMark } from "./savia-mark";
+import { SaviaMark } from "@savia-os/ui";
 
 const NAV_LINKS = [
   { href: "/design-system", label: "Inicio" },

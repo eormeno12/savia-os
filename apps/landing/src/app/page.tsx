@@ -10,13 +10,13 @@ import { HowItWorks } from '@/components/landing/how-it-works';
 import { IslandImage } from '@/components/landing/island-image';
 import { Pricing } from '@/components/landing/pricing';
 import { QuoteDivider } from '@/components/landing/quote-divider';
-import { SaviaParticles } from '@/components/landing/savia-particles';
+import { SaviaParticles } from '@savia-os/ui';
 import { SiteFooter } from '@/components/landing/site-footer';
 import { SiteHeader } from '@/components/landing/site-header';
 import { WaitlistSection } from '@/components/landing/waitlist-section';
 import { COMMUNITY_COUNT } from '@/lib/constants';
 import { siteConfig } from '@/lib/site';
-import { FadeInUp } from '@/components/ui/animated-section';
+import { FadeInUp } from '@savia-os/ui';
 
 const jsonLd = {
   '@context': 'https://schema.org',

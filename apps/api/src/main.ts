@@ -1,30 +1,39 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { Logger } from 'nestjs-pino';
 import { ZodValidationPipe } from 'nestjs-zod';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const cookieParser = require('cookie-parser') as () => ReturnType<typeof import('cookie-parser')>;
+import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
+import { AppConfig } from './common/config/app.config';
+import { AllExceptionsFilter } from './common/errors/all-exceptions.filter';
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+async function bootstrap(): Promise<void> {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
+  app.useLogger(app.get(Logger));
+  app.set('trust proxy', 1); // behind Caddy/ALB — honor X-Forwarded-For for rate-limit/IP
 
+  const config = app.get(AppConfig);
+
+  app.use(helmet());
   app.use(cookieParser());
   app.useGlobalPipes(new ZodValidationPipe());
-
-  const allowedOrigins = [
-    'http://127.0.0.1:4345',
-    'http://localhost:4345',
-    ...(process.env.APP_ORIGIN ? [process.env.APP_ORIGIN] : []),
-  ];
+  app.useGlobalFilters(new AllExceptionsFilter());
 
   app.enableCors({
-    origin: allowedOrigins,
+    origin: [
+      'http://127.0.0.1:4345',
+      'http://localhost:4345',
+      ...(config.appOrigin ? [config.appOrigin] : []),
+      ...config.corsOrigins,
+    ],
     credentials: true,
   });
+  app.enableShutdownHooks();
 
-  const port = parseInt(process.env.API_PORT ?? '4400', 10);
-  await app.listen(port, '127.0.0.1');
-  console.log(`API running on http://127.0.0.1:${port}`);
+  await app.listen(config.apiPort, config.host);
+  app.get(Logger).log(`API running on http://${config.host}:${config.apiPort}`);
 }
 
-bootstrap();
+void bootstrap();

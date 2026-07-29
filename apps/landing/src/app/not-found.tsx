@@ -1,6 +1,5 @@
 import { Box, Stack, Text } from '@chakra-ui/react';
-import { SaviaMark } from '@/components/design-system/savia-mark';
-import { LinkButton } from '@/components/ui/button';
+import { LinkButton, SaviaMark } from '@savia-os/ui';
 
 export default function NotFound() {
   return (

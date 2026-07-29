@@ -1,84 +1,103 @@
 import 'reflect-metadata';
-import * as http from 'http';
-import express from 'express';
-import { NestFactory } from '@nestjs/core';
+import * as http from 'node:http';
+import express, { NextFunction, Request, Response } from 'express';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { NestFactory } from '@nestjs/core';
+import { Logger } from 'nestjs-pino';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-
+import { validateEnv } from './common/config/env.schema';
+import { clientIp } from './common/http/client-ip';
+import { LoggingModule } from './common/logging/logging.module';
+import { InfraModule } from './common/infra/infra.module';
+import { AppConfig } from './common/config/app.config';
 import { PrismaService } from './common/clients/prisma.service';
-import { QdrantService } from './common/clients/qdrant.service';
 import { RedisService } from './common/clients/redis.service';
-import { MemoryModule } from './modules/memory/memory.module';
-import { MemoryService } from './modules/memory/memory.service';
 import { ConnectionsModule } from './modules/connections/connections.module';
 import { ConnectionsService } from './modules/connections/connections.service';
-import { ClassifierService } from './modules/spaces/classifier.service';
-import { createMcpServerForRequest } from './modules/mcp/mcp.tools';
+import { MemoryModule } from './modules/memory/memory.module';
+import { MemoryService } from './modules/memory/memory.service';
+import { CrossBoundaryReadService } from './modules/memory/cross-boundary-read.service';
+import { AccessModule } from './modules/access/access.module';
+import { AccessService } from './modules/access/access.service';
+import { createMcpServerForRequest, McpServices } from './modules/mcp/mcp.tools';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
-    MemoryModule,
+    ConfigModule.forRoot({ isGlobal: true, cache: true, validate: validateEnv }),
+    LoggingModule,
+    InfraModule,
+    AccessModule,
     ConnectionsModule,
+    MemoryModule,
   ],
-  providers: [PrismaService, QdrantService, RedisService, ClassifierService],
 })
-class McpAppModule {}
+class McpModule {}
 
-const MCP_PORT = 4401;
+const EDGE_RATE_WINDOW = 60;
+const EDGE_RATE_MAX = 120; // per IP, pre-auth — guards Postgres from token-spam DoS
 
-async function bootstrap() {
-  const app = await NestFactory.createApplicationContext(McpAppModule, {
-    logger: ['log', 'warn', 'error'],
-  });
-
-  const memory = app.get(MemoryService);
-  const connections = app.get(ConnectionsService);
-  const classifier = app.get(ClassifierService);
-  const prisma = app.get(PrismaService);
+async function bootstrap(): Promise<void> {
+  const app = await NestFactory.createApplicationContext(McpModule, { bufferLogs: true });
+  app.useLogger(app.get(Logger));
+  const config = app.get(AppConfig);
+  const log = app.get(Logger);
   const redis = app.get(RedisService);
 
-  const svc = { memory, connections, classifier, prisma, redis };
+  const svc: McpServices = {
+    connections: app.get(ConnectionsService),
+    memory: app.get(MemoryService),
+    reader: app.get(CrossBoundaryReadService),
+    access: app.get(AccessService),
+    prisma: app.get(PrismaService),
+    redis,
+  };
 
   const expressApp = express();
-  expressApp.use(express.json());
+  expressApp.set('trust proxy', 1); // behind Caddy — same single hop as main.ts
+  expressApp.use(express.json({ limit: '256kb' })); // bounded body
 
-  expressApp.post('/mcp', async (req, res) => {
-    const authHeader = String(req.headers['authorization'] ?? '');
-    const rawToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+  // Edge rate-limit BEFORE token resolution (F1.6): cheap Redis counter by IP, so
+  // garbage tokens never reach the argon2/Postgres path.
+  const edgeLimit = async (req: Request, res: Response, next: NextFunction) => {
+    const key = `mcp:rl:ip:${clientIp(req)}`;
+    const count = await redis.incr(key);
+    if (count === 1) await redis.expire(key, EDGE_RATE_WINDOW);
+    if (count > EDGE_RATE_MAX) return res.status(429).json({ error: 'Too many requests' });
+    next();
+  };
 
-    const mcpServer = createMcpServerForRequest(rawToken, svc);
+  expressApp.get('/health', (_req, res) => res.json({ status: 'ok', service: 'mcp' }));
 
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined, // stateless — no session cookies
-    });
-
-    res.on('close', () => transport.close().catch(() => null));
-
+  expressApp.post('/mcp', edgeLimit as express.RequestHandler, async (req, res) => {
+    const auth = String(req.headers['authorization'] ?? '');
+    const rawToken = auth.startsWith('Bearer ') ? auth.slice(7) : undefined;
+    const server = createMcpServerForRequest(rawToken, svc);
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    res.on('close', () => void transport.close().catch(() => null));
     try {
-      await mcpServer.connect(transport);
+      await server.connect(transport);
       await transport.handleRequest(req, res, req.body);
-    } catch (err: any) {
-      console.error('[MCP] request error:', err.message);
-      if (!res.headersSent) res.status(500).json({ error: err.message });
+    } catch (err) {
+      log.error(`MCP request error: ${(err as Error).message}`);
+      if (!res.headersSent) res.status(500).json({ error: 'internal error' });
     }
   });
 
-  expressApp.get('/health', (_req, res) =>
-    res.json({ status: 'ok', service: 'mcp', port: MCP_PORT }),
-  );
-
   const server = http.createServer(expressApp);
-  server.listen(MCP_PORT, '127.0.0.1', () => {
-    console.log(`[mcp] Savia MCP server → http://127.0.0.1:${MCP_PORT}/mcp`);
-  });
-
-  process.on('SIGTERM', async () => {
+  server.listen(config.mcpPort, config.host, () =>
+    log.log(`MCP server → http://${config.host}:${config.mcpPort}/mcp`),
+  );
+  // main.ts/worker.ts use enableShutdownHooks(); here we also own a raw
+  // http.Server outside Nest's DI, so close both explicitly — for every
+  // signal Nest would otherwise listen for (SIGTERM in prod, SIGINT for
+  // local Ctrl+C), not just SIGTERM.
+  const shutdown = () => {
     server.close();
-    await app.close();
-    process.exit(0);
-  });
+    void app.close();
+  };
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
 }
 
-bootstrap();
+void bootstrap();

@@ -1,0 +1,44 @@
+# Dependencies — reinstalled inside the image via pnpm
+node_modules
+**/node_modules
+
+# Secrets — must NEVER enter the build context or image
+.env
+**/.env
+**/.env.*
+!**/.env.example
+
+# Build outputs — regenerated inside the image
+dist
+**/dist
+.next
+**/.next
+.turbo
+**/.turbo
+# Incremental build caches — must be excluded at ALL levels, else `tsc --build`
+# trusts a stale cache and skips emitting dist inside the image.
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+# VCS & tooling
+.git
+.gitignore
+.github
+**/.DS_Store
+
+# Workspaces not needed by the api image
+apps/openmemory
+apps/landing
+apps/demo-api
+
+# Local artifacts
+*.log
+**/coverage
+**/*.local
+memory.db
+**/memory.db
+
+# Editor / OS
+.vscode
+.idea
+.claude

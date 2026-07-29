@@ -1,7 +1,7 @@
 import { Box, Grid, Stack, Text } from '@chakra-ui/react';
 import styles from './how-it-works.module.css';
-import { SectionHeader } from '@/components/ui/section-header';
-import { FadeInUp } from '@/components/ui/animated-section';
+import { SectionHeader } from '@savia-os/ui';
+import { FadeInUp } from '@savia-os/ui';
 
 // ─── Mini-UI illustrations ────────────────────────────────────────────────────
 

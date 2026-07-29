@@ -9,6 +9,7 @@ const SECURITY_HEADERS = [
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["googleapis"],
+  transpilePackages: ["@savia-os/design-tokens", "@savia-os/ui"],
   async headers() {
     return [{ source: "/(.*)", headers: SECURITY_HEADERS }];
   },

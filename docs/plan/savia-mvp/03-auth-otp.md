@@ -48,7 +48,7 @@ Detalles:
   `JWT_REFRESH_SECRET`. Payload mínimo: `{ sub: userId, email }`.
 - **Cookies**: `access_token`, `refresh_token` con
   `HttpOnly; Secure; SameSite=Lax; Domain=${COOKIE_DOMAIN}; Path=/`.
-  En local `COOKIE_DOMAIN=localhost`; en prod `.savia.com`.
+  En local `COOKIE_DOMAIN=localhost`; en prod `.savia.uno`.
 - **SES**: `@aws-sdk/client-ses`. `mail.service.sendOtp(email, code)`. Plantilla
   simple en español con el código y validez de 10 min.
 
@@ -67,7 +67,7 @@ middleware.ts                   # protege rutas privadas (chequea cookie/redirec
 
 ## CORS
 
-`apps/api` debe permitir origin `http://127.0.0.1:4345` (y prod `app.savia.com`)
+`apps/api` debe permitir origin `http://127.0.0.1:4345` (y prod `app.savia.uno`)
 con `credentials: true`. Configurar en `main.ts` (`app.enableCors`).
 
 ## Contracts (`packages/contracts/src/auth.ts`)

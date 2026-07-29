@@ -1,0 +1,76 @@
+<!-- @dsCard group="Motion" title="Curva y duraciones" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Savia · Motion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root { --ink:#0B2529; --paper:#F4F4F1; --lime:#E7FF18; --slate:#53606C; --line:#DDDFDC; --mist:#ECEDEA; --savia:cubic-bezier(0.22,1,0.36,1); }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter', system-ui, sans-serif; background:var(--paper); color:var(--ink); -webkit-font-smoothing:antialiased; padding:64px 48px; }
+  .wrap { max-width:1100px; margin:0 auto; }
+  .eyebrow { font-size:12px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--slate); margin-bottom:24px; }
+  h1 { font-size:clamp(40px,4.8vw,72px); font-weight:300; line-height:0.92; max-width:14ch; }
+  h1 em { font-weight:600; font-style:normal; }
+  .lede { font-size:clamp(16px,1.1vw,20px); line-height:1.6; color:var(--slate); margin-top:24px; max-width:54ch; }
+  .label { font-size:12px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--slate); margin:64px 0 24px; }
+  .curve-row { display:flex; gap:40px; align-items:center; flex-wrap:wrap; }
+  .curve-box { background:var(--ink); border-radius:24px; padding:32px; }
+  .curve-meta code { font-family:ui-monospace,monospace; font-size:14px; font-weight:600; }
+  .curve-meta .v { font-family:ui-monospace,monospace; font-size:12px; color:var(--slate); margin-top:8px; }
+  .curve-meta p { font-size:14px; color:var(--slate); line-height:1.6; margin-top:12px; max-width:40ch; }
+  .durations { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; }
+  .dur { border:1px solid var(--line); border-radius:20px; padding:24px; background:#fff; }
+  .dur .knob { width:64px; height:32px; border-radius:999px; background:var(--lime); transition:transform var(--dur) var(--savia); }
+  .dur:hover .knob { transform:translateX(96px); }
+  .dur code { font-family:ui-monospace,monospace; font-size:13px; font-weight:600; display:block; margin-top:24px; }
+  .dur .v { font-family:ui-monospace,monospace; font-size:11px; color:var(--slate); margin-top:4px; }
+  .dur .role { font-size:13px; color:var(--slate); margin-top:6px; }
+  .demo { background:var(--ink); border-radius:28px; padding:48px; margin-top:28px; text-align:center; cursor:pointer; transition:transform 260ms var(--savia), box-shadow 260ms var(--savia); position:relative; overflow:hidden; }
+  .demo:hover { transform:translateY(-4px); box-shadow:0 30px 90px rgba(0,0,0,0.45); }
+  .demo .glow { position:absolute; width:300px; height:300px; border-radius:50%; background:var(--lime); filter:blur(110px); opacity:0.08; top:-120px; left:50%; transform:translateX(-50%); }
+  .demo span { color:var(--lime); font-weight:600; font-size:15px; position:relative; }
+  .note { margin-top:40px; font-size:14px; color:var(--slate); line-height:1.7; max-width:60ch; border-left:2px solid var(--line); padding-left:18px; }
+  .note strong { color:var(--ink); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Fundamentos · Motion</div>
+  <h1>Suave, con un final <em>brusco.</em></h1>
+  <p class="lede">Una sola curva de marca y tres duraciones. La firma cinética de Savia: rápida de responder, tranquila al llegar. El motion tiene propósito — nunca decoración.</p>
+
+  <div class="label">Curva de marca</div>
+  <div class="curve-row">
+    <div class="curve-box">
+      <svg width="120" height="120" viewBox="0 0 100 100" fill="none" aria-label="Curva easing.savia">
+        <path d="M0 100 H100 M0 0 V100" stroke="rgba(244,244,241,0.15)" stroke-width="1" />
+        <path d="M0 100 C22 100, 64 0, 100 0" stroke="#E7FF18" stroke-width="3" stroke-linecap="round" />
+        <circle cx="0" cy="100" r="4" fill="#F4F4F1" />
+        <circle cx="100" cy="0" r="4" fill="#F4F4F1" />
+      </svg>
+    </div>
+    <div class="curve-meta">
+      <code>easings.savia</code>
+      <div class="v">cubic-bezier(0.22, 1, 0.36, 1)</div>
+      <p>La curva de todas las transiciones Savia. <code>EASE_SAVIA</code> en código.</p>
+    </div>
+  </div>
+
+  <div class="label">Duraciones</div>
+  <div class="durations">
+    <div class="dur" style="--dur:160ms"><div class="knob"></div><code>durations.fast</code><div class="v">160ms</div><div class="role">Hover, foco, micro-interacciones</div></div>
+    <div class="dur" style="--dur:260ms"><div class="knob"></div><code>durations.soft</code><div class="v">260ms</div><div class="role">Transiciones de estado estándar</div></div>
+    <div class="dur" style="--dur:700ms"><div class="knob"></div><code>durations.slow</code><div class="v">700ms</div><div class="role">Entrada de elementos de hero</div></div>
+  </div>
+
+  <div class="demo"><div class="glow"></div><span>Pasá el cursor — easing.savia + durations.soft</span></div>
+
+  <p class="note"><strong>Reglas:</strong> entrada de secciones con <code>FadeInUp</code> (stagger por índice, <code>delay = i·0.08</code>); hover de cards = lift sutil; éxito = flash/pulso. <strong>Siempre</strong> respetá <code>prefers-reduced-motion</code>. Para profundidad en superficies oscuras preferí el glow radial lima antes que partículas.</p>
+</div>
+</body>
+</html>

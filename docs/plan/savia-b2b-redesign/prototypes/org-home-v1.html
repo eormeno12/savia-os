@@ -1,0 +1,755 @@
+<meta charset="utf-8">
+<title>Savia B2B — Home de organización (prototipo)</title>
+<style>
+  :root {
+    /* ---- real Savia brand tokens (packages/ui/src/foundations/constants.ts + design-system.md) ---- */
+    --ink: #0B2529;
+    --soft-ink: #152F34;
+    --paper: #F4F4F1;
+    --mist: #ECEDEA;
+    --line: #DDDFDC;
+    --slate: #53606C;
+    --lime: #E7FF18;
+    --lime-soft: #F1FF67;
+    --ease-savia: cubic-bezier(0.22, 1, 0.36, 1);
+
+    /* semantic — desaturated, separate from the lime accent (lime never leaves ink surfaces) */
+    --success: #4A7C59;
+    --success-bg: #E4EEE3;
+    --warning: #8A6A2A;
+    --warning-bg: #F3E9D3;
+    --danger: #A23B32;
+    --danger-bg: #F5E2DF;
+    --info: #3D6B8A;
+    --info-bg: #E1EBF1;
+
+    /* area ramp — ink → teal → lime, small curated set (mirrors spaceScale concept) */
+    --ramp-1: #0B2529;
+    --ramp-2: #17434A;
+    --ramp-3: #1F6E63;
+    --ramp-4: #3D9B7C;
+    --ramp-5: #8FC98A;
+    --ramp-6: #D8EA8E;
+
+    --chrome-bg: #fbfaf8;
+    --chrome-border: #e4e1d8;
+    --chrome-fg: #14171a;
+    --chrome-muted: #6b6f76;
+  }
+  :root[data-theme="dark"] {
+    --chrome-bg: #17181a;
+    --chrome-border: #2c2e31;
+    --chrome-fg: #f0efec;
+    --chrome-muted: #9a9ea6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --chrome-bg: #17181a;
+      --chrome-border: #2c2e31;
+      --chrome-fg: #f0efec;
+      --chrome-muted: #9a9ea6;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+  html, body { margin: 0; padding: 0; background: var(--chrome-bg); }
+  body {
+    font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--chrome-fg);
+  }
+  button { font-family: inherit; }
+  button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+
+  /* ============== artifact chrome (not part of the simulated product) ============== */
+  #chrome-bar {
+    position: sticky; top: 0; z-index: 60;
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px;
+    background: color-mix(in srgb, var(--chrome-bg) 90%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--chrome-border);
+    font-size: 12.5px;
+  }
+  #chrome-bar .tag {
+    font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; font-size: 10.5px;
+    background: var(--ink); color: var(--lime); border-radius: 999px; padding: 4px 10px;
+  }
+  #chrome-bar .desc { color: var(--chrome-muted); }
+  #chrome-bar .spacer { flex: 1; }
+  #chrome-bar button {
+    border: 1px solid var(--chrome-border); background: transparent; color: var(--chrome-fg);
+    border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  #chrome-bar button:hover { border-color: var(--chrome-muted); }
+  #chrome-bar button.active { background: var(--chrome-fg); color: var(--chrome-bg); border-color: var(--chrome-fg); }
+
+  /* ============== rationale drawer ============== */
+  #rationale {
+    position: fixed; top: 0; right: 0; bottom: 0; width: 360px; z-index: 70;
+    background: var(--chrome-bg); border-left: 1px solid var(--chrome-border);
+    transform: translateX(100%); transition: transform 0.22s var(--ease-savia);
+    overflow-y: auto; padding: 60px 22px 40px;
+  }
+  #rationale.open { transform: translateX(0); }
+  #rationale h3 { font-size: 14px; margin: 0 0 4px; }
+  #rationale .sub { font-size: 11.5px; color: var(--chrome-muted); margin-bottom: 18px; line-height: 1.5; }
+  .r-item { border-top: 1px solid var(--chrome-border); padding: 14px 0; }
+  .r-item:first-of-type { border-top: none; }
+  .r-item .n {
+    display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px;
+    border-radius: 999px; background: var(--ink); color: var(--lime); font-size: 10px; font-weight: 700;
+    margin-right: 7px;
+  }
+  .r-item .t { font-size: 12.5px; font-weight: 700; }
+  .r-item p { font-size: 12px; color: var(--chrome-muted); line-height: 1.55; margin: 6px 0 8px; }
+  .r-item a { font-size: 11.5px; font-weight: 600; color: var(--info); text-decoration: none; cursor: pointer; }
+  .r-item a:hover { text-decoration: underline; }
+
+  /* ============== the simulated product screen ============== */
+  #stage { min-height: 100vh; background: var(--paper); }
+  .app-shell { display: flex; min-height: 100vh; }
+
+  /* ---- sidebar ---- */
+  .rail {
+    width: 232px; flex-shrink: 0; background: var(--paper); border-right: 1px solid var(--line);
+    padding: 18px 14px; display: flex; flex-direction: column; gap: 22px;
+  }
+  .org-switch {
+    display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 14px;
+    border: 1px solid var(--line); background: #fff; cursor: pointer; transition: border-color 0.15s;
+  }
+  .org-switch:hover { border-color: var(--slate); }
+  .org-mark {
+    width: 30px; height: 30px; border-radius: 9px; background: var(--ramp-3); color: #fff;
+    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0;
+  }
+  .org-switch .name { font-size: 13.5px; font-weight: 700; color: var(--ink); line-height: 1.2; }
+  .org-switch .plan { font-size: 10.5px; color: var(--slate); }
+  .org-switch .chev { margin-left: auto; color: var(--slate); font-size: 11px; }
+
+  .savia-badge { display: flex; align-items: center; gap: 6px; padding: 0 2px; color: var(--slate); font-size: 10.5px; }
+  .savia-badge svg { flex-shrink: 0; }
+
+  nav.primary { display: flex; flex-direction: column; gap: 2px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 11px;
+    font-size: 13.5px; font-weight: 600; color: var(--slate); cursor: pointer; border: none; background: none;
+    text-align: left; width: 100%; transition: background 0.12s;
+  }
+  .nav-item:hover { background: var(--mist); color: var(--ink); }
+  .nav-item.active { background: var(--ink); color: var(--lime); }
+  .nav-item svg { flex-shrink: 0; opacity: 0.85; }
+
+  .rail-footer { margin-top: auto; display: flex; align-items: center; gap: 9px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .rail-footer .avatar {
+    width: 28px; height: 28px; border-radius: 999px; background: var(--mist); color: var(--ink);
+    display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0;
+  }
+  .rail-footer .who { font-size: 12.5px; font-weight: 600; color: var(--ink); }
+  .rail-footer .role { font-size: 10.5px; color: var(--slate); }
+
+  /* ---- main ---- */
+  main { flex: 1; min-width: 0; padding: 26px 34px 60px; max-width: 1180px; }
+
+  /* hero */
+  .hero {
+    background: var(--ink); color: var(--paper); border-radius: 22px; padding: 30px 32px;
+    position: relative; overflow: hidden; margin-bottom: 30px;
+  }
+  .hero canvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.5; pointer-events: none; }
+  .hero-inner { position: relative; z-index: 1; }
+  .hero-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .kicker { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--lime-soft); }
+  .view-toggle { display: inline-flex; background: rgba(244,244,241,0.08); border-radius: 999px; padding: 3px; gap: 2px; }
+  .view-toggle button {
+    border: none; background: none; color: rgba(244,244,241,0.65); font-size: 12.5px; font-weight: 600;
+    padding: 7px 14px; border-radius: 999px; cursor: pointer; transition: all 0.18s var(--ease-savia);
+  }
+  .view-toggle button.active { background: var(--lime); color: var(--ink); }
+
+  .hero-stat { font-weight: 300; font-size: 34px; line-height: 1.25; margin: 20px 0 6px; letter-spacing: -0.01em; text-wrap: balance; }
+  .hero-stat b { font-weight: 700; }
+  .hero-sub { font-size: 14px; color: rgba(244,244,241,0.68); max-width: 46ch; line-height: 1.5; }
+  .hero-sub .lime { color: var(--lime); font-weight: 600; }
+
+  /* section shell */
+  section.block { margin-bottom: 34px; }
+  .block-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+  .block-head h2 { font-size: 16px; font-weight: 700; margin: 0; color: var(--ink); }
+  .block-head .meta { font-size: 12px; color: var(--slate); }
+
+  /* skills / synthesis — the signature moment */
+  .skills-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+  .skill-card {
+    background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 16px 17px;
+    cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .skill-card:hover { border-color: var(--ramp-3); box-shadow: 0 6px 20px rgba(11,37,41,0.08); }
+  .skill-card .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+  .skill-card .title { font-size: 14px; font-weight: 700; color: var(--ink); line-height: 1.35; }
+  .pill { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; border-radius: 999px; padding: 4px 9px; white-space: nowrap; }
+  .pill.review { background: var(--warning-bg); color: var(--warning); }
+  .pill.live { background: var(--success-bg); color: var(--success); }
+  .pill.locked { background: var(--mist); color: var(--slate); }
+  .pill.open { background: var(--info-bg); color: var(--info); }
+
+  .skill-sources { display: flex; align-items: center; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+  .chip {
+    font-size: 11px; font-weight: 600; color: var(--slate); background: var(--mist); border-radius: 999px;
+    padding: 4px 9px; display: inline-flex; align-items: center; gap: 4px;
+  }
+  .converge-arrow { color: var(--line); font-size: 13px; }
+
+  .skill-detail {
+    max-height: 0; overflow: hidden; transition: max-height 0.32s var(--ease-savia);
+  }
+  .skill-card.open .skill-detail { max-height: 220px; }
+  .skill-detail-inner { padding-top: 14px; margin-top: 14px; border-top: 1px dashed var(--line); }
+  .skill-detail-inner .row { font-size: 12px; color: var(--slate); line-height: 1.6; }
+  .skill-detail-inner .row b { color: var(--ink); }
+  .skill-detail-inner .cta {
+    margin-top: 10px; font-size: 12px; font-weight: 700; color: var(--ink); background: var(--lime-soft);
+    border: none; border-radius: 999px; padding: 7px 14px; cursor: pointer;
+  }
+
+  /* areas grid */
+  .areas-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+  .area-card {
+    background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 14px 15px;
+    cursor: pointer; transition: border-color 0.15s;
+  }
+  .area-card:hover { border-color: var(--slate); }
+  .area-top { display: flex; align-items: center; gap: 9px; }
+  .area-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+  .area-name { font-size: 13.5px; font-weight: 700; color: var(--ink); flex: 1; }
+  .area-count { font-size: 11.5px; color: var(--slate); font-variant-numeric: tabular-nums; }
+  .area-meta { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+  .avatar-stack { display: flex; }
+  .avatar-stack .av {
+    width: 22px; height: 22px; border-radius: 999px; background: var(--mist); color: var(--ink);
+    font-size: 9.5px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+    border: 2px solid #fff; margin-left: -7px;
+  }
+  .avatar-stack .av:first-child { margin-left: 0; }
+
+  .area-expand { max-height: 0; overflow: hidden; transition: max-height 0.3s var(--ease-savia); }
+  .area-card.open .area-expand { max-height: 200px; }
+  .area-expand-inner { padding-top: 12px; margin-top: 12px; border-top: 1px solid var(--line); font-size: 12px; color: var(--slate); line-height: 1.6; }
+  .area-expand-inner .fact { padding: 3px 0; }
+  .area-expand-inner .fact b { color: var(--ink); font-weight: 600; }
+
+  /* team */
+  .team-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .member-pill {
+    display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--line);
+    border-radius: 999px; padding: 5px 12px 5px 5px;
+  }
+  .member-pill .av {
+    width: 26px; height: 26px; border-radius: 999px; background: var(--mist); color: var(--ink);
+    font-size: 10.5px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+  }
+  .member-pill .name { font-size: 12.5px; font-weight: 600; color: var(--ink); }
+  .role-badge { font-size: 10px; font-weight: 700; border-radius: 999px; padding: 3px 8px; }
+  .role-badge.admin { background: var(--ink); color: var(--lime-soft); }
+  .role-badge.other { background: var(--mist); color: var(--slate); }
+  .invite-btn {
+    display: inline-flex; align-items: center; gap: 7px; background: var(--ink); color: var(--paper);
+    border: none; border-radius: 999px; padding: 9px 16px; font-size: 12.5px; font-weight: 700; cursor: pointer;
+  }
+  .invite-btn:hover { background: var(--soft-ink); }
+
+  /* connections */
+  .conn-row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .conn-card {
+    display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--line);
+    border-radius: 14px; padding: 11px 15px;
+  }
+  .conn-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--success); flex-shrink: 0; }
+  .conn-name { font-size: 13px; font-weight: 700; color: var(--ink); }
+  .conn-meta { font-size: 11px; color: var(--slate); }
+  .conn-add {
+    display: flex; align-items: center; gap: 8px; border: 1px dashed var(--line); border-radius: 14px;
+    padding: 11px 16px; font-size: 12.5px; font-weight: 600; color: var(--slate); background: none; cursor: pointer;
+  }
+  .conn-add:hover { border-color: var(--slate); color: var(--ink); }
+
+  /* command palette overlay */
+  .search-bar {
+    display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--line);
+    border-radius: 12px; padding: 10px 14px; margin-bottom: 22px; cursor: pointer; color: var(--slate); font-size: 13px;
+    max-width: 420px;
+  }
+  .search-bar kbd { margin-left: auto; font-size: 10.5px; background: var(--mist); border-radius: 6px; padding: 2px 6px; color: var(--slate); }
+
+  #palette-overlay {
+    position: fixed; inset: 0; background: rgba(11,37,41,0.45); z-index: 80; display: none;
+    align-items: flex-start; justify-content: center; padding-top: 14vh;
+  }
+  #palette-overlay.open { display: flex; }
+  #palette {
+    background: #fff; width: 100%; max-width: 520px; border-radius: 16px; overflow: hidden;
+    box-shadow: 0 30px 70px rgba(0,0,0,0.35);
+  }
+  #palette input {
+    width: 100%; border: none; border-bottom: 1px solid var(--line); padding: 16px 18px; font-size: 15px;
+    outline: none; font-family: inherit;
+  }
+  #palette .opt { padding: 11px 18px; font-size: 13.5px; color: var(--ink); display: flex; justify-content: space-between; cursor: pointer; }
+  #palette .opt:hover { background: var(--mist); }
+  #palette .opt .g { font-size: 10.5px; color: var(--slate); text-transform: uppercase; letter-spacing: 0.05em; }
+
+  .fade-in { animation: fadeUp 0.5s var(--ease-savia) both; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+
+<div id="chrome-bar">
+  <span class="tag">Prototipo</span>
+  <span class="desc">Home de organización — dirección B2B, ronda 1. No es código de producto.</span>
+  <div class="spacer"></div>
+  <button id="btn-notes">Notas de diseño</button>
+  <button id="btn-theme">◐ tema del artifact</button>
+</div>
+
+<div id="rationale">
+  <h3>Por qué esta dirección</h3>
+  <div class="sub">6 decisiones a favor o en contra. Reaccioná a cualquiera — esto es la ronda 1, no una propuesta cerrada.</div>
+
+  <div class="r-item">
+    <div class="t"><span class="n">1</span>El home ya no es "tu memoria" — es el cerebro de la empresa</div>
+    <p>Hoy el equivalente (Colectivo) es casi inalcanzable y el home real es la memoria personal. Acá invertimos el orden: el usuario aterriza en el estado del cerebro de la organización, con un toggle para ver su aporte individual.</p>
+    <a data-scroll="hero">→ ver el toggle Organización / Mi memoria</a>
+  </div>
+  <div class="r-item">
+    <div class="t"><span class="n">2</span>La síntesis (Capa 4) es visible desde el minuto uno</div>
+    <p>Hoy no existe ninguna superficie para "skills en construcción" — es el corazón del producto según la visión y no se ve en ningún lado. Acá es lo primero después del hero, con el gesto visual de fuentes convergiendo a una versión canónica.</p>
+    <a data-scroll="skills">→ ver síntesis en curso</a>
+  </div>
+  <div class="r-item">
+    <div class="t"><span class="n">3</span>Gobernanza visible por área, no una pantalla aparte</div>
+    <p>La auditoría B2C encontró que nadie sabe quién ve qué. Acá cada área muestra su alcance (todo el equipo / restringida) como badge, no como una config escondida en Cuenta.</p>
+    <a data-scroll="areas">→ ver badges de acceso</a>
+  </div>
+  <div class="r-item">
+    <div class="t"><span class="n">4</span>El equipo/roles reusa el patrón de Colectivo casi 1:1</div>
+    <p>RoleBadge (admin=pill sólido ink, resto=mist) y el avatar-stack de members-panel.tsx ya funcionaban bien en la auditoría — es lo que más se reaprovecha del B2C, solo se promueve de "dentro de un grupo" a protagonista del home.</p>
+    <a data-scroll="team">→ ver equipo</a>
+  </div>
+  <div class="r-item">
+    <div class="t"><span class="n">5</span>La identidad de Savia se corre a un badge chico</div>
+    <p>En B2B quien manda en el chrome es la marca del cliente (como Slack/Notion) — Savia pasa a infraestructura visible pero no protagonista. Es un cambio real de jerarquía, vale la pena discutirlo si se siente correcto.</p>
+    <a data-scroll="rail">→ ver sidebar</a>
+  </div>
+  <div class="r-item">
+    <div class="t"><span class="n">6</span>Paleta y tipografía: cero cambios</div>
+    <p>Ink/paper/lima, Inter, EASE_SAVIA, radios 2xl — todo tal cual el sistema real. La regla del lima se respeta (solo vive sobre ink). Lo que cambia es qué contenido protagoniza, no el lenguaje visual.</p>
+  </div>
+</div>
+
+<div id="stage">
+  <div class="app-shell">
+    <aside class="rail" id="rail">
+      <div class="org-switch">
+        <div class="org-mark">T</div>
+        <div style="flex:1; min-width:0;">
+          <div class="name">Torre</div>
+          <div class="plan">Plan Empresa</div>
+        </div>
+        <div class="chev">⌄</div>
+      </div>
+
+      <nav class="primary">
+        <button class="nav-item active">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+          Organización
+        </button>
+        <button class="nav-item">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="9" r="5"/><circle cx="17" cy="16" r="3.2"/></svg>
+          Mi memoria
+        </button>
+        <button class="nav-item">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l2.5-7 5 14 2.5-7H21"/></svg>
+          Pulso
+        </button>
+        <button class="nav-item">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 7l-3 3a3.5 3.5 0 005 5l2-2M16 17l3-3a3.5 3.5 0 00-5-5l-2 2"/></svg>
+          Conexiones
+        </button>
+        <button class="nav-item">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 15V4m0 0L8 8m4-4l4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+          Fuentes
+        </button>
+      </nav>
+
+      <div class="savia-badge">
+        <svg width="13" height="13" viewBox="0 0 148 148" fill="currentColor" aria-hidden="true">
+          <path d="M42.2 0H63.8A7.2 7.2 0 0 1 71 7.2V28.8A7.2 7.2 0 0 1 63.8 36H42.2C38.8 36 36 38.8 36 42.2V63.8A7.2 7.2 0 0 1 28.8 71H7.2A7.2 7.2 0 0 1 0 63.8V42.2A7.2 7.2 0 0 1 7.2 35H28.8C32.2 35 35 32.2 35 28.8V7.2A7.2 7.2 0 0 1 42.2 0Z"/>
+          <path d="M42.2 0H63.8A7.2 7.2 0 0 1 71 7.2V28.8A7.2 7.2 0 0 1 63.8 36H42.2C38.8 36 36 38.8 36 42.2V63.8A7.2 7.2 0 0 1 28.8 71H7.2A7.2 7.2 0 0 1 0 63.8V42.2A7.2 7.2 0 0 1 7.2 35H28.8C32.2 35 35 32.2 35 28.8V7.2A7.2 7.2 0 0 1 42.2 0Z" transform="rotate(90 74 74)"/>
+          <path d="M42.2 0H63.8A7.2 7.2 0 0 1 71 7.2V28.8A7.2 7.2 0 0 1 63.8 36H42.2C38.8 36 36 38.8 36 42.2V63.8A7.2 7.2 0 0 1 28.8 71H7.2A7.2 7.2 0 0 1 0 63.8V42.2A7.2 7.2 0 0 1 7.2 35H28.8C32.2 35 35 32.2 35 28.8V7.2A7.2 7.2 0 0 1 42.2 0Z" transform="rotate(180 74 74)"/>
+          <path d="M42.2 0H63.8A7.2 7.2 0 0 1 71 7.2V28.8A7.2 7.2 0 0 1 63.8 36H42.2C38.8 36 36 38.8 36 42.2V63.8A7.2 7.2 0 0 1 28.8 71H7.2A7.2 7.2 0 0 1 0 63.8V42.2A7.2 7.2 0 0 1 7.2 35H28.8C32.2 35 35 32.2 35 28.8V7.2A7.2 7.2 0 0 1 42.2 0Z" transform="rotate(270 74 74)"/>
+        </svg>
+        Con la memoria de Savia
+      </div>
+
+      <div class="rail-footer">
+        <div class="avatar">MJ</div>
+        <div>
+          <div class="who">María José</div>
+          <div class="role">Admin</div>
+        </div>
+      </div>
+    </aside>
+
+    <main>
+      <div class="search-bar" id="open-palette">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+        Busca en el cerebro de Torre…
+        <kbd>⌘K</kbd>
+      </div>
+
+      <div class="hero fade-in" id="hero">
+        <canvas id="particles" width="900" height="220"></canvas>
+        <div class="hero-inner">
+          <div class="hero-top">
+            <div class="kicker">Cerebro de la empresa</div>
+            <div class="view-toggle">
+              <button class="active" data-view="org">Organización</button>
+              <button data-view="me">Mi memoria</button>
+            </div>
+          </div>
+          <div class="hero-stat" id="hero-stat"><b>426</b> recuerdos · <b>14</b> personas · <b>22</b> áreas</div>
+          <div class="hero-sub" id="hero-sub">Esta semana Savia destiló <span class="lime">3 skills nuevas</span> a partir de lo que tu equipo compartió — 2 en revisión, 1 ya vigente.</div>
+        </div>
+      </div>
+
+      <section class="block" id="skills">
+        <div class="block-head">
+          <h2>Síntesis en curso</h2>
+          <span class="meta">lo que Savia está destilando de la memoria del equipo</span>
+        </div>
+        <div class="skills-row">
+          <div class="skill-card" data-skill="1">
+            <div class="top">
+              <div class="title">Cómo procesamos una devolución</div>
+              <span class="pill review">En revisión</span>
+            </div>
+            <div class="skill-sources">
+              <span class="chip">Bea</span><span class="converge-arrow">＋</span>
+              <span class="chip">Marco</span><span class="converge-arrow">＋</span>
+              <span class="chip">Ticket #4521</span>
+              <span class="converge-arrow">→</span>
+              <span class="chip" style="background:var(--lime-soft); color:var(--ink);">1 versión</span>
+            </div>
+            <div class="skill-detail">
+              <div class="skill-detail-inner">
+                <div class="row"><b>3 fuentes convergentes</b>, 2 con pasos contradictorios en el plazo de reembolso.</div>
+                <div class="row">Última actualización: hace 2 días · propuesta por Savia, pendiente que un admin la confirme.</div>
+                <button class="cta">Ver borrador y confirmar</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="skill-card" data-skill="2">
+            <div class="top">
+              <div class="title">Precio preferencial para clientes recurrentes</div>
+              <span class="pill review">En revisión</span>
+            </div>
+            <div class="skill-sources">
+              <span class="chip">Julia</span><span class="converge-arrow">＋</span>
+              <span class="chip">Slack #ventas</span>
+              <span class="converge-arrow">→</span>
+              <span class="chip" style="background:var(--lime-soft); color:var(--ink);">1 versión</span>
+            </div>
+            <div class="skill-detail">
+              <div class="skill-detail-inner">
+                <div class="row"><b>2 fuentes</b>, sin contradicciones — lista para confirmar.</div>
+                <div class="row">Última actualización: hoy.</div>
+                <button class="cta">Ver borrador y confirmar</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="skill-card" data-skill="3">
+            <div class="top">
+              <div class="title">Onboarding de un cliente nuevo</div>
+              <span class="pill live">Vigente</span>
+            </div>
+            <div class="skill-sources">
+              <span class="chip">5 fuentes</span>
+              <span class="converge-arrow">→</span>
+              <span class="chip" style="background:var(--success-bg); color:var(--success);">v3 · confirmada</span>
+            </div>
+            <div class="skill-detail">
+              <div class="skill-detail-inner">
+                <div class="row">Ejecutada <b>18 veces</b> por IAs conectadas este mes.</div>
+                <div class="row">Confirmada por María José · vigente desde hace 12 días.</div>
+                <button class="cta">Ver skill vigente</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="block" id="areas">
+        <div class="block-head">
+          <h2>Áreas de la empresa</h2>
+          <span class="meta">22 áreas · organizadas por Savia</span>
+        </div>
+        <div class="areas-grid">
+          <div class="area-card" data-area="1">
+            <div class="area-top">
+              <span class="area-dot" style="background:var(--ramp-1)"></span>
+              <span class="area-name">General</span>
+              <span class="area-count">145</span>
+            </div>
+            <div class="area-meta">
+              <div class="avatar-stack"><span class="av">MJ</span><span class="av">B</span><span class="av">M</span><span class="av">+11</span></div>
+              <span class="pill open">Todo el equipo</span>
+            </div>
+            <div class="area-expand"><div class="area-expand-inner">
+              <div class="fact"><b>Torre</b> factura en pesos y dólares según el contrato del cliente.</div>
+              <div class="fact">El horario de soporte es 9 a 20, L-V.</div>
+            </div></div>
+          </div>
+
+          <div class="area-card" data-area="2">
+            <div class="area-top">
+              <span class="area-dot" style="background:var(--ramp-3)"></span>
+              <span class="area-name">Devoluciones</span>
+              <span class="area-count">84</span>
+            </div>
+            <div class="area-meta">
+              <div class="avatar-stack"><span class="av">B</span><span class="av">M</span><span class="av">+2</span></div>
+              <span class="pill open">Todo el equipo</span>
+            </div>
+            <div class="area-expand"><div class="area-expand-inner">
+              <div class="fact">Plazo estándar: <b>14 días</b> desde la entrega.</div>
+              <div class="fact">Excepción para clientes Plan Empresa: <b>30 días</b>.</div>
+            </div></div>
+          </div>
+
+          <div class="area-card" data-area="3">
+            <div class="area-top">
+              <span class="area-dot" style="background:var(--ramp-2)"></span>
+              <span class="area-name">Precios y excepciones</span>
+              <span class="area-count">31</span>
+            </div>
+            <div class="area-meta">
+              <div class="avatar-stack"><span class="av">MJ</span><span class="av">J</span></div>
+              <span class="pill locked">🔒 Solo Admin</span>
+            </div>
+            <div class="area-expand"><div class="area-expand-inner">
+              <div class="fact">Descuentos &gt;15% requieren aprobación de <b>María José</b>.</div>
+              <div class="fact">No se documentan por email — solo acá.</div>
+            </div></div>
+          </div>
+
+          <div class="area-card" data-area="4">
+            <div class="area-top">
+              <span class="area-dot" style="background:var(--ramp-4)"></span>
+              <span class="area-name">Onboarding de clientes</span>
+              <span class="area-count">56</span>
+            </div>
+            <div class="area-meta">
+              <div class="avatar-stack"><span class="av">J</span><span class="av">B</span><span class="av">+4</span></div>
+              <span class="pill open">Todo el equipo</span>
+            </div>
+            <div class="area-expand"><div class="area-expand-inner">
+              <div class="fact">Kickoff call obligatoria en la <b>primera semana</b>.</div>
+              <div class="fact">Checklist de 9 pasos, ver skill vigente arriba.</div>
+            </div></div>
+          </div>
+
+          <div class="area-card" data-area="5">
+            <div class="area-top">
+              <span class="area-dot" style="background:var(--ramp-3)"></span>
+              <span class="area-name">Incidentes técnicos</span>
+              <span class="area-count">47</span>
+            </div>
+            <div class="area-meta">
+              <div class="avatar-stack"><span class="av">M</span><span class="av">D</span><span class="av">+3</span></div>
+              <span class="pill locked">🔒 Ingeniería + Admin</span>
+            </div>
+            <div class="area-expand"><div class="area-expand-inner">
+              <div class="fact">Severidad 1 escala a <b>on-call</b> automático.</div>
+              <div class="fact">Post-mortem obligatorio en 48h.</div>
+            </div></div>
+          </div>
+
+          <div class="area-card" data-area="6">
+            <div class="area-top">
+              <span class="area-dot" style="background:var(--ramp-4)"></span>
+              <span class="area-name">Playbook de ventas</span>
+              <span class="area-count">63</span>
+            </div>
+            <div class="area-meta">
+              <div class="avatar-stack"><span class="av">J</span><span class="av">MJ</span><span class="av">+2</span></div>
+              <span class="pill locked">🔒 Ventas + Admin</span>
+            </div>
+            <div class="area-expand"><div class="area-expand-inner">
+              <div class="fact">Objeción de precio más común: <b>"muy caro vs. competencia"</b>.</div>
+              <div class="fact">Guion de respuesta validado, ver Julia.</div>
+            </div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="block" id="team">
+        <div class="block-head">
+          <h2>Equipo</h2>
+          <span class="meta">14 personas</span>
+        </div>
+        <div class="team-row">
+          <div class="member-pill"><span class="av">MJ</span><span class="name">María José</span><span class="role-badge admin">Admin</span></div>
+          <div class="member-pill"><span class="av">B</span><span class="name">Bea</span><span class="role-badge other">Colaborador</span></div>
+          <div class="member-pill"><span class="av">M</span><span class="name">Marco</span><span class="role-badge other">Colaborador</span></div>
+          <div class="member-pill"><span class="av">J</span><span class="name">Julia</span><span class="role-badge other">Colaborador</span></div>
+          <div class="member-pill"><span class="av">D</span><span class="name">Diego</span><span class="role-badge other">Lector</span></div>
+          <div class="member-pill" style="background:var(--mist); border-style:dashed; color:var(--slate); font-size:12px;">+9 más</div>
+          <button class="invite-btn" id="open-invite">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>
+            Invitar persona
+          </button>
+        </div>
+      </section>
+
+      <section class="block">
+        <div class="block-head">
+          <h2>Conexiones de la organización</h2>
+          <span class="meta">2 IAs conectadas</span>
+        </div>
+        <div class="conn-row">
+          <div class="conn-card">
+            <span class="conn-dot"></span>
+            <div><div class="conn-name">Claude</div><div class="conn-meta">org-wide · 240 consultas esta semana</div></div>
+          </div>
+          <div class="conn-card">
+            <span class="conn-dot"></span>
+            <div><div class="conn-name">Cursor</div><div class="conn-meta">equipo de Ingeniería · 89 consultas</div></div>
+          </div>
+          <button class="conn-add">+ Conectar otra IA</button>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div id="palette-overlay">
+  <div id="palette">
+    <input placeholder="Busca en el cerebro de Torre…" autofocus />
+    <div class="opt"><span>Devoluciones</span><span class="g">Área</span></div>
+    <div class="opt"><span>Precios y excepciones</span><span class="g">Área · restringida</span></div>
+    <div class="opt"><span>Cómo procesamos una devolución</span><span class="g">Skill · en revisión</span></div>
+    <div class="opt"><span>Invitar a alguien del equipo</span><span class="g">Acción</span></div>
+  </div>
+</div>
+
+<script>
+  // theme toggle for the artifact chrome only (the product content is a single committed world)
+  document.getElementById('btn-theme').onclick = () => {
+    const root = document.documentElement;
+    const cur = root.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    root.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+  };
+
+  const rationale = document.getElementById('rationale');
+  document.getElementById('btn-notes').onclick = () => {
+    rationale.classList.toggle('open');
+    document.getElementById('btn-notes').classList.toggle('active');
+  };
+  document.querySelectorAll('#rationale a[data-scroll]').forEach(a => {
+    a.addEventListener('click', () => {
+      document.getElementById(a.dataset.scroll)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  });
+
+  // view toggle: org vs personal framing of the hero
+  const heroStat = document.getElementById('hero-stat');
+  const heroSub = document.getElementById('hero-sub');
+  document.querySelectorAll('.view-toggle button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.view-toggle button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (btn.dataset.view === 'me') {
+        heroStat.innerHTML = '<b>38</b> recuerdos tuyos · aportaste a <b>6</b> áreas';
+        heroSub.innerHTML = 'Tu conocimiento ya es parte de <span class="lime">2 skills</span> que el equipo usa todos los días.';
+      } else {
+        heroStat.innerHTML = '<b>426</b> recuerdos · <b>14</b> personas · <b>22</b> áreas';
+        heroSub.innerHTML = 'Esta semana Savia destiló <span class="lime">3 skills nuevas</span> a partir de lo que tu equipo compartió — 2 en revisión, 1 ya vigente.';
+      }
+    });
+  });
+
+  // skill cards expand
+  document.querySelectorAll('.skill-card').forEach(card => {
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.cta')) return;
+      card.classList.toggle('open');
+    });
+  });
+  document.querySelectorAll('.skill-detail-inner .cta').forEach(btn => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); });
+  });
+
+  // area cards expand
+  document.querySelectorAll('.area-card').forEach(card => {
+    card.addEventListener('click', () => card.classList.toggle('open'));
+  });
+
+  // command palette
+  const paletteOverlay = document.getElementById('palette-overlay');
+  document.getElementById('open-palette').addEventListener('click', () => {
+    paletteOverlay.classList.add('open');
+    paletteOverlay.querySelector('input').focus();
+  });
+  paletteOverlay.addEventListener('click', (e) => { if (e.target === paletteOverlay) paletteOverlay.classList.remove('open'); });
+  window.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); paletteOverlay.classList.add('open'); paletteOverlay.querySelector('input').focus(); }
+    if (e.key === 'Escape') paletteOverlay.classList.remove('open');
+  });
+
+  // invite modal (lightweight — reuses the InviteDialog copy pattern from members-panel.tsx)
+  document.getElementById('open-invite').addEventListener('click', () => {
+    alert('Prototipo: acá abriría el mismo flujo de invitación por link + rol que ya funciona en Colectivo (email → elegir Lector/Colaborador/Admin → link para compartir).');
+  });
+
+  // ambient particles — subtle, matches "partículas atmosféricas flotantes" from the real brand system
+  (function () {
+    const canvas = document.getElementById('particles');
+    const ctx = canvas.getContext('2d');
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let w, h, dots;
+    function size() {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      w = canvas.width = rect.width;
+      h = canvas.height = rect.height;
+    }
+    function init() {
+      size();
+      dots = Array.from({ length: 26 }, () => ({
+        x: Math.random() * w, y: Math.random() * h,
+        r: 0.6 + Math.random() * 1.6,
+        vx: (Math.random() - 0.5) * 0.12, vy: (Math.random() - 0.5) * 0.12,
+        a: 0.15 + Math.random() * 0.35,
+      }));
+    }
+    function draw() {
+      ctx.clearRect(0, 0, w, h);
+      dots.forEach(d => {
+        d.x += d.vx; d.y += d.vy;
+        if (d.x < 0 || d.x > w) d.vx *= -1;
+        if (d.y < 0 || d.y > h) d.vy *= -1;
+        ctx.beginPath();
+        ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(231,255,24,${d.a})`;
+        ctx.fill();
+      });
+      if (!reduced) requestAnimationFrame(draw);
+    }
+    init();
+    window.addEventListener('resize', size);
+    draw();
+  })();
+</script>

@@ -2,15 +2,14 @@ import { Module } from '@nestjs/common';
 import { FilesController } from './files.controller';
 import { FilesService } from './files.service';
 import { S3Service } from './s3.service';
-import { PrismaService } from '../../common/clients/prisma.service';
-import { AuthModule } from '../auth/auth.module';
+import { ingestQueueProvider } from '../ingest/ingest.queue';
 import { MemoryModule } from '../memory/memory.module';
-import { IngestModule } from '../ingest/ingest.module';
+import { AccessModule } from '../access/access.module';
 
 @Module({
-  imports: [AuthModule, MemoryModule, IngestModule],
+  imports: [MemoryModule, AccessModule],
   controllers: [FilesController],
-  providers: [FilesService, S3Service, PrismaService],
-  exports: [FilesService],
+  providers: [FilesService, S3Service, ingestQueueProvider],
+  exports: [S3Service],
 })
 export class FilesModule {}

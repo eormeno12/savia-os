@@ -1,0 +1,57 @@
+<!-- @dsCard group="Overview" title="Savia — Sistema de diseño" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Savia · Sistema de diseño</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root { --ink:#0B2529; --paper:#F4F4F1; --lime:#E7FF18; --slate:#53606C; --line:#DDDFDC; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter', system-ui, sans-serif; background:var(--ink); color:var(--paper); -webkit-font-smoothing:antialiased; min-height:100vh; display:flex; align-items:center; padding:64px 48px; position:relative; overflow:hidden; }
+  .glow { position:absolute; width:600px; height:600px; border-radius:50%; background:var(--lime); filter:blur(160px); opacity:0.09; top:-160px; right:-120px; }
+  .wrap { max-width:1000px; margin:0 auto; position:relative; }
+  .lockup { display:flex; align-items:center; gap:14px; margin-bottom:48px; }
+  .word { font-weight:600; letter-spacing:0.08em; font-size:20px; color:var(--paper); }
+  h1 { font-size:clamp(48px,6vw,88px); font-weight:300; line-height:0.92; max-width:18ch; }
+  h1 em { font-weight:600; font-style:normal; color:var(--lime); }
+  .lede { font-size:clamp(16px,1.2vw,21px); line-height:1.6; color:rgba(244,244,241,0.7); margin-top:28px; max-width:56ch; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; margin-top:56px; }
+  .pill { border:1px solid rgba(255,255,255,0.12); border-radius:16px; padding:18px; }
+  .pill .n { font-size:14px; font-weight:600; }
+  .pill .d { font-size:12px; color:rgba(244,244,241,0.55); margin-top:6px; line-height:1.45; }
+  .three { display:flex; gap:10px; margin-top:40px; flex-wrap:wrap; }
+  .three span { font-size:12px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:var(--ink); background:var(--lime); padding:8px 16px; border-radius:999px; }
+</style>
+</head>
+<body>
+<div class="glow"></div>
+<div class="wrap">
+  <div class="lockup">
+    <svg width="28" height="28" viewBox="0 0 148 148" fill="#E7FF18" aria-hidden="true">
+      <path id="p" d="M42.2 0H63.8A7.2 7.2 0 0 1 71 7.2V28.8A7.2 7.2 0 0 1 63.8 36H42.2C38.8 36 36 38.8 36 42.2V63.8A7.2 7.2 0 0 1 28.8 71H7.2A7.2 7.2 0 0 1 0 63.8V42.2A7.2 7.2 0 0 1 7.2 35H28.8C32.2 35 35 32.2 35 28.8V7.2A7.2 7.2 0 0 1 42.2 0Z"/>
+      <use href="#p" transform="rotate(90 74 74)"/><use href="#p" transform="rotate(180 74 74)"/><use href="#p" transform="rotate(270 74 74)"/>
+    </svg>
+    <span class="word">SAVIA · DESIGN SYSTEM</span>
+  </div>
+  <h1>La memoria que <em>conecta</em> todas tus IAs.</h1>
+  <p class="lede">Los fundamentos del sistema de diseño de Savia. Dirección: contraste dramático — lienzo claro puntuado por superficies oscuras de firma donde brilla el lima. Único e impactante, nunca un SaaS genérico.</p>
+
+  <div class="three">
+    <span>Vivo</span><span>Calmo</span><span>Tuyo</span>
+  </div>
+
+  <div class="grid">
+    <div class="pill"><div class="n">Color</div><div class="d">Paleta + la regla del lima, superficies, spaces</div></div>
+    <div class="pill"><div class="n">Tipografía</div><div class="d">Inter, escala fluida, highlight ink</div></div>
+    <div class="pill"><div class="n">Espaciado</div><div class="d">Ritmo fluido, contenedores, layout</div></div>
+    <div class="pill"><div class="n">Forma</div><div class="d">Radios y profundidad</div></div>
+    <div class="pill"><div class="n">Motion</div><div class="d">Curva de marca + duraciones</div></div>
+    <div class="pill"><div class="n">Voz</div><div class="d">Léxico, atributos, sí/no</div></div>
+  </div>
+</div>
+</body>
+</html>

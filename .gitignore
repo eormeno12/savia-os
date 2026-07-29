@@ -38,3 +38,12 @@ apps/landing/design-system-preview/
 # Claude Code local config (personal, no compartir)
 .claude/settings.local.json
 memory.db
+
+# MCP local config (contiene tokens/bearer secrets, no compartir)
+.mcp.json
+
+# Índice generado por graphify (regenerar con: graphify update .)
+graphify-out/
+
+# Experimento OCR local (pesos de modelos, venv, uploads — no es parte del monorepo)
+apps/demo-ocr/

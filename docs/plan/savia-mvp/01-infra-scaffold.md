@@ -69,7 +69,7 @@ COOKIE_DOMAIN=localhost
 # AWS (se usan desde step 03/04)
 AWS_REGION=us-east-1
 AWS_S3_BUCKET=
-AWS_SES_FROM=no-reply@savia.com
+AWS_SES_FROM=no-reply@savia.uno
 # Procesos internos
 INTERNAL_TOKEN=dev-internal-token
 API_PORT=4400

@@ -1,0 +1,72 @@
+<!-- @dsCard group="Espaciado" title="Ritmo y layout fluido" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Savia · Espaciado y layout</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root { --ink:#0B2529; --paper:#F4F4F1; --lime:#E7FF18; --slate:#53606C; --line:#DDDFDC; --mist:#ECEDEA; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter', system-ui, sans-serif; background:var(--paper); color:var(--ink); -webkit-font-smoothing:antialiased; padding:64px 48px; }
+  .wrap { max-width:1100px; margin:0 auto; }
+  .eyebrow { font-size:12px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--slate); margin-bottom:24px; }
+  h1 { font-size:clamp(40px,4.8vw,72px); font-weight:300; line-height:0.92; max-width:16ch; }
+  .lede { font-size:clamp(16px,1.1vw,20px); line-height:1.6; color:var(--slate); margin-top:24px; max-width:56ch; }
+  .label { font-size:12px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--slate); margin:64px 0 8px; }
+  .desc { font-size:14px; color:var(--slate); line-height:1.65; max-width:58ch; margin-bottom:24px; }
+  .scale .item { display:flex; gap:24px; align-items:center; padding:14px 0; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .scale .bar-wrap { width:220px; flex-shrink:0; }
+  .scale .bar { height:12px; border-radius:999px; background:var(--lime); box-shadow:inset 0 0 0 1px rgba(11,37,41,0.06); }
+  .scale code { font-family:ui-monospace,monospace; font-size:13px; font-weight:600; }
+  .scale .v { font-family:ui-monospace,monospace; font-size:11px; color:var(--slate); margin-top:4px; }
+  .scale .role { font-size:13px; color:var(--slate); }
+  .containers { display:flex; flex-direction:column; gap:14px; }
+  .cbar { height:44px; border-radius:12px; display:flex; align-items:center; padding-left:18px; font-family:ui-monospace,monospace; font-size:12px; font-weight:600; color:var(--paper); }
+  .principles { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:24px; }
+  @media (max-width:720px){ .principles{ grid-template-columns:1fr; } }
+  .principles .p { background:var(--mist); border-radius:20px; padding:24px; }
+  .principles h4 { font-size:15px; font-weight:600; margin-bottom:8px; }
+  .principles p { font-size:13px; color:var(--slate); line-height:1.6; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Fundamentos · Espaciado</div>
+  <h1>Generoso, y fluido por defecto.</h1>
+  <p class="lede">El espaciado de Savia respira. Los tokens de sección y stack usan <code>clamp()</code>: el viewport fija el valor exacto, sin saltos de breakpoint. Un layout apretado «se siente plano».</p>
+
+  <div class="label">Stack y secciones</div>
+  <p class="desc">Las barras muestran el ancho real renderizado en este viewport.</p>
+  <div class="scale">
+    <div class="item"><div class="bar-wrap"><div class="bar" style="width:clamp(8px,1vw,16px)"></div></div><div><code>stackXs</code><div class="v">clamp(8px, 1vw, 16px)</div></div><div class="role">Spacing mínimo</div></div>
+    <div class="item"><div class="bar-wrap"><div class="bar" style="width:clamp(16px,1.5vw,24px)"></div></div><div><code>stackSm</code><div class="v">clamp(16px, 1.5vw, 24px)</div></div><div class="role">Gap entre items</div></div>
+    <div class="item"><div class="bar-wrap"><div class="bar" style="width:clamp(24px,2vw,32px)"></div></div><div><code>stackMd</code><div class="v">clamp(24px, 2vw, 32px)</div></div><div class="role">Separación entre grupos</div></div>
+    <div class="item"><div class="bar-wrap"><div class="bar" style="width:clamp(32px,3vw,48px)"></div></div><div><code>stackLg</code><div class="v">clamp(32px, 3vw, 48px)</div></div><div class="role">Secciones menores</div></div>
+    <div class="item"><div class="bar-wrap"><div class="bar" style="width:clamp(48px,5vw,80px)"></div></div><div><code>stackXl</code><div class="v">clamp(48px, 5vw, 80px)</div></div><div class="role">Secciones mayores</div></div>
+    <div class="item"><div class="bar-wrap"><div class="bar" style="width:clamp(24px,2vw,32px)"></div></div><div><code>surfacePadding</code><div class="v">clamp(24px, 2vw, 32px)</div></div><div class="role">Padding de cards</div></div>
+    <div class="item"><div class="bar-wrap"><div class="bar" style="width:clamp(3.5rem,6vw,6.5rem)"></div></div><div><code>sectionYTight</code><div class="v">clamp(3.5rem, 6vw, 6.5rem)</div></div><div class="role">Sección compacta</div></div>
+    <div class="item" style="border-bottom:none"><div class="bar-wrap"><div class="bar" style="width:clamp(5rem,8vw,9rem)"></div></div><div><code>sectionY</code><div class="v">clamp(5rem, 8vw, 9rem)</div></div><div class="role">Sección estándar</div></div>
+  </div>
+
+  <div class="label">Contenedores</div>
+  <p class="desc">Anchos fluidos con márgenes laterales responsivos. No inventes anchos sueltos.</p>
+  <div class="containers">
+    <div class="cbar" style="background:#0B2529;width:100%">containerWide · 108rem</div>
+    <div class="cbar" style="background:#1F5A53;width:78%">container · 78rem</div>
+    <div class="cbar" style="background:#2C7560;width:60%">containerNarrow · 62rem</div>
+  </div>
+
+  <div class="label">Principios de layout</div>
+  <div class="principles">
+    <div class="p"><h4>Una acción primaria por pantalla</h4><p>Jerarquía clara. Si todo pesa igual, nada pesa. El CTA principal vive sobre superficie oscura.</p></div>
+    <div class="p"><h4>Split-panel</h4><p>Un lado oscuro con el formulario directo sobre el fondo; el otro claro que complementa con espacio (statement + journey).</p></div>
+    <div class="p"><h4>Aire en formularios</h4><p>gap grande entre bloques, gap chico entre label e input. Un form apretado se siente plano.</p></div>
+    <div class="p"><h4>Claridad para nuevos</h4><p>Si una pantalla no se explica sola, mostrá el journey en pasos (stepper vertical) con el paso actual activo.</p></div>
+  </div>
+</div>
+</body>
+</html>

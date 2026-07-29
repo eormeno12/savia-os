@@ -1,3 +1,16 @@
+// Savia OS — esquema objetivo (rebuild).
+// Fuente canónica del modelo: docs/audit/backend/2026-06-27/08-plan-end-to-end.md §2 (core)
+// + 05-rediseno-estructural.md §1 (capa de producto).
+//
+// Principios:
+//  - El árbol de áreas (Space) es la columna de la memoria personal; multi-membership
+//    (una memoria vive en varias áreas) se denormaliza al payload Qdrant `savia_area_ids[]`.
+//  - El colectivo es FEDERACIÓN (CollectiveGroup + GroupMember + FragmentShare): el dato
+//    nunca sale de su autor.
+//  - Postgres = verdad del árbol + outbox; Qdrant = vectores + payload + entity-store de mem0.
+//  - Enums nativos en columnas; cascadas onDelete explícitas; CHECKs (exactly-one-non-null)
+//    se aplican en la migración (Prisma no los expresa) — ver migration.sql.
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,27 +20,49 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id           String        @id @default(uuid())
-  email        String        @unique
-  createdAt    DateTime      @default(now())
-  files        File[]
-  spaces       Space[]
-  connections  Connection[]
-  memoryIndex  MemoryIndex[]
-  growthEvents GrowthEvent[]
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum SpaceGovernance {
+  auto // el motor dinámico puede reorganizar el área
+  manual // el usuario la fijó; el motor no la toca
 }
 
-model OtpCode {
-  id         String    @id @default(uuid())
-  email      String
-  codeHash   String
-  expiresAt  DateTime
-  attempts   Int       @default(0)
-  consumedAt DateTime?
-  createdAt  DateTime  @default(now())
+enum Sensitivity {
+  normal
+  sensitive
+}
 
-  @@index([email])
+enum GroupRole {
+  viewer
+  contributor
+  admin
+}
+
+enum GrantScope {
+  space
+  group
+}
+
+enum OutboxKind {
+  set_payload
+  delete_payload
+  purge
+}
+
+enum OutboxStatus {
+  pending
+  committed
+  failed
+}
+
+enum EventAction {
+  create
+  move
+  split
+  merge
+  decay
+  sensitivity
+  supersede
 }
 
 enum FileStatus {
@@ -37,106 +72,623 @@ enum FileStatus {
   failed
 }
 
-model File {
-  id        String     @id @default(uuid())
+enum SuggestionKind {
+  split
+  merge
+  duplicate
+}
+
+enum SuggestionStatus {
+  pending
+  accepted
+  dismissed
+}
+
+enum NotificationKind {
+  invite
+  suggestion
+  job
+  milestone
+  member_joined
+}
+
+enum JobType {
+  import_chatgpt
+  rescue
+  account_export
+  account_delete
+}
+
+enum JobStatus {
+  queued
+  running
+  done
+  failed
+}
+
+enum Plan {
+  free
+  pro
+}
+
+// Procedencia de una memoria: el TIPO de fuente que la originó (discriminador).
+// El id/etiqueta concretos van en MemoryIndex.sourceRef / sourceLabel (+ fileId tipado).
+enum MemorySource {
+  manual // el usuario la escribió (POST /memory)
+  mcp // una IA vía savia_remember (sourceRef = connectionId)
+  file // ingesta del Drive (fileId = FK tipada)
+  import_chatgpt // import de conversaciones (sourceRef = jobId)
+  rescue // prompt de rescate
+}
+
+enum SubscriptionStatus {
+  none // nunca se suscribió
+  pending // creó la preapproval, aún no pagó
+  active // authorized en MP → acceso pro
+  paused // pausada (reintentos / pausa manual)
+  cancelled // cancelada (gracia hasta nextPaymentAt; luego free)
+  failed // pago fallido definitivo
+}
+
+// ─── Motor de organización v2 (grafo de personas + encoding tree) ───────────
+// Estado PRIVADO del motor. La verdad de membership sigue siendo MemoryArea; el
+// motor solo la escribe vía el write-kernel. Estas tablas modelan el grafo
+// mutual-kNN (MemoryEdge), la factorización en personas por ego-splitting
+// (MemoryPersona/PersonaNeighbor), y el mapeo comunidad→árbol (EngineNode dentro
+// de EngineComponent). EngineTask es la cola event-driven (patrón outbox).
+
+enum EngineNodeKind {
+  community // hoja del encoding tree = destino de membership (un Space hoja)
+  internal // nodo intermedio del encoding tree (un Space contenedor)
+}
+
+enum EngineTaskKind {
+  memory_upserted // una memoria entró/volvió al grafo → refinar ego-nets + comunidades
+  memory_removed // una memoria salió (archive/supersede) → limpiar aristas + re-evaluar
+  rebuild_component // recomputar el encoding tree de un componente (coalesced)
+  bootstrap_user // reconstrucción completa del árbol de un usuario desde cero
+}
+
+enum EngineTaskStatus {
+  pending
+  running
+  done
+  failed
+}
+
+// ─── Identidad / sesión ─────────────────────────────────────────────────────
+
+model User {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  displayName String? // pedido en el onboarding (no en el signup OTP)
+  plan        Plan     @default(free) // materialized freemium gate (RequirePlan); kept in sync by the webhook
+  createdAt   DateTime @default(now())
+
+  spaces        Space[]
+  members       GroupMember[]
+  connections   Connection[]
+  lenses        Lens[]
+  sessions      AuthSession[]
+  events        MemoryEvent[]
+  fragments     FragmentShare[]
+  suggestions   Suggestion[]
+  jobs          Job[]
+  notifications Notification[]
+  subscription  Subscription?
+
+  engineComponents EngineComponent[]
+  engineTasks      EngineTask[]
+}
+
+// Sesión de refresh con rotación + revocación por familia (cierra SEC-1).
+model AuthSession {
+  id        String    @id @default(uuid()) // = jti del refresh token
   userId    String
-  user      User       @relation(fields: [userId], references: [id])
-  name      String
-  mimeType  String
-  sizeBytes Int
-  s3Key     String
-  status    FileStatus @default(pending)
-  error     String?
-  source    String     @default("upload")
-  createdAt DateTime   @default(now())
-  indexedAt DateTime?
-  memories  MemoryIndex[]
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  familyId  String // toda la cadena de rotaciones comparte familia → revocar de golpe
+  revokedAt DateTime?
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
 
   @@index([userId])
+  @@index([familyId])
 }
 
-// Space: ventana de contexto/lectura definida en lenguaje natural.
-// Write siempre libre; Savia clasifica qué memorias pertenecen aquí.
+// ─── Capa 1: árbol de áreas (memoria personal) ──────────────────────────────
+
 model Space {
-  id                   String   @id @default(uuid())
-  userId               String
-  user                 User     @relation(fields: [userId], references: [id])
-  name                 String
-  description          String
-  descriptionEmbedding Float[]
-  version              Int      @default(1)
-  reclassifying        Boolean  @default(false)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-  grants               Grant[]
+  id          String          @id @default(uuid())
+  ownerUserId String
+  owner       User            @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  governance  SpaceGovernance @default(auto)
 
-  @@unique([userId, name])
-  @@index([userId])
+  // jerarquía — depth NO está capada: la decide el motor (BIC+silhouette+min-size).
+  // CHECK (depth >= 0) en migration.sql.
+  parentId  String?
+  parent    Space?  @relation("Tree", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Space[] @relation("Tree")
+  path      String // "/general/trabajo/proyecto-x" materializado
+  depth     Int     @default(0)
+  isDefault Boolean @default(false) // General = raíz por usuario
+
+  // ancla del área (lo que la define) → naming + estabilidad. La geometría de
+  // clustering (CF/centroide) vive ahora en el motor v2 (grafo de personas), no
+  // en columnas del Space; los conteos son un COUNT en vivo sobre MemoryArea.
+  anchorEntities String[] // entidades dominantes (de mem0)
+
+  name        String
+  description String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  memberships MemoryArea[]
+  grants      Grant[]
+  fragments   FragmentShare[]
+  files       File[]
+  engineNode  EngineNode?
+
+  @@index([ownerUserId])
+  @@index([ownerUserId, isDefault])
+  @@index([parentId])
+  @@index([path])
 }
 
-model Connection {
-  id         String      @id @default(uuid())
-  userId     String
-  user       User        @relation(fields: [userId], references: [id])
-  label      String
-  tokenHash  String      @unique
-  lastSeenAt DateTime?
-  revokedAt  DateTime?
-  createdAt  DateTime    @default(now())
-  grants     Grant[]
-  accessLog  AccessLog[]
-
-  @@index([userId])
-}
-
-// Grant = esta conexión puede VER este space. Write siempre libre.
-model Grant {
-  connectionId String
-  connection   Connection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-  spaceId      String
-  space        Space      @relation(fields: [spaceId], references: [id], onDelete: Cascade)
-  createdAt    DateTime   @default(now())
-
-  @@id([connectionId, spaceId])
-}
-
+// Espejo Postgres del punto Qdrant. La membership multi-área es la VERDAD en
+// MemoryArea (durable + íntegra + consultable por SQL); el payload Qdrant
+// `savia_area_ids[]` es su PROYECCIÓN (vía outbox) para que el filtro de acceso
+// corra dentro del motor. No hay "área primaria": el mapa pinta todos los puntos.
 model MemoryIndex {
-  memoryId      String   @id
+  memoryId     String      @id // = id del punto Qdrant (determinista)
+  authorUserId String // = user_id de mem0 (provenance/partición; NO la frontera)
+  sensitivity  Sensitivity @default(normal)
+  supersededBy String? // consolidación soft (near-dup); nunca delete automático
+
+  // Procedencia: TIPO (source) + id/etiqueta concretos. fileId es FK tipada porque
+  // el Drive necesita integridad (conteo, deleteByFile, cascada); sourceRef es id
+  // denormalizado para mcp/import (connectionId | jobId) → la traza sobrevive al
+  // borrado de la conexión/job; sourceLabel es snapshot legible para el Pulso.
+  source      MemorySource @default(manual)
+  fileId      String?
+  file        File?        @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  sourceRef   String? // connectionId (mcp) | jobId (import)
+  sourceLabel String? // "Claude Desktop" | "Notas.pdf" | "Import ChatGPT"
+
+  createdAt DateTime     @default(now())
+  areas     MemoryArea[]
+
+  edgesOut MemoryEdge[]    @relation("EdgeSrc")
+  edgesIn  MemoryEdge[]    @relation("EdgeDst")
+  personas MemoryPersona[]
+
+  @@index([authorUserId, createdAt]) // cursor estable [createdAt, memoryId] por autor
+  @@index([fileId])
+  @@index([source])
+}
+
+// Membership multi-área (verdad). Una fila por área a la que pertenece la memoria.
+// El mapa pinta un punto por fila; la intensidad área↔área es un self-join sobre
+// esta tabla (memorias compartidas). Restrict en spaceId: la base OBLIGA a
+// re-homear antes de borrar un área → nunca se pierde acceso por borrar un Space.
+model MemoryArea {
+  memoryId String
+  spaceId  String
+  memory   MemoryIndex @relation(fields: [memoryId], references: [memoryId], onDelete: Cascade)
+  space    Space       @relation(fields: [spaceId], references: [id], onDelete: Restrict)
+
+  @@id([memoryId, spaceId])
+  @@index([spaceId]) // "memorias de este área" + cleanup en delete
+}
+
+// ─── Motor v2: grafo de personas (estado privado del motor) ─────────────────
+
+// Lista kNN DIRIGIDA por memoria (≈k filas por memoria). La arista del grafo es
+// el par mutuo: `mutual=true` se materializa cuando existe también la fila
+// inversa (evita un self-join en el hot path del ego-net). `weight` = simScore
+// (coseno del kNN) + entBoost (co-ocurrencia de entidades), materializado.
+model MemoryEdge {
+  srcId     String
+  dstId     String
+  src       MemoryIndex @relation("EdgeSrc", fields: [srcId], references: [memoryId], onDelete: Cascade)
+  dst       MemoryIndex @relation("EdgeDst", fields: [dstId], references: [memoryId], onDelete: Cascade)
+  userId    String // partición (= authorUserId de ambos extremos)
+  simScore  Float // coseno del kNN
+  entBoost  Float       @default(0) // boost por entidades compartidas (EntityGraphPort)
+  weight    Float // simScore + entBoost, materializado para ordenar/evictar
+  mutual    Boolean     @default(false)
+  updatedAt DateTime    @updatedAt
+
+  @@id([srcId, dstId])
+  @@index([dstId]) // aristas entrantes: mutualidad + limpieza local en delete
+  @@index([userId]) // bootstrap / limpieza por usuario
+}
+
+// Una "persona" de una memoria = un componente conexo de su ego-net (ego-splitting,
+// KDD 2017). Una memoria con vecinos en 2 mundos desconectados tiene 2 personas →
+// pertenece a 2 comunidades como miembro pleno (solapamiento literal).
+model MemoryPersona {
+  id          String      @id @default(uuid())
+  memoryId    String
+  memory      MemoryIndex @relation(fields: [memoryId], references: [memoryId], onDelete: Cascade)
+  userId      String
+  communityId String?
+  community   EngineNode? @relation(fields: [communityId], references: [id], onDelete: SetNull)
+
+  neighbors PersonaNeighbor[]
+
+  @@index([memoryId])
+  @@index([communityId]) // "personas de esta comunidad"
+  @@index([userId])
+}
+
+// El mapeo arista→persona: "la persona de `memoryId` que contiene a `neighborId`".
+// Cada vecino de una memoria vive en EXACTAMENTE una de sus personas (@@id). La
+// arista del grafo de personas se deriva por join (no se persiste): por cada
+// MemoryEdge mutua (u,v), PersonaNeighbor(u,v).personaId ↔ PersonaNeighbor(v,u).personaId.
+model PersonaNeighbor {
+  personaId  String
+  persona    MemoryPersona @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  memoryId   String // = ego (denormalizado para el PK compuesto)
+  neighborId String // vecino
+
+  @@id([memoryId, neighborId])
+  @@index([personaId])
+  @@index([neighborId]) // vecino borrado/tocado → personas afectadas
+}
+
+// Componente conexo del grafo de personas — unidad del encoding tree y de su
+// trigger event-driven (`changeCounter`: al superar TREE_REBUILD_DELTA se encola
+// un rebuild_component, coalesced por dedupeKey).
+model EngineComponent {
+  id            String   @id @default(uuid())
   userId        String
-  user          User     @relation(fields: [userId], references: [id])
-  fileId        String?
-  file          File?    @relation(fields: [fileId], references: [id], onDelete: SetNull)
-  spaceIds       String[]
-  spaceVersions  Json
-  manualOverride Boolean  @default(false)
-  source         String   @default("upload")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  changeCounter Int      @default(0)
+  updatedAt     DateTime @updatedAt
+
+  nodes EngineNode[]
+
+  @@index([userId])
+}
+
+// Mapeo motor→árbol: cada nodo del encoding tree se materializa como un Space.
+// kind=community: hoja (destino real de membership). kind=internal: contenedor.
+model EngineNode {
+  id          String          @id @default(uuid())
+  userId      String
+  componentId String
+  component   EngineComponent @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  spaceId     String          @unique
+  space       Space           @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  kind        EngineNodeKind
+  createdAt   DateTime        @default(now())
+
+  personas MemoryPersona[]
+
+  @@index([componentId])
+  @@index([userId, kind])
+}
+
+// Cola de recompute del motor (patrón outbox, drenada por el EngineWorker). Nunca
+// se escanea: se llena por eventos. `dedupeKey` @unique da coalescing (N inserts
+// de un import → un solo rebuild por componente).
+model EngineTask {
+  id            String           @id @default(uuid())
+  userId        String
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind          EngineTaskKind
+  payload       Json // { memoryId } | { componentId } | {}
+  dedupeKey     String?          @unique // p.ej. "u:{userId}:tree:{componentId}"
+  status        EngineTaskStatus @default(pending)
+  attempts      Int              @default(0)
+  lastError     String?
+  nextAttemptAt DateTime?
+  createdAt     DateTime         @default(now())
+
+  @@index([status, nextAttemptAt, createdAt])
+  @@index([userId, status])
+}
+
+// ─── Capa 2: lentes (espacios definidos por el usuario, poblados por query) ──
+
+// Lens = búsqueda guardada, personal, 100% en vivo: ni gobierna el árbol (no hay
+// modo `auto`/`manual`, el motor nunca la toca), ni persiste membership, ni se
+// muestra en dashboards — corre la query (anchor/radius + cota coseno, clamada
+// a sourceAreaIds) en cada lectura y listo. No cruza ninguna frontera de acceso
+// (ver Grant/FragmentShare): es exclusivamente para la vista del propio dueño.
+model Lens {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  query         String?
+  anchor        Float[] // embedding del query (centro del predicado), 256d
+  radius        Float    @default(0.4) // cota coseno: atrae si score >= 1-radius
+  sourceAreaIds String[] @default([]) // subárboles fuente (Space.id); vacío = todas las del dueño
   createdAt     DateTime @default(now())
 
   @@index([userId])
-  @@index([fileId])
 }
 
-model GrowthEvent {
+// ─── Conexiones IA + grants (frontera de lectura) ───────────────────────────
+
+model Connection {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label       String
+  tokenHash   String // argon2 (salt aleatorio) — solo para VERIFICAR; nunca se consulta por WHERE
+  tokenLookup String    @unique // HMAC-SHA256(serverKey, rawToken) — para BUSCAR (O(1)) + cachear
+  lastSeenAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  grants Grant[]
+
+  @@index([userId])
+}
+
+// Grant polimórfico: una conexión puede LEER un subárbol (space) o un grupo. No
+// hay "canWrite": la escritura (savia_remember) nunca se restringe por conexión
+// — solo la lectura está scoped por grant (decisión de producto). Lens NUNCA
+// cruza una frontera de acceso (ni colectivo ni IA) — es 100% personal.
+// CHECK exactly-one(spaceId, groupId) + UNIQUE parcial por target
+// (sin duplicados connectionId+scope+target) en migration.sql (0A F22).
+model Grant {
+  id               String           @id @default(uuid())
+  connectionId     String
+  connection       Connection       @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  scope            GrantScope
+  spaceId          String?
+  space            Space?           @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  groupId          String?
+  group            CollectiveGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  includeSensitive Boolean          @default(false)
+  createdAt        DateTime         @default(now())
+
+  @@index([connectionId])
+}
+
+// ─── Colectivo = FEDERACIÓN (grupo + fragmentos compartidos) ────────────────
+
+model CollectiveGroup {
   id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  spaceId   String?
-  memoryId  String?
+  name      String
   createdAt DateTime @default(now())
 
-  @@index([userId, createdAt])
-  @@index([userId, spaceId])
+  members   GroupMember[]
+  fragments FragmentShare[]
+  grants    Grant[]
+  invites   GroupInvite[]
 }
 
+model GroupMember {
+  groupId  String
+  group    CollectiveGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role     GroupRole       @default(contributor)
+  joinedAt DateTime        @default(now())
+
+  @@id([groupId, userId])
+  @@index([userId])
+}
+
+// Cada miembro contribuye un subárbol al grupo. Lens nunca se comparte (ver Grant).
+// `includeSensitive`: opt-in DEL DUEÑO — sensible es su marca privada global, así que
+// solo el dueño del fragmento decide si su parte compartida lleva lo `sensitive`. El
+// lector (conexión/otro miembro) NUNCA la levanta (R4). Grant.includeSensitive gobierna
+// grants a áreas PROPIAS; para fragmentos de grupo manda ESTE campo.
+model FragmentShare {
+  id               String          @id @default(uuid())
+  groupId          String
+  group            CollectiveGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId           String // el dueño del fragmento
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  spaceId          String
+  space            Space           @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  includeSensitive Boolean         @default(false)
+  createdAt        DateTime        @default(now())
+
+  // One share per (group, owner, area): duplicates would let removeFragment (by id)
+  // delete only ONE row while a leftover copy — possibly with includeSensitive=true —
+  // silently keeps that owner's area in the group view, defeating an "I unshared it"
+  // or "I turned off sensitive" expectation.
+  @@unique([groupId, userId, spaceId])
+  @@index([groupId])
+  @@index([userId])
+}
+
+// ─── Pulso (eventos reversibles), Outbox, Auditoría ─────────────────────────
+
+// Event-sourced → revert + feed del Pulso. spaceId/memoryId SIN FK a propósito
+// (igual que OutboxEvent/AccessLog): el evento es el historial — debe sobrevivir
+// a que el Space se borre o la memoria se purgue (GC), no solo mientras existan.
+model MemoryEvent {
+  id            String      @id @default(uuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action        EventAction
+  spaceId       String?
+  memoryId      String?
+  revertPayload Json? // la inversa de la operación (undo) — debe traer el valor PREVIO, no solo el tipo de op
+  revertedAt    DateTime?
+  createdAt     DateTime    @default(now())
+
+  @@index([userId, createdAt])
+}
+
+// Única vía Postgres → Qdrant. Decoupled de MemoryIndex a propósito: un evento de
+// delete/purge DEBE sobrevivir al borrado de la fila que describe (durabilidad).
+model OutboxEvent {
+  id            String       @id @default(uuid())
+  kind          OutboxKind
+  memoryId      String?
+  payload       Json
+  status        OutboxStatus @default(pending)
+  attempts      Int          @default(0)
+  lastError     String?
+  nextAttemptAt DateTime? // backoff: null = elegible ya (compat con filas existentes)
+  createdAt     DateTime     @default(now())
+  committedAt   DateTime?
+
+  @@index([status, createdAt])
+  @@index([status, nextAttemptAt])
+}
+
+// Auditoría de acceso MCP. Decoupled (sin FK): el log sobrevive al borrado de la conexión.
 model AccessLog {
-  id           String     @id @default(uuid())
+  id           String   @id @default(uuid())
   connectionId String
-  connection   Connection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
   action       String
   spaceIds     String[]
-  queryHash    String?
-  resultCount  Int        @default(0)
-  createdAt    DateTime   @default(now())
+  queryDigest  String? // SHA-256, NO el texto (cierra P0-3)
+  resultCount  Int      @default(0)
+  createdAt    DateTime @default(now())
 
   @@index([connectionId, createdAt])
+}
+
+// ─── Capa de producto (05 §1) ───────────────────────────────────────────────
+
+// Drive: un archivo vive en un ÁREA. Su ingesta produce memorias con membership.
+model File {
+  id             String     @id @default(uuid())
+  spaceId        String // el área donde se archiva
+  space          Space      @relation(fields: [spaceId], references: [id], onDelete: Restrict)
+  uploaderUserId String // provenance (= user_id de mem0)
+  name           String
+  mimeType       String
+  sizeBytes      Int
+  s3Key          String // spaces/{spaceId}/{uuid}-{name}
+  status         FileStatus @default(pending)
+  error          String?
+  source         String     @default("upload")
+  createdAt      DateTime   @default(now())
+  indexedAt      DateTime?
+
+  memories MemoryIndex[]
+
+  @@index([spaceId])
+  @@index([uploaderUserId])
+}
+
+// Invitación a un GRUPO colectivo (federación).
+model GroupInvite {
+  id              String          @id @default(uuid())
+  groupId         String
+  group           CollectiveGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  email           String
+  role            GroupRole
+  invitedByUserId String
+  tokenHash       String // argon2 del token de invitación
+  tokenLookup     String          @unique // HMAC → accept O(1)
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  createdAt       DateTime        @default(now())
+
+  @@index([email, acceptedAt]) // "mis invitaciones pendientes" (Bandeja)
+}
+
+model OtpCode {
+  id           String    @id @default(uuid())
+  email        String
+  codeHash     String
+  expiresAt    DateTime
+  attempts     Int       @default(0)
+  consumedAt   DateTime?
+  supersededAt DateTime? // invalidado por un código más nuevo del mismo email (nunca llegó a usarse)
+  createdAt    DateTime  @default(now())
+
+  @@index([email])
+  @@index([expiresAt]) // habilita el cron de purga (02-D4)
+}
+
+// Cola de propuestas del motor dinámico (08 §4): el ML PROPONE; el usuario acepta/descarta.
+model Suggestion {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      SuggestionKind
+  status    SuggestionStatus @default(pending)
+  payload   Json // {memoryIds, área propuesta, …} para aplicar al aceptar
+  rationale String
+  createdAt DateTime         @default(now())
+
+  @@index([userId, status])
+}
+
+// Superficie de procesos para la Bandeja (correlación con BullMQ).
+model Job {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      JobType
+  status    JobStatus @default(queued)
+  progress  Int       @default(0)
+  total     Int?
+  resultRef String?
+  error     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([userId, status])
+}
+
+// Bandeja unificada (polimórfica): invitaciones + sugerencias + jobs + member_joined.
+// hitos (milestone) sigue sin productor — pendiente, deriva de GrowthEvent
+// (01-gap-frontend.md §Bandeja: hitos, "Endpoint nuevo").
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      NotificationKind
+  refId     String?
+  data      Json
+  seenAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, seenAt])
+  @@index([userId, createdAt])
+}
+
+// Billing (Mercado Pago Subscriptions — 09-modulo-pagos.md). User.plan is the
+// materialized gate; this row is the authoritative subscription state.
+model Subscription {
+  id              String             @id @default(uuid())
+  userId          String             @unique
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mpPreapprovalId String?            @unique // preapproval id de MP (external_reference = userId)
+  status          SubscriptionStatus @default(none)
+  planType        String? // 'monthly' | 'annual'
+  amount          Decimal?           @db.Decimal(10, 2)
+  currency        String?
+  startedAt       DateTime?
+  nextPaymentAt   DateTime? // próximo cobro; en cancelled = fin de la gracia
+  cancelledAt     DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  payments        Payment[]
+
+  @@index([status])
+}
+
+model Payment {
+  id             String       @id @default(uuid())
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  mpPaymentId    String       @unique // dedup de cobros
+  status         String // approved | rejected | refunded | pending
+  amount         Decimal      @db.Decimal(10, 2)
+  currency       String
+  paidAt         DateTime?
+  createdAt      DateTime     @default(now())
+}
+
+// Idempotencia de webhooks: MP entrega at-least-once → insertar el id antes de
+// procesar; si ya existe, descartar.
+model WebhookEvent {
+  id          String   @id // `${dataId}:${requestId}`
+  type        String
+  processedAt DateTime @default(now())
 }

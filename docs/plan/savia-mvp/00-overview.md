@@ -2,7 +2,15 @@
 
 > Índice maestro del plan incremental del MVP de Savia. Léelo antes de cualquier step.
 
-## Qué es Savia
+> 📍 **Este plan documenta el MVP personal tal como se construyó** — la capa de
+> memoria individual (login, drive, submemorias, MCP por usuario). Es la base
+> bottom-up sobre la que se construye la dirección de producto **actual: B2B**,
+> Savia como el cerebro ejecutable de cada empresa. Ver
+> [`docs/product/savia-b2b/01-vision.md`](../../product/savia-b2b/01-vision.md) para la visión
+> vigente antes de planear trabajo nuevo — no asumas que "usuario individual" sigue
+> siendo el destino final del producto.
+
+## Qué es Savia (la base personal — ver nota arriba para la dirección actual)
 
 Savia es "la memoria que conecta todas tus IAs". El usuario:
 
@@ -61,7 +69,7 @@ cómo se clasificó el conocimiento.
 
 ```
 Vercel: apps/landing (marketing) + apps/app (producto)
-                                   │ HTTPS (cookies Domain=.savia.com)
+                                   │ HTTPS (cookies Domain=.savia.uno)
 EC2 (Docker Compose):
   gateway (Caddy, TLS)
    ├─ api    (NestJS, proc main)   HTTP REST  → Postgres, Redis, S3, Qdrant
@@ -118,6 +126,20 @@ docs/plan/savia-mvp/   (estos .md)
 
 Cada step se ejecuta **en orden** y termina con su **verificación** antes de pasar
 al siguiente.
+
+## Fase 2 — Memoria colectiva (complemento)
+
+Tras el MVP (00–12), la **Fase 2** introduce la memoria colectiva (spaces
+compartidos tipo drive) y unifica el modelo de propiedad en una sola primitiva
+`Space`. Es un complemento al plan, no lo reemplaza. Empieza por su índice:
+
+| Step | Archivo | Resultado |
+|------|---------|-----------|
+| 13 | `13-collective-overview.md` | visión + mapa de cambios a steps 02–11 |
+| 14 | `14-spaces-unification.md` | `Space` unificado + single-home |
+| 15 | `15-frontier-hardening.md` | frontera limpia (default-deny en el dato, HMAC, audit) |
+| 16 | `16-collective-spaces.md` | colectivos: miembros, roles, invitaciones, drive compartido |
+| 17 | `17-hierarchical-spaces.md` | índice jerárquico automático de la memoria (2 capas · Qdrant directo · clustering batch) |
 
 ## Reusar lo existente
 

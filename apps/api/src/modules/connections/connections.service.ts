@@ -1,16 +1,17 @@
-import {
-  Injectable,
-  NotFoundException,
-  ForbiddenException,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import type { Connection, Grant } from '@prisma/client';
 import { PrismaService } from '../../common/clients/prisma.service';
+import { ConflictError, ForbiddenError } from '../../common/errors/domain-error';
+import { AccessService } from '../access/access.service';
 import { TokenService } from './token.service';
-import { GrantsCache, ResolvedToken } from './grants.cache';
+import { GrantsCache, ResolvedConnection } from './grants.cache';
 import type {
-  CreateConnectionDto,
   ConnectionDto,
+  CreateConnectionDto,
   CreateConnectionResponse,
+  CreateGrantDto,
+  GrantDto,
 } from '@savia-os/contracts';
 
 @Injectable()
@@ -19,144 +20,135 @@ export class ConnectionsService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly tokenService: TokenService,
-    private readonly grantsCache: GrantsCache,
+    private readonly tokens: TokenService,
+    private readonly cache: GrantsCache,
+    private readonly access: AccessService,
   ) {}
 
   async create(userId: string, dto: CreateConnectionDto): Promise<CreateConnectionResponse> {
-    const rawToken = this.tokenService.generate();
-    const tokenHash = await this.tokenService.hash(rawToken);
-
-    const connection = await this.prisma.connection.create({
-      data: { userId, label: dto.label, tokenHash },
+    const rawToken = this.tokens.generate();
+    const [tokenHash, tokenLookup] = [await this.tokens.hash(rawToken), this.tokens.lookup(rawToken)];
+    const conn = await this.prisma.connection.create({
+      data: { userId, label: dto.label, tokenHash, tokenLookup },
     });
-
-    return {
-      id: connection.id,
-      label: connection.label,
-      lastSeenAt: null,
-      revoked: false,
-      spaceIds: [],
-      createdAt: connection.createdAt.toISOString(),
-      token: rawToken,
-    };
+    return { ...this.toDto(conn, []), token: rawToken };
   }
 
   async findAll(userId: string): Promise<ConnectionDto[]> {
-    const connections = await this.prisma.connection.findMany({
+    const conns = await this.prisma.connection.findMany({
       where: { userId },
-      include: { grants: { select: { spaceId: true } } },
+      include: { grants: true },
       orderBy: { createdAt: 'desc' },
     });
-
-    return connections.map((c) => ({
-      id: c.id,
-      label: c.label,
-      lastSeenAt: c.lastSeenAt?.toISOString() ?? null,
-      revoked: !!c.revokedAt,
-      spaceIds: c.grants.map((g) => g.spaceId),
-      createdAt: c.createdAt.toISOString(),
-    }));
+    return conns.map((c) => this.toDto(c, c.grants));
   }
 
   async revoke(userId: string, connectionId: string): Promise<void> {
-    const conn = await this.prisma.connection.findFirst({
-      where: { id: connectionId, userId },
-    });
-    if (!conn) throw new NotFoundException('Conexión no encontrada');
-
-    await this.prisma.connection.update({
-      where: { id: connectionId },
-      data: { revokedAt: new Date() },
-    });
-    await this.grantsCache.invalidate(conn.tokenHash);
+    const conn = await this.access.assertOwnsConnection(userId, connectionId);
+    await this.prisma.connection.update({ where: { id: connectionId }, data: { revokedAt: new Date() } });
+    // Strict: the DB write above is already durable (resolveToken's DB fallback
+    // will reject the token immediately), but a stale cache entry could still
+    // serve it for up to TTL_SECONDS. Do NOT swallow a failure here — let it
+    // propagate (5xx) so the caller knows the revoke isn't fully confirmed and
+    // retries (idempotent: the DB update and the cache invalidate both no-op
+    // safely on retry).
+    await this.cache.invalidate(conn.tokenLookup);
     this.logger.log(`revoked connection id=${connectionId}`);
   }
 
-  async addGrant(userId: string, connectionId: string, spaceId: string): Promise<void> {
-    const conn = await this.prisma.connection.findFirst({
-      where: { id: connectionId, userId, revokedAt: null },
-    });
-    if (!conn) throw new NotFoundException('Conexión no encontrada o revocada');
+  async addGrant(userId: string, connectionId: string, dto: CreateGrantDto): Promise<GrantDto> {
+    const conn = await this.access.assertOwnsConnection(userId, connectionId);
+    if (conn.revokedAt) throw new ConflictError('Conexión revocada');
 
-    const space = await this.prisma.space.findFirst({ where: { id: spaceId, userId } });
-    if (!space) throw new NotFoundException('Space no encontrado');
-
-    await this.prisma.grant.upsert({
-      where: { connectionId_spaceId: { connectionId, spaceId } },
-      create: { connectionId, spaceId },
-      update: {},
-    });
-
-    await this.grantsCache.invalidate(conn.tokenHash);
-  }
-
-  async removeGrant(userId: string, connectionId: string, spaceId: string): Promise<void> {
-    const conn = await this.prisma.connection.findFirst({
-      where: { id: connectionId, userId },
-    });
-    if (!conn) throw new NotFoundException('Conexión no encontrada');
-
-    await this.prisma.grant.delete({
-      where: { connectionId_spaceId: { connectionId, spaceId } },
-    }).catch(() => null);
-
-    await this.grantsCache.invalidate(conn.tokenHash);
-  }
-
-  /**
-   * Resolves a raw MCP token to its connection context.
-   * Used by the MCP server (hot path). Results are cached in Redis for 60s.
-   */
-  async resolveToken(rawToken: string): Promise<ResolvedToken> {
-    // We can't look up by hash directly since argon2 is one-way.
-    // Strategy: iterate non-revoked connections and verify. Cache the result.
-    // For MVP scale (few connections per user), this is fast enough.
-    // Production: store a fast-lookup key (HMAC prefix) alongside the argon2 hash.
-
-    const connections = await this.prisma.connection.findMany({
-      where: { revokedAt: null },
-      include: { grants: { select: { spaceId: true } } },
-    });
-
-    for (const conn of connections) {
-      const match = await this.tokenService.verify(rawToken, conn.tokenHash);
-      if (!match) continue;
-
-      const resolved: ResolvedToken = {
-        connectionId: conn.id,
-        userId: conn.userId,
-        spaceIds: conn.grants.map((g) => g.spaceId),
-      };
-
-      await this.grantsCache.set(conn.tokenHash, resolved);
-
-      // Update lastSeenAt without blocking
-      this.prisma.connection.update({
-        where: { id: conn.id },
-        data: { lastSeenAt: new Date() },
-      }).catch(() => null);
-
-      return resolved;
+    // The grantor must own/belong to the target.
+    if (dto.scope === 'space') {
+      await this.access.assertCanManageSpace(userId, dto.spaceId!);
+    } else {
+      const member = await this.prisma.groupMember.findUnique({
+        where: { groupId_userId: { groupId: dto.groupId!, userId } },
+      });
+      if (!member) throw new ForbiddenError('No sos miembro de ese grupo');
     }
 
-    throw new ForbiddenException('Token inválido o revocado');
+    let grant: Grant;
+    try {
+      grant = await this.prisma.grant.create({
+        data: {
+          connectionId,
+          scope: dto.scope,
+          spaceId: dto.spaceId ?? null,
+          groupId: dto.groupId ?? null,
+          includeSensitive: dto.includeSensitive,
+        },
+      });
+    } catch (err) {
+      // P2002: el UNIQUE parcial (connectionId + target) ya cubre este grant.
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new ConflictError('Ya existe un grant para ese destino en esta conexión');
+      }
+      throw err;
+    }
+    // No cache invalidation needed: `GrantsCache` only ever holds the token→connection
+    // identity mapping, never grants. `AccessService.buildConnectionReadPlan` re-fetches
+    // `connection.grants` fresh from Postgres on every call, so a new grant is visible
+    // to the very next read regardless of cache state.
+    return this.grantDto(grant);
+  }
+
+  async removeGrant(userId: string, connectionId: string, grantId: string): Promise<void> {
+    await this.access.assertOwnsConnection(userId, connectionId);
+    await this.prisma.grant.deleteMany({ where: { id: grantId, connectionId } });
+    // Same reasoning as addGrant: grants are always read fresh, nothing to invalidate.
   }
 
   /**
-   * Fast token resolution for the MCP server — cache first.
+   * Hot path: raw token → connection. O(1) HMAC lookup + ONE argon2 verify
+   * (defense in depth), cached for 60s under the same key the writers invalidate.
    */
-  async resolveTokenCached(rawToken: string): Promise<ResolvedToken> {
-    // Derive a stable cache key from the raw token using a lightweight hash.
-    // We use a simple SHA-256 prefix (not argon2) just for cache lookup.
-    const { createHash } = await import('crypto');
-    const cacheKey = createHash('sha256').update(rawToken).digest('base64url').slice(0, 32);
-
-    const cached = await this.grantsCache.get(cacheKey);
+  async resolveToken(rawToken: string): Promise<ResolvedConnection> {
+    const tokenLookup = this.tokens.lookup(rawToken);
+    const cached = await this.cache.get(tokenLookup);
     if (cached) return cached;
 
-    const resolved = await this.resolveToken(rawToken);
-    await this.grantsCache.set(cacheKey, resolved);
+    const conn = await this.prisma.connection.findFirst({ where: { tokenLookup, revokedAt: null } });
+    if (!conn || !(await this.tokens.verify(rawToken, conn.tokenHash))) {
+      throw new ForbiddenError('Token inválido o revocado');
+    }
+
+    const resolved: ResolvedConnection = { connectionId: conn.id, userId: conn.userId, label: conn.label };
+    await this.cache.set(tokenLookup, resolved);
+    void this.prisma.connection
+      .update({ where: { id: conn.id }, data: { lastSeenAt: new Date() } })
+      .catch(() => null);
     return resolved;
+  }
+
+  /** Drop the resolution cache for ALL of a user's connections (e.g. on group
+   *  expulsion) so their AI access re-derives from scratch on the next call. */
+  async invalidateAllForUser(userId: string): Promise<void> {
+    const conns = await this.prisma.connection.findMany({ where: { userId }, select: { tokenLookup: true } });
+    await Promise.all(conns.map((c) => this.cache.invalidate(c.tokenLookup)));
+  }
+
+  private toDto(conn: Connection, grants: Grant[]): ConnectionDto {
+    return {
+      id: conn.id,
+      label: conn.label,
+      lastSeenAt: conn.lastSeenAt?.toISOString() ?? null,
+      revoked: !!conn.revokedAt,
+      grants: grants.map((g) => this.grantDto(g)),
+      createdAt: conn.createdAt.toISOString(),
+    };
+  }
+
+  private grantDto(g: Grant): GrantDto {
+    return {
+      id: g.id,
+      scope: g.scope,
+      spaceId: g.spaceId,
+      groupId: g.groupId,
+      includeSensitive: g.includeSensitive,
+      createdAt: g.createdAt.toISOString(),
+    };
   }
 }

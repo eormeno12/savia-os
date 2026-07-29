@@ -1,0 +1,70 @@
+<!-- @dsCard group="Color" title="Escala de spaces (ink → lima)" -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Savia · Escala de spaces</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root { --ink:#0B2529; --paper:#F4F4F1; --slate:#53606C; --line:#DDDFDC; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter', system-ui, sans-serif; background:var(--paper); color:var(--ink); -webkit-font-smoothing:antialiased; padding:64px 48px; }
+  .wrap { max-width:1100px; margin:0 auto; }
+  .eyebrow { font-size:12px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--slate); margin-bottom:24px; }
+  h1 { font-size:clamp(40px,4.8vw,72px); font-weight:300; line-height:0.92; max-width:16ch; }
+  .lede { font-size:clamp(16px,1.1vw,20px); line-height:1.6; color:var(--slate); margin-top:24px; max-width:56ch; }
+  .ramp { display:flex; border-radius:20px; overflow:hidden; margin-top:56px; box-shadow:0 18px 70px rgba(11,37,41,0.08); }
+  .ramp .step { flex:1; height:120px; }
+  .legend { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; margin-top:24px; }
+  .legend .item { display:flex; align-items:center; gap:10px; font-size:12px; }
+  .legend .sw { width:18px; height:18px; border-radius:5px; box-shadow:inset 0 0 0 1px rgba(11,37,41,0.1); flex-shrink:0; }
+  .legend code { font-family:ui-monospace,monospace; font-weight:600; }
+  .legend .hex { color:var(--slate); }
+  .note { margin-top:48px; font-size:14px; color:var(--slate); line-height:1.7; max-width:60ch; border-left:2px solid var(--line); padding-left:18px; }
+  .note strong { color:var(--ink); }
+  .chips { display:flex; gap:10px; flex-wrap:wrap; margin-top:32px; }
+  .chips .chip { display:inline-flex; align-items:center; gap:8px; padding:8px 14px; border-radius:16px; font-size:13px; font-weight:600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Fundamentos · Color</div>
+  <h1>Una familia tonal, no un arcoíris.</h1>
+  <p class="lede">Cada space (espacio de memoria) se colorea de forma determinista con un paso de esta rampa que va de ink a lima. Todos los pasos pertenecen a la marca: nunca colores aleatorios compitiendo.</p>
+
+  <div class="ramp">
+    <div class="step" style="background:#0B2529"></div>
+    <div class="step" style="background:#163F40"></div>
+    <div class="step" style="background:#1F5A53"></div>
+    <div class="step" style="background:#2C7560"></div>
+    <div class="step" style="background:#357A4C"></div>
+    <div class="step" style="background:#74A93F"></div>
+    <div class="step" style="background:#A8C72B"></div>
+    <div class="step" style="background:#E7FF18"></div>
+  </div>
+  <div class="legend">
+    <div class="item"><span class="sw" style="background:#0B2529"></span><div><code>spaceScale.1</code><div class="hex">#0B2529</div></div></div>
+    <div class="item"><span class="sw" style="background:#163F40"></span><div><code>spaceScale.2</code><div class="hex">#163F40</div></div></div>
+    <div class="item"><span class="sw" style="background:#1F5A53"></span><div><code>spaceScale.3</code><div class="hex">#1F5A53</div></div></div>
+    <div class="item"><span class="sw" style="background:#2C7560"></span><div><code>spaceScale.4</code><div class="hex">#2C7560</div></div></div>
+    <div class="item"><span class="sw" style="background:#357A4C"></span><div><code>spaceScale.5</code><div class="hex">#357A4C</div></div></div>
+    <div class="item"><span class="sw" style="background:#74A93F"></span><div><code>spaceScale.6</code><div class="hex">#74A93F</div></div></div>
+    <div class="item"><span class="sw" style="background:#A8C72B"></span><div><code>spaceScale.7</code><div class="hex">#A8C72B</div></div></div>
+    <div class="item"><span class="sw" style="background:#E7FF18"></span><div><code>spaceScale.8</code><div class="hex">#E7FF18</div></div></div>
+  </div>
+
+  <div class="chips">
+    <span class="chip" style="background:#0B2529;color:#F4F4F1">Trabajo</span>
+    <span class="chip" style="background:#1F5A53;color:#F4F4F1">Personal</span>
+    <span class="chip" style="background:#2C7560;color:#F4F4F1">Salud</span>
+    <span class="chip" style="background:#74A93F;color:#0B2529">Estudio</span>
+    <span class="chip" style="background:#A8C72B;color:#0B2529">Ideas</span>
+  </div>
+
+  <p class="note"><strong>Cómo se usa:</strong> <code>spaceColor(spaceId)</code> mapea cada space a un paso + su tinta legible (la función ya devuelve un foreground con contraste AA). Nunca elijas el color a mano ni uses verdes/azules fuera de esta rampa.</p>
+</div>
+</body>
+</html>
