@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>demo-ocr — dots.ocr vs Unlimited-OCR vs MinerU2.5-Pro</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1>demo-ocr</h1>
+  <p class="subtitle">Comparación local de dots.ocr, Unlimited-OCR-MLX y MinerU2.5-Pro — sin scoring, solo datos crudos.</p>
+</header>
+
+<main>
+  <section id="sidebar">
+    <div class="panel">
+      <h2>1. Documento</h2>
+      <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.webp,.tif,.tiff">
+      <div id="pageSelectorWrap" class="hidden">
+        <label for="pageSelect">Página</label>
+        <select id="pageSelect"></select>
+      </div>
+      <div id="uploadStatus" class="status-line"></div>
+    </div>
+
+    <div class="panel">
+      <h2>2. dots.ocr</h2>
+      <div id="dotsOcrPrompts" class="prompt-list"></div>
+    </div>
+
+    <div class="panel">
+      <h2>3. Unlimited-OCR-MLX</h2>
+      <div class="model-note ok">
+        ℹ️ El port MLX publicado de este modelo venía roto/incompleto; se
+        corrigieron <strong>11 bugs</strong> (incl. reimplementar la atención de
+        posición relativa de SAM) para que <strong>lea texto real</strong>.
+        Salida en formato grounding con coords <strong>normalizadas 0–999</strong>
+        (la UI lo detecta solo). Ver README → "Estado actual".
+      </div>
+      <div id="unlimitedOcrPrompts" class="prompt-list"></div>
+    </div>
+
+    <div class="panel">
+      <h2>4. MinerU2.5-Pro</h2>
+      <div class="model-note">
+        ℹ️ Corre vía transformers (sin conversión MLX confirmada), en un venv
+        aislado (<code>.venv-mineru</code>) por conflicto de versión de
+        <code>transformers</code> con mlx-vlm. Coordenadas <strong>normalizadas
+        0–1</strong> (garantizado por el propio código de la librería, no
+        heurística). Sin logprobs (solo el backend vLLM de la librería los
+        expone). El modelo se recarga en cada corrida (subprocess por corrida).
+      </div>
+      <div id="mineruPrompts" class="prompt-list"></div>
+    </div>
+
+    <div class="panel">
+      <button id="runButton" disabled>Ejecutar seleccionados</button>
+      <div id="runStatus" class="status-line"></div>
+    </div>
+  </section>
+
+  <section id="viewer">
+    <div id="legend"></div>
+    <div id="coordBanner" class="hidden"></div>
+    <div id="imageWrap">
+      <img id="pageImage" alt="página del documento">
+      <svg id="overlay"></svg>
+    </div>
+  </section>
+</main>
+
+<section id="blockDetail" class="hidden">
+  <h2>Bloque seleccionado</h2>
+  <pre id="blockDetailContent"></pre>
+  <button id="closeBlockDetail">Cerrar</button>
+</section>
+
+<section id="results"></section>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

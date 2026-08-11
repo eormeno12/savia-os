@@ -1,0 +1,6 @@
+.venv/
+.venv-mineru/
+weights/
+uploads/
+__pycache__/
+*.pyc
