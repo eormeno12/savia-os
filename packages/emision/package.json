@@ -1,0 +1,28 @@
+{
+  "name": "@savia-os/emision",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Tramo 4, piezas 1 y 2: ruta (de dónde cuelga cada nodo) y emisor (un solo recorrido con una pila). El reconciliador es el paso 11 y NO vive todavía acá.",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "invariantes": "node scripts/invariantes.mjs",
+    "build": "tsc --noEmit && node scripts/invariantes.mjs && node scripts/citas.mjs",
+    "lint": "tsc --noEmit && node scripts/invariantes.mjs && node scripts/citas.mjs",
+    "citas": "node scripts/citas.mjs"
+  },
+  "dependencies": {
+    "@savia-os/ir": "workspace:*"
+  },
+  "devDependencies": {
+    "@savia-os/tsconfig": "workspace:*",
+    "typescript": "^5.9.3"
+  }
+}
