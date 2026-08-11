@@ -37,7 +37,10 @@
     "infra:logs": "docker compose -f infra/docker-compose.yml logs -f",
     "stack:up": "docker compose -f infra/docker-compose.yml --profile full up -d --build",
     "stack:down": "docker compose -f infra/docker-compose.yml --profile full down",
-    "stack:logs": "docker compose -f infra/docker-compose.yml --profile full logs -f"
+    "stack:logs": "docker compose -f infra/docker-compose.yml --profile full logs -f",
+    "viewer": "node scripts/repo-viewer.mjs",
+    "viewer:share": "node scripts/repo-viewer.mjs --share",
+    "viewer:test": "node scripts/repo-viewer.test.mjs"
   },
   "devDependencies": {
     "puppeteer-core": "^23.0.0",

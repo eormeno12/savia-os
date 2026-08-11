@@ -50,3 +50,6 @@ graphify-out/
 
 # Copia local de consulta de la versión en español (ver .legacy-local/README.md)
 .legacy-local/
+
+# Cola viva del visor de revisión (churn). El rescate histórico sí se versiona.
+.review/cola.json

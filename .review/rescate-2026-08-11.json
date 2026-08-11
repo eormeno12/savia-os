@@ -1,0 +1,65 @@
+{
+  "rescatado": "2026-08-11",
+  "origen": "proceso node PID 56963, puerto 4380 — fuente perdido con el scratchpad",
+  "pedidos": [
+    {
+      "ruta": "docs/product/savia-b2b/borrador-pipeline-tecnico.md",
+      "motivo": "Lectura libre de los tramos 1 a 4, de arriba a abajo. No busco que valides nada puntual: quiero que anotes lo que no te cierre, lo que te suene sobre-diseñado, o cualquier duda. Usá \"Guardar nota\" para ir dejando observaciones sin cerrarlo, y \"Listo\" cuando termines. Después de esto vienen los dos pedidos puntuales.",
+      "estado": "pendiente",
+      "notas": [
+        {
+          "seccion": "Tramo 1 — Recepción › Registro del documento",
+          "nota": "Será necesario aceptar todo? O mejor rechazar y en función de lo que los usuarios pidan vamos soportando nuevos formatos"
+        },
+        {
+          "seccion": "Tramo 2 — Selección › Los tres casos difíciles",
+          "nota": "Si rechazamos directamente aquellos que no soportamos ya no tendría sentido el piso universal"
+        },
+        {
+          "seccion": "Tramo 3 — Reconocimiento › El principio, y su condición",
+          "nota": "Para entender, entonces según la extracción dejamos una pista? Verifica la biyeccion"
+        },
+        {
+          "seccion": "Tramo 3 — Reconocimiento › El casillero contenido — donde muere el formato",
+          "nota": "Los asestes se suben a un bucket o basta con la referencia al archivo?"
+        },
+        {
+          "seccion": "Tramo 3 — Reconocimiento › Los tres casilleros de lectura",
+          "nota": "Explícame que es perfilar"
+        },
+        {
+          "seccion": "Tramo 3 — Reconocimiento › El registro",
+          "nota": "Si el psf viene mixto?"
+        },
+        {
+          "seccion": "Tramo 3 — Reconocimiento › El registro",
+          "nota": "El chat considera que uno es por la tool invocada por el llm, en este crees que debería mandar solo la memoria, como puede tener contexto previo, como lo pide mem0? Aparte tenemos integraciones de chats como slack donde ahí si se procesan los mensajes."
+        },
+        {
+          "seccion": "Tramo 4 — Traducción › Las seis formas",
+          "nota": "El código debe estar en inglés"
+        },
+        {
+          "seccion": "Tramo 4 — Traducción › La traducción entera",
+          "nota": "«forma = TABLA[tipo] ?? porDefecto(contenido.clase)»\n\nexplicame lo de la tabla"
+        },
+        {
+          "seccion": "Plan de implementación › Paquetes y regla de dependencia",
+          "nota": "«traduccion  adaptadores          ← estas dos NUNCA se ven entre sí»\n\npor qué traducción y adaptadores van en paralelo?"
+        }
+      ]
+    },
+    {
+      "ruta": "docs/product/savia-b2b/borrador-pipeline-tecnico.md #tramo-4-traducción",
+      "motivo": "Tramo 4 escrito completo. Lo que más me interesa que valides: la regla TABLA[tipo] ?? porDefecto(clase), y la decisión de que la tabla NUNCA sea extensible por organización.",
+      "estado": "pendiente",
+      "notas": []
+    },
+    {
+      "ruta": "docs/product/savia-b2b/borrador-pipeline-tecnico.md #plan-de-implementación",
+      "motivo": "El orden de construcción va por riesgo arquitectónico, no por demanda: traduccion en el paso 2 sin que exista ningún adaptador, y chat en el paso 5 antes que docx. Si tenés otra prioridad de negocio, este orden es lo primero que cambiaría.",
+      "estado": "pendiente",
+      "notas": []
+    }
+  ]
+}
