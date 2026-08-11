@@ -1,43 +1,72 @@
-# 00 — Savia B2B: reescritura limpia (en progreso)
+# 00 — Savia B2B: mapa de la documentación
 
-> Estado: arrancando de cero, archivo por archivo. Esta carpeta reemplaza a
-> [`docs/product/savia-b2b-legacy/`](../savia-b2b-legacy/00-overview.md), que
-> queda **congelada como guía de referencia** — mismo principio que aplicamos
-> al código (`apps/legacy-api`/`apps/legacy-app` vs `apps/api`/`apps/app`):
-> lo legacy no se copia tal cual, se usa como blueprint validado y se
-> reintegra/reescribe con criterio propio en cada archivo nuevo.
+> Toda la documentación de producto y arquitectura de Savia B2B vive en esta
+> carpeta: qué es Savia, cómo funciona capa por capa, y en qué orden se
+> construye. Es la fuente única de verdad — si algo se decide sobre el
+> producto, se registra acá.
 
-## Por qué se reescribe en vez de seguir editando lo legacy
+## Cómo está organizada
 
-`docs/product/savia-b2b-legacy/` tenía valor real (`01-vision.md` completo,
-5 de 9 decisiones bloqueantes ya resueltas, dos apéndices as-built) pero
-también arrastraba huecos estructurales: sin plan de fases/secuencia, con
-`18-estado-actual-vs-propuesto.md` desactualizado a los dos días de escrito,
-con un desfasaje de numeración interno (headers de `10`/`11` dicen `09`/`10`),
-y con la auditoría técnica de fase 1 (2026-07-29) sin persistir en ningún
-archivo del repo. Reescribir file por file, en vez de parchear, es la
-oportunidad de resolver eso de una vez — igual que decidimos para el código.
+La carpeta va de lo más abstracto a lo más concreto. Cada capa del producto
+se documenta en dos niveles: **modelo** (qué hace y por qué, en términos de
+producto) y **técnico** (cómo se implementa). Esa separación existe para que
+una decisión de producto no quede enterrada en detalle de implementación, y
+para que un cambio técnico no obligue a reescribir la explicación conceptual.
 
-## Cómo se usa lo legacy
+```
+Visión            01          qué es Savia y a qué apunta
+Fundamentos       02-03       vocabulario, entidades, quién la usa
+Las 5 capas       04-12       captación · memoria · gobernanza · síntesis · consumo
+                              (cada una: modelo + técnico)
+Crecimiento       13-15       cómo se adopta, qué pantallas necesita, hacia dónde va
+Negocio           16          precios y planes
+Ejecución         17          en qué orden se construye
+Seguimiento       18          decisiones que siguen abiertas
+```
 
-Cada archivo nuevo que se escriba acá debe, antes de darse por terminado:
+## Índice
 
-1. Leer el archivo equivalente en `docs/product/savia-b2b-legacy/` (si existe).
-2. Verificar contra el código real (`apps/legacy-api`/`apps/legacy-app`) lo
-   que el legacy afirma — no asumir que sigue siendo cierto.
-3. Reintegrar lo que siga siendo válido, reescribir lo que no, y **fijar la
-   numeración correctamente** desde el arranque (header y nombre de archivo
-   coinciden).
-4. Registrar explícitamente qué cambió respecto al legacy y por qué, para
-   que quede trazable.
+| # | Documento | Estado |
+|---|---|---|
+| 01 | [Visión](01-vision.md) | ✅ Escrito |
+| 02 | [Glosario y entidades](02-glosario-y-entidades.md) | ✅ Escrito |
+| 03 | [Personas y roles](03-personas-y-roles.md) | ✅ Escrito |
+| 04 | [Capa 1 — Captación (modelo)](04-capa1-captacion-modelo.md) | ✅ Escrito |
+| 05 | [Capa 1 — Pipeline de ingesta documental (técnico)](05-capa1-pipeline-ingesta-tecnico.md) | ⚠️ Escrito, superado en parte por el borrador — se reescribe desde él |
+| 05b | Capa 1 — Flujos de eventos (técnico) | ⬜ Pendiente |
+| 06-07 | Capa 2 — Memoria | 🚧 [Borrador](borrador-capa2-memoria.md) — 28 puntos abiertos |
+| 08-09 | Capa 3 — Gobernanza | 🚧 [Borrador](borrador-capa3-gobernanza.md) — 19 puntos abiertos |
+| 10-11 | Capa 4 — Síntesis | 🚧 [Borrador](borrador-capa4-sintesis.md) — 21 puntos abiertos · **es una reintegración, no un diseño nuevo** |
+| 12 | Capa 5 — Consumo vía MCP | 🚧 [Borrador](borrador-capa5-consumo.md) — 21 puntos abiertos |
+| 13 | Adopción bottom-up | ⬜ Pendiente |
+| 14 | Superficies de producto | ⬜ Pendiente |
+| 15 | Roadmap: asistido → autónomo | ⬜ Pendiente |
+| 16 | Billing y planes | ⬜ Pendiente |
+| 17 | Plan de fases | ⬜ Pendiente |
+| 18 | Decisiones abiertas | ⬜ Pendiente |
+| — | [Borrador: pipeline técnico tramo por tramo](borrador-pipeline-tecnico.md) | 🚧 Tramos 1–6 cerrados · **tramo 7 sin diseñar** · fuente vigente de la Capa 1 |
+| — | [Lectura cruzada de capas (2026-08-10)](lectura-cruzada-capas-2026-08-10.md) | ✅ Qué necesita cada capa de la Capa 1 y no recibe — **léase antes de tocar `packages/ir`** |
 
-Las decisiones ya resueltas en
-[`docs/product/savia-b2b-legacy/19-decisiones-abiertas.md`](../savia-b2b-legacy/19-decisiones-abiertas.md)
-siguen vigentes salvo que el archivo nuevo correspondiente diga lo contrario
-explícitamente — no hay que volver a discutirlas desde cero.
+El orden del índice no es el orden en que se escriben: hay dependencias
+reales (las superficies dependen del modelo de datos, el plan de fases
+depende de que la Capa 4 esté diseñada). Cada documento declara de qué
+depende en su encabezado.
 
-## Índice (se completa a medida que se reescribe cada archivo)
+## Convenciones
 
-_(vacío — cada archivo se agrega acá cuando se reescribe, con un link. Hasta
-entonces, el índice de referencia es el de
-[`docs/product/savia-b2b-legacy/00-overview.md`](../savia-b2b-legacy/00-overview.md).)_
+- **Un término, un significado.** El vocabulario canónico está en
+  [02](02-glosario-y-entidades.md). Si un documento necesita un término
+  nuevo, se agrega ahí antes de usarlo.
+- **Las decisiones se registran donde se toman**, con fecha, y se indexan en
+  el tracker de decisiones abiertas (18). Nada queda resuelto solo en una
+  conversación.
+- **Lo que no está decidido se marca como tal.** Es preferible un hueco
+  explícito a una definición inventada para rellenar.
+
+---
+
+<sub>Nota de método: `docs/product/savia-b2b-legacy/` contiene una iteración
+anterior de esta documentación. Se consulta como investigación de fondo al
+escribir cada documento nuevo — verificando siempre contra el código real lo
+que afirma — pero no se cita en el texto ni se copia su estructura. Este plan
+se escribe y se lee como si fuera la primera vez.</sub>
