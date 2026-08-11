@@ -45,5 +45,8 @@ memory.db
 # Índice generado por graphify (regenerar con: graphify update .)
 graphify-out/
 
-# Experimento OCR local (pesos de modelos, venv, uploads — no es parte del monorepo)
-apps/demo-ocr/
+# Nota: lab/demo-ocr sí se versiona (solo su código, ~140 KB). Los pesos de modelos,
+# los venvs y uploads los excluye su propio lab/demo-ocr/.gitignore.
+
+# Copia local de consulta de la versión en español (ver .legacy-local/README.md)
+.legacy-local/
