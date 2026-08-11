@@ -6,7 +6,7 @@
 > ante una duda de diseño, esta es la fuente.
 
 > **Estrella polar:** Savia es _"el cerebro ejecutable de cada empresa"_ (dirección
-> B2B, ver [`docs/product/savia-b2b-legacy/01-vision.md`](../product/savia-b2b-legacy/01-vision.md), en reescritura limpia en `docs/product/savia-b2b/`) — construido
+> B2B, ver [`docs/product/savia-b2b/01-vision.md`](../product/savia-b2b/01-vision.md)) — construido
 > bottom-up desde _"la memoria que conecta todas tus IAs"_ de cada persona. El producto
 > debe sentirse **único e impactante — un outlier**, no un SaaS claro y genérico.
 > Cada pantalla se piensa; ninguna se deja "prolija pero olvidable".
