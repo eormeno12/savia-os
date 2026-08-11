@@ -1,0 +1,27 @@
+{
+  "name": "@savia-os/ir",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "El contrato del pipeline de ingesta: las seis formas, Tipo, Pista, la proyección canónica. CERO dependencias de runtime.",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "fronteras": "node scripts/fronteras.mjs",
+    "proyeccion": "node scripts/proyeccion.mjs",
+    "citas": "node scripts/citas.mjs",
+    "build": "tsc --noEmit && node scripts/fronteras.mjs && node scripts/proyeccion.mjs && node scripts/citas.mjs",
+    "lint": "tsc --noEmit && node scripts/fronteras.mjs && node scripts/proyeccion.mjs && node scripts/citas.mjs"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@savia-os/tsconfig": "workspace:*",
+    "typescript": "^5.9.3"
+  }
+}
