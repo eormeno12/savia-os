@@ -15,7 +15,7 @@ mcp.savia.uno {
     header X-Via-Gateway "1"
 }
 
-# If apps/legacy-app (or its B2B successor) is served from this host (instead of Vercel), uncomment:
+# If legacy/app (or its B2B successor) is served from this host (instead of Vercel), uncomment:
 # app.savia.uno {
 #     reverse_proxy app:3000
 # }

@@ -61,7 +61,7 @@ services:
     profiles: ["full"]
     build:
       context: ..
-      dockerfile: apps/legacy-api/Dockerfile
+      dockerfile: legacy/api/Dockerfile
     command: ["node", "dist/main.js"]
     env_file: [./.env]
     environment:
@@ -85,7 +85,7 @@ services:
     profiles: ["full"]
     build:
       context: ..
-      dockerfile: apps/legacy-api/Dockerfile
+      dockerfile: legacy/api/Dockerfile
     command: ["node", "dist/worker.js"]
     env_file: [./.env]
     environment:
@@ -103,7 +103,7 @@ services:
     profiles: ["full"]
     build:
       context: ..
-      dockerfile: apps/legacy-api/Dockerfile
+      dockerfile: legacy/api/Dockerfile
     command: ["node", "dist/mcp.js"]
     env_file: [./.env]
     environment:

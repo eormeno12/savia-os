@@ -1,6 +1,11 @@
 packages:
+  # Línea principal — B2B
   - 'apps/*'
   - 'packages/*'
+  # Congelado — el producto B2C. Se lee como referencia, no se le escribe.
+  - 'legacy/*'
+  # Experimentos y forks. No forman parte del producto.
+  - 'lab/*'
 allowBuilds:
   '@google/genai': false
   '@prisma/client': true
