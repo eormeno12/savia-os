@@ -6,13 +6,13 @@
  * nombra en la regla R1 («la frontera de formato la impone el grafo de paquetes»),
  * aplicada acá a la frontera de nodos.
  *
- *   `shapes.ts` no puede alcanzar `salidas.ts`.
+ *   `shapes.ts` no puede alcanzar `outputs.ts`.
  *
  * Por qué eso ES el invariante «ningún payload anida un nodo»
- * (§{Tramo 3 › Qué sale}): lo que vuelve `Nodo` a un `Nodo` es `MARCA_NODAL`, que
- * vive solo en `salidas.ts`. Sin
+ * (§{Tramo 3 › Qué sale}): lo que vuelve `Node` a un `Node` es `NODE_BRAND`, que
+ * vive solo en `outputs.ts`. Sin
  * alcanzarlo, un nodo dentro de un `Body` es inexpresable — no hace falta
- * detectarlo. Y la dirección natural del grafo ya es la contraria (`salidas.ts`
+ * detectarlo. Y la dirección natural del grafo ya es la contraria (`outputs.ts`
  * importa `shapes.ts`), así que violar la frontera exige introducir un CICLO.
  *
  * Reemplaza a un detector recursivo de ~50 líneas que estuvo roto desde que se
@@ -32,9 +32,14 @@ const SRC = resolve(dirname(fileURLToPath(import.meta.url)), "..", "src");
 const FRONTERAS = [
   {
     origen: "shapes.ts",
-    prohibido: "salidas.ts",
+    // Renombrado en el bloque 3 (`salidas.ts` → `outputs.ts`). El chequeo de
+    // existencia de más abajo —el de 1b— es el que agarra que esta línea quede
+    // corrida: verificado renombrando el archivo sin tocar la constante, sale 1 con
+    // «la frontera nombra un archivo que no existe — salidas.ts» en vez de mentir
+    // en verde. Es por lo que el chequeo existe.
+    prohibido: "outputs.ts",
     porque:
-      "un Cuerpo que alcanza a Nodo puede anidarlo, y el árbol deja de ser plano (§{Tramo 3 › Qué sale})",
+      "un Body que alcanza a Node puede anidarlo, y el árbol deja de ser plano (§{Tramo 3 › Qué sale})",
   },
 ];
 

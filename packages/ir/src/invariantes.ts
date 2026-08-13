@@ -20,8 +20,8 @@
  *   · el piso físico nunca da un par ilegal → anotación de `ROLE_BY_SHAPE`
  *   · «código siempre atómico» → anotación de `COHESION_BY_ROLE`
  * La cuarta —ningún payload anida un nodo— la impone el grafo de módulos:
- * `shapes.ts` no puede alcanzar `salidas.ts`, verificado por
- * `scripts/fronteras.mjs`. Sin ese import, un `Nodo` dentro de un `Body` es
+ * `shapes.ts` no puede alcanzar `outputs.ts`, verificado por
+ * `scripts/fronteras.mjs`. Sin ese import, un `Node` dentro de un `Body` es
  * inexpresable.
  *
  * Pero «restringir donde se escribe» solo cuenta mientras la restricción SIGA
@@ -39,6 +39,7 @@ import {
   type Shape as Forma,
 } from "./shapes.js";
 import type {
+  CERTAINTY_RANK,
   COHESION_BY_ROLE,
   Role,
   RoleFor,
@@ -46,6 +47,7 @@ import type {
   ROLES,
 } from "./classification.js";
 import type {
+  ActorId,
   // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
   ByteHash as HashBytes,
   // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
@@ -61,6 +63,8 @@ import type {
   // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
   NodeFingerprint as HuellaNodo,
   Nominal,
+  ObjectKey,
+  OrganizationId,
 } from "./identity.js";
 import type {
   // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
@@ -71,7 +75,17 @@ import type {
   Location as Ubicación,
   SourceRange,
 } from "./location.js";
-import { MARCA_NODAL, type Nodo, type NodoCrudo } from "./salidas.js";
+import {
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  NODE_BRAND as MARCA_NODAL,
+  type Annotation,
+  type Ingestion,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  type Node as Nodo,
+  type NodeInVersion,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  type RawNode as NodoCrudo,
+} from "./outputs.js";
 import type { Unidad } from "./adaptador.js";
 
 // ─────────────────────────────── Maquinaria ──────────────────────────────────
@@ -118,6 +132,10 @@ export type PRUEBAS_DE_FORMA = readonly [_ArregloCompleto];
 //
 // Si alguien agrega un `id` a `Unidad` o a `NodoCrudo`, la tenaza que H13 declara
 // inexistente vuelve a existir — y el build lo dice acá, no seis meses después.
+//
+// `NodoCrudo` es el alias local de `RawNode` (`outputs.ts`, bloque 3): este archivo
+// sigue en español y lo pide con alias, como los otros nueve. Cuando se traduzca,
+// el alias muere y la aserción nombra `RawNode` directo.
 
 /** Error si `T` tiene la clave `K`. */
 type SinClave<T, K extends string, Mensaje extends string> = K extends keyof T
@@ -383,6 +401,130 @@ export type PRUEBAS_DE_COORDENADA = readonly [
   _WithinEsRecursivo,
   _MarcoObligatorio,
 ];
+
+// ════ Invariante 8 · los cuatro campos del envoltorio siguen marcados (H3/H13) ══
+// Los cuatro entraron en el bloque 3 porque el dato que llevan NO SE RECONSTRUYE a
+// posteriori: en qué versión de bytes apareció un nodo, de qué organización es esa
+// fila del índice, dónde están los bytes originales, y QUIÉN curó. Los cuatro son
+// marcas nominales sobre `string`, y ahí está el problema: la edición que los rompe
+// NO es borrarlos —eso se ve en el diff y rompe a todos los consumidores— sino
+// cambiarles la marca por otra de la MISMA FAMILIA. Las cuatro compilan:
+// `ObjectKey → DocumentId`, `ByteHash → ContentHash`, `OrganizationId → DocumentId`
+// y `ActorId → string` son todos `string` por debajo, así que ninguna línea de
+// código deja de funcionar y el campo sigue existiendo, direccionando lo que no es.
+//
+// Verificado sin estas aserciones: tres de las cuatro mutaciones NO ROMPÍAN NADA, y
+// la cuarta rompía por casualidad —`TS6196`, un import que quedaba huérfano—, o sea
+// acreditando el linter en vez del contrato. Ver M32–M35 en `scripts/mutantes.mjs`.
+//
+// Cada campo va en DOS aserciones, no en una intersección: hacia adelante agarra el
+// cambio de marca y el ensanchamiento a `string`; hacia atrás agarra el colapso a
+// `never`, que es asignable a todo y pasaría la primera en verde. Es la misma razón
+// por la que `SourceRange` necesita `Habitado` además de su tag.
+
+type _VersiónDeIngestaEsBytes = Verdadero<
+  Cubre<
+    Ingestion["version"],
+    HashBytes,
+    "Ingestion.version is no longer the ByteHash of the received bytes"
+  >
+>;
+type _VersiónDeIngestaHabitada = Verdadero<
+  Cubre<
+    HashBytes,
+    Ingestion["version"],
+    "Ingestion.version is no longer the ByteHash of the received bytes"
+  >
+>;
+
+type _OriginalEsUnObjeto = Verdadero<
+  Cubre<
+    Ingestion["original"],
+    ObjectKey,
+    "Ingestion.original stopped being an ObjectKey — the verbatim asset is addressed by a Postgres row instead of an object"
+  >
+>;
+type _OriginalHabitado = Verdadero<
+  Cubre<
+    ObjectKey,
+    Ingestion["original"],
+    "Ingestion.original stopped being an ObjectKey — the verbatim asset is addressed by a Postgres row instead of an object"
+  >
+>;
+
+type _OrganizaciónDeVersiónSepara = Verdadero<
+  Cubre<
+    NodeInVersion["organization"],
+    OrganizationId,
+    "NodeInVersion.organization stopped being an OrganizationId — the hash → document lookup filters by the wrong thing and crosses tenants"
+  >
+>;
+type _OrganizaciónDeVersiónHabitada = Verdadero<
+  Cubre<
+    OrganizationId,
+    NodeInVersion["organization"],
+    "NodeInVersion.organization stopped being an OrganizationId — the hash → document lookup filters by the wrong thing and crosses tenants"
+  >
+>;
+
+type _ActorDeAnotaciónEsActor = Verdadero<
+  Cubre<
+    Annotation["actor"],
+    ActorId,
+    "Annotation.actor stopped being an ActorId — curation is no longer attributable and the dedup key stops separating two curators"
+  >
+>;
+type _ActorDeAnotaciónHabitado = Verdadero<
+  Cubre<
+    ActorId,
+    Annotation["actor"],
+    "Annotation.actor stopped being an ActorId — curation is no longer attributable and the dedup key stops separating two curators"
+  >
+>;
+
+export type PRUEBAS_DE_ENVOLTORIO = readonly [
+  _VersiónDeIngestaEsBytes,
+  _VersiónDeIngestaHabitada,
+  _OriginalEsUnObjeto,
+  _OriginalHabitado,
+  _OrganizaciónDeVersiónSepara,
+  _OrganizaciónDeVersiónHabitada,
+  _ActorDeAnotaciónEsActor,
+  _ActorDeAnotaciónHabitado,
+];
+
+// ═════════ Invariante 9 · el orden de `Certainty` va en el sentido que dice ═════
+// `CERTAINTY_RANK` (`classification.ts`) cerró un hueco real: hasta el bloque 3 el
+// paquete no exportaba NINGÚN orden sobre `Certainty`, y `Fragment.minCertainty`
+// prometía «la peor certeza de los nodos agrupados», que no era computable con lo
+// que el contrato daba.
+//
+// Pero una tabla de dos filas se invierte con una edición de dos palabras, y las dos
+// versiones compilan: `Record<Certainty, number>` no dice nada de los valores. Y
+// invertida no es un bug cualquiera — marca como `declared` lo que el pipeline
+// ADIVINÓ, o sea la promesa de §{La escalera} exactamente al revés, y en el único
+// dato que el plan hace viajar «hasta la skill que consuma esa memoria».
+//
+// Las dos cifras son literales de TIPO, igual que el `15` de `ROLES`: no deciden
+// comportamiento en runtime, así que `scripts/numbers.mjs` no las cuenta. Fijar un
+// hecho del contrato es lo contrario de inventar un umbral.
+
+type _DeclaradoEsElMejor = Verdadero<
+  Cubre<
+    (typeof CERTAINTY_RANK)["declared"],
+    0,
+    "CERTAINTY_RANK.declared moved: the ladder now ranks what the pipeline GUESSED as the safest certainty"
+  >
+>;
+type _InferidoEsElPeor = Verdadero<
+  Cubre<
+    (typeof CERTAINTY_RANK)["inferred"],
+    1,
+    "CERTAINTY_RANK.inferred moved: the ladder now ranks a guess above a declared fact"
+  >
+>;
+
+export type PRUEBAS_DE_CERTEZA = readonly [_DeclaradoEsElMejor, _InferidoEsElPeor];
 
 // ─────────────────────────────── Invariantes de runtime ──────────────────────
 

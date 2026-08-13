@@ -16,7 +16,7 @@
  * Ninguno de los dos falla ruidoso. Degradan como una colisión de huella: el nodo
  * cuelga del padre equivocado, nada se pone rojo, y la curación del cliente se
  * despega en silencio. Es el mismo modo de falla por el que existe
- * `scripts/proyeccion.mjs`, y por eso este guardián se escribe igual: casos con un
+ * `scripts/projection.mjs`, y por eso este guardián se escribe igual: casos con un
  * «porqué» al lado, para que el que los lea sepa qué se pierde si los borra.
  *
  * TODO CASO DE ORDEN VERIFICA TAMBIÉN ANTISIMETRÍA — `sign(cmp(a,b)) === -sign(cmp(b,a))`

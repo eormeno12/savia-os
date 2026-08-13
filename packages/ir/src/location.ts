@@ -19,7 +19,7 @@ import type { AdapterId } from "./identity.js";
  * lugares, los tres obligatorios: `Hint.spatial.box` (`classification.ts`),
  * `Window.region.box` (`shapes.ts`) y `Coordinate.visual.box` (acá). `Location` NO
  * tiene ningún campo `Box`, ni opcional ni obligatorio — la versión de este
- * docstring que decía «dos lugares, uno de ellos opcional en `Ubicación`»
+ * docstring que decía «dos lugares, uno de ellos opcional en `Location`»
  * describía un tipo anterior. Elijo enteros en milésimas del marco, origen
  * arriba-izquierda, eje `y` hacia abajo, con el marco identificado por un string
  * opaco — Las tres alternativas fallan en algo que el plan afirma: píxeles
@@ -185,7 +185,7 @@ export type Coordinate =
   | { readonly space: "time"; readonly start: number; readonly end: number };
 
 /**
- * La coordenada de grilla, que es lo que `Registro` necesita (§{Las dos salidas}).
+ * La coordenada de grilla, que es lo que `DataRecord` necesita (§{Las dos salidas}).
  * Es la variante `grid` de `Coordinate`, no un segundo vocabulario: «un elemento
  * con dos coordenadas puede tenerlas contradictorias, y ningún tipo lo impediría»
  * (05-capa1 L255-256).
@@ -240,7 +240,7 @@ export type LocalLocation = {
  * la página 3, y un record plano no puede expresar la cadena. La cadena es lo único
  * que hace citable el caso canónico del propio plan (§{La delegación es emergente})
  * — NO viola el no-anidamiento (§{Tramo 3 › Qué sale}), que es sobre `Body`
- * anidando `Nodo`, no sobre `Location` anidando `Location` — Si se decide al
+ * anidando `Node`, no sobre `Location` anidando `Location` — Si se decide al
  * revés (reconstruirla en la citación caminando `parentId` hasta el nodo `asset`
  * que delegó), hace falta el resolvedor que C13 demuestra que no tiene dónde vivir
  * en el grafo de paquetes.

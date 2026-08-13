@@ -68,8 +68,8 @@ export type Nominal<Base, Label extends string> = [Base] extends [Branded]
  * una de las dos mordazas no existe. El test dice «para cada adaptador a:
  * a.reconocer(f) ≡ a.reconocer(f), árbol byte-idéntico»: compara LA SALIDA DE UN
  * ADAPTADOR, y esa salida NO TIENE IDS. `Unidad<S>` lleva `señales`, `cuerpo`,
- * `ubicación` y `autoríaPropia`; `NodoCrudo` tampoco lleva id. El `id` nace dos
- * pasos después, en `NodoEmitido`, que produce el tramo 4. Un test que compara
+ * `ubicación` y `autoríaPropia`; `RawNode` tampoco lleva id. El `id` nace dos
+ * pasos después, en `EmittedNode`, que produce el tramo 4. Un test que compara
  * artefactos sin ids no puede romperse por cómo se acuñan los ids.
  *
  * Y el tramo 4 tiene su propio invariante, que es otro: no «byte-idéntico» sino
@@ -81,13 +81,13 @@ export type Nominal<Base, Label extends string> = [Base] extends [Branded]
  * H13(b) — UNICIDAD GLOBAL, y el documento lo lleva el CONTENEDOR, no cada
  * referencia. Con 128 bits de azar la unicidad global es gratis: no se elige, se
  * obtiene. Lo que sí se decide es si cada referencia arrastra su documento, y la
- * respuesta es no: un `Fragmento` pertenece a UN documento, un `Registro` también,
+ * respuesta es no: un `Fragment` pertenece a UN documento, un `DataRecord` también,
  * una anotación también — así que el contenedor ya lo sabe y repetirlo por
  * elemento sería ALMACENAR ALGO DERIVABLE, lo mismo que el plan prohíbe con
  * `depth`, `siblingIndex` y `ordinal`. La tabla de nodos sí lleva su columna
  * `documento` (borrado en cascada, filtro por tenant, particionado); las
- * referencias no la repiten. Los tipos ya lo asumían: `Fragmento.nodos` y
- * `Registro.nodo` son `ElementId` a secas.
+ * referencias no la repiten. Los tipos ya lo asumían: `Fragment.nodes` y
+ * `DataRecord.node` son `ElementId` a secas.
  *
  * H13(c) — UN ID ES ESTABLE DESDE QUE SE PERSISTE. La idempotencia del emisor no
  * la da el acuñado: la da el reconciliador. Volver a emitir no acuña ids frescos —
@@ -184,7 +184,7 @@ export type DelegationId = Nominal<string, "DelegationId">;
 
 /**
  * Identificador de un fragmento, para deduplicar resultados de búsqueda
- * (§{Tramo 7} dedupica por `fragmentoId` y `Fragmento` no tiene ese campo —
+ * (§{Tramo 7} dedupica por `fragmentoId` y `Fragment` no tiene ese campo —
  * auditoría #69).
  *
  * PROVISIONAL(#69): se deriva de `(DocumentId, contextualFingerprint)` — Si fuera
@@ -269,21 +269,38 @@ export type ByteHash = Nominal<string,"ByteHash">;
  * La huella de identidad de un NODO. Es lo que el próximo reconciliador usa como
  * material (§{Tramo 4 › Qué sale}).
  *
- * PENDING(D24): HOY ESTE TIPO NO TIENE NI UN PRODUCTOR. `huellaDe`
- * (`proyeccion.ts`) devuelve `string` pelado, así que la marca protege HACIA
+ * PENDING(D24): HOY ESTE TIPO NO TIENE NI UN PRODUCTOR. `fingerprintOf`
+ * (`projection.ts`) devuelve `string` pelado, así que la marca protege HACIA
  * ADENTRO —nadie puede pasar una huella donde va una clave de caché— y no protege
  * hacia afuera: cualquier `string` sirve de huella y nadie está obligado a llamar
  * a `asNodeFingerprint`. La aserción `_S5` de `invariantes.ts` está verde mientras
  * eso pasa, así que la promesa es de la prosa, no del tipo.
  *
- * NO SE ARREGLA ACÁ, y la razón es el grafo de módulos: para que `huellaDe`
- * devuelva `NodeFingerprint`, `proyeccion.ts` tendría que importar este archivo, y
- * con esa arista `Authorship` pasaría a ser ALCANZABLE desde el archivo que calcula
- * la huella. Hoy «`Authorship` NO entra en la huella» está impuesto por el escalón
- * ② —`proyeccion.ts` no importa `identity.ts`, punto—, y de ese hecho cuelga que el
- * caché de reconocimiento pueda cruzar organizaciones (§{Caché}) y que el mismo
- * contenido subido por dos personas dé la misma huella. Cambiar el retorno sin
- * reponer esa frontera compraría un tipo y vendería un invariante.
+ * NO SE ARREGLA ACÁ, y el argumento se CORRIGIÓ en el bloque 3 porque el que estaba
+ * escrito era más fuerte de lo que ningún guardián puede sostener. Decía que
+ * «`Authorship` NO entra en la huella» lo impone el escalón ② —«`proyeccion.ts` no
+ * importa `identity.ts`, punto»— y que agregar el import volvería `Authorship`
+ * ALCANZABLE. `fronteras.mjs` mide ALCANCE, y el alcance ya existe: verificado
+ * poniendo la frontera a mano,
+ *
+ *     IR-ERR: frontera violada — projection.ts alcanza identity.ts
+ *             camino: projection.ts → shapes.ts → identity.ts
+ *
+ * porque `shapes.ts` importa `ObjectKey` de acá. O sea que la frontera
+ * `projection.ts ↛ identity.ts` es hoy INESCRIBIBLE: nace violada.
+ *
+ * Lo que sí es cierto es más angosto: `projection.ts` no NOMBRA este archivo, así
+ * que `Authorship` no está en su alcance léxico. Eso es una propiedad del texto de
+ * aquel archivo, no del grafo, y se sostiene por lectura y no por un guardián.
+ *
+ * De que `Authorship` no entre en la huella cuelgan que el caché de reconocimiento
+ * pueda cruzar organizaciones (§{Caché}) y que el mismo contenido subido por dos
+ * personas dé la misma huella, así que la protección débil no alcanza y cambiar el
+ * retorno ahora compraría un tipo y vendería un invariante. Por eso el bloque 3b
+ * PARTE ESTE ARCHIVO: mover `NodeFingerprint`, `asNodeFingerprint`, la familia de
+ * hashes y `ObjectKey` a un módulo del fondo que no alcance `Authorship` no es una
+ * comodidad, es la única forma de que la frontera sea expresable — y ahí sí la
+ * puede imponer `fronteras.mjs`, con su propio mutante.
  *
  * PROVISIONAL(ContentHash): el plan usa el MISMO nombre `ContentHash` para esto y
  * para el hash del texto de un fragmento (§{Tramo 4 › Qué sale} vs
@@ -422,10 +439,10 @@ export const asCacheKey = (v: string): CacheKey => v as CacheKey;
  * «esto lo dijo el CFO en marzo» es la mitad del valor de la memoria.
  *
  * PROVISIONAL(C8/#22): `Authorship` NO forma parte de lo que produce un adaptador
- * ni de lo que se cachea. Se inyecta DESPUÉS del caché, al componer `Nodo` a partir
- * de `NodoCrudo` — Resuelve dos cosas de un golpe y es gratis, porque ya está
+ * ni de lo que se cachea. Se inyecta DESPUÉS del caché, al componer `Node` a partir
+ * de `RawNode` — Resuelve dos cosas de un golpe y es gratis, porque ya está
  * latente en los tipos escritos (`Unidad<S>` de §{`descomponer`} NO lleva autoría y
- * `Nodo` de §{Tramo 3 › Qué sale} sí): (1) el property test de determinismo
+ * `Node` de §{Tramo 3 › Qué sale} sí): (1) el property test de determinismo
  * byte-idéntico (§{El determinismo}) no puede pasar con un timestamp en cada nodo,
  * y sellarlo una vez por documento en el tramo 1 lo arregla sin cambiar ningún
  * tipo; (2) el caché de reconocimiento se indexa por `hashBytes` y el acierto cruza
@@ -441,12 +458,18 @@ export const asCacheKey = (v: string): CacheKey => v as CacheKey;
  * decide al revés, cada re-emisión cambia la autoría de todo lo delegado.
  *
  * `Authorship` NO entra en la huella. Esto NO está dicho en ningún lado del plan y
- * es la única razón por la que sellar una vez por documento alcanza. Y hoy lo
- * IMPONE EL GRAFO DE MÓDULOS, no esta línea: `proyeccion.ts` —el único archivo que
- * calcula la huella— no importa `identity.ts`, así que `Authorship` ni siquiera es
- * nombrable desde ahí. Ver PENDING(D24) en `NodeFingerprint`: es el mismo hecho
- * mirado desde el otro lado, y la razón por la que `huellaDe` sigue devolviendo un
- * `string`.
+ * es la única razón por la que sellar una vez por documento alcanza. Hoy lo sostiene
+ * que `projection.ts` —el único archivo que calcula la huella— no NOMBRE este
+ * archivo, así que `Authorship` no está en su alcance léxico y no se puede escribir.
+ *
+ * OJO, Y ESTO SE CORRIGIÓ EN EL BLOQUE 3: no lo impone el grafo de módulos. La
+ * versión anterior de esta línea decía que sí, y es falso — `shapes.ts` importa
+ * `ObjectKey` de acá, así que `projection.ts` YA ALCANZA `identity.ts` y una
+ * frontera que lo prohíba nace violada (verificado). La protección es de
+ * nombrabilidad, que es más débil y se sostiene por lectura. Ver PENDING(D24) en
+ * `NodeFingerprint`: es el mismo hecho mirado desde el otro lado, la razón por la
+ * que `fingerprintOf` sigue devolviendo un `string`, y lo que el bloque 3b arregla
+ * partiendo este archivo.
  */
 export type Authorship = {
   readonly actor: ActorId;

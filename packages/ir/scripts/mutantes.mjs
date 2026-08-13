@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Acredita cada garantía del paquete ROMPIÉNDOLA, y falla si alguna deja de romperse.
 //
-//   node scripts/mutantes.mjs          las 31 mutaciones, ~13 s
+//   node scripts/mutantes.mjs          las 41 mutaciones, ~17 s
 //   node scripts/mutantes.mjs M8       una sola, para iterar
 //
 // POR QUÉ ESTO ES UN SCRIPT Y NO UNA AUDITORÍA CON AGENTES
@@ -17,12 +17,12 @@
 // a correr en cada `pnpm lint`. Una garantía que solo se verificó el día que se
 // escribió es indistinguible de una que nunca funcionó.
 //
-// EN SERIE Y EN EL ÁRBOL, a propósito. `tsc --noEmit` tarda 0,18 s y los seis
+// EN SERIE Y EN EL ÁRBOL, a propósito. `tsc --noEmit` tarda 0,18 s y los cinco
 // guardianes menos de un segundo: paralelizar en copias ahorraría medio minuto y costaría
 // gestión de directorios temporales. El árbol se restaura siempre, incluso si
 // algo explota, y se comprueba verde al principio Y al final.
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -132,15 +132,16 @@ const MUTANTES = [
   },
   {
     id: "M12c",
-    garantía: "R1 — shapes.ts no puede alcanzar salidas.ts (anidar un nodo)",
+    garantía: "R1 — shapes.ts no puede alcanzar outputs.ts (anidar un nodo)",
     cambios: [[
       `export type Shape = Body["shape"];`,
       // El import tiene que USARSE: si queda huérfano, tsc lo rechaza con TS6133
       // antes de que el guardián de fronteras llegue a correr, y el mutante
       // estaría probando el linter en vez de la frontera.
-      `import type { Nodo } from "./salidas.js";\nexport type _Anida = Nodo;\nexport type Shape = Body["shape"];`,
+      `import type { Node } from "./outputs.js";\nexport type _Anida = Node;\nexport type Shape = Body["shape"];`,
     ]],
     espera: /frontera/i,
+    nota: "reanclada en el bloque 3 (salidas.ts → outputs.ts). Antes de reanclarla falló RUIDOSA con TS2307 «Cannot find module './salidas.js'», que NO matchea /frontera/i: «rompió, pero no por la razón esperada». Es el diseño del corredor — que falle no alcanza, tiene que fallar por la razón correcta",
   },
   {
     id: "M12d",
@@ -223,11 +224,11 @@ const MUTANTES = [
     id: "M29",
     garantía: "lo que se cachea por hashBytes no puede llevar un id (H13)",
     cambios: [[
-      `export type NodoCrudo = {\n  readonly tipo: Tipo;`,
-      `export type NodoCrudo = {\n  readonly id: ElementId;\n  readonly tipo: Tipo;`,
+      `export type RawNode = {\n  readonly role: Role;`,
+      `export type RawNode = {\n  readonly id: ElementId;\n  readonly role: Role;`,
     ]],
     espera: /what is cached by hashBytes must not carry an id/,
-    nota: "se pudre cuando salidas.ts pase a outputs.ts: hay que reanclarlo en ese bloque",
+    nota: "reanclada en el bloque 3 (salidas.ts → outputs.ts). Antes de reanclarla falló RUIDOSA —«el texto a mutar aparece en 0 archivos»—, que es el diseño del corredor: un mutante podrido es un error, no un salteo",
   },
 
   // ── Bloque 2 · location.ts ─────────────────────────────────────────────────
@@ -263,13 +264,13 @@ const MUTANTES = [
   },
   {
     id: "M28",
-    garantía: "R1 — location.ts no puede alcanzar salidas.ts (una Location que anida un Nodo)",
+    garantía: "R1 — location.ts no puede alcanzar outputs.ts (una Location que anida un Node)",
     cambios: [[
       `export type SourceRange = Extract<Coordinate, { space: "grid" }>;`,
-      `import type { Nodo } from "./salidas.js";\nexport type _Anida = Nodo;\nexport type SourceRange = Extract<Coordinate, { space: "grid" }>;`,
+      `import type { Node } from "./outputs.js";\nexport type _Anida = Node;\nexport type SourceRange = Extract<Coordinate, { space: "grid" }>;`,
     ]],
     espera: /frontera/i,
-    nota: "mismo cuidado que M12c: el import tiene que USARSE o TS6133 mata la corrida antes del guardián. La cobertura es TRANSITIVA (shapes.ts → location.ts → salidas.ts): no hace falta una frontera nueva, pero si shapes.ts dejara de importar location.ts esta fila diría NO ROMPIÓ y ahí se vería",
+    nota: "mismo cuidado que M12c: el import tiene que USARSE o TS6133 mata la corrida antes del guardián. La cobertura es TRANSITIVA (shapes.ts → location.ts → outputs.ts): no hace falta una frontera nueva, pero si shapes.ts dejara de importar location.ts esta fila diría NO ROMPIÓ y ahí se vería",
   },
   {
     id: "M30",
@@ -286,7 +287,94 @@ const MUTANTES = [
     garantía: "Box.frame es OBLIGATORIO",
     cambios: [[`  readonly frame: string;`, `  readonly frame?: string;`]],
     espera: /Box\.frame became optional/,
-    nota: "boxContains compara undefined !== undefined, que es false: opcionalizarlo no rompe ni una línea de código. Sin el testigo, lo agarraba de casualidad proyeccion.ts —que mete el marco en la preimagen de huella— y eso habría acreditado una garantía que el contrato no impone",
+    nota: "boxContains compara undefined !== undefined, que es false: opcionalizarlo no rompe ni una línea de código. Sin el testigo, lo agarraba de casualidad projection.ts —que mete el marco en la preimagen de huella— y eso habría acreditado una garantía que el contrato no impone",
+  },
+
+  // ── Bloque 3 · outputs.ts · los cuatro agregados de contrato ───────────────
+  // Los cuatro campos entraron porque el dato que llevan NO SE RECONSTRUYE a
+  // posteriori. Los cuatro son marcas nominales sobre `string`, así que la edición
+  // que los rompe no es borrarlos: es cambiarles la marca por otra de la familia, y
+  // sin `PRUEBAS_DE_ENVOLTORIO` (invariante 8) las cuatro compilan.
+  {
+    id: "M32",
+    garantía: "Ingestion.version es el hash de los BYTES, no la huella de un nodo",
+    cambios: [[
+      `  readonly version: ByteHash;\n  /**\n   * AGREGADO(Capa 5 A6): el activo original`,
+      `  readonly version: ContentHash;\n  /**\n   * AGREGADO(Capa 5 A6): el activo original`,
+    ]],
+    espera: /Ingestion\.version is no longer the ByteHash/,
+    nota: "el plan usa «ContentHash» para dos cosas distintas (PROVISIONAL(ContentHash) en identity.ts): esta confusión es la plausible, no una inventada. `readonly version: ByteHash;` aparece DOS veces en el archivo —NodeInVersion e Ingestion— y por eso el ancla arrastra el docstring siguiente. Sin el testigo: NO ROMPÍA",
+  },
+  {
+    id: "M33",
+    garantía: "Ingestion.original apunta a un OBJETO, no a un documento",
+    cambios: [[`  readonly original: ObjectKey;`, `  readonly original: DocumentId;`]],
+    espera: /Ingestion\.original stopped being an ObjectKey/,
+    nota: "SIN el testigo esta fila rompía POR CASUALIDAD: con TS6196 «'ObjectKey' is declared but never used», porque el import quedaba huérfano. Habría acreditado el linter, no el contrato — la falla del bloque 2, repetida. Es el caso más valioso de los ocho, porque es el que un revisor habría dado por bueno",
+  },
+  {
+    id: "M34",
+    garantía: "NodeInVersion.organization separa tenants (H3)",
+    cambios: [[
+      `  readonly organization: OrganizationId;\n  /**\n   * ATÓMICO CON LOS NODOS`,
+      `  readonly organization: DocumentId;\n  /**\n   * ATÓMICO CON LOS NODOS`,
+    ]],
+    espera: /NodeInVersion\.organization stopped being an OrganizationId/,
+    nota: "el campo entró para que `hash → documento` no cruce organizaciones; con la marca equivocada el filtro existe, compila, y filtra por lo que no es. Sin el testigo: NO ROMPÍA",
+  },
+  {
+    id: "M35",
+    garantía: "Annotation.actor es un actor, no un string cualquiera",
+    cambios: [[
+      `  readonly actor: ActorId;\n  readonly annotator: string;`,
+      `  readonly actor: string;\n  readonly annotator: string;`,
+    ]],
+    espera: /Annotation\.actor stopped being an ActorId/,
+    nota: "`readonly actor: ActorId;` también existe en Authorship (identity.ts), así que el ancla necesita la línea siguiente o `ubicar` encuentra dos archivos. Sin el testigo: NO ROMPÍA",
+  },
+
+  // ── Bloque 3 · el orden de Certainty (hueco cerrado) ──────────────────────
+  {
+    id: "M36",
+    garantía: "CERTAINTY_RANK ordena, y en el sentido que dice la escalera",
+    cambios: [[
+      `  declared: PARAMETERS.arithmetic.zero,\n  inferred: PARAMETERS.arithmetic.one,`,
+      `  declared: PARAMETERS.arithmetic.one,\n  inferred: PARAMETERS.arithmetic.zero,`,
+    ]],
+    espera: /CERTAINTY_RANK\.(declared|inferred) moved/,
+    nota: "invertir la tabla marca como «declared» lo que el pipeline adivinó — la promesa de §{La escalera} exactamente al revés. Antes de este bloque «la peor certeza» que Fragment prometía NO ERA COMPUTABLE: el paquete no exportaba ningún orden sobre Certainty. Sin el testigo: NO ROMPÍA",
+  },
+
+  // ── Bloque 3 · projection.ts · la huella ──────────────────────────────────
+  {
+    id: "M37",
+    garantía: "verbatim se tokeniza por LÍNEA — los espacios son significativos (H6)",
+    cambios: [[
+      `const lines = (text: string): readonly string[] => text.split("\\n");`,
+      `const lines = (text: string): readonly string[] => text.split(/\\s+/gu);`,
+    ]],
+    espera: /verbatim: los espacios son significativos/,
+    nota: "es el bug que tuvo la primera versión del archivo. Se muta `lines` y no el `case` a propósito: cambiar el case deja `lines` huérfana y la corrida muere con TS6133 ANTES del guardián, o sea acreditando el linter (la lección de M12c). Verificado: con `lines` en uso, los cinco guardianes quedaban VERDES antes de este bloque",
+  },
+  {
+    id: "M38",
+    garantía: "la normalización NFC es parte de la DEFINICIÓN de la huella",
+    cambios: [[
+      `  const base = text.normalize("NFC").replace(/\\r\\n?/gu, "\\n");`,
+      `  const base = text.replace(/\\r\\n?/gu, "\\n");`,
+    ]],
+    espera: /NFC: el mismo texto compuesto y descompuesto/,
+    nota: "sin NFC, guardar el mismo DOCX con otro editor mueve todas las anclas del corpus. Antes de este bloque el guardián no tenía un solo caso de normalización y esta edición pasaba limpia — sobre una línea que el propio archivo llama «PARTE DE LA DEFINICIÓN de la huella»",
+  },
+  {
+    id: "M39",
+    garantía: "el vocabulario de TokenKind no se puede cambiar en silencio",
+    cambios: [
+      [`  | "word"`, `  | "wrd"`],
+      [`token("word", p)`, `token("wrd", p)`],
+    ],
+    espera: /la preimagen canónica de text_span cambió/,
+    nota: "los casos de discriminación comparan cuerpos ENTRE SÍ y son ciegos al cambio que los mueve a TODOS: renombrar un valor de TokenKind cambia toda huella del corpus. Verificado antes de fijar las canónicas: «word» → «wrd» pasaba tsc y los cinco .mjs en verde. Este bloque HACE ese cambio doce veces, y por eso la tabla se fija en el mismo commit",
   },
 
   // ── Controles ──────────────────────────────────────────────────────────────
@@ -328,6 +416,26 @@ const MUTANTES = [
     ]],
     nota: "el par de M19/M21: Nominal está abierta a marcas nuevas y cerrada a dos niveles y a etiquetas repetidas",
   },
+  {
+    id: "MC5",
+    control: true,
+    garantía: "reordenar dos campos de Ingestion no cambia el tipo",
+    cambios: [[
+      `  readonly owner: ActorId;\n  readonly channel: Channel;`,
+      `  readonly channel: Channel;\n  readonly owner: ActorId;`,
+    ]],
+    nota: "el par de M32–M35: cambiarle la MARCA a un campo del envoltorio es rojo, moverlo de lugar es verde",
+  },
+  {
+    id: "MC6",
+    control: true,
+    garantía: "editar un docstring de projection.ts no mueve ninguna huella",
+    cambios: [[
+      `/** La preimagen de la huella de un nodo. Pura, sin dependencias, determinística. */`,
+      `/** control MC6: la preimagen de la huella de un nodo. */`,
+    ]],
+    nota: "el par de M39: las canónicas fijan el VOCABULARIO de tokens, no la prosa. Sin este control, una tabla golden demasiado sensible sería indistinguible de una que verifica lo que dice",
+  },
 ];
 
 // Dónde vive cada mutación se deduce de su primer `buscar`, así que no hay que
@@ -338,16 +446,18 @@ const ARCHIVOS = [
   "src/params.ts",
   "src/identity.ts",
   "src/location.ts",
-  // Entra SOLO por M29 (H13). Cuando `salidas.ts` pase a `outputs.ts`, esa fila hay
-  // que reanclarla acá mismo y en el mismo commit.
-  "src/salidas.ts",
+  // `salidas.ts` → `outputs.ts` (bloque 3). Ya no entra «solo por M29»: ahora aloja
+  // los cuatro agregados de contrato (M32–M35) y el control MC5.
+  "src/outputs.ts",
+  // Entra en el bloque 3 con M37, M38, M39 y el control MC6.
+  "src/projection.ts",
 ];
 
 const guardianes = () => {
   try {
     const salida = execSync(
       `./node_modules/.bin/tsc --noEmit && node scripts/fronteras.mjs && ` +
-        `node scripts/proyeccion.mjs && node scripts/geometry.mjs && ` +
+        `node scripts/projection.mjs && node scripts/geometry.mjs && ` +
         `node scripts/citas.mjs && node scripts/numbers.mjs`,
       { cwd: RAIZ, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
     );
@@ -358,6 +468,20 @@ const guardianes = () => {
 };
 
 const ubicar = (buscar) => {
+  // Si `ARCHIVOS` nombra un archivo que no está en disco —un rename a medio hacer—,
+  // el `readFileSync` de abajo salía con un ENOENT CRUDO de Node: stack trace, y un
+  // mensaje que habla de `fs` y no de mutantes, así que el que lo lee no sabe si se
+  // rompió el arnés o el contrato. Es el MISMO bug que `fronteras.mjs` documenta
+  // haber arreglado en sí mismo, y el bloque 3 (`salidas.ts` → `outputs.ts`) es el
+  // primero donde el caso se ejerce de verdad. Con la lista corrida, además, un
+  // mutante que no encuentra su texto es indistinguible de uno podrido.
+  const faltantes = ARCHIVOS.filter((a) => !existsSync(ruta(a)));
+  if (faltantes.length > 0) {
+    throw new Error(
+      `ARCHIVOS nombra ${faltantes.length} archivo(s) que no están en disco: ${faltantes.join(", ")}\n` +
+        `  ¿rename a medio hacer? Actualizá la lista: con ella corrida, este arnés no acredita nada.`,
+    );
+  }
   const encontrados = ARCHIVOS.filter((a) => readFileSync(ruta(a), "utf8").includes(buscar));
   if (encontrados.length !== 1) {
     throw new Error(

@@ -4,7 +4,7 @@
  * PROVISIONAL(§{Paquetes}): esto vive en `ir` y no en `adaptadores` — El plan de
  * implementación pone `sonda · registro · los 12` en `adaptadores` y enumera `ir`
  * como «las seis formas · Tipo · Pista · Marca · cohesiónDe()». Pero esa
- * enumeración ya es incompleta: tampoco lista `Nodo`, `Cuerpo`, `Autoría` ni
+ * enumeración ya es incompleta: tampoco lista `Node`, `Body`, `Authorship` ni
  * `Unidad`, y los cuatro tienen que estar ahí. La línea de corte es DECLARACIÓN vs
  * IMPLEMENTACIÓN, no tramo: el argumento textual de §{Cómo se agrega}
  * («`adaptadores` lo emite y el fragmentador lo lee, y esos dos no se ven entre sí;
@@ -44,7 +44,14 @@ import type {
   // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
   Location as Ubicación,
 } from "./location.js";
-import type { Canal, NivelLogrado, NodoCrudo } from "./salidas.js";
+import type {
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  AchievedLevel as NivelLogrado,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  Channel as Canal,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  RawNode as NodoCrudo,
+} from "./outputs.js";
 
 // ─────────────────────────────── Evidencia ───────────────────────────────────
 
@@ -450,7 +457,8 @@ export interface Contexto {
  * sigue siendo diez líneas —la tesis del plan se sostiene— pero son otras diez.
  *
  * PROVISIONAL(#C21): NO lleva marcador de delegación — El adaptador delegado no
- * sabe que fue delegado. Va en `NodoCrudo.delegación`, puesto por el orquestador.
+ * sabe que fue delegado. Va en `RawNode.delegation` (`outputs.ts`), puesto por el
+ * orquestador.
  *
  * PROVISIONAL(#22): NO lleva `Autoría`, con UNA excepción opcional — El chat la
  * necesita de verdad (cada mensaje tiene su autor, §{Chat}) y ningún otro
@@ -578,7 +586,7 @@ export type Eslabón<S> = {
  */
 export interface Adaptador<S, E = Fuente> {
   readonly id: AdaptadorId;
-  /** El escalón de la escalera en el que trabaja. Alimenta `certezaDeNivel`. */
+  /** El escalón de la escalera en el que trabaja. Alimenta `certaintyOfLevel`. */
   readonly nivel: NivelDeReconocimiento;
   readonly versión: string;
   evidencia(sonda: Sonda): Promise<Evidencia>;

@@ -238,7 +238,7 @@ export const PARAMETERS = {
      * Se mide: distribución de anclaje sobre re-ingestas reales; el umbral va
      * por debajo del p1 de las re-ingestas sanas.
      * OJO: el denominador NO está en el plan (auditoría #62) — ver
-     * `DENOMINADOR_DE_ANCLAJE` en `salidas.ts`.
+     * `ANCHORING_DENOMINATOR` en `outputs.ts`.
      */
     anchoringThreshold: null as Pending<number>,
   },
@@ -298,6 +298,12 @@ export const PARAMETERS = {
      * string se concatena al texto antes de embeber Y va al payload para filtrar
      * por sección de forma exacta (§{Las cinco}), así que sin regla el filtro deja de
      * matchear en silencio (auditoría #50).
+     * El hueco #50 tiene DOS mitades y esta es solo una: el NÚMERO, que es lo que
+     * este campo declara pendiente. La otra —qué normalización se aplica y dónde
+     * trunca— es una REGLA, `ir` ya exporta `normalize` y ya aloja una política
+     * idéntica en `fieldKey`, y sigue sin escribirse. Mientras falte, fijar este
+     * número no cierra el hueco: dos implementaciones truncan lo mismo en distinto
+     * lugar. Ver `Breadcrumb` en `outputs.ts`.
      * Se mide: distribución de longitud de títulos reales; el truncado cae por
      * encima del p99 para que casi nunca dispare.
      */

@@ -4,17 +4,17 @@
  * El plan necesita tres cosas que hoy son tres funciones inexistentes y que nadie
  * declaró relacionadas: la serialización canónica de la huella (H6), la
  * tokenización de la similitud de los pases 2 y 3 (H2), y el renderizado a texto
- * de `Fragmento.texto` y del embedding (H4). Si son independientes DERIVAN —H2
+ * de `Fragment.text` y del embedding (H4). Si son independientes DERIVAN —H2
  * avisa que la elección de tokenización decide si «una planilla pierde 500
  * identidades o ninguna»— y nada garantiza la propiedad más elemental que el
  * reconciliador necesita: que el pase 1 y el pase 2 no se contradigan.
  *
  * PROVISIONAL(H2/H4/H6): UNA proyección por nodo con dos consumidores, y el
- * renderizado APARTE — `proyectar(cuerpo)` es única, determinística y consciente de
- * la forma; `huellaDe` = hash(codificar(proyectar(...))) y `similitud` =
- * f(proyectar(a), proyectar(b)). De ahí sale POR CONSTRUCCIÓN el invariante que la
+ * renderizado APARTE — `project(body)` es única, determinística y consciente de
+ * la forma; `fingerprintOf` = hash(encode(project(...))) y `similarity` =
+ * f(project(a), project(b)). De ahí sale POR CONSTRUCCIÓN el invariante que la
  * auditoría reclama sin nombrarlo: `huella(a) === huella(b) ⟹ similitud(a,b) ===
- * 1`. `renderizar` queda separada porque persigue lo contrario: la huella tiene que
+ * 1`. `render` queda separada porque persigue lo contrario: la huella tiene que
  * ser INYECTIVA y ESTABLE, el texto que se embebe tiene que ser LEGIBLE — Colapsar
  * las tres es imposible y dejarlas independientes es la deriva garantizada con doce
  * adaptadores y años. Separar el renderizado además lo deja evolucionar sin mover
@@ -32,18 +32,8 @@
  * una declaración de tipos.
  */
 
-import {
-  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
-  PARAMETERS as PARAMETROS,
-} from "./params.js";
-import type {
-  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
-  Body as Cuerpo,
-  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
-  Shape as Forma,
-  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
-  Window as Ventana,
-} from "./shapes.js";
+import { PARAMETERS } from "./params.js";
+import type { Body, Shape, Window } from "./shapes.js";
 
 // ─────────────────────────────── El operador `‖` ─────────────────────────────
 
@@ -63,9 +53,15 @@ import type {
  * verificación), hay que verificar en cada sitio y la verificación se olvida.
  *
  * El MISMO operador en las DOS claves de caché, no uno por sitio.
+ *
+ * SE LLAMA `encodeParts` Y NO `concatenate` (GLOSARIO.md, G1): el cognado nombra
+ * justamente lo que esta función NO es —«ni concatenación desnuda», dos párrafos
+ * arriba—, y la salvedad de R1 manda preferir el término de dominio cuando el
+ * cognado significa otra cosa. Queda además en la familia de las otras dos
+ * serializaciones inyectivas del archivo, `encode` y `encodeWindow`, que la llaman.
  */
-export const concatenar = (...partes: readonly string[]): string =>
-  partes.map((p) => `${p.length}:${p}`).join("");
+export const encodeParts = (...parts: readonly string[]): string =>
+  parts.map((p) => `${p.length}:${p}`).join("");
 
 // ─────────────────────────────── Normalización ───────────────────────────────
 
@@ -86,10 +82,18 @@ export const concatenar = (...partes: readonly string[]): string =>
  * un documento real hace a propósito — Si se decide al revés (NFKC + colapso
  * uniforme), es estable pero destruye distinciones reales y contradice la semántica
  * de `verbatim`.
+ *
+ * ACREDITADO DESDE EL BLOQUE 3, y hasta entonces no lo estaba. Este párrafo decía
+ * «PARTE DE LA DEFINICIÓN de la huella» mientras BORRAR el `.normalize("NFC")` de
+ * abajo pasaba `tsc` y los cinco guardianes en verde: el guardián no tenía un solo
+ * caso de normalización. Ahora lo tiene —compuesto vs descompuesto, y CRLF vs LF—
+ * y el mutante M38 lo rompe a propósito en cada `pnpm lint`. La distinción importa
+ * porque «una garantía que solo se verificó el día que se escribió es
+ * indistinguible de una que nunca funcionó» (`scripts/mutantes.mjs`).
  */
-export const normalizar = (texto: string, forma: Forma): string => {
-  const base = texto.normalize("NFC").replace(/\r\n?/gu, "\n");
-  if (forma === "verbatim") return base;
+export const normalize = (text: string, shape: Shape): string => {
+  const base = text.normalize("NFC").replace(/\r\n?/gu, "\n");
+  if (shape === "verbatim") return base;
   return base.replace(/[^\S\n]+/gu, " ").trim();
 };
 
@@ -98,20 +102,27 @@ export const normalizar = (texto: string, forma: Forma): string => {
 /**
  * La clase de un token. Existe para que la codificación sea inyectiva: dos
  * proyecciones con los mismos textos y clases distintas no pueden colisionar.
+ *
+ * LOS DOCE VALORES SON DATOS, NO NOMBRES, y de una especie que no tiene ningún otro
+ * vocabulario del paquete: no van a Postgres ni al payload de Qdrant, van a la
+ * PREIMAGEN DE LA HUELLA. `encode` serializa `[t.kind, t.text]`, así que el string
+ * de la clase es parte de la preimagen y renombrar cualquiera de los doce cambia el
+ * `ContentHash` de todo nodo del corpus. Ver GLOSARIO.md, G9 y el «OJO AL
+ * DESPLEGAR» de `END_OF_ROW`.
  */
-export type ClaseDeToken =
-  | "forma"
-  | "ordenado"
-  | "esquemaEstado"
-  | "esquema"
-  | "palabra"
-  | "linea"
-  | "celda"
-  | "fila"
-  | "etiqueta"
-  | "valor"
-  | "objeto"
-  | "ventana";
+export type TokenKind =
+  | "shape"
+  | "ordered"
+  | "schemaState"
+  | "schema"
+  | "word"
+  | "line"
+  | "cell"
+  | "row"
+  | "label"
+  | "value"
+  | "object"
+  | "window";
 
 /**
  * La unidad de comparación.
@@ -135,13 +146,20 @@ export type ClaseDeToken =
  * humo, que es exactamente cómo el banco encontró el hallazgo 10 (§{Cuarta}) — Si
  * se decide al revés, reindentar un bloque de código no mueve su id, que suena bien
  * pero significa que dos snippets distintos colisionan y ninguno ancla.
+ *
+ * ACREDITADO DESDE EL BLOQUE 3. El párrafo de arriba estaba escrito desde que se
+ * arregló el bug y NADA lo verificaba: cambiar `lines` para que partiera por
+ * `/\s+/gu` —o sea, reponer el bug exacto— pasaba `tsc` y los cinco guardianes en
+ * verde, porque los casos del guardián comparaban `grid` y `container` y ninguno
+ * era `verbatim`. Lo cuida el mutante M37, y su par de IGUALES (que `text_span` SÍ
+ * colapsa espacio horizontal) impide el arreglo tramposo de colapsar los dos.
  */
 export type Token = {
-  readonly clase: ClaseDeToken;
-  readonly texto: string;
+  readonly kind: TokenKind;
+  readonly text: string;
 };
 
-const token = (clase: ClaseDeToken, texto: string): Token => ({ clase, texto });
+const token = (kind: TokenKind, text: string): Token => ({ kind, text });
 
 /**
  * LA AUSENCIA NO PUEDE SER LA CODIFICACIÓN DE NADA.
@@ -161,21 +179,27 @@ const token = (clase: ClaseDeToken, texto: string): Token => ({ clase, texto });
  *
  * La forma del arreglo es TOTAL a propósito: los tres casos emiten un token de
  * estado. Ninguno codifica por ausencia, así que no hay dos estados que puedan
- * volver a colisionar. Y va en clase propia (`esquemaEstado`), no en `esquema`: si
+ * volver a colisionar. Y va en clase propia (`schemaState`), no en `schema`: si
  * el estado viajara como un valor más, un encabezado que dijera literalmente
- * «heredado» colisionaría con el marcador.
+ * «inherited» colisionaría con el marcador.
+ *
+ * LOS TRES MARCADORES SON DATOS DE LA PREIMAGEN, igual que las doce clases de
+ * `TokenKind` (GLOSARIO.md, G9). El bloque 3 los pasó de `heredado · ninguno ·
+ * propio` a `inherited · none · own`, y con eso el caso adversario del guardián
+ * —«un encabezado que se llama literalmente “heredado”»— dejaba de ser adversario
+ * y seguía pasando: el fixture se reancló a `"inherited"` en el mismo commit.
  */
-const tokensDeEsquema = (
-  esquema: readonly string[] | null,
-  forma: Forma,
+const tokensOfSchema = (
+  schema: readonly string[] | null,
+  shape: Shape,
 ): readonly Token[] => {
-  if (esquema === null) return [token("esquemaEstado", "heredado")];
-  if (esquema.length === PARAMETROS.arithmetic.zero) {
-    return [token("esquemaEstado", "ninguno")];
+  if (schema === null) return [token("schemaState", "inherited")];
+  if (schema.length === PARAMETERS.arithmetic.zero) {
+    return [token("schemaState", "none")];
   }
   return [
-    token("esquemaEstado", "propio"),
-    ...esquema.map((e) => token("esquema", normalizar(e, forma))),
+    token("schemaState", "own"),
+    ...schema.map((e) => token("schema", normalize(e, shape))),
   ];
 };
 
@@ -192,7 +216,7 @@ const tokensDeEsquema = (
  * invisible de punta a punta.
  *
  * ES UN SEPARADOR PELADO, SIN POSICIÓN, y eso es deliberado. Codificar el índice de
- * la fila (`fila:0`, `fila:1`…) distinguiría igual, pero insertar una fila arriba
+ * la fila (`row:0`, `row:1`…) distinguiría igual, pero insertar una fila arriba
  * renumeraría todas las siguientes y les cambiaría la huella a todas — la misma
  * familia de error que el `ordinal` de la fórmula de identidad que el tramo 4
  * eliminó. La posición nunca entra en la huella.
@@ -201,19 +225,28 @@ const tokensDeEsquema = (
  * Con datos en producción, la primera re-ingesta posterior a este cambio no ancla
  * nada de esas dos formas. Es el mismo evento que H16 describe («un adaptador
  * cambió y ahora produce hashes distintos») y necesita el mismo tratamiento.
+ *
+ * Y NO SOLO AGREGAR: **renombrar** un valor de `TokenKind` o uno de los tres
+ * marcadores de `tokensOfSchema` tiene EXACTAMENTE el mismo efecto, sobre las seis
+ * formas y no sobre dos. Es lo que hizo el bloque 3, doce veces más tres. Lo que
+ * vuelve visible ese acto es la TABLA DE PREIMÁGENES CANÓNICAS de
+ * `scripts/projection.mjs`: los casos de discriminación comparan cuerpos entre sí y
+ * son ciegos a cualquier cambio que los mueva a todos a la vez — verificado
+ * rompiéndolo, `"word"` → `"wrd"` pasaba los cinco guardianes en verde. Con la
+ * tabla, mover el vocabulario es un acto que hay que escribir en el diff.
  */
-const FIN_DE_FILA: Token = token("fila", "");
+const END_OF_ROW: Token = token("row", "");
 
-const palabras = (texto: string): readonly string[] =>
-  texto.split(/\s+/gu).filter((p) => p.length !== PARAMETROS.arithmetic.zero);
+const words = (text: string): readonly string[] =>
+  text.split(/\s+/gu).filter((p) => p.length !== PARAMETERS.arithmetic.zero);
 
 /** Las líneas EXACTAS, espacios incluidos. Ver PROVISIONAL(H6) en `Token`. */
-const líneas = (texto: string): readonly string[] => texto.split("\n");
+const lines = (text: string): readonly string[] => text.split("\n");
 
-// ─────────────────────────────── proyectar ───────────────────────────────────
+// ─────────────────────────────── project ─────────────────────────────────────
 
 /**
- * La proyección canónica de un `Cuerpo` a tokens. Determinística, total sobre las
+ * La proyección canónica de un `Body` a tokens. Determinística, total sobre las
  * seis formas, sin acceso a nada fuera del payload.
  *
  * QUÉ ENTRA Y QUÉ NO — la regla, no la lista:
@@ -221,30 +254,30 @@ const líneas = (texto: string): readonly string[] => texto.split("\n");
  * PROVISIONAL(H6): **entra en la huella lo que una persona vería si leyera el nodo;
  * queda afuera todo lo que un clasificador, un detector o el pipeline concluyeron
  * sobre él** — Es R3 (§{R3}) aplicada a la huella. De ahí sale directo, sin
- * discutir campo por campo: `marcas` NO (poner una palabra en negrita conserva el
- * id), `lenguaje` NO (una re-detección de lenguaje no cambia el contenido), `mime`
- * NO (es derivable de los bytes), `grano` NO (un cambio `entero`↔`fila` es una
- * conclusión del clasificador), `pendientes` NO (además está PROHIBIDO por
- * §{La delegación tardía}), `tipo` NO (ver abajo), `Location` NO (§{Por qué esto},
+ * discutir campo por campo: `marks` NO (poner una palabra en negrita conserva el
+ * id), `language` NO (una re-detección de lenguaje no cambia el contenido), `mime`
+ * NO (es derivable de los bytes), `grain` NO (un cambio `whole`↔`row` es una
+ * conclusión del clasificador), `deferred` NO (además está PROHIBIDO por
+ * §{La delegación tardía}), `role` NO (ver abajo), `Location` NO (§{Por qué esto},
  * §{Tercera}: mover un párrafo sin editarlo da 0 ids movidos), `Authorship` NO,
- * `parentId` NO, `migas` NO, `delegación` NO, `atribución` NO — La ventaja de la
- * regla sobre la lista es que el próximo campo que se agregue a una forma se
+ * `parentId` NO, `breadcrumbs` NO, `delegation` NO, `attribution` NO — La ventaja
+ * de la regla sobre la lista es que el próximo campo que se agregue a una forma se
  * resuelve solo, que es el criterio que el plan usa en todas partes. COSTO
  * ACEPTADO: dos `verbatim` con el mismo texto y lenguajes distintos colisionan.
  *
- * PROVISIONAL(H6): `forma` SÍ participa, `tipo` NO — El pase 2 ya restringe el
+ * PROVISIONAL(H6): `shape` SÍ participa, `role` NO — El pase 2 ya restringe el
  * emparejamiento a «mismo tipo y misma forma» (§{5 · Reconciliador}), así que la
- * discriminación por tipo se recupera aguas abajo sin pagar la fragilidad; y
- * `forma` es un hecho que el adaptador LEE del formato (§{`descomponer`}), no una
+ * discriminación por rol se recupera aguas abajo sin pagar la fragilidad; y
+ * `shape` es un hecho que el adaptador LEE del formato (§{`descomponer`}), no una
  * conclusión de un clasificador, así que incluirla no acopla la identidad a las
- * mejoras de clasificación. Si `tipo` entrara, mejorar un clasificador —que es el
+ * mejoras de clasificación. Si `role` entrara, mejorar un clasificador —que es el
  * objetivo declarado de la métrica de atribución (§{Observabilidad})—
  * reclasificaría nodos y les movería el id, que es exactamente la causa «un
  * adaptador cambió» que el plan admite no poder distinguir de un documento
- * reescrito (§{Degradación}, H16) — COSTO ACEPTADO Y ESCRIBIBLE: un `titulo` y un
- * `parrafo` con texto idéntico no anclan y caen al pase 2, donde el filtro por tipo
- * los separa correctamente — Si se decide al revés (`tipo` dentro), cada mejora del
- * clasificador despega curación.
+ * reescrito (§{Degradación}, H16) — COSTO ACEPTADO Y ESCRIBIBLE: un `heading` y un
+ * `paragraph` con texto idéntico no anclan y caen al pase 2, donde el filtro por
+ * rol los separa correctamente — Si se decide al revés (`role` dentro), cada mejora
+ * del clasificador despega curación.
  *
  * PROVISIONAL(C14): la huella de `container` NO es «la forma y si es ordenado»
  * (§{Tramo 4 › Qué sale}) sino eso MÁS su esquema — Con dos valores de dominio,
@@ -257,19 +290,19 @@ const líneas = (texto: string): readonly string[] => texto.split("\n");
  * alternativa —que nadie lo note— es exactamente el «colapso en silencio» que el
  * plan nombra como su peor modo de falla. Corolario para la métrica: si los
  * containers desnudos no pueden anclar POR CONSTRUCCIÓN, el denominador de
- * `anclaje` mide en parte una imposibilidad.
+ * `anchoring` mide en parte una imposibilidad.
  *
  * PROVISIONAL(H6): la huella de `asset` NO es solo «la referencia al objeto»
  * (§{Tramo 4 › Qué sale}) sino el par (objeto, ventana) — Con la referencia sola, y
  * por la precondición de terminación que obliga a referenciar el original
  * (§{Dónde frena}), dos regiones distintas de la MISMA página comparten
- * `RefObjeto`, hashean idénticas y ninguna ancla. Con el par, dos regiones
+ * `ObjectRef`, hashean idénticas y ninguna ancla. Con el par, dos regiones
  * distintas dan huellas distintas y 200 apariciones del mismo logo entero siguen
  * colisionando entre sí — que es correcto: son el mismo contenido, y el pase 2 las
  * separa por hueco.
  *
  * PROVISIONAL(C3): la huella de un nodo-FILA son sus celdas y NADA MÁS — porque
- * `encabezados` es `null` en un nodo-fila y el esquema vive en el container. Es lo
+ * `headers` es `null` en un nodo-fila y el esquema vive en el container. Es lo
  * que hace verdadera la medición de §{Las filas} («renombrar una columna toca UN
  * nodo»), declarada requisito medido, anclaje 1.00 vs 0.00.
  *
@@ -284,70 +317,70 @@ const líneas = (texto: string): readonly string[] => texto.split("\n");
  * ancla → todas al pase 2 en un solo hueco → el escenario cuadrático de
  * §{Tramo 4 › Costo}.
  */
-export const proyectar = (cuerpo: Cuerpo): readonly Token[] => {
-  const cabecera = token("forma", cuerpo.shape);
-  switch (cuerpo.shape) {
+export const project = (body: Body): readonly Token[] => {
+  const head = token("shape", body.shape);
+  switch (body.shape) {
     case "text_span":
       return [
-        cabecera,
-        ...palabras(normalizar(cuerpo.text, cuerpo.shape)).map((p) =>
-          token("palabra", p),
+        head,
+        ...words(normalize(body.text, body.shape)).map((p) =>
+          token("word", p),
         ),
       ];
     case "verbatim":
       return [
-        cabecera,
-        ...líneas(normalizar(cuerpo.text, cuerpo.shape)).map((l) =>
-          token("linea", l),
+        head,
+        ...lines(normalize(body.text, body.shape)).map((l) =>
+          token("line", l),
         ),
       ];
     case "asset":
       return [
-        cabecera,
-        token("objeto", cuerpo.ref.object),
-        token("ventana", codificarVentana(cuerpo.ref.window)),
+        head,
+        token("object", body.ref.object),
+        token("window", encodeWindow(body.ref.window)),
       ];
     case "grid":
       return [
-        cabecera,
-        ...tokensDeEsquema(cuerpo.headers, cuerpo.shape),
-        ...cuerpo.rows.flatMap((fila) => [
-          ...fila.map((c) => token("celda", normalizar(c.text, cuerpo.shape))),
-          FIN_DE_FILA,
+        head,
+        ...tokensOfSchema(body.headers, body.shape),
+        ...body.rows.flatMap((row) => [
+          ...row.map((c) => token("cell", normalize(c.text, body.shape))),
+          END_OF_ROW,
         ]),
       ];
     case "fields":
       return [
-        cabecera,
-        ...cuerpo.pairs.flatMap((par) => [
-          token("etiqueta", normalizar(par.label, cuerpo.shape)),
-          token("valor", normalizar(par.value, cuerpo.shape)),
+        head,
+        ...body.pairs.flatMap((pair) => [
+          token("label", normalize(pair.label, body.shape)),
+          token("value", normalize(pair.value, body.shape)),
         ]),
       ];
     case "container":
       return [
-        cabecera,
-        token("ordenado", String(cuerpo.ordered)),
-        ...tokensDeEsquema(cuerpo.schema, cuerpo.shape),
+        head,
+        token("ordered", String(body.ordered)),
+        ...tokensOfSchema(body.schema, body.shape),
       ];
   }
 };
 
 /**
- * Canonicalización de una `Ventana`.
+ * Canonicalización de una `Window`.
  *
  * RESIDUO DECLARADO (C4): las coordenadas de `Box` son ENTEROS en milésimas del
  * marco precisamente para que esto sea exacto. Si alguna vez `Box` pasa a floats,
  * dos corridas dan `MatterHash` distintos y el caché por página deja de acertar.
  */
-export const codificarVentana = (v: Ventana): string => {
+export const encodeWindow = (v: Window): string => {
   switch (v.scope) {
     case "whole":
-      return concatenar(v.scope);
+      return encodeParts(v.scope);
     case "range":
-      return concatenar(v.scope, String(v.start), String(v.end));
+      return encodeParts(v.scope, String(v.start), String(v.end));
     case "region":
-      return concatenar(
+      return encodeParts(
         v.scope,
         v.box.frame,
         String(v.box.x),
@@ -359,48 +392,71 @@ export const codificarVentana = (v: Ventana): string => {
   }
 };
 
-// ─────────────────────────────── codificar · huella ──────────────────────────
+// ─────────────────────────────── encode · huella ─────────────────────────────
 
 /**
  * Serialización inyectiva de una proyección. Es la PREIMAGEN de la huella: `ir` la
  * define entera y el llamador solo aplica sha256, que no es una decisión de diseño.
  */
-export const codificar = (tokens: readonly Token[]): string =>
-  concatenar(...tokens.flatMap((t) => [t.clase, t.texto]));
+export const encode = (tokens: readonly Token[]): string =>
+  encodeParts(...tokens.flatMap((t) => [t.kind, t.text]));
 
 /** La preimagen de la huella de un nodo. Pura, sin dependencias, determinística. */
-export const preimagenDeHuella = (cuerpo: Cuerpo): string =>
-  codificar(proyectar(cuerpo));
+export const preimageOfFingerprint = (body: Body): string =>
+  encode(project(body));
 
 /** Una función de hash provista por el llamador. `ir` no depende de `node:crypto`. */
-export type FunciónHash = (preimagen: string) => string;
+export type HashFn = (preimage: string) => string;
 
 /**
- * `huellaDe` — el material de la próxima reconciliación (§{Tramo 4 › Qué sale}).
+ * `fingerprintOf` — el material de la próxima reconciliación (§{Tramo 4 › Qué sale}).
  * El tipo del retorno es `string` en bruto: quien lo marque como `NodeFingerprint`
  * es el llamador, con `asNodeFingerprint(...)`.
  *
  * PENDING(D24): eso NO es una decisión cerrada, es un hueco conocido. Nadie está
  * OBLIGADO a marcar, así que la familia de marcas de `identity.ts` no tiene un solo
- * productor tipado. Marcar acá exigiría que este archivo importe `identity.ts`, y
- * esa arista volvería `Authorship` alcanzable desde el archivo que calcula la
- * huella — hoy «`Authorship` NO entra en la huella» lo impone justamente que esa
- * arista no exista. Ver el PENDING(D24) de `NodeFingerprint`.
+ * productor tipado.
+ *
+ * POR QUÉ NO SE ARREGLA ACÁ, con el argumento CORREGIDO en el bloque 3. La versión
+ * anterior de este párrafo decía que marcar exigiría importar `identity.ts` y que
+ * esa arista volvería `Authorship` ALCANZABLE desde el archivo que calcula la
+ * huella, «hoy impedido porque la arista no existe». Eso es falso y se verificó
+ * poniendo la frontera a mano:
+ *
+ *     IR-ERR: frontera violada — projection.ts alcanza identity.ts
+ *             camino: projection.ts → shapes.ts → identity.ts
+ *
+ * La arista YA EXISTE, porque `shapes.ts` importa `ObjectKey`. O sea que una
+ * frontera `projection.ts ↛ identity.ts` es hoy INESCRIBIBLE: nace violada, y
+ * ningún guardián puede sostener el argumento como estaba escrito.
+ *
+ * Lo que SÍ es cierto es más angosto, y es lo único que se afirma acá: este archivo
+ * no NOMBRA `identity.ts`, así que `Authorship` no está en su alcance léxico y no
+ * se puede escribir. Es una propiedad del texto de este archivo, no del grafo — se
+ * mantiene por lectura, no por `scripts/fronteras.mjs`.
+ *
+ * De que `Authorship` no entre en la huella cuelgan el caché de reconocimiento
+ * cross-org (§{Caché}) y que el mismo contenido subido por dos personas dé la misma
+ * huella, así que la protección DÉBIL no alcanza. Por eso el bloque 3b parte
+ * `identity.ts`: mover `NodeFingerprint` y `asNodeFingerprint` a un módulo del
+ * fondo que NO alcance `Authorship` es lo que vuelve la frontera expresable, y
+ * recién ahí `fingerprintOf` puede devolver `NodeFingerprint` sin comprar un tipo y
+ * vender un invariante. Ver el PENDING(D24) de `NodeFingerprint`.
  */
-export const huellaDe = (cuerpo: Cuerpo, sha256: FunciónHash): string =>
-  sha256(preimagenDeHuella(cuerpo));
+export const fingerprintOf = (body: Body, sha256: HashFn): string =>
+  sha256(preimageOfFingerprint(body));
 
-// ─────────────────────────────── similitud ───────────────────────────────────
+// ─────────────────────────────── similarity ──────────────────────────────────
 
-const clave = (t: Token): string => concatenar(t.clase, t.texto);
+const key = (t: Token): string => encodeParts(t.kind, t.text);
 
-const nGramas = (tokens: readonly Token[]): readonly string[] => {
-  const n = Math.min(PARAMETROS.projection.nGramSize, tokens.length);
-  if (n === PARAMETROS.arithmetic.zero) return [];
+const nGrams = (tokens: readonly Token[]): readonly string[] => {
+  const n = Math.min(PARAMETERS.projection.nGramSize, tokens.length);
+  if (n === PARAMETERS.arithmetic.zero) return [];
   return tokens
     .map((_, i) => tokens.slice(i, i + n))
     .filter((g) => g.length === n)
-    .map((g) => concatenar(...g.map(clave)));
+    .map((g) => encodeParts(...g.map(key)));
 };
 
 /**
@@ -424,50 +480,50 @@ const nGramas = (tokens: readonly Token[]): readonly string[] => {
  * contrato.
  *
  * `asset` y `container` DEGENERAN a 0/1: sus proyecciones son de dos o tres tokens
- * y no admiten gradación. O sea que `umbralDeSimilitud` gobierna de hecho solo
+ * y no admiten gradación. O sea que `similarityThreshold` gobierna de hecho solo
  * `text_span`, `verbatim`, `grid` y `fields`.
  */
-export const similitudDeProyecciones = (
+export const similarityOfProjections = (
   a: readonly Token[],
   b: readonly Token[],
 ): number => {
-  const ga = nGramas(a);
-  const gb = nGramas(b);
+  const ga = nGrams(a);
+  const gb = nGrams(b);
   if (
-    ga.length === PARAMETROS.arithmetic.zero &&
-    gb.length === PARAMETROS.arithmetic.zero
+    ga.length === PARAMETERS.arithmetic.zero &&
+    gb.length === PARAMETERS.arithmetic.zero
   ) {
-    return PARAMETROS.projection.maxSimilarity;
+    return PARAMETERS.projection.maxSimilarity;
   }
-  const restantes = [...gb];
-  const comunes = ga.filter((g) => {
-    const i = restantes.indexOf(g);
-    if (i === PARAMETROS.arithmetic.notFound) return false;
-    restantes.splice(i, PARAMETROS.arithmetic.one);
+  const remaining = [...gb];
+  const common = ga.filter((g) => {
+    const i = remaining.indexOf(g);
+    if (i === PARAMETERS.arithmetic.notFound) return false;
+    remaining.splice(i, PARAMETERS.arithmetic.one);
     return true;
   });
-  const unión = ga.length + gb.length - comunes.length;
-  if (unión === PARAMETROS.arithmetic.zero) {
-    return PARAMETROS.projection.maxSimilarity;
+  const union = ga.length + gb.length - common.length;
+  if (union === PARAMETERS.arithmetic.zero) {
+    return PARAMETERS.projection.maxSimilarity;
   }
-  return comunes.length / unión;
+  return common.length / union;
 };
 
 /** La similitud que consumen los pases 2 y 3, sobre cuerpos. */
-export const similitud = (a: Cuerpo, b: Cuerpo): number =>
-  similitudDeProyecciones(proyectar(a), proyectar(b));
+export const similarity = (a: Body, b: Body): number =>
+  similarityOfProjections(project(a), project(b));
 
-// ─────────────────────────────── renderizar ──────────────────────────────────
+// ─────────────────────────────── render ──────────────────────────────────────
 
 /**
- * El texto LEGIBLE de un nodo: lo que va a `Fragmento.texto` y al embedding.
+ * El texto LEGIBLE de un nodo: lo que va a `Fragment.text` y al embedding.
  * SEPARADA de la huella a propósito — ver el PROVISIONAL(H2/H4/H6) del encabezado.
  *
  * PROVISIONAL(#53): devuelve `null` para `asset` y `container`, que no tienen texto
  * — Obliga al tramo 5 a decidir explícitamente qué hace con un fragmento sin texto
  * en vez de embeber cadena vacía, que la mayoría de las APIs rechaza y que
  * colisiona en el caché con todos los demás fragmentos vacíos. La decisión
- * recomendada: se emite el fragmento con `texto: ''` y `vectores: 0`, se persiste,
+ * recomendada: se emite el fragmento con `text: ''` y `vectores: 0`, se persiste,
  * y el enriquecimiento posterior lo re-emite — así §{El recorrido} («un nodo entra
  * entero en algún fragmento, siempre») sigue siendo cierto — Si se decide al revés
  * (omitir el fragmento), el nodo no entra en ninguno y el invariante es falso.
@@ -475,42 +531,41 @@ export const similitud = (a: Cuerpo, b: Cuerpo): number =>
  * PROVISIONAL(H4): `grid` se renderiza como TSV, no como markdown con pipes — Es lo
  * único que este archivo puede fijar sin decidir por el tramo 6, y una grilla en
  * markdown con pipes puede DUPLICAR los tokens de la misma grilla en TSV, lo que
- * cambia si se ventanea y en cuántas ventanas. `esquemaDelContainer` es lo que
+ * cambia si se ventanea y en cuántas ventanas. `containerSchema` es lo que
  * hace posible renderizar una fila sola, que §{Las filas} declara necesario y no
  * provee — Si se decide al revés (markdown), N ventanas cambia para toda planilla.
  */
-export const renderizar = (
-  cuerpo: Cuerpo,
-  esquemaDelContainer: readonly string[] | null,
+export const render = (
+  body: Body,
+  containerSchema: readonly string[] | null,
 ): string | null => {
-  switch (cuerpo.shape) {
+  switch (body.shape) {
     case "text_span":
     case "verbatim":
-      return normalizar(cuerpo.text, cuerpo.shape);
+      return normalize(body.text, body.shape);
     case "asset":
       return null;
     case "container":
       return null;
     case "fields":
-      return cuerpo.pairs.map((p) => `${p.label}\t${p.value}`).join("\n");
+      return body.pairs.map((p) => `${p.label}\t${p.value}`).join("\n");
     case "grid": {
       // `null` HEREDA del container («mi esquema está arriba»); `[]` NO hereda,
       // porque dice explícitamente «esta región no tiene encabezados».
-      const encabezados = cuerpo.headers ?? esquemaDelContainer;
-      const filas = cuerpo.rows.map((f) => f.map((c) => c.text).join("\t"));
+      const headers = body.headers ?? containerSchema;
+      const rows = body.rows.map((f) => f.map((c) => c.text).join("\t"));
       // Un esquema VACÍO no es una línea de encabezado vacía: es no tener línea.
-      // Antes, `encabezados: []` producía `"\nx\ty"` — con la primera línea en
+      // Antes, `headers: []` producía `"\nx\ty"` — con la primera línea en
       // blanco—, que es justo el mecanismo que hace renderizable una fila sola.
-      return encabezados === null ||
-        encabezados.length === PARAMETROS.arithmetic.zero
-        ? filas.join("\n")
-        : [encabezados.join("\t"), ...filas].join("\n");
+      return headers === null || headers.length === PARAMETERS.arithmetic.zero
+        ? rows.join("\n")
+        : [headers.join("\t"), ...rows].join("\n");
     }
   }
 };
 
 /**
- * La política de claves de `Registro.valores`.
+ * La política de claves de `DataRecord.values`.
  *
  * PROVISIONAL(#55): las etiquetas vacías se rellenan por POSICIÓN (`col_1`,
  * `col_2`) y las repetidas se desambiguan con sufijo posicional —
@@ -519,17 +574,17 @@ export const renderizar = (
  * cortas. `ir` es el único paquete que `adaptadores` y `emision` alcanzan a la vez,
  * así que es el único lugar donde la política puede vivir sin romper el grafo de
  * §{Paquetes} — Si se decide al revés (que cada consumidor invente sus claves), dos
- * implementaciones producen `Registro` distintos para la misma planilla. RIESGO
+ * implementaciones producen `DataRecord` distintos para la misma planilla. RIESGO
  * CONOCIDO: colisiona con un encabezado real que se llame literalmente `col_3`.
  */
-export const claveDeCampo = (
-  etiqueta: string | null,
-  posición: number,
-  yaUsadas: ReadonlySet<string>,
+export const fieldKey = (
+  label: string | null,
+  position: number,
+  alreadyUsed: ReadonlySet<string>,
 ): string => {
   const base =
-    etiqueta === null || etiqueta.trim().length === PARAMETROS.arithmetic.zero
-      ? `col_${posición}`
-      : etiqueta.trim();
-  return yaUsadas.has(base) ? `${base}__${posición}` : base;
+    label === null || label.trim().length === PARAMETERS.arithmetic.zero
+      ? `col_${position}`
+      : label.trim();
+  return alreadyUsed.has(base) ? `${base}__${position}` : base;
 };

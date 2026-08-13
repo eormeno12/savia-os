@@ -8,6 +8,7 @@
  */
 
 import { SHAPES, type Body, type Shape } from "./shapes.js";
+import { PARAMETERS } from "./params.js";
 import type { Box } from "./location.js";
 import type { LocalId } from "./identity.js";
 
@@ -64,6 +65,48 @@ export const CERTAINTIES = ["declared", "inferred"] as const;
 export type Certainty = (typeof CERTAINTIES)[number];
 
 /**
+ * El orden sobre `Certainty`. Más alto = PEOR.
+ *
+ * POR QUÉ EXISTE. Hasta el bloque 3 este paquete exportaba `CERTAINTIES` (un
+ * arreglo), `rank(level)` y `certaintyOfLevel`, y NINGÚN orden sobre `Certainty`.
+ * `Fragment.minCertainty` prometía «la PEOR certeza de los nodos agrupados» y esa
+ * frase NO ERA COMPUTABLE con lo que el contrato exportaba: cada consumidor tenía
+ * que inventar la comparación, que es exactamente lo que `ir` existe para impedir.
+ * Y la trampa de nombre encima: si alguien deducía el orden de `CERTAINTIES.indexOf`
+ * —`declared`=0, `inferred`=1— la peor era el MÁXIMO mientras el campo se llamaba
+ * `min`, así que escribir `Math.min` daba lo contrario de lo prometido, en verde.
+ *
+ * `Fragment` ya no lleva certeza —lleva `minLevel` y la certeza se deriva, ver el
+ * #74 de `outputs.ts`— pero el orden hace falta igual, y para el consumidor que el
+ * plan nombra: la certeza es lo que «viaja con el nodo y LLEGA HASTA LA SKILL»
+ * (§{La escalera}), y una skill que junta certezas de varias fuentes necesita saber
+ * cuál es la peor sin inventarlo.
+ *
+ * LA DIRECCIÓN ESTÁ ATADA A NIVEL DE TIPO, igual que `ROLES.length === 15`: ver
+ * `PRUEBAS_DE_CERTEZA` en `invariantes.ts`. Invertir esta tabla marcaría como
+ * «declarado» lo que el pipeline adivinó — la promesa de §{La escalera} exactamente
+ * al revés— y sin la aserción compila en verde.
+ */
+export const CERTAINTY_RANK = {
+  declared: PARAMETERS.arithmetic.zero,
+  inferred: PARAMETERS.arithmetic.one,
+} as const satisfies Record<Certainty, number>;
+
+/**
+ * La peor certeza de un conjunto. Total, sin caso de error.
+ *
+ * EL CASO VACÍO SE DECLARA A PROPÓSITO y devuelve `declared`: es la familia de «la
+ * ausencia no puede ser la codificación de nada» que este paquete ya pagó dos veces.
+ * Dejarlo indefinido —o devolver `null`— obliga a cada llamador a inventar qué
+ * significa un conjunto sin certezas, que es la deriva que esta función evita.
+ */
+export const worstCertainty = (cs: readonly Certainty[]): Certainty =>
+  cs.reduce(
+    (worst, c) => (CERTAINTY_RANK[c] > CERTAINTY_RANK[worst] ? c : worst),
+    "declared" as Certainty,
+  );
+
+/**
  * El nivel de la escalera de degradación (§{La escalera}).
  *
  * PROVISIONAL(C18/C19): tipo NUEVO — `Certainty` queda EXACTAMENTE como está
@@ -111,6 +154,12 @@ export const rank = (level: RecognitionLevel): number =>
  * promete a las skills («no citar como autoridad lo de confianza baja»,
  * §{La escalera}) quede desactivado precisamente para las páginas escaneadas — Si
  * se decide al revés (constante), la certeza miente donde más importa.
+ *
+ * DESDE EL BLOQUE 3 ES LA ÚNICA FUENTE DE CERTEZA DEL PAQUETE, y no una comodidad.
+ * `RawNode` llevaba `certainty` Y `level`, y como esta función es PURA Y TOTAL del
+ * nivel, el primero era enteramente derivable del segundo: los dos podían discrepar
+ * y nada lo impedía. Se borró el campo, no la promesa — ver el docstring de
+ * `RawNode` en `outputs.ts`.
  */
 export const certaintyOfLevel = (level: RecognitionLevel): Certainty =>
   level === "declarative" || level === "physical" ? "declared" : "inferred";
@@ -128,7 +177,7 @@ export type Linkage = (typeof LINKAGES)[number];
  * ramifica sobre «si BAJÓ / si SUBIÓ de un subárbol delegado» (§{2 · Emisor}) y la
  * tentación es meterlo acá. Pero el adaptador que produce la pista NO SABE que fue
  * delegado: lo sabe el orquestador. Meterlo contaminaría el tipo con información
- * que su productor no tiene — Va en `Nodo.delegación` (ver `salidas.ts`), puesto
+ * que su productor no tiene — Va en `RawNode.delegation` (ver `outputs.ts`), puesto
  * por quien injerta.
  */
 export type Hint =
@@ -194,10 +243,16 @@ export type Hint =
  * raíz, o todo párrafo abstenido de un DOCX cierra la pila entera. De esto dependen
  * las rutas de la mayoría de los nodos de la mayoría de los documentos.
  *
- * PROVISIONAL(#61): `certeza` NO la produce el clasificador: la estampa la cascada
- * al devolver (§{La única}, `{...r, certeza}`). Por eso el tipo del retorno de un
- * eslabón es `Classification`, y lo que sale de `enCascada` es
- * `Classification & {nivel}` — ver `Eslabón` en `adaptador.ts`.
+ * PROVISIONAL(#61): la certeza NO la produce el clasificador. Por eso el tipo del
+ * retorno de un eslabón es `Classification`, y lo que sale de `enCascada` es
+ * `Classification & {level}` — ver `Eslabón` en `adaptador.ts`.
+ *
+ * CORREGIDO EN EL BLOQUE 3: este párrafo decía que la cascada ESTAMPA la certeza al
+ * devolver (`{...r, certeza}`, §{La única}). Ya no estampa nada, porque `RawNode`
+ * dejó de llevar `certainty`: la cascada devuelve el NIVEL y la certeza se deriva
+ * con `certaintyOfLevel(level)` en el punto de uso. El hecho de fondo —que el
+ * clasificador no la produce— sigue siendo el mismo; lo que cambió es que ahora no
+ * hay ningún lugar donde pueda quedar guardada en contradicción con el nivel.
  */
 export type Classification = {
   readonly role: Role;

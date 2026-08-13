@@ -47,7 +47,7 @@
  * un comentario, de un string, de un `/[̀-ͯ]/` o de una versión no cuenta,
  * y decidir eso a mano es escribir un lexer de TypeScript incompleto. Un lexer
  * incompleto falla en el modo peor: da verde sobre lo que no supo leer. `typescript`
- * ya es devDependency del paquete —`proyeccion.mjs` ejecuta su binario— así que el
+ * ya es devDependency del paquete —`projection.mjs` ejecuta su binario— así que el
  * scanner de verdad sale gratis, y con él la respuesta es exacta y no aproximada.
  */
 

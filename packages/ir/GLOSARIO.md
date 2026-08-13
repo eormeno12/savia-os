@@ -1,6 +1,8 @@
 # Glosario — el plan está en español, el código en inglés
 
-**Congelado el 2026-08-12.** Es la autoridad de nombres del pipeline. Se decide una
+**Congelado el 2026-08-12.** Se amplía solo por la regla del cierre —un término que
+ninguna regla determina se **agrega acá primero**— y cada ampliación va fechada y con
+su razón: §7 es la del bloque 3. Es la autoridad de nombres del pipeline. Se decide una
 sola vez, acá, para que la reescritura y los doce adaptadores no tengan ni una
 decisión de nombre adentro — que es la parte que se degrada cuando se improvisa
 archivo por archivo.
@@ -265,6 +267,80 @@ en que un docstring cita un archivo que ya no existe.
 |---|---|---|
 | `PROVISIONAL(...)` | `PROVISIONAL(...)` | Es palabra inglesa: funciona igual |
 | `PENDIENTE(...)` | **`PENDING(...)`** | No lo es — y el tipo `Pendiente<T>` sí pasa a `Pending<T>`. Dejarlos en idiomas distintos diciendo lo mismo sería incoherente |
+
+---
+
+## 7 · Bloque 3 — los nueve que ninguna regla determinaba
+
+**Agregado el 2026-08-13**, antes de escribir una línea de `projection.ts` /
+`outputs.ts`, por la regla del cierre: «si un término no está acá y ninguna regla de
+§2 lo determina, no se inventa: se agrega acá primero». Los nueve estaban en esa
+situación. Cada uno con la razón que no se ve leyendo la palabra.
+
+| # | Español | **Queda** | Por qué no la que salía sola |
+|---|---|---|---|
+| **G1** | `concatenar` | **`encodeParts`** | R1 daría `concatenate` y la **salvedad de R1 se dispara**: el cognado nombra justamente lo que la función **no** es — su propio docstring dice «ni separador improbable ni **concatenación desnuda**». Es una codificación con longitud prefijada, inyectiva por construcción. `encodeParts` la pone en la familia que el archivo ya tiene —`encode`, `encodeWindow`—, que son las otras dos serializaciones inyectivas del paquete **y las dos la llaman a ella** |
+| **G2** | `MARCA_NODAL` / `EsNodo` | **`NODE_BRAND`** / **`BrandedAsNode`** | La constante sale de R2+R9. Para la interfaz, R3 (`es*→is*`) daría `IsNode`, que queda **a una mayúscula** de `esNodo→isNode` —el type guard de `invariantes.ts`, ya listado en R3— y son cosas distintas: un tipo y un predicado. `NodeBrand` nombraría el **símbolo**, no la interfaz. `BrandedAsNode` dice qué le pasa a quien la extienda (`Node = RawNode & {authorship} & BrandedAsNode`), y sigue el precedente `Eslabón→CascadeLink`: gana el nombre que no necesita comentario |
+| **G3** | `Valor` | **`FieldValue`** | R1 da `Value`, correcto y vacío: queda a un carácter de `Vector.values` y de `DataRecord.values`, que son otra cosa. `RecordValue` reimporta la confusión con `Record<K,V>` que obligó a `Registro→DataRecord`. `FieldValue` nombra el dominio y ata con **`claveDeCampo→fieldKey`**, que es exactamente la política de claves de estos pares. Campos: `etiqueta→label`, `valor→value` (R10) |
+| **G4** | `Anotador.mirar` | **`propose`** | R1 da `look`, que en inglés nombra un acto de observación y no dice qué devuelve. El método devuelve **`ProposedAnnotation[]`** y el docstring del tipo abre con «lo que un anotador **propone**». Con `propose`, el método y su tipo de retorno son la misma palabra y el contrato se lee solo |
+| **G5** | `parcial · fallido · rechazado · en_espera` | **`partial · failed · rejected · on_hold`** | Los tres primeros son R1. El cuarto no: `queued` afirma una cola con orden, que el contrato no declara (y §{Tramo 1 › El registro} dice explícitamente que las transiciones no están); `waiting` no dice esperando qué. `on_hold` dice «retenido por algo de afuera», que es el caso que el docstring nombra — «un documento guardado pero no escaneado». **Snake**, como el resto de los vocabularios (`page_header`, `text_span`, `ordered_list`) |
+| **G6** | `NIVELES_LOGRADOS` | **`ACHIEVED_LEVELS`** = `structured · plain_text · mixed` | R9+R1 para el nombre. El valor `texto plano` lleva **espacio** y ninguno de los otros vocabularios lo hace: pasa a `plain_text` por la misma convención snake de §5 |
+| **G7** | `Anotación.origen` | **`origin`** = `automatic · human` | El campo sale de R1. Los dos valores no estaban en §5 y son R1 llana. Se listan acá porque son **datos** (§5) y hoy cambiarlos es gratis |
+| **G8** | `DENOMINADOR_DE_ANCLAJE = "viejo"` | **`ANCHORING_DENOMINATOR = "old"`** | Nombre por R9 + `anclaje→anchoring` (§4). El **valor** es un vocabulario cerrado de un elemento y tampoco estaba en §5 |
+| **G9** | los 12 de `ClaseDeToken` + los 3 marcadores de esquema | ver abajo | No estaban en §5 **y no van a Postgres ni a Qdrant**: van a la **preimagen de la huella** |
+
+### G9 · el único vocabulario cuya traducción mueve identidades
+
+```
+forma→shape        ordenado→ordered   esquemaEstado→schemaState   esquema→schema
+palabra→word       linea→line         celda→cell                  fila→row
+etiqueta→label     valor→value        objeto→object               ventana→window
+
+heredado→inherited   ninguno→none   propio→own
+```
+
+Los quince son R1 llana; lo que necesitaba decidirse es **que se traduzcan**.
+`encode` serializa `[t.kind, t.text]`, así que **el string de la clase es parte de la
+preimagen** y traducirlo cambia el `ContentHash` de todo nodo del corpus — el mismo
+evento que `END_OF_ROW` ya documenta como «OJO AL DESPLEGAR». §5 dice que hoy es
+gratis «porque el tramo 7 no existe y nada está persistido»; **es el último bloque en
+que lo es**.
+
+**Se quedan en `camelCase`** (`schemaState`), contra la convención snake de §5, y a
+propósito: los vocabularios de §5 son snake **porque van a filas de Postgres y al
+payload de Qdrant**, y estos son los únicos que no van a ninguno de los dos. La
+convención que les corresponde es la del archivo que los produce.
+
+Lo que ata este vocabulario a algo es la **tabla de preimágenes canónicas** de
+`scripts/projection.mjs` — una preimagen fijada por forma, las seis. Es el mismo
+compromiso deliberado que `ROLES.length === 15`: no es un umbral inventado, es un
+hecho del contrato atado para que cambiarlo sea un **acto visible**. Sin ella, mover
+el vocabulario entero pasa **en verde**: los casos de discriminación comparan cuerpos
+*entre sí* y son ciegos a lo que los mueve a *todos*.
+
+### Un rename de guardián que el bloque 3 DIFIERE, dicho de frente
+
+§6 renombra `proyeccion.mjs → projection.mjs` y `fronteras.mjs → boundaries.mjs`, y
+aclara que los renombres «esperan a que se traduzca el último archivo que el guardián
+nombra».
+
+- `proyeccion.mjs` nombra solo `proyeccion.ts` → **se renombró en este bloque**.
+- `fronteras.mjs` nombra `shapes.ts` y `salidas.ts`, y al cerrar el bloque 3 los dos
+  están en inglés, así que **por la regla ya calificaría**. Se difiere igual, al
+  bloque que traduzca `invariantes.ts`, y la razón es concreta: `invariantes.ts` cita
+  `scripts/fronteras.mjs` en prosa, así que renombrarlo ahora abriría exactamente la
+  ventana que la regla existe para cerrar — un docstring citando un archivo que ya no
+  existe. Va escrito acá como decisión, no escondido como olvido.
+
+### Y tres que el bloque 3 agregó al contrato
+
+No son renombres, así que **nacen en inglés** y ninguna regla de §2 los cubría.
+
+| Símbolo | Por qué así |
+|---|---|
+| `Fragment.minLevel: RecognitionLevel` | R5 da el prefijo `min*` y §3 la raíz. **Reemplaza a `certezaMínima→minCertainty`**, que prometía «la peor certeza» sobre un tipo del que el paquete **no exporta orden** — y peor: la peor sería el *máximo* mientras el campo se llama `min`. Sobre `RecognitionLevel` el orden ya existe (`rank`, `indexOf`) y es el correcto, y la certeza **se deriva** con `certaintyOfLevel` en vez de almacenarse |
+| `Fragment.confidence: { min; hasNull } \| null` | `min` es R5. **`hasNull`** es nombre nuevo: dice si alguno de los nodos agrupados no reportaba confianza. No hay palabra en español que traducir — el campo no existía |
+| `CERTAINTY_RANK` / `worstCertainty` | R9 para la tabla; `worst` es la palabra del docstring que el campo prometía y nadie podía computar («la PEOR certeza de los nodos agrupados») |
 
 ---
 

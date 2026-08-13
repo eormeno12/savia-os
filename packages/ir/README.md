@@ -93,12 +93,15 @@ porque una aserción rota y una que funciona compilan igual.
 | …y esa anotación sigue siendo un **literal**, no `Cohesion` | `PRUEBAS_DE_COHESIÓN` en `invariantes.ts` | error — sin esto, ensanchar el campo y poner `"normal"` apaga la fila de arriba en verde |
 | El `satisfies` de `REQUIRED_SHAPE` sigue atando las claves a `Role` | `PRUEBAS_DE_PAREJA` en `invariantes.ts` | error — sin esto, sacarlo lleva `ILLEGAL_PAIRS` de 25 pares a 0 sin un solo aviso |
 | El barrido del banco recorre 15 × 6 (§{Estrategia}) | `PRUEBAS_DE_DOMINIO` en `invariantes.ts` — fija las dos cifras a nivel de tipo | error — quitar un rol obliga a actualizar plan y barrido en el mismo commit |
-| Ningún payload anida un nodo (§{Tramo 3 › Qué sale}) | el **grafo de módulos**: `shapes.ts` no alcanza `salidas.ts` (`scripts/fronteras.mjs`) | `pnpm lint` falla y muestra el camino |
+| Ningún payload anida un nodo (§{Tramo 3 › Qué sale}) | el **grafo de módulos**: `shapes.ts` no alcanza `outputs.ts` (`scripts/fronteras.mjs`) | `pnpm lint` falla y muestra el camino |
 | Las marcas nominales separan | `PRUEBAS_DE_MARCA` en `invariantes.ts` — **irreducible**, es una propiedad de tipos | error nombrando las dos marcas que se confunden |
 | La salida del adaptador no lleva `id` | `PRUEBAS_DE_ACUÑADO` en `invariantes.ts` | error — y el acuñado al azar deja de estar justificado |
 | `SourceRange` no colapsa, el vocabulario de `Coordinate['space']` es cerrado, `Location.within` es recursiva y `Box.frame` es obligatorio | `PRUEBAS_DE_COORDENADA` en `invariantes.ts` | error — un `Extract` que deja de matchear da `never`, no un error, y `never` es asignable a todo |
 | `boxContains` exige el mismo marco · `compareBoxes` ordena por área ascendente, es antisimétrico y **no** es total | `scripts/geometry.mjs` — son de **comportamiento** | `pnpm lint` falla nombrando el caso y qué se pierde |
-| **Cuerpos distintos ⟹ huellas distintas** | `scripts/proyeccion.mjs` — es de **comportamiento**, ningún tipo la expresa | `pnpm lint` falla nombrando los cuerpos que colisionan |
+| **Cuerpos distintos ⟹ huellas distintas** | `scripts/projection.mjs` — es de **comportamiento**, ningún tipo la expresa | `pnpm lint` falla nombrando los cuerpos que colisionan |
+| **El vocabulario de `TokenKind` no se mueve en silencio** | `scripts/projection.mjs` — la tabla de **preimágenes canónicas**, una por forma | `pnpm lint` falla mostrando la preimagen esperada y la obtenida |
+| Los cuatro campos del envoltorio siguen marcados (versión, original, organización, actor) | `PRUEBAS_DE_ENVOLTORIO` en `invariantes.ts` | error — sin esto, cambiar una marca por otra de la misma familia compila y direcciona lo que no es |
+| `Certainty` tiene un orden, y va en el sentido de la escalera | `PRUEBAS_DE_CERTEZA` en `invariantes.ts` — fija las dos cifras a nivel de tipo | error — invertirla marca como `declared` lo que el pipeline adivinó |
 | Toda cita al plan apunta a una sección que existe | `scripts/citas.mjs` — el plan es un borrador vivo y las citas por número se corren solas, en silencio | `pnpm lint` falla nombrando la cita y la sección que no aparece |
 | Ningún número suelto fuera de `params.ts`, y la cifra publicada es la real | `scripts/numbers.mjs` — scanner de AST, no regex | `pnpm lint` falla nombrando archivo, línea y literal, o la discrepancia entre el censo y el AST |
 
@@ -123,7 +126,7 @@ El principio que salió de ahí, aplicable a cualquier codificación futura:
 Las tres primeras versiones de esta lista **no verificaban nada** y decían que sí. La
 familia de hashes era `never` (asignable a todo), el chequeo de `Shape` era un alias
 sin restricción, y el detector de anidamiento no veía el nodo a través de un campo
-opcional, de una unión con `null`, de `(Nodo | null)[]`, de `Nodo | string`, ni más
+opcional, de una unión con `null`, de `(Node | null)[]`, de `Node | string`, ni más
 allá de seis niveles — donde además respondía «limpio».
 
 Por eso ninguna entrada de esta tabla se acredita por lectura: **cada una se verificó
@@ -132,9 +135,9 @@ en el informe de la revisión.
 
 ### Por qué el anidamiento se impone con el grafo y no con tipos
 
-Lo que vuelve `Nodo` a un `Nodo` es `MARCA_NODAL`, que vive solo en `salidas.ts`. Si
+Lo que vuelve `Node` a un `Node` es `NODE_BRAND`, que vive solo en `outputs.ts`. Si
 `shapes.ts` no lo alcanza, un nodo dentro de un `Body` es **inexpresable** — no hay
-nada que detectar. Y la dependencia natural ya va al revés (`salidas.ts` importa
+nada que detectar. Y la dependencia natural ya va al revés (`outputs.ts` importa
 `shapes.ts`), así que violar la frontera exige introducir un ciclo.
 
 Es la técnica que la regla **R1** ya usa para la frontera de formato («la impone el
@@ -144,19 +147,27 @@ alcanza** — hace falta `pnpm lint`, que corre las dos cosas.
 
 ## Una sola proyección
 
-`proyectar(cuerpo)` es la única tokenización del sistema. De ella salen **la
-huella** (`preimagenDeHuella` → `huellaDe`) y **la similitud** de los pases 2 y 3
-del reconciliador. Eso da por construcción el invariante que el reconciliador
+`project(body)` es la única tokenización del sistema. De ella salen **la
+huella** (`preimageOfFingerprint` → `fingerprintOf`) y **la similitud** de los pases
+2 y 3 del reconciliador. Eso da por construcción el invariante que el reconciliador
 necesita y que el plan nunca enuncia:
 
 ```
 huella(a) === huella(b)  ⟹  similitud(a, b) === 1
 ```
 
-El renderizado a texto (`renderizar`, para `Fragmento.texto` y el embedding) es una
+El renderizado a texto (`render`, para `Fragment.text` y el embedding) es una
 función **aparte** a propósito: la huella persigue ser inyectiva y estable, el texto
 que se embebe persigue ser legible. Separarlas es lo que deja al renderizado
 evolucionar sin mover un solo id.
+
+Y hay una tercera cosa que la huella necesita y que no se ve leyendo el código: **el
+vocabulario de clases de token entra en la preimagen**. `encode` serializa
+`[kind, text]`, así que renombrar `"word"` reescribe el `ContentHash` de todo el
+corpus. Los casos de discriminación no lo agarran —comparan cuerpos entre sí y son
+ciegos a lo que los mueve a todos—, y por eso `projection.mjs` fija una **preimagen
+canónica por forma**, las seis. Cambiar el vocabulario es legítimo; hacerlo sin que
+se vea, no.
 
 ---
 
@@ -166,7 +177,16 @@ evolucionar sin mover un solo id.
 pnpm --filter @savia-os/ir lint
 ```
 
-Son **cinco** comandos encadenados —`tsc --noEmit`, `fronteras`, `proyeccion`,
-`citas`, `numbers`— y hacen falta los cinco: `typecheck` solo cubre la mitad de la
-tabla de arriba, y las cuatro filas que impone un `.mjs` quedarían en verde sin
-haberse mirado.
+Son **siete** comandos encadenados —`tsc --noEmit`, `fronteras`, `projection`,
+`geometry`, `citas`, `numbers` y `mutantes`— y hacen falta los siete: `typecheck`
+solo cubre la mitad de la tabla de arriba, y las filas que impone un `.mjs` quedarían
+en verde sin haberse mirado.
+
+El séptimo es el que acredita a los otros seis. `mutantes.mjs` rompe cada garantía a
+propósito y falla si alguna **deja de romperse**: sin él, una fila de esta tabla que
+dejó de verificar nada es indistinguible de una que funciona. Hoy son **35 garantías
+y 6 controles**; los controles existen porque una suite donde todo falla es
+indistinguible de una donde el compilador está roto.
+
+> El README decía «cinco» y `package.json` encadenaba siete desde el bloque 2:
+> faltaban `geometry` y `mutantes`. Corregido en el bloque 3.

@@ -13,21 +13,28 @@
  * misma lista de exports. El bloque 1 pasó a inglés `shapes.ts`, `classification.ts`
  * y `params.ts` —con ellos los literales de `Role` y de `Linkage`, y sus nombres
  * exportados—; el bloque 2 pasó `identidad.ts → identity.ts` y
- * `ubicacion.ts → location.ts`, las dos capas del fondo del grafo de imports.
- * `proyeccion.ts`, `salidas.ts`, `adaptador.ts` e `invariantes.ts` siguen en
- * español, con tilde en los exportados (`Diagnóstico`, `huellaDe`), que es la
- * mezcla exacta del plan. El costo de traducir el fondo primero es visible y
- * grepeable: `grep -rc "alias temporal" src/` cuenta los alias que los consumidores
- * todavía en español necesitan, y es la cifra que baja sola con cada bloque
- * siguiente. (La cuenta se hace sobre el texto del comentario y no sobre el
- * marcador, para que esta línea no se cuente a sí misma.)
+ * `ubicacion.ts → location.ts`, las dos capas del fondo del grafo de imports; el
+ * bloque 3 pasó `proyeccion.ts → projection.ts` y `salidas.ts → outputs.ts`, las
+ * capas 3 y 4. Quedan DOS: `adaptador.ts` e `invariantes.ts`, con tilde en los
+ * exportados (`Diagnóstico`, `Autoría`), que es la mezcla exacta del plan. El costo
+ * de traducir el fondo primero es visible y grepeable:
+ *
+ *     grep -rc "alias temporal" src/
+ *
+ * cuenta los alias que los consumidores todavía en español necesitan, y es la cifra
+ * que baja sola con cada bloque siguiente. La cuenta se hace sobre el texto del
+ * comentario y no sobre el marcador — con la salvedad, corregida acá en el bloque 3,
+ * de que ESTA LÍNEA CONTIENE EL TEXTO Y SE CUENTA A SÍ MISMA: el total real es el
+ * del grep menos uno. La versión anterior de este párrafo afirmaba lo contrario y
+ * publicaba una cifra que estaba uno arriba.
  *
  * El argumento que sostenía el español entero era el cotejo contra el borrador, y
  * caducó: las citas de este paquete nombran SECCIONES, no líneas ni símbolos
  * (`scripts/citas.mjs`), y una sección sobrevive a un rename. Lo que queda del
  * argumento original es el orden: se traduce por bloques, cada uno verde en los
- * cinco comandos antes del siguiente, y el bump de versión mayor de `ir` va cuando
- * el último bloque cierre — nunca de contrabando dentro de otro cambio.
+ * SIETE comandos que `package.json` encadena antes del siguiente, y el bump de
+ * versión mayor de `ir` va cuando el último bloque cierre — nunca de contrabando
+ * dentro de otro cambio.
  *
  * Cómo leer las decisiones forzadas:
  *
@@ -125,6 +132,8 @@ export {
   type Role,
   CERTAINTIES,
   type Certainty,
+  CERTAINTY_RANK,
+  worstCertainty,
   RECOGNITION_LEVELS,
   type RecognitionLevel,
   rank,
@@ -151,54 +160,55 @@ export {
 
 // La proyección canónica y lo que deriva de ella.
 export {
-  concatenar,
-  normalizar,
-  type ClaseDeToken,
+  encodeParts,
+  normalize,
+  type TokenKind,
   type Token,
-  proyectar,
-  codificarVentana,
-  codificar,
-  preimagenDeHuella,
-  type FunciónHash,
-  huellaDe,
-  similitudDeProyecciones,
-  similitud,
-  renderizar,
-  claveDeCampo,
-} from "./proyeccion.js";
+  project,
+  encodeWindow,
+  encode,
+  preimageOfFingerprint,
+  type HashFn,
+  fingerprintOf,
+  similarityOfProjections,
+  similarity,
+  render,
+  fieldKey,
+} from "./projection.js";
 
 // Salidas del pipeline.
 export {
-  MARCA_NODAL,
-  type EsNodo,
-  type NodoCrudo,
-  type Nodo,
-  comoNodo,
-  type Miga,
-  type MigaLocal,
-  type MigaEstable,
-  type NodoConRuta,
-  type NodoEmitido,
-  DENOMINADOR_DE_ANCLAJE,
-  type MétricasReconciliación,
-  type SalidaDeEmisión,
-  type NodoConocido,
-  type NodoEnVersión,
-  type Fragmento,
+  NODE_BRAND,
+  type BrandedAsNode,
+  type RawNode,
+  type Node,
+  asNode,
+  type Breadcrumb,
+  type LocalBreadcrumb,
+  type StableBreadcrumb,
+  type RoutedNode,
+  type EmittedNode,
+  ANCHORING_DENOMINATOR,
+  type ReconciliationMetrics,
+  type EmissionOutput,
+  type KnownNode,
+  type NodeInVersion,
+  type Fragment,
   type Vector,
-  type Valor,
-  type Registro,
-  type AnotaciónPropuesta,
-  type Anotación,
-  type Anotador,
-  type Ingesta,
-  CANALES,
-  type Canal,
-  NIVELES_LOGRADOS,
-  type NivelLogrado,
-  ESTADOS_DE_DOCUMENTO,
-  type EstadoDeDocumento,
-} from "./salidas.js";
+  type FieldValue,
+  type DataRecord,
+  type ProposedAnnotation,
+  type Annotation,
+  type AnnotationKey,
+  type Annotator,
+  type Ingestion,
+  CHANNELS,
+  type Channel,
+  ACHIEVED_LEVELS,
+  type AchievedLevel,
+  DOCUMENT_STATES,
+  type DocumentState,
+} from "./outputs.js";
 
 // Contrato de adaptador.
 export {
@@ -234,5 +244,7 @@ export {
   type PRUEBAS_DE_PAREJA,
   type PRUEBAS_DE_DOMINIO,
   type PRUEBAS_DE_COORDENADA,
+  type PRUEBAS_DE_ENVOLTORIO,
+  type PRUEBAS_DE_CERTEZA,
   esNodo,
 } from "./invariantes.js";
