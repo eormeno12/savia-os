@@ -36,7 +36,7 @@
  */
 
 // Parámetros — el único objeto con literales numéricos de todo el paquete.
-export { PARAMETROS, type Pendiente } from "./params.js";
+export { PARAMETERS, type Pending } from "./params.js";
 
 // Identidad y huella.
 export {
@@ -90,53 +90,53 @@ export {
 
 // Las seis formas.
 export {
-  FORMAS,
-  type Forma,
-  type Cuerpo,
-  type CuerpoDe,
-  type Marca,
-  type Celda,
-  type TipoCelda,
-  type Par,
-  type Grano,
-  type Ventana,
-  type RefObjeto,
-  type Enriquecimiento,
-  type ClaseDeEnriquecimiento,
-  ventanaCubre,
-  esNodoFila,
-} from "./formas.js";
+  SHAPES,
+  type Shape,
+  type Body,
+  type BodyOf,
+  type Mark,
+  type Cell,
+  type CellType,
+  type Pair,
+  type Grain,
+  type Window,
+  type ObjectRef,
+  type Enrichment,
+  type EnrichmentKind,
+  windowCovers,
+  isRowNode,
+} from "./shapes.js";
 
 // Clasificación.
 export {
-  TIPOS,
-  type Tipo,
-  CERTEZAS,
-  type Certeza,
-  NIVELES_DE_RECONOCIMIENTO,
-  type NivelDeReconocimiento,
-  rango,
-  certezaDeNivel,
-  VIAS,
-  type Via,
-  type Pista,
-  type Clase,
-  COHESIONES,
-  type Cohesión,
-  COHESIÓN,
-  cohesiónDe,
-  esLead,
-  admiteSatelite,
-  TIPO_POR_FORMA,
-  tipoDesdeCuerpo,
-  FORMA_OBLIGADA,
-  type TipoConFormaObligada,
-  type TipoPara,
-  parLegal,
-  PARES_TIPO_FORMA,
-  PARES_ILEGALES,
-  CARDINALIDADES,
-} from "./clasificacion.js";
+  ROLES,
+  type Role,
+  CERTAINTIES,
+  type Certainty,
+  RECOGNITION_LEVELS,
+  type RecognitionLevel,
+  rank,
+  certaintyOfLevel,
+  LINKAGES,
+  type Linkage,
+  type Hint,
+  type Classification,
+  COHESIONS,
+  type Cohesion,
+  COHESION_BY_ROLE,
+  cohesionOf,
+  isLead,
+  acceptsSatellite,
+  ROLE_BY_SHAPE,
+  roleFromBody,
+  REQUIRED_SHAPE,
+  type RoleWithRequiredShape,
+  type RoleFor,
+  isLegalPair,
+  ROLE_SHAPE_PAIRS,
+  ILLEGAL_PAIRS,
+  CARDINALITIES,
+} from "./classification.js";
 
 // La proyección canónica y lo que deriva de ella.
 export {

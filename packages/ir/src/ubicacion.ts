@@ -9,7 +9,10 @@
  * precedente que el propio plan ya usa para `Pista` (§{La pista}).
  */
 
-import { PARAMETROS } from "./params.js";
+import {
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  PARAMETERS as PARAMETROS,
+} from "./params.js";
 import type { AdaptadorId } from "./identidad.js";
 
 /**
@@ -202,7 +205,7 @@ export type Ubicación = UbicaciónLocal & {
  */
 export const cajaContiene = (padre: Caja, hijo: Caja): boolean => {
   if (padre.marco !== hijo.marco) return false;
-  const t = PARAMETROS.geometría.toleranciaDeContención;
+  const t = PARAMETROS.geometry.containmentTolerance;
   return (
     hijo.x >= padre.x - t &&
     hijo.y >= padre.y - t &&

@@ -40,17 +40,17 @@ try {
     pathToFileURL(join(salida, "index.js")).href
   );
 
-  const celda = (texto) => ({ texto, tipo: null });
-  const grid = (encabezados, filas, grano = "entero") => ({
-    forma: "grid",
-    encabezados,
-    filas,
-    grano,
+  const celda = (text) => ({ text, type: null });
+  const grid = (headers, rows, grain = "whole") => ({
+    shape: "grid",
+    headers,
+    rows,
+    grain,
   });
-  const container = (esquema, ordenado = true) => ({
-    forma: "container",
-    ordenado,
-    esquema,
+  const container = (schema, ordered = true) => ({
+    shape: "container",
+    ordered,
+    schema,
   });
 
   /** Cuerpos que TIENEN que tener preimágenes distintas entre sí. */
@@ -59,7 +59,7 @@ try {
       nombre: "nodo-fila (esquema heredado) vs región sin encabezado",
       porqué:
         "colapsaban por `encabezados ?? []`; una planilla de 50 000 filas depende de esta distinción",
-      cuerpos: [grid(null, [[celda("x"), celda("y")]], "fila"), grid([], [[celda("x"), celda("y")]])],
+      cuerpos: [grid(null, [[celda("x"), celda("y")]], "row"), grid([], [[celda("x"), celda("y")]])],
     },
     {
       nombre: "container con esquema heredado vs sin esquema",

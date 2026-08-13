@@ -32,8 +32,18 @@
  * una declaración de tipos.
  */
 
-import { PARAMETROS } from "./params.js";
-import type { Cuerpo, Forma, Ventana } from "./formas.js";
+import {
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  PARAMETERS as PARAMETROS,
+} from "./params.js";
+import type {
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  Body as Cuerpo,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  Shape as Forma,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  Window as Ventana,
+} from "./shapes.js";
 
 // ─────────────────────────────── El operador `‖` ─────────────────────────────
 
@@ -160,7 +170,7 @@ const tokensDeEsquema = (
   forma: Forma,
 ): readonly Token[] => {
   if (esquema === null) return [token("esquemaEstado", "heredado")];
-  if (esquema.length === PARAMETROS.aritmética.cero) {
+  if (esquema.length === PARAMETROS.arithmetic.zero) {
     return [token("esquemaEstado", "ninguno")];
   }
   return [
@@ -195,7 +205,7 @@ const tokensDeEsquema = (
 const FIN_DE_FILA: Token = token("fila", "");
 
 const palabras = (texto: string): readonly string[] =>
-  texto.split(/\s+/gu).filter((p) => p.length !== PARAMETROS.aritmética.cero);
+  texto.split(/\s+/gu).filter((p) => p.length !== PARAMETROS.arithmetic.zero);
 
 /** Las líneas EXACTAS, espacios incluidos. Ver PROVISIONAL(H6) en `Token`. */
 const líneas = (texto: string): readonly string[] => texto.split("\n");
@@ -275,50 +285,50 @@ const líneas = (texto: string): readonly string[] => texto.split("\n");
  * §{Tramo 4 › Costo}.
  */
 export const proyectar = (cuerpo: Cuerpo): readonly Token[] => {
-  const cabecera = token("forma", cuerpo.forma);
-  switch (cuerpo.forma) {
+  const cabecera = token("forma", cuerpo.shape);
+  switch (cuerpo.shape) {
     case "text_span":
       return [
         cabecera,
-        ...palabras(normalizar(cuerpo.texto, cuerpo.forma)).map((p) =>
+        ...palabras(normalizar(cuerpo.text, cuerpo.shape)).map((p) =>
           token("palabra", p),
         ),
       ];
     case "verbatim":
       return [
         cabecera,
-        ...líneas(normalizar(cuerpo.texto, cuerpo.forma)).map((l) =>
+        ...líneas(normalizar(cuerpo.text, cuerpo.shape)).map((l) =>
           token("linea", l),
         ),
       ];
     case "asset":
       return [
         cabecera,
-        token("objeto", cuerpo.ref.objeto),
-        token("ventana", codificarVentana(cuerpo.ref.ventana)),
+        token("objeto", cuerpo.ref.object),
+        token("ventana", codificarVentana(cuerpo.ref.window)),
       ];
     case "grid":
       return [
         cabecera,
-        ...tokensDeEsquema(cuerpo.encabezados, cuerpo.forma),
-        ...cuerpo.filas.flatMap((fila) => [
-          ...fila.map((c) => token("celda", normalizar(c.texto, cuerpo.forma))),
+        ...tokensDeEsquema(cuerpo.headers, cuerpo.shape),
+        ...cuerpo.rows.flatMap((fila) => [
+          ...fila.map((c) => token("celda", normalizar(c.text, cuerpo.shape))),
           FIN_DE_FILA,
         ]),
       ];
     case "fields":
       return [
         cabecera,
-        ...cuerpo.pares.flatMap((par) => [
-          token("etiqueta", normalizar(par.etiqueta, cuerpo.forma)),
-          token("valor", normalizar(par.valor, cuerpo.forma)),
+        ...cuerpo.pairs.flatMap((par) => [
+          token("etiqueta", normalizar(par.label, cuerpo.shape)),
+          token("valor", normalizar(par.value, cuerpo.shape)),
         ]),
       ];
     case "container":
       return [
         cabecera,
-        token("ordenado", String(cuerpo.ordenado)),
-        ...tokensDeEsquema(cuerpo.esquema, cuerpo.forma),
+        token("ordenado", String(cuerpo.ordered)),
+        ...tokensDeEsquema(cuerpo.schema, cuerpo.shape),
       ];
   }
 };
@@ -331,20 +341,20 @@ export const proyectar = (cuerpo: Cuerpo): readonly Token[] => {
  * dos corridas dan `HashMateria` distintos y el caché por página deja de acertar.
  */
 export const codificarVentana = (v: Ventana): string => {
-  switch (v.alcance) {
-    case "entero":
-      return concatenar(v.alcance);
-    case "rango":
-      return concatenar(v.alcance, String(v.desde), String(v.hasta));
+  switch (v.scope) {
+    case "whole":
+      return concatenar(v.scope);
+    case "range":
+      return concatenar(v.scope, String(v.start), String(v.end));
     case "region":
       return concatenar(
-        v.alcance,
-        v.caja.marco,
-        String(v.caja.x),
-        String(v.caja.y),
-        String(v.caja.ancho),
-        String(v.caja.alto),
-        String(v.caja.z),
+        v.scope,
+        v.box.marco,
+        String(v.box.x),
+        String(v.box.y),
+        String(v.box.ancho),
+        String(v.box.alto),
+        String(v.box.z),
       );
   }
 };
@@ -379,8 +389,8 @@ export const huellaDe = (cuerpo: Cuerpo, sha256: FunciónHash): string =>
 const clave = (t: Token): string => concatenar(t.clase, t.texto);
 
 const nGramas = (tokens: readonly Token[]): readonly string[] => {
-  const n = Math.min(PARAMETROS.proyección.tamañoDeNGrama, tokens.length);
-  if (n === PARAMETROS.aritmética.cero) return [];
+  const n = Math.min(PARAMETROS.projection.nGramSize, tokens.length);
+  if (n === PARAMETROS.arithmetic.zero) return [];
   return tokens
     .map((_, i) => tokens.slice(i, i + n))
     .filter((g) => g.length === n)
@@ -418,21 +428,21 @@ export const similitudDeProyecciones = (
   const ga = nGramas(a);
   const gb = nGramas(b);
   if (
-    ga.length === PARAMETROS.aritmética.cero &&
-    gb.length === PARAMETROS.aritmética.cero
+    ga.length === PARAMETROS.arithmetic.zero &&
+    gb.length === PARAMETROS.arithmetic.zero
   ) {
-    return PARAMETROS.proyección.similitudMáxima;
+    return PARAMETROS.projection.maxSimilarity;
   }
   const restantes = [...gb];
   const comunes = ga.filter((g) => {
     const i = restantes.indexOf(g);
-    if (i === PARAMETROS.aritmética.noEncontrado) return false;
-    restantes.splice(i, PARAMETROS.aritmética.uno);
+    if (i === PARAMETROS.arithmetic.notFound) return false;
+    restantes.splice(i, PARAMETROS.arithmetic.one);
     return true;
   });
   const unión = ga.length + gb.length - comunes.length;
-  if (unión === PARAMETROS.aritmética.cero) {
-    return PARAMETROS.proyección.similitudMáxima;
+  if (unión === PARAMETROS.arithmetic.zero) {
+    return PARAMETROS.projection.maxSimilarity;
   }
   return comunes.length / unión;
 };
@@ -467,26 +477,26 @@ export const renderizar = (
   cuerpo: Cuerpo,
   esquemaDelContainer: readonly string[] | null,
 ): string | null => {
-  switch (cuerpo.forma) {
+  switch (cuerpo.shape) {
     case "text_span":
     case "verbatim":
-      return normalizar(cuerpo.texto, cuerpo.forma);
+      return normalizar(cuerpo.text, cuerpo.shape);
     case "asset":
       return null;
     case "container":
       return null;
     case "fields":
-      return cuerpo.pares.map((p) => `${p.etiqueta}\t${p.valor}`).join("\n");
+      return cuerpo.pairs.map((p) => `${p.label}\t${p.value}`).join("\n");
     case "grid": {
       // `null` HEREDA del container («mi esquema está arriba»); `[]` NO hereda,
       // porque dice explícitamente «esta región no tiene encabezados».
-      const encabezados = cuerpo.encabezados ?? esquemaDelContainer;
-      const filas = cuerpo.filas.map((f) => f.map((c) => c.texto).join("\t"));
+      const encabezados = cuerpo.headers ?? esquemaDelContainer;
+      const filas = cuerpo.rows.map((f) => f.map((c) => c.text).join("\t"));
       // Un esquema VACÍO no es una línea de encabezado vacía: es no tener línea.
       // Antes, `encabezados: []` producía `"\nx\ty"` — con la primera línea en
       // blanco—, que es justo el mecanismo que hace renderizable una fila sola.
       return encabezados === null ||
-        encabezados.length === PARAMETROS.aritmética.cero
+        encabezados.length === PARAMETROS.arithmetic.zero
         ? filas.join("\n")
         : [encabezados.join("\t"), ...filas].join("\n");
     }
@@ -512,7 +522,7 @@ export const claveDeCampo = (
   yaUsadas: ReadonlySet<string>,
 ): string => {
   const base =
-    etiqueta === null || etiqueta.trim().length === PARAMETROS.aritmética.cero
+    etiqueta === null || etiqueta.trim().length === PARAMETROS.arithmetic.zero
       ? `col_${posición}`
       : etiqueta.trim();
   return yaUsadas.has(base) ? `${base}__${posición}` : base;

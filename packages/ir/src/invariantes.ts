@@ -25,7 +25,12 @@
  * inexpresable.
  */
 
-import { FORMAS, type Forma } from "./formas.js";
+import {
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  SHAPES as FORMAS,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  type Shape as Forma,
+} from "./shapes.js";
 import type {
   ClaveDeCache,
   ClaveEmbedding,

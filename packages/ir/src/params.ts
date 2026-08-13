@@ -1,5 +1,5 @@
 /**
- * `PARAMETROS` — el ÚNICO objeto con valores numéricos de todo el paquete.
+ * `PARAMETERS` — el ÚNICO objeto con valores numéricos de todo el paquete.
  *
  * Regla de gobierno, tomada del propio plan (§{5 · Reconciliador}):
  *
@@ -20,23 +20,23 @@
  */
 
 /** Un parámetro que el plan declara medible y todavía no midió. `null` = sin valor. */
-export type Pendiente<T> = T | null;
+export type Pending<T> = T | null;
 
-export const PARAMETROS = {
+export const PARAMETERS = {
   /**
    * Constantes de contrato, NO parámetros calibrables. Existen para que el resto
    * del paquete no tenga ningún literal numérico suelto. Nadie las mide.
    */
-  aritmética: {
-    cero: 0,
-    uno: 1,
+  arithmetic: {
+    zero: 0,
+    one: 1,
     /** Lo que devuelve `Array.prototype.indexOf` cuando no encuentra. */
-    noEncontrado: -1,
+    notFound: -1,
   },
 
   // ───────────────────────────── Tramo 1 · Recepción ─────────────────────────
 
-  recepción: {
+  intake: {
     /**
      * Tamaño de la ventana de la sonda, en bytes (plan §{Qué se acepta},
      * §{La sonda}: «los primeros 4 KB, nada más»). Decide: sobre qué corre el gate
@@ -46,7 +46,7 @@ export const PARAMETROS = {
      * no en 4000, para que coincida con el tamaño de bloque de cualquier lector.
      * Ver PROVISIONAL(bytesMágicos) en `adaptador.ts`.
      */
-    bytesMágicos: 4096,
+    magicBytes: 4096,
 
     /**
      * Proporción mínima de code points imprimibles sobre la ventana de la sonda
@@ -60,7 +60,7 @@ export const PARAMETROS = {
      * `en_espera` = recuperable). Sin valor porque cualquier número cambia el
      * corpus entero.
      */
-    proporciónImprimiblesMínima: null as Pendiente<number>,
+    minPrintableProportion: null as Pending<number>,
 
     /**
      * Tope de tamaño de archivo en la puerta, en bytes (plan §{El orden},
@@ -71,7 +71,7 @@ export const PARAMETROS = {
      * tamaños del corpus B2B real, cruzado con el techo de memoria del worker que
      * después lo decodifica.
      */
-    tamañoMáximoDeArchivo: null as Pendiente<number>,
+    maxFileSize: null as Pending<number>,
 
     /**
      * Reintentos antes de la cola de descarte (plan §{Tramo 1 › Decisiones}: «tras
@@ -80,12 +80,12 @@ export const PARAMETROS = {
      * producción; N = el intento a partir del cual la probabilidad marginal de
      * éxito cae por debajo del costo del reintento.
      */
-    reintentosMáximos: null as Pendiente<number>,
+    maxRetries: null as Pending<number>,
   },
 
   // ───────────────────────────── Tramo 3 · Presupuesto ───────────────────────
 
-  presupuesto: {
+  budget: {
     /**
      * Techo de tiempo de pared por corrida, en milisegundos (plan §{Diagnóstico}).
      * Decide: nada del contenido, solo cuándo se corta. Es el ÚNICO de los cinco
@@ -94,7 +94,7 @@ export const PARAMETROS = {
      * p99 observado por ruta (decenas de ms declarativo, cientos posicional,
      * segundos perceptual — §{Tramo 3 › Costo}) por un factor de holgura.
      */
-    msMáximo: null as Pendiente<number>,
+    maxMs: null as Pending<number>,
 
     /**
      * Techo de nodos emitidos por corrida (plan §{Diagnóstico}).
@@ -103,7 +103,7 @@ export const PARAMETROS = {
      * por encima del p99 legítimo y por debajo del punto donde el worker se
      * queda sin memoria.
      */
-    nodosMáximos: null as Pendiente<number>,
+    maxNodes: null as Pending<number>,
 
     /**
      * Techo de bytes MATERIALIZADOS en memoria por corrida (plan §{Diagnóstico}
@@ -113,7 +113,7 @@ export const PARAMETROS = {
      * bytes-materializados por formato; el techo cubre la tasa de expansión de un
      * OOXML legítimo.
      */
-    bytesMaterializadosMáximos: null as Pendiente<number>,
+    maxMaterializedBytes: null as Pending<number>,
 
     /**
      * Techo del costo perceptual: descomposiciones con modelo antes de diferir el
@@ -123,12 +123,12 @@ export const PARAMETROS = {
      * converger la cola de pendientes. Si crece sin drenar, está mal calibrado
      * (§{Observabilidad}).
      */
-    invocacionesMáximas: null as Pendiente<number>,
+    maxInvocations: null as Pending<number>,
 
     /**
      * Techo de expansiones de la recursión de delegación por corrida. NO existe en
      * el plan: es la medida decreciente que le falta a la terminación (auditoría
-     * #7). `invocacionesMáximas` no sirve porque «un acierto de caché no descuenta»
+     * #7). `maxInvocations` no sirve porque «un acierto de caché no descuenta»
      * (§{Diagnóstico}), así que una cadena infinita de assets
      * distintos-pero-cacheados no consume nada. Este contador descuenta SIEMPRE,
      * incluso en acierto de caché, porque lo que acota no es el dinero sino la
@@ -136,7 +136,7 @@ export const PARAMETROS = {
      * el corpus (la observabilidad ya declara «profundidad media»,
      * §{Observabilidad}).
      */
-    expansionesMáximas: null as Pendiente<number>,
+    maxExpansions: null as Pending<number>,
 
     /**
      * Corridas máximas por documento (re-emisiones por delegación tardía, asset
@@ -147,12 +147,12 @@ export const PARAMETROS = {
      * necesita un documento sano hasta drenar sus pendientes — el mismo dato que
      * P2.
      */
-    corridasMáximasPorDocumento: null as Pendiente<number>,
+    maxRunsPerDocument: null as Pending<number>,
   },
 
   // ───────────────────────────── Tramo 3 · Geometría ─────────────────────────
 
-  geometría: {
+  geometry: {
     /**
      * Unidades por marco de una `Caja`: las coordenadas son enteros en milésimas
      * del ancho/alto del marco.
@@ -163,7 +163,7 @@ export const PARAMETROS = {
      * Se mide: no se mide. 1000 da resolución sub-píxel en cualquier página real
      * sin acercarse al límite de un entero de 32 bits.
      */
-    unidadesPorMarco: 1000,
+    unitsPerFrame: 1000,
 
     /**
      * Tolerancia de contención geométrica, en unidades de marco.
@@ -174,12 +174,12 @@ export const PARAMETROS = {
      * «cuelga de la raíz», que es visible, en vez de a «cuelga del vecino
      * equivocado», que es silencioso.
      */
-    toleranciaDeContención: 0,
+    containmentTolerance: 0,
   },
 
   // ───────────────────────────── Tramo 4 · Identidad ─────────────────────────
 
-  identidad: {
+  identity: {
     /**
      * Multiplicidad máxima de un hash para que el pase 1 lo use como ancla (plan
      * §{5 · Reconciliador}: «solo los hashes que aparecen una única vez de cada
@@ -189,7 +189,7 @@ export const PARAMETROS = {
      * planillas reales (auditoría #64): una columna de estado produce filas enteras
      * repetidas y entonces NINGUNA ancla.
      */
-    multiplicidadMáximaParaAnclar: 1,
+    maxMultiplicityForAnchoring: 1,
 
     /**
      * Umbral de similitud de los pases 2 y 3, en [0,1]. Decide: qué se considera
@@ -200,7 +200,7 @@ export const PARAMETROS = {
      * el plan declara explícitamente medido-y-no-elegido, y aun así no figura en
      * P1–P5.
      */
-    umbralDeSimilitud: null as Pendiente<number>,
+    similarityThreshold: null as Pending<number>,
 
     /**
      * Tope de comparaciones de los pases 2 y 3, por corrida.
@@ -214,7 +214,7 @@ export const PARAMETROS = {
      * Al superarlo el hueco se resuelve como altas + bajas y se emite el evento
      * de anclaje bajo — nunca se trunca en silencio.
      */
-    comparacionesMáximas: null as Pendiente<number>,
+    maxComparisons: null as Pending<number>,
 
     /**
      * Umbral de `anclaje` por debajo del cual se registra el evento de
@@ -225,12 +225,12 @@ export const PARAMETROS = {
      * OJO: el denominador NO está en el plan (auditoría #62) — ver
      * `DENOMINADOR_DE_ANCLAJE` en `salidas.ts`.
      */
-    umbralDeAnclaje: null as Pendiente<number>,
+    anchoringThreshold: null as Pending<number>,
   },
 
   // ───────────────────────── Proyección · huella · similitud ─────────────────
 
-  proyección: {
+  projection: {
     /**
      * Tamaño del n-grama de tokens con el que se calcula la similitud.
      * Decide, según la auditoría H2, «si una planilla pierde 500 identidades o
@@ -238,20 +238,20 @@ export const PARAMETROS = {
      * token), así que cambiar una celda de una fila de N mueve 1 token de N y la
      * similitud queda alta. Con grano de palabra sobre una fila serializada,
      * cambiar una celda de un campo corto hunde la similitud.
-     * Se mide: barrido conjunto con `umbralDeSimilitud` sobre el corpus; se
+     * Se mide: barrido conjunto con `similarityThreshold` sobre el corpus; se
      * reportan las dos curvas juntas porque no son independientes.
      */
-    tamañoDeNGrama: 2,
+    nGramSize: 2,
 
     /** Similitud mínima. Constante de contrato: define el codominio, no se mide. */
-    similitudMínima: 0,
+    minSimilarity: 0,
     /** Similitud máxima. Constante de contrato: define el codominio, no se mide. */
-    similitudMáxima: 1,
+    maxSimilarity: 1,
   },
 
   // ───────────────────────────── Tramo 5 · Agrupación ────────────────────────
 
-  agrupación: {
+  grouping: {
     /**
      * Tamaño objetivo de un fragmento, en CARACTERES (code points del texto ya
      * normalizado). Decide: la granularidad de todo el índice — número de
@@ -266,7 +266,7 @@ export const PARAMETROS = {
      * da está en tokens («~300», §{Por qué la miga}) y está en la sección del tramo
      * 6, o sea que ni siquiera es de este tramo.
      */
-    tamañoObjetivoEnCaracteres: null as Pendiente<number>,
+    targetSizeChars: null as Pending<number>,
 
     /**
      * Solapamiento entre fragmentos, en caracteres. Fijado en 0 por decisión
@@ -275,7 +275,7 @@ export const PARAMETROS = {
      * cerrada del plan. Se mide: no se mide. Reintroducirlo revierte una
      * eliminación argumentada.
      */
-    solapamientoEntreFragmentos: 0,
+    fragmentOverlapChars: 0,
 
     /**
      * Longitud máxima del texto de una miga, en caracteres, antes de truncar.
@@ -286,7 +286,7 @@ export const PARAMETROS = {
      * Se mide: distribución de longitud de títulos reales; el truncado cae por
      * encima del p99 para que casi nunca dispare.
      */
-    largoMáximoDeMiga: null as Pendiente<number>,
+    maxBreadcrumbLength: null as Pending<number>,
   },
 
   // ───────────────────────────── Tramo 6 · Embeddings ────────────────────────
@@ -296,7 +296,7 @@ export const PARAMETROS = {
      * Límite del modelo, en tokens. Dato del proveedor, no se mide.
      * Decide: cuándo un fragmento se vectoriza en N ventanas (§{Cómo se rebana}).
      */
-    límiteDelModeloEnTokens: null as Pendiente<number>,
+    modelLimitTokens: null as Pending<number>,
 
     /**
      * Solapamiento entre ventanas DENTRO de un fragmento, en tokens.
@@ -306,7 +306,7 @@ export const PARAMETROS = {
      * Se mide: recuperación de contenido que cae exactamente sobre una frontera
      * de ventana.
      */
-    solapamientoEntreVentanas: null as Pendiente<number>,
+    windowOverlapTokens: null as Pending<number>,
 
     /**
      * Techo de ventanas por fragmento. Decide: que «nada: el ventaneo se ajusta
@@ -316,12 +316,12 @@ export const PARAMETROS = {
      * plan: diferir y marcar `parcial`, nunca truncar en silencio. Se mide:
      * distribución de tamaño de nodo del corpus real.
      */
-    ventanasMáximasPorFragmento: null as Pendiente<number>,
+    maxWindowsPerFragment: null as Pending<number>,
   },
 
   // ───────────────────────────── Tramo 7 · Búsqueda ──────────────────────────
 
-  búsqueda: {
+  search: {
     /**
      * Factor de sobre-fetch antes de deduplicar por `FragmentoId`.
      * Decide: que un top-10 no quede en 3 resultados después del dedupe, porque
@@ -329,6 +329,6 @@ export const PARAMETROS = {
      * Se mide: distribución del número de ventanas por fragmento del corpus; el
      * factor cubre el p99.
      */
-    factorDeSobreFetch: null as Pendiente<number>,
+    overFetchFactor: null as Pending<number>,
   },
 } as const;

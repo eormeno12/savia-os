@@ -17,9 +17,23 @@ import type {
   LocalId,
   OrganizacionId,
 } from "./identidad.js";
-import type { Cuerpo, Forma } from "./formas.js";
+import type {
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  Body as Cuerpo,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  Shape as Forma,
+} from "./shapes.js";
 import type { Token } from "./proyeccion.js";
-import type { Certeza, NivelDeReconocimiento, Pista, Tipo } from "./clasificacion.js";
+import type {
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  Certainty as Certeza,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  RecognitionLevel as NivelDeReconocimiento,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  Hint as Pista,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  Role as Tipo,
+} from "./classification.js";
 import type { SourceRange, Ubicación } from "./ubicacion.js";
 
 // ─────────────────────────────── La marca nodal ──────────────────────────────

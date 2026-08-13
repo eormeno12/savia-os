@@ -16,10 +16,23 @@
  * (§{Paquetes}) deja de significar que el contrato está congelado.
  */
 
-import { PARAMETROS } from "./params.js";
+import {
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  PARAMETERS as PARAMETROS,
+} from "./params.js";
 import type { AdaptadorId, HashMateria } from "./identidad.js";
-import type { Clase, NivelDeReconocimiento } from "./clasificacion.js";
-import type { Cuerpo, RefObjeto } from "./formas.js";
+import type {
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  Classification as Clase,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  RecognitionLevel as NivelDeReconocimiento,
+} from "./classification.js";
+import type {
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  Body as Cuerpo,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  ObjectRef as RefObjeto,
+} from "./shapes.js";
 import type { Ubicación, UbicaciónLocal } from "./ubicacion.js";
 import type { Canal, NivelLogrado, NodoCrudo } from "./salidas.js";
 
@@ -617,4 +630,4 @@ export interface AdaptadorOpaco {
 }
 
 /** El tamaño de la ventana de la sonda, para quien la construya. */
-export const BYTES_MAGICOS = PARAMETROS.recepción.bytesMágicos;
+export const BYTES_MAGICOS = PARAMETROS.intake.magicBytes;
