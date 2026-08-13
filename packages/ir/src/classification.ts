@@ -14,16 +14,18 @@ import type { LocalId } from "./identidad.js";
 // ─────────────────────────────── Tipo ────────────────────────────────────────
 
 /**
- * Los 15 valores, en el orden y con la grafía literal de §{Por qué `tipo`}.
+ * Los 15 valores, en el orden de §{Por qué `tipo`} y con la grafía del glosario.
  *
- * PROVISIONAL(P1): los LITERALES van en español y SIN tilde (`parrafo`, `codigo`,
- * `epigrafe`) mientras los nombres exportados van CON tilde (`cohesiónDe`,
- * `COHESIÓN`, `Cohesión`, `Ubicación`) — Es una asimetría real del plan, no un
- * descuido de transcripción, y la conservo para que cualquiera pueda cotejar cada
- * símbolo contra su línea del borrador. P1 declara pendiente el pasaje a inglés y
- * hay que resolverlo en una pasada dedicada, con bump de versión mayor de `ir`, no
- * de contrabando — Si se decide al revés (traducir ahora), ninguna cita de línea
- * del plan verifica y el rename posterior toca el contrato del que depende todo.
+ * P1, EJECUTADO ACÁ (bloque 1). El plan escribe estos literales en español y sin
+ * tilde (`parrafo`, `codigo`, `epigrafe`) y sus exports con tilde (`cohesiónDe`,
+ * `COHESIÓN`, `Cohesión`) — una asimetría real del borrador, no un descuido de
+ * transcripción. Este archivo ya NO la conserva: los quince literales y los nombres
+ * exportados están en inglés, según `GLOSARIO.md`, que es la autoridad de nombres.
+ * Lo que sostenía el español era poder cotejar cada símbolo contra su LÍNEA del
+ * borrador; el cotejo pasó a ser por SECCIÓN —las anclas de `scripts/citas.mjs`— y
+ * una sección sobrevive a un rename mientras un número de línea no. P1 sigue
+ * pendiente para los archivos que no entraron al bloque 1 — ver PROVISIONAL(P1) en
+ * `index.ts`.
  *
  * NUEVE de los quince no tienen productor en ningún adaptador del registro
  * (`subheading`, `quote`, `ordered_list`, `formula`, `caption`, `footnote`,
@@ -251,7 +253,10 @@ export const COHESION_BY_ROLE: Partial<Record<Role, Cohesion>> & {
   // usaba —`cohesionOf` resuelve `code` por esta tabla antes de mirar la forma—
   // y que además nadie llamaba. Lo que sostenía la propiedad eran estas tres
   // entradas; ahora son inescribibles de otro modo. Los tres tipos son LITERALES a
-  // propósito: ensancharlos a `Cohesion` deja pasar `"normal"` en verde.
+  // propósito: ensancharlos a `Cohesion` dejaba pasar `"normal"` —y lo dejaba pasar
+  // EN VERDE, porque nada verificaba que siguieran siendo literales—. Eso ya no:
+  // `PRUEBAS_DE_COHESIÓN` (`invariantes.ts`) asevera los tres campos contra `"solo"`
+  // exacto, así que ensanchar cualquiera de ellos rompe el build.
   readonly code: "solo";
   readonly formula: "solo";
   readonly image: "solo";
@@ -387,9 +392,10 @@ export const roleFromBody = (body: Body): Role =>
  * entonces la anotación de `ROLE_BY_SHAPE` DEJA DE RESTRINGIR — el par ilegal
  * `text_span ⇒ code` compila en verde. Y `isLegalPair`, que pregunta
  * `role in REQUIRED_SHAPE` (un chequeo de runtime sobre claves string), devuelve
- * `true` para todo: `ILLEGAL_PAIRS` queda vacío y `CARDINALITIES.illegalPairs` pasa
- * de 25 a 0 sin un solo error. Sacarlo no rompe nada: apaga tres garantías en
- * silencio.
+ * `true` para todo: `ILLEGAL_PAIRS` pasa de 25 pares a 0 sin un solo error.
+ * Sacarlo no rompía nada: apagaba tres garantías en silencio. Ahora lo ataja
+ * `PRUEBAS_DE_PAREJA` (`invariantes.ts`), que asevera por separado que las claves de
+ * este mapa siguen siendo `Role` y que la pareja obligada sigue restringiendo.
  */
 export const REQUIRED_SHAPE = {
   code: "verbatim",
@@ -468,20 +474,11 @@ export const ROLE_SHAPE_PAIRS: readonly (readonly [Role, Shape])[] = ROLES.flatM
 export const ILLEGAL_PAIRS: readonly (readonly [Role, Shape])[] =
   ROLE_SHAPE_PAIRS.filter(([r, s]) => !isLegalPair(r, s));
 
-/** Conteos que otros paquetes citan, derivados y no escritos. */
-export const CARDINALITIES = {
-  roles: ROLES.length,
-  shapes: SHAPES.length,
-  cohesions: COHESIONS.length,
-  linkages: LINKAGES.length,
-  certainties: CERTAINTIES.length,
-  levels: RECOGNITION_LEVELS.length,
-  totalPairs: ROLE_SHAPE_PAIRS.length,
-  illegalPairs: ILLEGAL_PAIRS.length,
-  legalPairs: ROLE_SHAPE_PAIRS.length - ILLEGAL_PAIRS.length,
-  // PENDING(glosario): `formaObligadaCubre` es una frase verbal y ninguna regla del
-  // glosario la determina (el plan la dejó abierta en D16 con tres candidatos). Se
-  // usa `requiredShapeCovers`, que es el nombre con el que el anexo del plan cita
-  // esta cifra, hasta que el glosario la registre.
-  requiredShapeCovers: Object.keys(REQUIRED_SHAPE).length,
-} as const;
+// Acá vivía `CARDINALITIES`, un objeto de conteos derivados («conteos que otros
+// paquetes citan»). No lo citaba nadie: su única mención fuera de este archivo era
+// el re-export de `index.ts`. Y como cifra de runtime no cubría nada — borrar un rol
+// bajaba `totalPairs` de 90 a 84 y los cuatro comandos seguían en verde, porque un
+// valor derivado que nadie compara contra nada no es una garantía, es un espejo.
+// Lo que sí es garantía está ahora en `PRUEBAS_DE_DOMINIO` (`invariantes.ts`), que
+// fija 15 y 6 A NIVEL DE TIPO: quitar un rol rompe el build en vez de mover
+// calladamente un número que nadie lee.

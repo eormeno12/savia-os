@@ -38,7 +38,30 @@ const FRONTERAS = [
   },
 ];
 
+/** Módulos que el BFS encontró importados y no están en disco. */
+const faltantes = new Set();
+
+/**
+ * Los módulos que `archivo` importa, en nombres de disco.
+ *
+ * El archivo puede NO EXISTIR, y no es un caso raro: durante un rename por etapas
+ * (`formas.ts` → `shapes.ts`) todo import a un módulo todavía sin renombrar apunta a
+ * un archivo que no está. La versión anterior hacía `readFileSync` a secas y salía
+ * con un `ENOENT` crudo de Node, con stack trace y sin el «porque» — falla ruidosa,
+ * sí, pero el mensaje habla de `fs.readFileSync` y no de fronteras, así que el que
+ * lo lee no sabe si rompió el guardián o el contrato.
+ *
+ * Un módulo que no está no aporta aristas, así que el recorrido sigue sin él y el
+ * BFS termina y dice lo que sí pudo ver. Pero el script NO sale en verde: un grafo
+ * recorrido a medias no acredita la frontera, y quedarse callado es el mismo error
+ * que el chequeo de más abajo existe para no cometer. Se reporta una vez por módulo
+ * y el exit lo decide el cierre.
+ */
 const importsDe = (archivo) => {
+  if (!existsSync(join(SRC, archivo))) {
+    faltantes.add(archivo);
+    return [];
+  }
   const código = readFileSync(join(SRC, archivo), "utf8");
   const rutas = [...código.matchAll(/from\s+"(\.\/[^"]+)"/g)].map((m) => m[1]);
   // `verbatimModuleSyntax` obliga a la extensión `.js`; en disco es `.ts`.
@@ -79,6 +102,26 @@ for (const { origen, prohibido } of FRONTERAS) {
 }
 if (inexistentes > 0) process.exit(1);
 
+// Y el grafo tiene que tener aristas. El BFS se alimenta de UN regex, y un regex que
+// deriva no falla: devuelve cero. Si mañana el formateador pasa las comillas dobles a
+// simples, o `verbatimModuleSyntax` deja de exigir la extensión `.js`, `importsDe`
+// devuelve `[]` para todo, `camino()` no alcanza nada, y este script imprime
+// «fronteras ok (1 verificada)» sin haber verificado nada — verde por no haber
+// mirado, que es el modo de falla que el paquete entero trata de no tener. El origen
+// de una frontera siempre importa algo; si no importa nada, el que se rompió es el
+// lector, no el código.
+let ciegas = 0;
+for (const { origen } of FRONTERAS) {
+  if (importsDe(origen).length > 0) continue;
+  ciegas += 1;
+  console.error(
+    `IR-ERR: ${origen} no le parece importar nada a este guardián\n` +
+      "        el regex de importsDe() dejó de reconocer los imports (¿comillas? ¿extensión?):\n" +
+      "        el grafo quedó sin aristas y «fronteras ok» no significaría nada",
+  );
+}
+if (ciegas > 0) process.exit(1);
+
 let violaciones = 0;
 for (const { origen, prohibido, porque } of FRONTERAS) {
   const ruta = camino(origen, prohibido);
@@ -91,5 +134,16 @@ for (const { origen, prohibido, porque } of FRONTERAS) {
   );
 }
 
-if (violaciones > 0) process.exit(1);
+// Los módulos que el BFS quiso abrir y no estaban. Va DESPUÉS de las violaciones a
+// propósito: si además hay una frontera rota, lo primero que se lee es la frontera
+// rota, que es la noticia grande.
+for (const archivo of faltantes) {
+  console.error(
+    `IR-ERR: import a un módulo que no existe — ${archivo}\n` +
+      "        alguien lo importa y en disco no está (¿rename a medio hacer?)\n" +
+      "        el BFS lo salteó, así que esta corrida NO acredita la frontera",
+  );
+}
+
+if (violaciones > 0 || faltantes.size > 0) process.exit(1);
 console.log(`fronteras ok (${FRONTERAS.length} verificada${FRONTERAS.length === 1 ? "" : "s"})`);

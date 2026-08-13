@@ -9,13 +9,19 @@
  * falta en otro lado, se importa. Si hace falta uno nuevo, se agrega ACÁ y es un
  * cambio de contrato, visible como tal en el diff (§{Cómo se agrega}).
  *
- * PROVISIONAL(P1): todo el paquete está en ESPAÑOL, con los literales de `Tipo` y
- * de `via` sin tilde y los nombres exportados con tilde — Es la mezcla exacta del
- * plan, y su valor está en que cualquiera puede cotejar cada símbolo contra su
- * sección del borrador. P1 declara pendiente el pasaje a inglés — Si se decide al
- * revés (traducir ahora), ninguna cita verifica y se toca, de contrabando, el
- * contrato del que depende todo; hay que hacerlo en una pasada dedicada con bump de
- * versión mayor de `ir`.
+ * PROVISIONAL(P1): el paquete está A MEDIO TRADUCIR, y el estado es visible en esta
+ * misma lista de exports. El bloque 1 pasó a inglés `shapes.ts`, `classification.ts`
+ * y `params.ts` —con ellos los literales de `Role` y de `Linkage`, y sus nombres
+ * exportados—; `identidad.ts`, `ubicacion.ts`, `proyeccion.ts`, `salidas.ts`,
+ * `adaptador.ts` e `invariantes.ts` siguen en español, con tilde en los exportados
+ * (`Ubicación`, `Autoría`, `huellaDe`), que es la mezcla exacta del plan.
+ *
+ * El argumento que sostenía el español entero era el cotejo contra el borrador, y
+ * caducó: las citas de este paquete nombran SECCIONES, no líneas ni símbolos
+ * (`scripts/citas.mjs`), y una sección sobrevive a un rename. Lo que queda del
+ * argumento original es el orden: se traduce por bloques, cada uno verde en los
+ * cinco comandos antes del siguiente, y el bump de versión mayor de `ir` va cuando
+ * el último bloque cierre — nunca de contrabando dentro de otro cambio.
  *
  * Cómo leer las decisiones forzadas:
  *
@@ -135,7 +141,6 @@ export {
   isLegalPair,
   ROLE_SHAPE_PAIRS,
   ILLEGAL_PAIRS,
-  CARDINALITIES,
 } from "./classification.js";
 
 // La proyección canónica y lo que deriva de ella.
@@ -219,5 +224,8 @@ export {
   type PRUEBAS_DE_FORMA,
   type PRUEBAS_DE_ACUÑADO,
   type PRUEBAS_DE_MARCA,
+  type PRUEBAS_DE_COHESIÓN,
+  type PRUEBAS_DE_PAREJA,
+  type PRUEBAS_DE_DOMINIO,
   esNodo,
 } from "./invariantes.js";

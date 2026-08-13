@@ -58,13 +58,20 @@ revés**, con la cita de sección del borrador o el identificador de la auditor�
 
 ## Los números
 
-Todos los valores numéricos del paquete viven en **un solo objeto**, `PARAMETROS`
-(`src/params.ts`). No hay un solo literal numérico en ningún otro archivo.
+Todos los valores numéricos del paquete viven en **un solo objeto**, `PARAMETERS`
+(`src/params.ts`). Ningún otro archivo tiene un literal numérico **en posición de
+valor** — lo verifica `scripts/numbers.mjs` sobre el AST, no es una promesa de
+estilo. (Un literal en posición de *tipo*, como el `15` con el que
+`invariantes.ts` fija la cantidad de roles, no cuenta: no puede decidir
+comportamiento en runtime, que es lo que esta regla gobierna.)
 
 Cada parámetro lleva su unidad, qué decide y cómo se mediría el definitivo. Los que
 están en `null` son los que el plan declara *load-bearing* y no fija: no se pueden
 inventar sin invalidar las cifras que el banco de pruebas reporta, y el tipo
-`Pendiente<T>` obliga a que alguien los provea.
+`Pending<T>` obliga a que alguien los provea. Cuántos son y cuántos siguen en `null`
+lo publica el docstring de `params.ts` en una línea `CENSO(numbers.mjs)` que el
+guardián **deriva del AST y contrasta**: una cifra de cobertura sostenida a mano ya
+llegó una vez a certificar el árbol roto y rechazar el sano.
 
 > *«Un número inventado con precisión falsa es peor que uno declarado como
 > pendiente.»* — §{5 · Reconciliador}
@@ -79,15 +86,19 @@ porque una aserción rota y una que funciona compilan igual.
 
 | Invariante | Quién lo impone | Qué pasa al violarlo |
 |---|---|---|
-| `Forma` ≡ `Cuerpo['forma']` | `Forma` se **deriva** de `Cuerpo`; `FORMAS` lleva `satisfies` | no hay dos conjuntos que puedan discrepar; un nombre de más falla en el arreglo |
-| A `FORMAS` no le falta ninguna forma | aserción en `invariantes.ts` — **irreducible**, un tipo no se enumera en runtime | error nombrando la forma faltante |
-| El piso físico nunca da un par `tipo⇒forma` ilegal | la **anotación** de `TIPO_POR_FORMA` | error en la línea de la tabla |
-| «Código siempre atómico» (§{Invariantes}) | la **anotación** de `COHESIÓN` | error en la línea de la tabla |
-| Ningún payload anida un nodo (§{Tramo 3 › Qué sale}) | el **grafo de módulos**: `formas.ts` no alcanza `salidas.ts` (`scripts/fronteras.mjs`) | `pnpm lint` falla y muestra el camino |
+| `Shape` ≡ `Body['shape']` | `Shape` se **deriva** de `Body`; `SHAPES` lleva `satisfies` | no hay dos conjuntos que puedan discrepar; un nombre de más falla en el arreglo |
+| A `SHAPES` no le falta ninguna forma | aserción en `invariantes.ts` — **irreducible**, un tipo no se enumera en runtime | error nombrando la forma faltante |
+| El piso físico nunca da un par `rol⇒forma` ilegal | la **anotación** de `ROLE_BY_SHAPE` | error en la línea de la tabla |
+| «Código siempre atómico» (§{Invariantes}) | la **anotación** de `COHESION_BY_ROLE` | error en la línea de la tabla |
+| …y esa anotación sigue siendo un **literal**, no `Cohesion` | `PRUEBAS_DE_COHESIÓN` en `invariantes.ts` | error — sin esto, ensanchar el campo y poner `"normal"` apaga la fila de arriba en verde |
+| El `satisfies` de `REQUIRED_SHAPE` sigue atando las claves a `Role` | `PRUEBAS_DE_PAREJA` en `invariantes.ts` | error — sin esto, sacarlo lleva `ILLEGAL_PAIRS` de 25 pares a 0 sin un solo aviso |
+| El barrido del banco recorre 15 × 6 (§{Estrategia}) | `PRUEBAS_DE_DOMINIO` en `invariantes.ts` — fija las dos cifras a nivel de tipo | error — quitar un rol obliga a actualizar plan y barrido en el mismo commit |
+| Ningún payload anida un nodo (§{Tramo 3 › Qué sale}) | el **grafo de módulos**: `shapes.ts` no alcanza `salidas.ts` (`scripts/fronteras.mjs`) | `pnpm lint` falla y muestra el camino |
 | Las marcas nominales separan | `PRUEBAS_DE_MARCA` en `invariantes.ts` — **irreducible**, es una propiedad de tipos | error nombrando las dos marcas que se confunden |
 | La salida del adaptador no lleva `id` | `PRUEBAS_DE_ACUÑADO` en `invariantes.ts` | error — y el acuñado al azar deja de estar justificado |
 | **Cuerpos distintos ⟹ huellas distintas** | `scripts/proyeccion.mjs` — es de **comportamiento**, ningún tipo la expresa | `pnpm lint` falla nombrando los cuerpos que colisionan |
 | Toda cita al plan apunta a una sección que existe | `scripts/citas.mjs` — el plan es un borrador vivo y las citas por número se corren solas, en silencio | `pnpm lint` falla nombrando la cita y la sección que no aparece |
+| Ningún número suelto fuera de `params.ts`, y la cifra publicada es la real | `scripts/numbers.mjs` — scanner de AST, no regex | `pnpm lint` falla nombrando archivo, línea y literal, o la discrepancia entre el censo y el AST |
 
 ### La huella es de comportamiento, no de tipos
 
@@ -108,7 +119,7 @@ El principio que salió de ahí, aplicable a cualquier codificación futura:
 > codifican a *lo mismo que no codificar*, colisionan. Cada estado emite algo.
 
 Las tres primeras versiones de esta lista **no verificaban nada** y decían que sí. La
-familia de hashes era `never` (asignable a todo), el chequeo de `Forma` era un alias
+familia de hashes era `never` (asignable a todo), el chequeo de `Shape` era un alias
 sin restricción, y el detector de anidamiento no veía el nodo a través de un campo
 opcional, de una unión con `null`, de `(Nodo | null)[]`, de `Nodo | string`, ni más
 allá de seis niveles — donde además respondía «limpio».
@@ -120,9 +131,9 @@ en el informe de la revisión.
 ### Por qué el anidamiento se impone con el grafo y no con tipos
 
 Lo que vuelve `Nodo` a un `Nodo` es `MARCA_NODAL`, que vive solo en `salidas.ts`. Si
-`formas.ts` no lo alcanza, un nodo dentro de un `Cuerpo` es **inexpresable** — no hay
+`shapes.ts` no lo alcanza, un nodo dentro de un `Body` es **inexpresable** — no hay
 nada que detectar. Y la dependencia natural ya va al revés (`salidas.ts` importa
-`formas.ts`), así que violar la frontera exige introducir un ciclo.
+`shapes.ts`), así que violar la frontera exige introducir un ciclo.
 
 Es la técnica que la regla **R1** ya usa para la frontera de formato («la impone el
 grafo de paquetes»), aplicada a la frontera de nodos. Reemplaza ~50 líneas de tipos
@@ -150,5 +161,10 @@ evolucionar sin mover un solo id.
 ## Verificación
 
 ```bash
-pnpm --filter @savia-os/ir typecheck
+pnpm --filter @savia-os/ir lint
 ```
+
+Son **cinco** comandos encadenados —`tsc --noEmit`, `fronteras`, `proyeccion`,
+`citas`, `numbers`— y hacen falta los cinco: `typecheck` solo cubre la mitad de la
+tabla de arriba, y las cuatro filas que impone un `.mjs` quedarían en verde sin
+haberse mirado.

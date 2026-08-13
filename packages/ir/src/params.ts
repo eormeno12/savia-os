@@ -9,14 +9,29 @@
  *
  * Por eso ningún otro archivo de `ir` contiene un literal numérico: si un número
  * decide comportamiento, vive acá, con nombre, unidad, qué decide y cómo se
- * mediría el definitivo. Los que están en `null` son los que el plan declara
- * load-bearing y que NO se pueden inventar sin invalidar las cifras que el banco
- * de pruebas reporta (auditoría H3): quien los necesite tiene que proveerlos, y
- * el tipo lo obliga.
+ * mediría el definitivo. Lo verifica `scripts/numbers.mjs`, que recorre el AST de
+ * cada archivo de `src/` — no es una promesa de estilo. Los que están en `null` son
+ * los que el plan declara load-bearing y que NO se pueden inventar sin invalidar
+ * las cifras que el banco de pruebas reporta (auditoría H3): quien los necesite
+ * tiene que proveerlos, y el tipo lo obliga.
  *
- * Nomenclatura: el plan está en español (P1 declara pendiente el pasaje a
- * inglés). Este archivo lo respeta para que cada símbolo se pueda cotejar contra
- * su línea del borrador. Ver PROVISIONAL(P1) en `index.ts`.
+ * CENSO(numbers.mjs): 29 numéricos = 18 pending en null + 11 con valor
+ *
+ * Esa línea NO se sostiene a mano: `scripts/numbers.mjs` la deriva del AST y falla
+ * si discrepa. La versión anterior de esta cifra vivía en el plan, decía «17 campos
+ * en `null`» y el árbol sano tenía 18 — o sea que publicaba como correcto el estado
+ * que resulta de convertir un pendiente en un número inventado, y un auditor que
+ * verificara contra ella aprobaba el árbol roto y rechazaba el sano. Es exactamente
+ * el modo de falla que la cita de arriba denuncia, reproducido en la cifra que
+ * existía para protegerlo.
+ *
+ * Nomenclatura: este archivo YA está en inglés — el bloque 1 ejecutó P1 acá, sobre
+ * `shapes.ts` y sobre `classification.ts`. El argumento que sostenía el español
+ * («que cada símbolo se pueda cotejar contra su línea del borrador») caducó cuando
+ * el cotejo pasó a hacerlo `scripts/citas.mjs` contra SECCIONES del plan: una
+ * sección sobrevive al rename de un símbolo, un número de línea no. El plan sigue
+ * en español y las anclas de sección lo citan tal cual. Ver PROVISIONAL(P1) en
+ * `index.ts` para lo que todavía no se tradujo.
  */
 
 /** Un parámetro que el plan declara medible y todavía no midió. `null` = sin valor. */
