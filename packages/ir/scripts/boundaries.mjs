@@ -20,13 +20,30 @@
  * `null`, de `(Nodo | null)[]`, de `Nodo | string`, ni más allá de 6 niveles —
  * donde además respondía «limpio». Esto se prueba agregando el import y mirando
  * fallar el comando; aquello no se podía probar leyéndolo.
+ *
+ * Y UNA SEGUNDA COSA QUE NO ES UNA FRONTERA DEL GRAFO, dicho de frente para que no
+ * parezca que se coló: la CADENA DE GUARDIANES de `package.json`. Va acá y no en un
+ * guardián nuevo porque `lint` corre SIETE y siete son los que tiene que correr —un
+ * guardián que existe para vigilar a los guardianes sería el octavo, y el paquete no
+ * lo quiere—. De los seis scripts, este es el que ya razona sobre nombres escritos a
+ * mano que nada verifica («el archivo exento se nombra por STRING», más abajo) y es
+ * el PRIMERO de la cadena, así que si algo falta se entera antes que nadie.
+ * `packages/emission` tiene los dos chequeos desde su bloque 5 (I11a/I11b) y `ir` no
+ * los tenía, siendo que el accidente que I11b describe —`turbo` corriendo `lint` y
+ * `build` en paralelo, el corredor de mutación mutando el árbol en el lugar— dejó
+ * mutaciones pegadas en OCHO archivos de `packages/ir/src`. El que se lo comió no
+ * tenía el chequeo.
  */
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const SRC = resolve(dirname(fileURLToPath(import.meta.url)), "..", "src");
+const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const SRC = join(RAIZ, "src");
+
+/** El guardián que muta el árbol en el lugar: va en `lint` y NUNCA en `build`. */
+const MUTANTES = "scripts/mutants.mjs";
 
 /** `origen` no puede alcanzar `prohibido`, ni directa ni transitivamente. */
 const FRONTERAS = [
@@ -48,12 +65,64 @@ const FRONTERAS = [
     // verificado, con el camino impreso. Lo que la vuelve escribible es haber mudado
     // `Authorship` a un archivo propio, y esa es la única razón por la que ese
     // archivo existe.
+    //
+    // El bloque 3b la escribió como `projection.ts ↛ authorship.ts` y cubría UN tipo.
+    // Este bloque le mudó `DelegationId` —que declaraba el mismo invariante y del
+    // lado alcanzable no lo protegía nada— y con dos miembros el archivo pasa a
+    // llamarse por la categoría: `provenance.ts`. La frontera no cambió de forma; lo
+    // que cambió es cuánto cubre, y por eso el `porque` de abajo nombra las DOS
+    // razones. Está acreditada por miembro: M46 con `Authorship`, M49 con
+    // `DelegationId` — un solo mutante que importara los dos se pondría rojo por el
+    // primero y no acreditaría al segundo.
     origen: "projection.ts",
-    prohibido: "authorship.ts",
+    prohibido: "provenance.ts",
     porque:
-      "si la autoría entrara en la huella, el mismo contenido subido por dos personas daría huellas distintas: se caen el caché de reconocimiento, que cruza organizaciones POR DISEÑO (§{Caché}), y la deduplicación",
+      "la huella contesta QUÉ ES un contenido, no CÓMO LLEGÓ. Si la autoría entrara, el mismo contenido subido por dos personas daría huellas distintas y se caen el caché de reconocimiento —que cruza organizaciones POR DISEÑO (§{Caché})— y la deduplicación; si entrara la delegación, la re-emisión por delegación tardía movería identificadores, contra el «cero identificadores movidos» de §{La delegación tardía}",
   },
 ];
+
+// ── La cadena de guardianes ───────────────────────────────────────────────────
+// Dos mitades de la misma regla, y las dos se comprueban antes de tocar el grafo:
+// si la cadena está mal, lo que este script diga del grafo importa menos.
+//
+//   (a) `lint` los nombra a TODOS. Un guardián que no corre NO AVISA QUE NO CORRIÓ:
+//       el paquete queda verde y la garantía que ese script acredita deja de existir
+//       sin que nada cambie de color. Cubre las dos formas de perderlo —omitirlo, y
+//       nombrarlo mal, que es lo que deja un rename a medio hacer—. Es la falla que
+//       `GLOSARIO.md` (sección 6) documenta haber tenido con `mutantes.mjs`.
+//   (b) `build` NO puede nombrar al corredor de mutación. No es una excepción a (a):
+//       es la otra mitad. `mutants.mjs` edita los archivos del árbol EN EL LUGAR y
+//       los restaura, y `turbo` agenda `lint` y `build` del mismo paquete en
+//       PARALELO: si los dos lo encadenan, el segundo captura como «original» un
+//       archivo que el primero ya mutó. La regla de fondo es más simple que la
+//       carrera: un build no muta su fuente.
+{
+  const pkg = JSON.parse(readFileSync(join(RAIZ, "package.json"), "utf8"));
+  const lint = pkg.scripts?.lint ?? "";
+  const build = pkg.scripts?.build ?? "";
+  const enDisco = readdirSync(join(RAIZ, "scripts")).filter((f) => f.endsWith(".mjs")).sort();
+
+  const faltan = enDisco.filter((g) => !lint.includes(`scripts/${g}`));
+  if (faltan.length > 0) {
+    console.error(
+      `IR-ERR: guardian left out of \`lint\` — ${faltan.join(", ")}\n` +
+        `        la cadena dice: ${lint}\n` +
+        "        un guardián que no corre no avisa que no corrió: el paquete queda verde y la\n" +
+        "        garantía que ese script acredita deja de existir sin que nada cambie de color",
+    );
+    process.exit(1);
+  }
+
+  if (build.includes(MUTANTES)) {
+    console.error(
+      `IR-ERR: \`build\` chains the mutation runner — ${MUTANTES}\n` +
+        `        la cadena dice: ${build}\n` +
+        "        muta los archivos del árbol en el lugar, y turbo corre `lint` y `build` en\n" +
+        "        paralelo: se pisan y dejan mutaciones pegadas. Va solo en `lint`",
+    );
+    process.exit(1);
+  }
+}
 
 /** Módulos que el BFS encontró importados y no están en disco. */
 const faltantes = new Set();
@@ -180,4 +249,7 @@ for (const archivo of faltantes) {
 }
 
 if (violaciones > 0 || faltantes.size > 0) process.exit(1);
-console.log(`fronteras ok (${FRONTERAS.length} verificada${FRONTERAS.length === 1 ? "" : "s"})`);
+console.log(
+  `fronteras ok (${FRONTERAS.length} verificada${FRONTERAS.length === 1 ? "" : "s"}; ` +
+    "la cadena de `lint` nombra a todos los guardianes y `build` no encadena el corredor de mutación)",
+);

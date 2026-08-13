@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Acredita cada garantía del paquete ROMPIÉNDOLA, y falla si alguna deja de romperse.
 //
-//   node scripts/mutants.mjs           las 52 mutaciones, ~24 s
+//   node scripts/mutants.mjs           las 56 mutaciones, ~26 s
 //   node scripts/mutants.mjs M8        una sola, para iterar
 //
 // POR QUÉ ESTO ES UN SCRIPT Y NO UNA AUDITORÍA CON AGENTES
@@ -330,7 +330,7 @@ const MUTANTES = [
       `  readonly actor: string;\n  readonly annotator: string;`,
     ]],
     espera: /Annotation\.actor stopped being an ActorId/,
-    nota: "`readonly actor: ActorId;` también existe en Authorship —`identity.ts` hasta el bloque 3b, `authorship.ts` desde el corte—, así que el ancla necesita la línea siguiente o `ubicar` encuentra dos archivos. Que el corte no la haya podrido es precisamente porque `authorship.ts` ENTRA en ARCHIVOS: si no entrara, el texto pasaría a aparecer en un solo archivo y esta fila quedaría verde por una razón equivocada. Sin el testigo: NO ROMPÍA",
+    nota: "`readonly actor: ActorId;` también existe en Authorship —`identity.ts` hasta el bloque 3b, `authorship.ts` desde el corte, `provenance.ts` desde el rename—, así que el ancla necesita la línea siguiente o `ubicar` encuentra dos archivos. Que ni el corte ni el rename la hayan podrido es precisamente porque ese archivo ENTRA en ARCHIVOS: si no entrara, el texto pasaría a aparecer en un solo archivo y esta fila quedaría verde por una razón equivocada. Sin el testigo: NO ROMPÍA",
   },
 
   // ── Bloque 3 · el orden de Certainty (hueco cerrado) ──────────────────────
@@ -447,17 +447,17 @@ const MUTANTES = [
   // `_S5` probaba que la marca separa y NADIE probaba que el productor la usara.
   {
     id: "M46",
-    garantía: "R1 — projection.ts no puede alcanzar authorship.ts (la autoría en la huella)",
+    garantía: "R1 — projection.ts no puede alcanzar provenance.ts (la AUTORÍA en la huella)",
     cambios: [[
       `export type HashFn = (preimage: string) => string;`,
       // Calcada de M12c, con su lección: el import tiene que USARSE o `tsc` lo mata
       // con TS6133 antes de que el guardián de fronteras corra, y la fila estaría
       // acreditando al linter. Verificado a mano ANTES de escribir la frontera: con
       // el import puesto y usado, los seis guardianes quedaban VERDES.
-      `import type { Authorship } from "./authorship.js";\nexport type _EntraEnLaHuella = Authorship;\nexport type HashFn = (preimage: string) => string;`,
+      `import type { Authorship } from "./provenance.js";\nexport type _EntraEnLaHuella = Authorship;\nexport type HashFn = (preimage: string) => string;`,
     ]],
     espera: /frontera/i,
-    nota: "esta frontera era INESCRIBIBLE hasta el bloque 3b: con `Authorship` en `identity.ts`, el camino projection.ts → shapes.ts → identity.ts ya existía (por `ObjectKey`) y nacía violada. Mover UN tipo es lo que la vuelve escribible, y es la única razón por la que `authorship.ts` existe",
+    nota: "esta frontera era INESCRIBIBLE hasta el bloque 3b: con `Authorship` en `identity.ts`, el camino projection.ts → shapes.ts → identity.ts ya existía (por `ObjectKey`) y nacía violada. Mover UN tipo es lo que la vuelve escribible, y es la única razón por la que ese archivo existe. Se reancló en este bloque (`authorship.js` → `provenance.js`); sin reanclarla habría fallado RUIDOSA con TS2307 «Cannot find module './authorship.js'», que NO matchea /frontera/i — la lección de M12c",
   },
   {
     id: "M47",
@@ -488,6 +488,55 @@ const MUTANTES = [
     ]],
     espera: /the hash family census published by identity\.ts does not match/,
     nota: "es M9c aplicado al otro censo del paquete. La prosa decía «la familia son SEIS» y «esta línea y las seis de invariants.ts se actualizan juntas» desde el bloque 2, y NADIE LO CONTABA — el bloque 4 lo dejó escrito como hueco. Verificado antes del chequeo: mover la cifra pasaba en verde",
+  },
+
+  // ── Bloque 3c · la deuda del 3b: el segundo miembro de la frontera, y la ────
+  // ── cifra que quedaba sostenida a mano ─────────────────────────────────────
+  {
+    id: "M49",
+    garantía: "R1 — projection.ts no puede alcanzar provenance.ts (la DELEGACIÓN en la huella)",
+    cambios: [[
+      `export type HashFn = (preimage: string) => string;`,
+      // Misma lección que M12c y M46: el import tiene que USARSE o TS6133 mata la
+      // corrida antes del guardián de fronteras.
+      `import type { DelegationId } from "./provenance.js";\nexport type _EntraEnLaHuella = DelegationId;\nexport type HashFn = (preimage: string) => string;`,
+    ]],
+    espera: /frontera/i,
+    nota: "fila NUEVA, y no es M46 repetida: hasta este bloque `DelegationId` vivía en `identity.ts`, que `projection.ts` YA importa desde D24, así que este mismo mutante pasaba EN VERDE — verificado antes de mudarlo, con los siete guardianes limpios. Es la deuda que el bloque 3b dejó escrita en tres docstrings («su protección pasó de débil a ninguna») y que ninguna fila acreditaba. Va como fila propia y no ampliando M46 a propósito: un mutante que importara los DOS tipos se pondría rojo por `Authorship` solo, y sería indistinguible de M46 — acreditaría la mudanza sin haberla ejercido",
+  },
+  {
+    id: "M50",
+    garantía: "la cifra de llamadas a NotAssignableTo no se puede desincronizar del AST",
+    cambios: [[
+      ` * CENSO(numbers.mjs): 10 llamadas a NotAssignableTo, 10 con mensaje propio`,
+      ` * CENSO(numbers.mjs): 9 llamadas a NotAssignableTo, 9 con mensaje propio`,
+    ]],
+    espera: /the NotAssignableTo census published by invariants\.ts does not match/,
+    nota: "es la cifra VIEJA, literal: el docstring decía «las nueve» hasta el bloque 3b, se recontó a mano y eran diez, y la MISMA frase seguía diciendo «las nueve pasan el suyo» dos párrafos más arriba — o sea que la corrección a mano arregló una de las dos apariciones y dejó la otra mintiendo. Escribir cualquiera de las dos de nuevo tiene que ser imposible. Es M9c/M48 aplicado al tercer censo del paquete",
+  },
+  {
+    id: "M51",
+    garantía: "ningún guardián puede quedarse fuera de la cadena de `lint`",
+    cambios: [[
+      `node scripts/numbers.mjs && node scripts/mutants.mjs`,
+      `node scripts/mutants.mjs`,
+    ]],
+    espera: /guardian left out of `lint`/,
+    nota: "primera fila que muta `package.json`, y por eso el archivo entra en ARCHIVOS. Es el equivalente de I11a de `packages/emission`, que `ir` no tenía: un guardián que no corre NO AVISA QUE NO CORRIÓ, así que sacarlo de la cadena deja el paquete verde y apaga en silencio todo lo que ese script acredita. La mutación saca justamente a `numbers.mjs`, que es el que sostiene los tres censos. Sin el chequeo: NO ROMPÍA — el corredor arma su propia cadena en `guardianes()` y es ciego a lo que diga `package.json`",
+  },
+  {
+    id: "M52",
+    garantía: "`build` no puede encadenar el corredor de mutación",
+    cambios: [[
+      // El ancla lleva el guardián ANTERIOR y la comilla de cierre a propósito:
+      // `node scripts/numbers.mjs",` a secas aparece DOS veces —en `build` y en el
+      // atajo `"numbers"`—, y `ubicar()` lo rechaza. Verificado: la primera versión
+      // de esta fila salió «el texto a mutar aparece 2 veces».
+      `citations.mjs && node scripts/numbers.mjs",`,
+      `citations.mjs && node scripts/numbers.mjs && node scripts/mutants.mjs",`,
+    ]],
+    espera: /`build` chains the mutation runner/,
+    nota: "equivalente de I11b de `packages/emission`. No es una excepción a M51: es la otra mitad. `mutants.mjs` muta los archivos del árbol EN EL LUGAR y `turbo` agenda `lint` y `build` del mismo paquete en paralelo, así que el segundo captura como «original» un archivo que el primero ya mutó. No es hipotético y le pasó a ESTE paquete: dejó ocho archivos de `packages/ir/src` con mutaciones pegadas. `emission` tenía el chequeo desde su bloque 5 y `ir`, que fue el que se lo comió, no",
   },
 
   // ── Controles ──────────────────────────────────────────────────────────────
@@ -575,13 +624,15 @@ const ARCHIVOS = [
   "src/classification.ts",
   "src/params.ts",
   "src/identity.ts",
-  // Nace en el bloque 3b, con el corte que hace escribible `projection.ts ↛
-  // authorship.ts`. No aloja ninguna mutación —M46 muta `projection.ts`, que es el
-  // lado que viola la frontera— y entra igual, por la misma razón que
-  // `invariants.ts`: `readonly actor: ActorId;` vive acá desde el corte y en
-  // `outputs.ts`, así que sin este archivo en la lista el ancla de M35 pasaría a
-  // encontrar UN solo archivo y la fila quedaría verde por una razón equivocada.
-  "src/authorship.ts",
+  // Nace en el bloque 3b como `src/authorship.ts`, con el corte que hace escribible
+  // `projection.ts ↛ authorship.ts`, y se renombra en este bloque al mudarse
+  // `DelegationId` (la frontera es hoy `projection.ts ↛ provenance.ts`). No aloja
+  // ninguna mutación —M46 y M49 mutan `projection.ts`, que es el lado que viola la
+  // frontera— y entra igual, por la misma razón que `invariants.ts`: `readonly actor:
+  // ActorId;` vive acá desde el corte y en `outputs.ts`, así que sin este archivo en
+  // la lista el ancla de M35 pasaría a encontrar UN solo archivo y la fila quedaría
+  // verde por una razón equivocada.
+  "src/provenance.ts",
   "src/location.ts",
   // `salidas.ts` → `outputs.ts` (bloque 3). Ya no entra «solo por M29»: ahora aloja
   // los cuatro agregados de contrato (M32–M35) y el control MC5.
@@ -598,6 +649,13 @@ const ARCHIVOS = [
   // matchean, y tenerlo en la lista es lo que hace que `ubicar()` avise si mañana
   // alguien muta uno de esos mensajes desde dos lados.
   "src/invariants.ts",
+  // Entra en el bloque 3c, con M51 y M52. Es el ÚNICO que no es de `src/`, y entra
+  // por la misma razón que los demás: aloja una garantía —qué guardianes corre `lint`
+  // y cuál NO puede correr `build`— que hasta este bloque no verificaba nadie en `ir`.
+  // La cadena de `guardianes()` de este archivo está escrita a mano y es ciega a
+  // `package.json`, así que sin las dos filas el chequeo nuevo sería indistinguible de
+  // uno que no puede fallar.
+  "package.json",
 ];
 
 const guardianes = () => {

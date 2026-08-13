@@ -94,7 +94,7 @@ porque una aserción rota y una que funciona compilan igual.
 | El `satisfies` de `REQUIRED_SHAPE` sigue atando las claves a `Role` | `PAIR_PROOFS` en `invariants.ts` | error — sin esto, sacarlo lleva `ILLEGAL_PAIRS` de 25 pares a 0 sin un solo aviso |
 | El barrido del banco recorre 15 × 6 (§{Estrategia}) | `DOMAIN_PROOFS` en `invariants.ts` — fija las dos cifras a nivel de tipo | error — quitar un rol obliga a actualizar plan y barrido en el mismo commit |
 | Ningún payload anida un nodo (§{Tramo 3 › Qué sale}) | el **grafo de módulos**: `shapes.ts` no alcanza `outputs.ts` (`scripts/boundaries.mjs`) | `pnpm lint` falla y muestra el camino |
-| La **autoría no entra en la huella** (§{Caché}) | el **grafo de módulos**: `projection.ts` no alcanza `authorship.ts` (`scripts/boundaries.mjs`) | `pnpm lint` falla y muestra el camino |
+| La **procedencia no entra en la huella**: ni la autoría (§{Caché}) ni la delegación (§{La delegación tardía}) | el **grafo de módulos**: `projection.ts` no alcanza `provenance.ts` (`scripts/boundaries.mjs`) | `pnpm lint` falla y muestra el camino |
 | Las marcas nominales separan | `BRAND_PROOFS` en `invariants.ts` — **irreducible**, es una propiedad de tipos | error nombrando las dos marcas que se confunden |
 | …y el único productor de huellas **las pone**: `fingerprintOf` devuelve `NodeFingerprint` | `BRAND_PROOFS` en `invariants.ts`, sobre `ReturnType<typeof fingerprintOf>` | error — sin esto, la marca prueba que separa y nadie prueba que el productor la use |
 | La familia de hashes son **seis**, y cada una tiene su prueba | `scripts/numbers.mjs` — deriva del AST la sección de `identity.ts` y la contrasta con la línea `CENSO(numbers.mjs)` | `pnpm lint` falla nombrando la marca sin prueba, o la discrepancia entre el censo y el AST |
@@ -150,21 +150,30 @@ grafo de paquetes»), aplicada a la frontera de nodos. Reemplaza ~50 líneas de 
 recursivos con contador de profundidad. El costo, dicho de frente: **`tsc` solo no
 alcanza** — hace falta `pnpm lint`, que corre las dos cosas.
 
-### Y por qué existe `authorship.ts`
+### Y por qué existe `provenance.ts`
 
-Por lo mismo, y es el único motivo. `Authorship` **no puede entrar en la huella**: si
-entrara, el mismo contenido subido por dos personas daría huellas distintas y se caen
+Por lo mismo, y es el único motivo. **La huella contesta *qué es* un contenido, no
+*cómo llegó***, y lo que dice cómo llegó no puede entrar en ella: si entrara la
+autoría, el mismo contenido subido por dos personas daría huellas distintas y se caen
 el caché de reconocimiento —que cruza organizaciones **por diseño** (§{Caché})— y la
-deduplicación. Mientras el tipo vivió en `identity.ts` eso no lo imponía nada: la
-frontera `projection.ts ↛ identity.ts` **nacía violada**, porque `shapes.ts` importa
-`ObjectKey` y el camino ya existía. Lo único cierto era que `projection.ts` no
-*nombraba* aquel archivo — una propiedad del texto, sostenida por lectura.
+deduplicación; si entrara la delegación, la re-emisión por delegación tardía movería
+identificadores, contra el «cero identificadores movidos» de §{La delegación tardía}.
 
-Mudar **un** tipo a su propio módulo es lo que vuelve la frontera escribible, y recién
-con ella puesta `fingerprintOf` puede devolver `NodeFingerprint` sin comprar un tipo y
-vender un invariante. Lo que el corte **no** cubre está escrito de frente:
-`DelegationId` declara el mismo invariante, no se movió, y ahora está en el alcance
-léxico de `projection.ts`.
+Mientras esos tipos vivieron en `identity.ts` eso no lo imponía nada: la frontera
+`projection.ts ↛ identity.ts` **nacía violada**, porque `shapes.ts` importa `ObjectKey`
+y el camino ya existía. Lo único cierto era que `projection.ts` no *nombraba* aquel
+archivo — una propiedad del texto, sostenida por lectura, que caducó sola cuando
+`fingerprintOf` pasó a devolver `NodeFingerprint`.
+
+El archivo nació como `authorship.ts` con **un** tipo mudado, que es lo mínimo que
+vuelve la frontera escribible. `DelegationId` declaraba el mismo invariante y se quedó
+del lado alcanzable, lo que quedó escrito de frente en tres docstrings: su protección
+pasó de débil a **ninguna**. El bloque siguiente lo mudó con su constructor, y con dos
+miembros el archivo pasó a llamarse por la categoría que los cubre. La frontera es una
+sola y está acreditada **por miembro** —M46 con `Authorship`, M49 con `DelegationId`—,
+porque un mutante que importara los dos se pondría rojo por el primero y no probaría
+nada del segundo. Qué entra en el módulo y qué no lo decide el criterio de membresía de
+su encabezado, no una lista.
 
 ## Una sola proyección
 
@@ -207,7 +216,7 @@ en verde sin haberse mirado.
 
 El séptimo es el que acredita a los otros seis. `mutants.mjs` rompe cada garantía a
 propósito y falla si alguna **deja de romperse**: sin él, una fila de esta tabla que
-dejó de verificar nada es indistinguible de una que funciona. Hoy son **44 garantías
+dejó de verificar nada es indistinguible de una que funciona. Hoy son **48 garantías
 y 8 controles**; los controles existen porque una suite donde todo falla es
 indistinguible de una donde el compilador está roto.
 
@@ -216,6 +225,17 @@ indistinguible de una donde el compilador está roto.
 > marca dentro de la sección de la familia y la declaraba inocua, o sea que la suite
 > tenía una fila que ejercía el agujero que `M48` cierra. Se mudó a la sección de
 > identificadores, donde sigue diciendo lo que decía.
+
+> El bloque 3c sumó cuatro, y las cuatro cierran deuda propia del paquete. `M49` es la
+> otra mitad de `M46`: la frontera cubre ahora también `DelegationId`, que hasta este
+> bloque vivía del lado alcanzable — verificado que **este mismo mutante pasaba en
+> verde** antes de mudarlo. `M50` ata al AST la tercera cifra que el paquete publicaba
+> a mano (cuántas llamadas tiene `NotAssignableTo`), que ya había mentido y peor: se
+> había corregido a medias. `M51` y `M52` acreditan un chequeo nuevo del guardián de
+> fronteras —que `lint` nombre a **todos** los guardianes y que `build` **no** encadene
+> el corredor de mutación—, que `packages/emission` tenía desde su bloque 5 e `ir` no,
+> siendo que el accidente que describe dejó mutaciones pegadas en ocho archivos de
+> `packages/ir/src`. Son las dos primeras filas que mutan `package.json`.
 
 > El README decía «cinco» y `package.json` encadenaba siete desde el bloque 2:
 > faltaban `geometry` y `mutantes`. Corregido en el bloque 3. Los nombres de tres de

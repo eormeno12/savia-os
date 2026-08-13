@@ -1,11 +1,19 @@
 /**
- * Los números del paquete: dónde viven y cuántos son. Cuatro garantías, un scanner.
+ * Los números del paquete: dónde viven y cuántos son. Cinco garantías, un scanner.
  *
  * La cuarta entró en el bloque 3b y no es de `params.ts`: es el CENSO DE LA FAMILIA
  * DE HASHES de `identity.ts`. Va acá y no en un guardián nuevo porque es exactamente
  * la garantía 3 de abajo aplicada a otro docstring —una cifra publicada a mano que
  * el AST tiene que confirmar—, y ya tiene el scanner puesto. Ver el bloque 4 de
  * chequeos, al final.
+ *
+ * La quinta es la MISMA garantía por tercera vez, sobre el tercer censo del paquete:
+ * cuántas llamadas tiene `NotAssignableTo` en `invariants.ts`. Ver el bloque 5. Que
+ * sean tres aplicaciones del mismo chequeo no es repetición ociosa: cada una tapa una
+ * cifra que este paquete ya publicó mal, y la de `NotAssignableTo` es la que mejor
+ * muestra el modo de falla, porque se corrigió A MEDIAS —la ficha decía «las DIEZ» en
+ * un párrafo y «las nueve» dos párrafos más arriba, después de un recuento manual que
+ * arregló una sola de las dos—.
  *
  * `params.ts` abre diciendo que es «el ÚNICO objeto con valores numéricos de todo el
  * paquete», y apoya la regla en el plan (§{5 · Reconciliador}):
@@ -40,7 +48,7 @@
  * exacta que el tipo existe para hacer visible. Cuando se mida de verdad, se borra
  * la anotación y el valor entra como los otros once, con unidad y con cómo se midió.
  *
- * QUÉ NO CUENTA. Un literal numérico en posición de TIPO (`Covers<…, 15, …>` en
+ * QUÉ NO CUENTA. Un literal numérico en posición de TIPO (`FitsIn<…, 15, …>` en
  * `invariants.ts`) no es un valor: no puede decidir comportamiento en runtime, que
  * es lo que gobierna la regla de `params.ts`. Fijar 15 y 6 a nivel de tipo es lo
  * contrario de inventar un umbral — es atar el contrato al plan para que quitar un
@@ -100,7 +108,7 @@ const leer = (archivo) => {
 };
 
 /**
- * `true` si el literal está en posición de tipo. `15` en `Covers<…, 15, …>` cuelga de
+ * `true` si el literal está en posición de tipo. `15` en `FitsIn<…, 15, …>` cuelga de
  * un `LiteralTypeNode`; `-1` en posición de tipo cuelga de un unario que cuelga de
  * uno. En posición de valor, el padre es una expresión.
  */
@@ -396,6 +404,86 @@ if (censoFamilia === null) {
   }
 }
 
+// ── 5 · El censo de llamadas a `NotAssignableTo` coincide con el AST ──────────
+//
+// Es el chequeo 3 por tercera vez, sobre el tercer número que este paquete publicaba
+// a mano. La ficha del operador en `invariants.ts` decía cuántas aserciones lo usan y
+// esa cifra ya había caducado una vez: se publicó «nueve», el bloque 3b la recontó y
+// eran diez. Peor que caducar: la corrección arregló UNA de las dos apariciones, y la
+// otra siguió diciendo nueve. Una cifra revisada a medias es indistinguible de una
+// revisada, que es justo lo que la vuelve peligrosa.
+//
+// SE CUENTAN DOS COSAS Y NO UNA. Las llamadas, y cuántas pasan su propio mensaje. La
+// segunda es la que le da filo: el tercer parámetro tiene DEFAULT, y el docstring
+// afirma que ninguna aserción lo usa —«así conviene que siga»—. Sin contarlas, agregar
+// una aserción sin mensaje propio no mueve ninguna cifra: falla cuando tiene que
+// fallar, pero mandando a leer `identity.ts`, que es el defecto que el operador
+// documenta haber evitado. Con las dos, esa aserción baja la segunda cifra y esto
+// grita.
+//
+// La membresía acá NO se decide por sección (como en la familia de hashes) sino por
+// el NOMBRE del operador, que es lo que la define: una llamada a `NotAssignableTo` es
+// una llamada a `NotAssignableTo` esté donde esté en el archivo.
+
+const OPERADOR = "NotAssignableTo";
+const ARGS_CON_MENSAJE = 3;
+
+/** La línea del docstring de `PRUEBAS` que publica la cifra. */
+const CENSO_OPERADOR = new RegExp(
+  `CENSO\\(numbers\\.mjs\\):\\s*(\\d+)\\s+llamadas a ${OPERADOR},\\s*(\\d+)\\s+con mensaje propio`,
+);
+
+/** Las instanciaciones de `OPERADOR` en `PRUEBAS`, con cuántos argumentos lleva cada una. */
+const llamadasAlOperador = () => {
+  const { fuente } = leer(PRUEBAS);
+  const llamadas = [];
+  const recorrer = (nodo) => {
+    if (ts.isTypeReferenceNode(nodo) && nodo.typeName.getText(fuente) === OPERADOR) {
+      const { line } = fuente.getLineAndCharacterOfPosition(nodo.getStart(fuente));
+      llamadas.push({ línea: line + 1, argumentos: nodo.typeArguments?.length ?? 0 });
+    }
+    ts.forEachChild(nodo, recorrer);
+  };
+  recorrer(fuente);
+  return llamadas;
+};
+
+const llamadas = llamadasAlOperador();
+
+// Canario, por la misma razón que los otros dos: cero llamadas no es «todo bien», es
+// «el operador se renombró y este chequeo quedó contando la nada».
+if (llamadas.length === 0) {
+  fallas += 1;
+  console.error(
+    `IR-ERR: ${PRUEBAS} no instancia ${OPERADOR} ni una vez\n` +
+      "        o el operador se renombró, o las aserciones se fueron: este chequeo quedó vacuo",
+  );
+} else {
+  const conMensaje = llamadas.filter((l) => l.argumentos === ARGS_CON_MENSAJE).length;
+  const publicado = CENSO_OPERADOR.exec(readFileSync(join(SRC, PRUEBAS), "utf8"));
+
+  if (publicado === null) {
+    fallas += 1;
+    console.error(
+      `IR-ERR: ${PRUEBAS} no publica la línea «CENSO(numbers.mjs): N llamadas a ${OPERADOR}, M con mensaje propio»\n` +
+        "        sin ella la cifra vuelve a sostenerse a mano, que es como llegó a decir «las nueve»\n" +
+        "        y «las DIEZ» en el mismo docstring",
+    );
+  } else {
+    const dicho = { llamadas: Number(publicado[1]), conMensaje: Number(publicado[2]) };
+    if (dicho.llamadas !== llamadas.length || dicho.conMensaje !== conMensaje) {
+      fallas += 1;
+      console.error(
+        `IR-ERR: the ${OPERADOR} census published by ${PRUEBAS} does not match the AST\n` +
+          `        dice:    ${dicho.llamadas} llamadas, ${dicho.conMensaje} con mensaje propio\n` +
+          `        el AST:  ${llamadas.length} llamadas, ${conMensaje} con mensaje propio\n` +
+          `        el AST manda: líneas ${llamadas.map((l) => l.línea).join(", ")}\n` +
+          "        corregí la línea CENSO(numbers.mjs) del docstring",
+      );
+    }
+  }
+}
+
 if (fallas > 0) process.exit(1);
 
 const enNull = pending.filter((c) => c.enNull).length;
@@ -403,5 +491,6 @@ console.log(
   `números ok (${pending.length + conValor.length} campos en ${HOGAR}: ` +
     `${pending.length} ${PENDIENTE} —${enNull} en null— y ${conValor.length} con valor; ` +
     `${archivos.length - 1} archivos sin un literal numérico de valor; ` +
-    `${censoFamilia.marcas.length} marcas de hash censadas en ${FAMILIA})`,
+    `${censoFamilia.marcas.length} marcas de hash censadas en ${FAMILIA}; ` +
+    `${llamadas.length} llamadas a ${OPERADOR} en ${PRUEBAS})`,
 );

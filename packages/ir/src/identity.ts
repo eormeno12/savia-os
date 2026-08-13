@@ -8,11 +8,13 @@
  * familia de valores ya se confundió una vez: el hallazgo 10 del banco
  * (§{Cuarta}) fue exactamente eso.
  *
- * LA AUTORÍA NO ESTÁ ACÁ. Vivió en este archivo hasta el bloque 3b y se mudó a
- * `authorship.ts`, que importa de acá `ActorId` e `Instant`. No es una comodidad ni
- * un archivo por tamaño: es lo que vuelve escribible la frontera
- * `projection.ts ↛ authorship.ts`, o sea lo único que puede imponer que la autoría
- * no entre en la huella. El argumento entero está en el encabezado de aquel archivo.
+ * LA PROCEDENCIA NO ESTÁ ACÁ. `Authorship` vivió en este archivo hasta el bloque 3b y
+ * `DelegationId` hasta este; los dos están en `provenance.ts`, que importa de acá
+ * `ActorId`, `Instant` y `Nominal`. No es una comodidad ni un archivo por tamaño: es
+ * lo que vuelve escribible la frontera `projection.ts ↛ provenance.ts`, o sea lo único
+ * que puede imponer que lo que dice CÓMO LLEGÓ un contenido no entre en la huella, que
+ * contesta QUÉ ES. El argumento entero, y el criterio que decide qué otro tipo se muda,
+ * están en el encabezado de aquel archivo.
  */
 
 declare const nominal: unique symbol;
@@ -167,38 +169,13 @@ export type DocumentId = Nominal<string, "DocumentId">;
  */
 export type ObjectKey = Nominal<string, "ObjectKey">;
 
-/**
- * Identificador de un marco de delegación. Lo acuña el orquestador de la
- * recursión, NO el adaptador delegado (que no sabe que fue delegado).
- *
- * PROVISIONAL(C21): existe porque el emisor ramifica sobre «si BAJÓ de un subárbol
- * delegado» / «si SUBIÓ a un subárbol delegado» (§{2 · Emisor}) y NINGÚN tipo del
- * plan lleva ese dato: `tipo:'delegado'` se eliminó a propósito
- * (§{Lo que se borró}) y `ubicación.adaptador` no sirve (un zip dentro de un zip da
- * el mismo adaptador arriba y abajo). El propio plan se reprocha haber afirmado el
- * mecanismo «sin mecanismo» (§{Cuarta}) y lo lista entre los resueltos (§{Puntos})
- * habiendo cambiado solo la prosa — Viaja como CADENA (`Nodo.delegación`) y no como
- * valor suelto, porque la cadena además hace expresables la composición de rutas a
- * través de la frontera (auditoría #13) y la cita encadenada (#15) — Si se decide
- * al revés (un solo id, o nada), el emisor no puede distinguir bajar un nivel de
- * bajar tres, y el ejemplo canónico contrato.pdf → pg3 → imagen no se puede citar.
- *
- * NUNCA entra en la huella: si entrara, la re-emisión por delegación tardía
- * movería ids, contra §{La delegación tardía} («cero identificadores movidos»).
- *
- * Y ESO NO LO IMPONE NADIE — dicho de frente en el bloque 3b, que lo empeoró. Es el
- * mismo invariante que `Authorship`, y `Authorship` se mudó a `authorship.ts` para
- * que una frontera pudiera imponerlo. Este tipo se quedó: no hacía falta moverlo
- * para que esa frontera cerrara, y el corte se quiso mínimo. El costo es real:
- * hasta el bloque 3b `projection.ts` no nombraba este archivo y `DelegationId`
- * tampoco estaba en su alcance léxico; ahora lo nombra —importa `asNodeFingerprint`—
- * así que la protección pasó de débil a ninguna. Hoy la sostiene una sola línea de
- * prosa: la lista de PROVISIONAL(H6) en `project` («`delegation` NO»). Cerrarlo es
- * mudarlo junto a `Authorship` —y entonces ese módulo deja de llamarse «la autoría»
- * y pasa a ser «lo que no entra en la huella», que es una decisión de contrato— o
- * darle frontera propia.
- */
-export type DelegationId = Nominal<string, "DelegationId">;
+// `DelegationId` VIVÍA ACÁ y se mudó a `provenance.ts` (con su constructor). No es
+// prolijidad: declara el mismo invariante que `Authorship` —«NUNCA entra en la
+// huella»— y este archivo SÍ es alcanzable desde `projection.ts` desde que
+// `fingerprintOf` importa `asNodeFingerprint`, así que acá no lo protegía ninguna
+// frontera. Allá lo protege `projection.ts ↛ provenance.ts`, acreditada por miembro
+// (M46 y M49). El criterio que decide qué otro tipo se muda está en el encabezado de
+// aquel archivo; `ObjectKey` y `DocumentId`, que se quedan, están nombrados ahí.
 
 /**
  * Identificador de un fragmento, para deduplicar resultados de búsqueda
@@ -344,14 +321,20 @@ export type ByteHash = Nominal<string,"ByteHash">;
  *     que `Authorship` no estaba en su alcance léxico. Propiedad del texto de aquel
  *     archivo, sostenida por lectura y no por un guardián.
  *
- * QUÉ LO DESTRABÓ: partir el archivo. `Authorship` se fue a `authorship.ts` —un tipo,
- * el corte mínimo— y la frontera pasó a ser `projection.ts ↛ authorship.ts`, que sí
+ * QUÉ LO DESTRABÓ: partir el archivo. `Authorship` se fue a un módulo propio —un tipo,
+ * el corte mínimo— y la frontera pasó a ser `projection.ts ↛ provenance.ts`, que sí
  * es escribible, la impone `boundaries.mjs` y está acreditada rompiéndola. Recién
  * con eso puesto, importar `identity.ts` desde `projection.ts` dejó de comprar un
  * tipo vendiendo un invariante. El plan que este mismo docstring traía escrito era el
  * corte INVERSO —mudar la familia de hashes y `ObjectKey` a un módulo del fondo— y se
  * descartó por tamaño: mueve diez tipos y ocho constructores, toca cinco archivos y
  * cierra exactamente la misma frontera que mover uno.
+ *
+ * LO QUE EL CORTE MÍNIMO DEJÓ ABIERTO, y cerró el bloque siguiente: `DelegationId`
+ * declaraba el MISMO invariante y se había quedado acá, del lado alcanzable. Se mudó
+ * con su constructor al mismo archivo, que por eso pasó a llamarse `provenance.ts` —la
+ * categoría es «cómo llegó», no «quién lo dijo»—. La frontera no cambió de forma: es
+ * la misma, y ahora está acreditada por CADA miembro (M46 y M49).
  *
  * DOS COSAS QUE EL BLOQUE 4 LE HABÍA DEJADO A ESTA CHECKLIST, las dos disueltas por
  * el corte que se eligió: `adapter.ts` no importa de dos módulos (importa
@@ -466,8 +449,18 @@ export type CacheKey = Nominal<string,"CacheKey">;
 // marcado y el contrato es inusable. Son conversiones, no validaciones: quien
 // construye es responsable de la forma (ULID, hex de 64, ISO-8601).
 //
-// Son DIECISÉIS. R4 del glosario dice «los 15 constructores de marca» y es una
-// errata suya, no del archivo: `grep -c '^export const as' src/identity.ts` = 16.
+// Son QUINCE, y la cifra cambió en ESTE bloque: eran dieciséis hasta que
+// `asDelegationId` se fue con su tipo a `provenance.ts` (obligado — ver allá).
+// La cuenta se saca sola, sin creerle a esta línea:
+//
+//     grep -c '^export const as' src/identity.ts
+//
+// R4 del glosario publicaba la cifra y ya no: decía «los 15 constructores» cuando eran
+// dieciséis —el bloque 2 lo anotó acá como errata suya— y este bloque los dejó en
+// quince, o sea que la misma línea habría estado mal en las DOS direcciones en tres
+// bloques. Se le sacó el número en vez de corregirlo por tercera vez: el glosario
+// nombra, no cuenta, y ninguna cifra suya la verifica nadie. Las que sí se verifican
+// son las tres que `numbers.mjs` deriva del AST.
 
 export const asElementId = (v: string): ElementId => v as ElementId;
 export const asLocalId = (v: string): LocalId => v as LocalId;
@@ -476,7 +469,6 @@ export const asActorId = (v: string): ActorId => v as ActorId;
 export const asOrganizationId = (v: string): OrganizationId => v as OrganizationId;
 export const asDocumentId = (v: string): DocumentId => v as DocumentId;
 export const asObjectKey = (v: string): ObjectKey => v as ObjectKey;
-export const asDelegationId = (v: string): DelegationId => v as DelegationId;
 export const asFragmentId = (v: string): FragmentId => v as FragmentId;
 export const asInstant = (v: string): Instant => v as Instant;
 

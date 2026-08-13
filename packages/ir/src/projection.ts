@@ -37,8 +37,9 @@ import type { Body, Shape, Window } from "./shapes.js";
 // El import que este archivo NO PODÍA TENER hasta el bloque 3b. Ver `fingerprintOf`:
 // mientras `Authorship` vivía en `identity.ts`, nombrar este módulo la ponía en el
 // alcance léxico del único archivo que calcula la huella, y era lo único —débil, por
-// lectura— que impedía que entrara. Hoy la autoría está en `authorship.ts` y la
-// frontera `projection.ts ↛ authorship.ts` la impone `scripts/boundaries.mjs`.
+// lectura— que impedía que entrara. Hoy la autoría y la delegación están en
+// `provenance.ts` y la frontera `projection.ts ↛ provenance.ts` la impone
+// `scripts/boundaries.mjs`, acreditada por miembro (M46 y M49).
 import { asNodeFingerprint, type NodeFingerprint } from "./identity.js";
 
 // ─────────────────────────────── El operador `‖` ─────────────────────────────
@@ -444,16 +445,19 @@ export type HashFn = (preimage: string) => string;
  *     IR-ERR: frontera violada — projection.ts alcanza identity.ts
  *             camino: projection.ts → shapes.ts → identity.ts
  *
- * El bloque 3b mudó `Authorship` a `authorship.ts` —un tipo, el corte mínimo— y con
- * eso la frontera `projection.ts ↛ authorship.ts` existe, la impone
+ * El bloque 3b mudó `Authorship` a un archivo propio —un tipo, el corte mínimo— y con
+ * eso la frontera `projection.ts ↛ provenance.ts` existe, la impone
  * `scripts/boundaries.mjs` y está acreditada rompiéndola. Recién ahí este import
  * dejó de comprar un tipo vendiendo un invariante.
  *
- * LO QUE ESTE IMPORT SÍ EMPEORÓ, dicho de frente: `DelegationId` declara el mismo
- * invariante («NUNCA entra en la huella») y no se movió, así que ahora está en el
- * alcance léxico de este archivo y no lo protege ninguna frontera. Lo sostiene la
- * lista de PROVISIONAL(H6) en `project` («`delegation` NO»), que es prosa. Está
- * escrito en su docstring y en el encabezado de `authorship.ts`.
+ * LO QUE ESTE IMPORT EMPEORÓ, Y ESTE BLOQUE CERRÓ. El corte del 3b fue mínimo y dejó
+ * afuera a `DelegationId`, que declara el mismo invariante («NUNCA entra en la
+ * huella»): este import lo metió en el alcance léxico de este archivo sin ninguna
+ * frontera que lo protegiera, y lo sostenía la lista de PROVISIONAL(H6) en `project`
+ * («`delegation` NO»), que es prosa. Se mudó al mismo archivo —que por eso pasó a
+ * llamarse `provenance.ts`, la categoría que cubre a los dos: no QUÉ ES el contenido
+ * sino CÓMO LLEGÓ—, la frontera es una sola y está acreditada por miembro: M46 con
+ * `Authorship`, M49 con `DelegationId`.
  */
 export const fingerprintOf = (body: Body, sha256: HashFn): NodeFingerprint =>
   asNodeFingerprint(sha256(preimageOfFingerprint(body)));

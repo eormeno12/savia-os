@@ -42,6 +42,14 @@
  *
  *   43 aserciones de tipo · 27 con mutante que las acredita · 16 sin
  *
+ * El bloque 3c NO movió estas tres cifras y conviene decir por qué, para que la
+ * ausencia de cambio no se lea como que no se miró: sus dos filas nuevas no acreditan
+ * aserciones de este archivo. M49 acredita una FRONTERA del grafo de módulos
+ * (`projection.ts ↛ provenance.ts`, para `DelegationId`) y M50 un CHEQUEO de
+ * `numbers.mjs` (el censo de llamadas a `NotAssignableTo`, abajo). Lo único que este
+ * bloque le hizo al archivo es renombrar un operador —`Covers` → `FitsIn`, ver su
+ * ficha— y las 24 llamadas siguen siendo las mismas 24 aserciones.
+ *
  * Las 16 sin mutante NO son 16 huecos, y decirlo es más útil que escribir 16 filas
  * que no compran nada:
  *
@@ -56,8 +64,9 @@
  * SIN ACREDITACIÓN POSIBLE — las seis, dichas de frente
  *
  *   · `_UsableAsString` — la única edición que la dispara es cambiar `Nominal`
- *     para que no intersecte con `Base`, y eso rompe PRIMERO en los 16
- *     constructores `as*` de `identity.ts`: el mutante acreditaría al compilador,
+ *     para que no intersecte con `Base`, y eso rompe PRIMERO en los 15
+ *     constructores `as*` de `identity.ts` —16 hasta que `asDelegationId` se fue con
+ *     su tipo a `provenance.ts`—: el mutante acreditaría al compilador,
  *     no a esta línea. Lo que la protege de verdad es `_GuardFires` (M18), que fija
  *     la forma de `Nominal`. Queda como SEGURO SIN ACREDITACIÓN, escrito.
  *   · las cinco mitades «hacia atrás» — `_IngestionVersionInhabited`,
@@ -131,14 +140,43 @@ type True<T extends true> = T;
  * Y por eso mismo dos condiciones se assertean por SEPARADO y nunca con `&`:
  * `true & {error}` sigue siendo asignable a `true`.
  *
- * ADVERTENCIA HEREDADA DE LA TRADUCCIÓN, dicha de frente: el nombre y el orden de
- * los parámetros se leen al revés. `Covers<From, To>` significa «`To` cubre a
- * `From`», no «`From` cubre a `To`». En español (`Cubre<De, A>`) el defecto pasaba
- * desapercibido; en inglés invita al error. Arreglarlo es `FitsIn<Sub, Super>` o
- * invertir los parámetros — 34 sitios de llamada, que NO es traducción y por eso el
- * bloque 4 no lo hizo. Queda escrito en `GLOSARIO.md` (sección 8) como decisión pendiente.
+ * SE LLAMABA `Covers`, Y EL NOMBRE SE LEÍA AL REVÉS DE SU FIRMA. `Covers<From, To>`
+ * significaba «`To` cubre a `From`», o sea que el sujeto del verbo era el SEGUNDO
+ * parámetro. En español (`Cubre<De, A>`) el defecto pasaba desapercibido; en inglés
+ * invita a leer «From covers To», que es lo contrario. Venía marcado desde el bloque 4
+ * como decisión pendiente y este bloque la toma: **se renombra, no se invierte el
+ * orden**. `FitsIn<From, To>` se lee «`From` cabe en `To`», en el orden en que están
+ * escritos, y la firma no se toca.
+ *
+ * POR QUÉ RENOMBRAR Y NO INVERTIR, que era la otra opción válida:
+ *   · Es el criterio que este archivo YA usó para el operador hermano. D7 eligió
+ *     `NotAssignableTo<From, To>` sobre `Separates<A,B>` porque «CONSERVA LA
+ *     DIRECCIÓN»: el nombre se lee en el orden de los parámetros. `FitsIn` le aplica
+ *     el mismo criterio a este. Un criterio para los dos, no uno por operador.
+ *   · La palabra «covers» ya tiene dueño en el paquete Y CON LA CONVENCIÓN CONTRARIA:
+ *     `windowCovers(exterior, interior)` (`shapes.ts`, exportada por el barril) toma
+ *     al que cubre PRIMERO. Invertir el orden acá arreglaba la lectura y dejaba la
+ *     misma palabra haciendo dos trabajos opuestos; renombrar la desocupa.
+ *   · El costo se mapeó antes de tocar nada, y es asimétrico. Los sitios de llamada
+ *     son **24** (contados por AST, no a ojo: la cifra publicada desde el bloque 4
+ *     decía 34 y era otra cifra sostenida a mano). Renombrar les cambia el nombre del
+ *     operador y NADA MÁS: el orden de los argumentos y el mensaje —que es el tercer
+ *     parámetro, un literal— quedan intactos, así que ninguna aserción puede cambiar
+ *     de sentido en silencio y ninguna `espera` del corredor de mutación se toca —las
+ *     que matchean mensajes producidos por este operador matchean el LITERAL, no la
+ *     firma, y por eso no llevan cifra acá—. Invertir el orden obliga a releer los 24
+ *     pares, y ahí sí
+ *     hay un fallo MUDO posible: `_SpacesDeclared` y `_SpacesPresent` son el mismo par
+ *     en las dos direcciones, así que invertir uno y no el otro deja dos copias de la
+ *     misma aserción, las dos en verde, y M25 o M45 se queda sin acreditar sin que
+ *     nada cambie de color. Misma lectura arreglada, superficie de error mucho mayor.
+ *
+ * `_ArrayCoversShapes` CONSERVA su nombre, y no por olvido: nombra la PROPIEDAD —«el
+ * arreglo cubre las formas»—, no el operador. Con `FitsIn` las dos lecturas por fin
+ * coinciden: `FitsIn<Shape, (typeof SHAPES)[number]>` es «`Shape` cabe en el arreglo»,
+ * que es exactamente «el arreglo cubre las formas».
  */
-type Covers<From, To, Message extends string> = [From] extends [To]
+type FitsIn<From, To, Message extends string> = [From] extends [To]
   ? true
   : { "IR-ERR": [Message, From, To] };
 
@@ -152,7 +190,7 @@ type Covers<From, To, Message extends string> = [From] extends [To]
 // recorre un dominio viejo — los dos fallos, mudos.
 
 type _ArrayCoversShapes = True<
-  Covers<Shape, (typeof SHAPES)[number], "SHAPES is missing a shape of Body">
+  FitsIn<Shape, (typeof SHAPES)[number], "SHAPES is missing a shape of Body">
 >;
 
 export type SHAPE_PROOFS = readonly [_ArrayCoversShapes];
@@ -221,23 +259,34 @@ type Inhabited<
  * propio, una aserción sobre `RoleFor<…>` falla diciendo «la marca no separa» y
  * manda a leer `identity.ts`, que no tiene nada que ver — falla cuando tiene que
  * fallar y manda a buscar el bug al lugar equivocado, que es la mitad del trabajo
- * de un diagnóstico. Hoy NINGUNA aserción usa el default —las nueve pasan el suyo,
- * y así conviene que siga—; queda como red para que agregar una no obligue a
- * inventar el mensaje en el mismo minuto, no como opción legítima.
+ * de un diagnóstico. Hoy NINGUNA aserción usa el default: TODAS pasan el suyo, y así
+ * conviene que siga. Queda como red para que agregar una no obligue a inventar el
+ * mensaje en el mismo minuto, no como opción legítima — y por eso el censo de abajo
+ * cuenta las dos cosas por separado, para que «ninguna usa el default» tampoco quede
+ * sostenido por esta frase.
  *
- * Las DIEZ, recontadas en el bloque 3b (`_S1`–`_S6`, `_GuardFires`,
- * `_IllegalPairStaysIllegal`, `_FrameRequired`, `_FingerprintIsBranded`). Eran
- * nueve al cerrar el bloque 4 —los invariantes 10 y 11 usan `Covers` y no este
- * operador— y la décima entró con D24. Se recuenta a propósito, y en este bloque el
- * recuento sirvió: es exactamente la clase de número que este paquete ya publicó mal
- * dos veces (`M9c` en `params.ts`, «los siete» en `identity.ts`), y una cifra que
- * sobrevive un bloque sin que nadie la vuelva a contar es una cifra que va a mentir
- * en el siguiente. Esta se sigue sosteniendo a mano: el censo que el bloque 3b SÍ
- * ató al AST es el de la familia de hashes (`numbers.mjs`, M48).
+ * CENSO(numbers.mjs): 10 llamadas a NotAssignableTo, 10 con mensaje propio
+ *
+ * Son `_S1`–`_S6`, `_GuardFires`, `_IllegalPairStaysIllegal`, `_FrameRequired` y
+ * `_FingerprintIsBranded`. Los invariantes 10 y 11 usan `FitsIn` y no este operador.
+ *
+ * LA CIFRA LA DERIVA EL AST DESDE ESTE BLOQUE, y hay motivo. Estuvo sostenida a mano
+ * desde el bloque 4 y falló exactamente como falla una cifra a mano: se publicó
+ * «nueve», el bloque 3b la recontó y eran diez —la décima entró con D24—, y la
+ * corrección arregló UNA de las dos apariciones: dos párrafos más arriba esta misma
+ * ficha siguió diciendo «las nueve pasan el suyo» hasta hoy. O sea que el recuento a
+ * mano no solo caduca: caduca a medias, y la mitad que queda es indistinguible de la
+ * que se revisó. Es la tercera vez que el paquete publica mal un número de este tipo
+ * (`M9c` en `params.ts` —la cifra invertida que aprobaba el árbol mutado y rechazaba
+ * el sano— y «los siete» de la familia de hashes en `identity.ts`), y las tres se
+ * cierran igual: `scripts/numbers.mjs` cuenta las instanciaciones en el AST, las
+ * contrasta contra la línea `CENSO(numbers.mjs)` de acá arriba y falla nombrando las
+ * dos. Su mutante es M50.
  *
  * El nombre es del bloque 4 (GLOSARIO.md, D7): `NotAssignableTo` es la semántica
  * exacta de TypeScript y CONSERVA LA DIRECCIÓN. `Separates<A,B>` se lee simétrico y
- * el operador no lo es.
+ * el operador no lo es. Es el criterio que este bloque le aplicó al operador hermano,
+ * que se llamaba `Covers` y hoy se llama `FitsIn`.
  */
 type NotAssignableTo<
   From,
@@ -285,13 +334,14 @@ type _S6 = True<
  * archivo —`false` no es asignable a `true`, así que rompe— pero rompe con un
  * `TS2344` pelado que dice «Type 'false' does not satisfy the constraint 'true'» y
  * no dice QUÉ se rompió, en un archivo cuya tesis es que el mensaje es lo único que
- * el desarrollador va a leer. Ahora pasa por `Covers` y habla.
+ * el desarrollador va a leer. Ahora pasa por `FitsIn` y habla.
  *
  * SIGUE SIN MUTANTE, y la razón está en el encabezado: la única edición que la
- * dispara rompe primero en los 16 constructores `as*`.
+ * dispara rompe primero en los 15 constructores `as*` de `identity.ts` (más el de
+ * `provenance.ts`, que se fue con `DelegationId` en este bloque).
  */
 type _UsableAsString = True<
-  Covers<
+  FitsIn<
     NodeFingerprint,
     string,
     "a NodeFingerprint is no longer usable as a string — the brand stopped being an intersection, and every concatenation and map key that treats it as text broke"
@@ -322,7 +372,7 @@ type _GuardFires = True<
  * acá, porque una firma copiada es otra vez dos fuentes que pueden discrepar.
  *
  * LA MITAD QUE NO SE ESCRIBE, dicho de frente: que el retorno sea EXACTAMENTE
- * `NodeFingerprint` y no otra marca de la familia (`Covers<ReturnType<…>,
+ * `NodeFingerprint` y no otra marca de la familia (`FitsIn<ReturnType<…>,
  * NodeFingerprint>`). Se omite porque no hay edición de UNA línea que la dispare —
  * cambiar el constructor por `asMatterHash` rompe en la línea de `fingerprintOf`,
  * contra su propia anotación de retorno, y para escaparse hace falta cambiar
@@ -355,21 +405,21 @@ export type BRAND_PROOFS = readonly [
 // Acá el campo se obliga a ser EXACTAMENTE `"solo"`, no un supertipo suyo.
 
 type _CodeIsSolo = True<
-  Covers<
+  FitsIn<
     (typeof COHESION_BY_ROLE)["code"],
     "solo",
     "COHESION_BY_ROLE.code widened past the literal and no longer forces solo"
   >
 >;
 type _FormulaIsSolo = True<
-  Covers<
+  FitsIn<
     (typeof COHESION_BY_ROLE)["formula"],
     "solo",
     "COHESION_BY_ROLE.formula widened past the literal and no longer forces solo"
   >
 >;
 type _ImageIsSolo = True<
-  Covers<
+  FitsIn<
     (typeof COHESION_BY_ROLE)["image"],
     "solo",
     "COHESION_BY_ROLE.image widened past the literal and no longer forces solo"
@@ -394,7 +444,7 @@ export type COHESION_PROOFS = readonly [_CodeIsSolo, _FormulaIsSolo, _ImageIsSol
 
 /** Las 5 claves del mapa son roles de verdad. Muere si el `satisfies` se va. */
 type _RequiredShapeKeysAreRoles = True<
-  Covers<
+  FitsIn<
     RoleWithRequiredShape,
     Role,
     "REQUIRED_SHAPE keys are no longer Role — did the satisfies go away?"
@@ -434,14 +484,14 @@ export type PAIR_PROOFS = readonly [
 // y la fila acreditaría el invariante 1.
 
 type _FifteenRoles = True<
-  Covers<
+  FitsIn<
     (typeof ROLES)["length"],
     15,
     "ROLES no longer has 15 roles: the 15×6 = 90 sweep (§{Estrategia}) walks a different domain"
   >
 >;
 type _SixShapes = True<
-  Covers<
+  FitsIn<
     (typeof SHAPES)["length"],
     6,
     "SHAPES no longer has 6 shapes: the 15×6 = 90 sweep (§{Estrategia}) walks a different domain"
@@ -481,21 +531,21 @@ type _SourceRangeExists = True<
   >
 >;
 type _SpacesDeclared = True<
-  Covers<
+  FitsIn<
     Coordinate["space"],
     "source" | "text" | "grid" | "visual" | "time",
     "Coordinate gained a space: every exhaustive consumer and the twelve adapters walk a different domain"
   >
 >;
 type _SpacesPresent = True<
-  Covers<
+  FitsIn<
     "source" | "text" | "grid" | "visual" | "time",
     Coordinate["space"],
     "Coordinate lost a space: something that used to be citable no longer is"
   >
 >;
 type _WithinIsRecursive = True<
-  Covers<
+  FitsIn<
     Location["within"][number],
     Location,
     "Location.within stopped being recursive — the chained citation (contract.pdf → pg3 → image) is no longer expressible"
@@ -542,14 +592,14 @@ export type COORDINATE_PROOFS = readonly [
 // disparara mandaría a leer lo que no es. Ahora cada una dice lo suyo.
 
 type _IngestionVersionIsBytes = True<
-  Covers<
+  FitsIn<
     Ingestion["version"],
     ByteHash,
     "Ingestion.version is no longer the ByteHash of the received bytes"
   >
 >;
 type _IngestionVersionInhabited = True<
-  Covers<
+  FitsIn<
     ByteHash,
     Ingestion["version"],
     "Ingestion.version collapsed to never — the field still typechecks everywhere and addresses nothing"
@@ -557,14 +607,14 @@ type _IngestionVersionInhabited = True<
 >;
 
 type _OriginalIsAnObject = True<
-  Covers<
+  FitsIn<
     Ingestion["original"],
     ObjectKey,
     "Ingestion.original stopped being an ObjectKey — the verbatim asset is addressed by a Postgres row instead of an object"
   >
 >;
 type _OriginalInhabited = True<
-  Covers<
+  FitsIn<
     ObjectKey,
     Ingestion["original"],
     "Ingestion.original collapsed to never — the field still typechecks everywhere and addresses nothing"
@@ -572,14 +622,14 @@ type _OriginalInhabited = True<
 >;
 
 type _VersionOrganizationSeparates = True<
-  Covers<
+  FitsIn<
     NodeInVersion["organization"],
     OrganizationId,
     "NodeInVersion.organization stopped being an OrganizationId — the hash → document lookup filters by the wrong thing and crosses tenants"
   >
 >;
 type _VersionOrganizationInhabited = True<
-  Covers<
+  FitsIn<
     OrganizationId,
     NodeInVersion["organization"],
     "NodeInVersion.organization collapsed to never — the field still typechecks everywhere and filters nothing"
@@ -587,14 +637,14 @@ type _VersionOrganizationInhabited = True<
 >;
 
 type _AnnotationActorIsActor = True<
-  Covers<
+  FitsIn<
     Annotation["actor"],
     ActorId,
     "Annotation.actor stopped being an ActorId — curation is no longer attributable and the dedup key stops separating two curators"
   >
 >;
 type _AnnotationActorInhabited = True<
-  Covers<
+  FitsIn<
     ActorId,
     Annotation["actor"],
     "Annotation.actor collapsed to never — the field still typechecks everywhere and attributes nothing"
@@ -629,14 +679,14 @@ export type WRAPPER_PROOFS = readonly [
 // hecho del contrato es lo contrario de inventar un umbral.
 
 type _DeclaredIsBest = True<
-  Covers<
+  FitsIn<
     (typeof CERTAINTY_RANK)["declared"],
     0,
     "CERTAINTY_RANK.declared moved: the ladder now ranks what the pipeline GUESSED as the safest certainty"
   >
 >;
 type _InferredIsWorst = True<
-  Covers<
+  FitsIn<
     (typeof CERTAINTY_RANK)["inferred"],
     1,
     "CERTAINTY_RANK.inferred moved: the ladder now ranks a guess above a declared fact"
@@ -666,14 +716,14 @@ export type CERTAINTY_PROOFS = readonly [_DeclaredIsBest, _InferredIsWorst];
 // calcada.
 
 type _AncestorsAreMatter = True<
-  Covers<
+  FitsIn<
     Context["ancestors"][number],
     MatterHash,
     "Context.ancestors is no longer a chain of MatterHash — the cycle guard compares hashes of another family and the recursion has no decreasing measure"
   >
 >;
 type _AncestorsInhabited = True<
-  Covers<
+  FitsIn<
     MatterHash,
     Context["ancestors"][number],
     "Context.ancestors collapsed to never — the chain still typechecks everywhere and can hold nothing, so the cycle guard never fires"
@@ -710,7 +760,7 @@ export type RECURSION_PROOFS = readonly [_AncestorsAreMatter, _AncestorsInhabite
 // rojo al reordenar las claves de `Evidence` estaría fijando prosa.
 
 type _EvidenceScaleOrder = True<
-  Covers<
+  FitsIn<
     typeof EVIDENCE_SCALE,
     readonly ["None", "Floor", "Content", "Extension", "Structure", "Signature"],
     "EVIDENCE_SCALE was reordered: the six values of Evidence are derived from this order (§{Evidencia}), so Signature is no longer 4 and Floor is no longer 0 — which adapter wins a file changed"

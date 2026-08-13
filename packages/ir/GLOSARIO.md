@@ -44,7 +44,7 @@ Aplicadas en orden. Si dos reglas compiten, gana la de más arriba.
 | **R1** | **Si hay una sola palabra correcta en inglés, esa es** — cognados (`-ción→-tion`, `-dad→-ity`) y traducciones llanas. **Salvedad: el cognado es la primera opción, no la última palabra.** Si el cognado significa otra cosa en inglés, gana el término de dominio | `Ubicación→Location` · `dueño→owner` · `hoja→sheet` · `ancho/alto→width/height` · pero `recepción→intake` (no `reception`, que es un lobby) y `epigrafe→caption` (no `epigraph`) |
 | **R2** | **Raíz + modificador**, y en inglés el adjetivo va **adelante** | `Nodo→Node` ⇒ `NodoCrudo→RawNode`, `NodoEmitido→EmittedNode` · `Miga→Breadcrumb` ⇒ `MigaEstable→StableBreadcrumb` |
 | **R3** | **Todo predicado lleva `is*`**, empiece o no con `es*` en español | `esNodo→isNode` · `esNodoFila→isRowNode` · `parLegal→isLegalPair` |
-| **R4** | `como*` → `as*` | los 16 constructores de marca: `comoElementId→asElementId` |
+| **R4** | `como*` → `as*` | los constructores de marca: `comoElementId→asElementId` |
 | **R5** | **`Máximo/…` → `max*` y `Mínimo/…` → `min*`**, como prefijo. Las cuatro formas de género y número colapsan en una | `msMáximo→maxMs` · `nodosMáximos→maxNodes` · `bytesMaterializadosMáximos→maxMaterializedBytes` · `similitudMínima→minSimilarity` · `certezaMínima→minCertainty` |
 | **R6** | `Clave*` / `clave*` → `*Key` | `ClaveDeCache→CacheKey` · `ClaveEmbedding→EmbeddingKey` · `claveDeCampo→fieldKey` |
 | **R7** | **`por` → `by` si el símbolo es un mapa o un método** (nombra el criterio); **`per` si es un número** (nombra el denominador). Lo decide el tipo del valor, no la intuición | `porHash→byHash` · `TIPO_POR_FORMA→ROLE_BY_SHAPE` · pero `unidadesPorMarco→unitsPerFrame` · `corridasMáximasPorDocumento→maxRunsPerDocument` |
@@ -86,11 +86,19 @@ Todo lo demás se deriva de acá por las reglas de §2.
 | `Ventana` | `Window` | | `Anotación` | `Annotation` |
 | `Rebanada` | `Slice` | | `Fuente` | `Source` ⚠ |
 | `Unidad` | `Unit` | | `Presupuesto` | `Budget` |
-| `Prueba` | `Proof` ⚠ | | | |
+| `Prueba` | `Proof` ⚠ | | `Procedencia` | `Provenance` ⚠ |
 
 > **`Prueba → Proof` entra en el bloque 4** (§8, D8) y no estaba acá: R1 admitía
 > `Proof` y `Test`, y `Test` era el falso amigo exacto. Con la raíz puesta, los once
 > `*_PROOFS` de `invariants.ts` salen solos por R2+R9.
+
+> **`Procedencia → Provenance` entra en el bloque 3c** (§11, E2). No es una palabra que
+> el diseño original tuviera y que la traducción convirtiera: es un nombre **nuevo**,
+> para una categoría que el paquete descubrió que tenía. R1 es llana —el cognado es la
+> palabra correcta y significa exactamente lo mismo en las dos lenguas—; lo que hacía
+> falta decidir es **que la categoría existe y qué la define**, y eso va en §11 con su
+> criterio de membresía. La raíz se lista acá porque nombra el módulo `provenance.ts`
+> y porque `Autoría → Authorship` pasa a ser un miembro suyo, no un archivo.
 
 ---
 
@@ -267,6 +275,12 @@ mutantes.mjs  → mutants.mjs       proyeccion.mjs → projection.mjs   ✔ hech
 > nombra es un guardián que el rename se olvida, y **un guardián que no corre no avisa
 > que no corrió**.
 
+> **Un rename de inglés a inglés no es de esta lista.** `src/authorship.ts →
+> src/provenance.ts` (bloque 3c) no es una traducción: es un cambio de **qué nombra el
+> archivo**, de un miembro a la categoría que lo contiene, y por lo tanto una decisión
+> de contrato. Va en §11 (E2), con el criterio que decide la membresía. Se anota acá
+> para que quien busque nombres de archivo no concluya que el rename no está escrito.
+
 **Un guardián NUEVO nace en inglés.** La lista de arriba son renombres, y no decía
 nada del caso nuevo. El precedente ya existía —`numbers.mjs` nació así en el bloque 1—
 y `geometry.mjs` lo sigue en el bloque 2. Los renombres, en cambio, esperan a que se
@@ -400,6 +414,27 @@ de 34 sitios de llamada que **no es traducción**. El bloque 4 **no lo hace**, y
 escrito acá para que sea una decisión pendiente y no un olvido. `NotAssignableTo`
 (D7) se eligió justamente para no repetirlo.
 
+> **Cerrado en el bloque 3c: se renombra a `FitsIn<From, To>`, y el orden NO se toca.**
+> El criterio es el de D7 aplicado al operador hermano: el nombre tiene que leerse **en
+> el orden de los parámetros**, que es exactamente por lo que `NotAssignableTo` le ganó
+> a `Separates<A,B>`. Un criterio para los dos operadores, no uno por operador. Se suma
+> una razón que en el bloque 4 no estaba escrita: la palabra *covers* **ya tiene dueño
+> en el paquete y con la convención contraria** — `windowCovers(exterior, interior)`
+> (`shapes.ts`, exportada por el barril) toma primero al que cubre. Invertir el orden
+> arreglaba la lectura y dejaba la misma palabra haciendo dos trabajos opuestos;
+> renombrar la desocupa.
+>
+> **Y los sitios de llamada eran 24, no 34.** La cifra de arriba se sostenía a mano
+> desde el bloque 4 y era otra que mentía; la de este párrafo sale del AST. Importa
+> porque decidió el costo comparado: renombrar toca **solo el nombre del operador**
+> —orden de argumentos y mensaje quedan intactos, así que ninguna aserción puede
+> cambiar de sentido en silencio y ninguna `espera` del corredor de mutación se
+> toca—, mientras que invertir obliga a releer los 24 pares y ahí sí hay un fallo
+> **mudo** posible: `_SpacesDeclared` y `_SpacesPresent` son el mismo par en las dos
+> direcciones, así que invertir uno y no el otro deja dos copias de la misma aserción,
+> las dos en verde, y `M25` o `M45` se queda sin acreditar sin que nada cambie de
+> color. Misma lectura arreglada, mucha menos superficie de error.
+
 ### Un escalón que `Evidence` podría subir y NO sube en el bloque 4
 
 `export type Evidence = number` (`adapter.ts`). O sea: **cualquier número es una
@@ -428,6 +463,12 @@ el nombre, así que se decide acá.
 > **El archivo no existe por tamaño.** Existe porque una frontera —`projection.ts ↛
 > authorship.ts`— es inescribible mientras el tipo viva en `identity.ts`. Está dicho en
 > su encabezado y verificado por `scripts/boundaries.mjs`, con su mutante (`M46`).
+
+> **Superado por E2 (§11).** El disparador que E1 dejó escrito —«el día que
+> `DelegationId` se mude, el rename es el acto visible que corresponde»— se cumplió en
+> el bloque 3c. El archivo hoy es `src/provenance.ts`. E1 se conserva entero porque su
+> argumento sigue siendo correcto **para su momento**: con un solo miembro, el nombre
+> de la categoría prometía de más. Lo que cambió no es el criterio, son los hechos.
 
 ---
 
@@ -483,6 +524,49 @@ guardianes de `ir`.
 > `invariantes.mjs`, «que **no existe en este paquete** — está en `packages/emision`».
 > Sigue siendo cierto que no es de `ir`; el archivo hoy se llama
 > `packages/emission/scripts/invariants.mjs`.
+
+---
+
+## 11 · Bloque 3c — la categoría que el 3b no podía nombrar
+
+**Agregado el 2026-08-13**, por la regla del cierre. §9 (E1) eligió `authorship.ts`
+—«el archivo se llama como lo que contiene»— y descartó los dos nombres de categoría
+por la misma razón: con **un** miembro, nombrar la categoría afirma una membresía que
+el archivo no tiene. Este bloque le sumó el segundo miembro y con eso la objeción
+caduca, así que el rename se decide acá antes de hacerlo.
+
+| # | Símbolo | **Queda** | Por qué no la que salía sola |
+|---|---|---|---|
+| **E2** | el módulo que aloja `Authorship` **y** `DelegationId` | **`src/provenance.ts`** (era `src/authorship.ts`) | Con dos miembros, el patrón de E1 —«el archivo se llama como lo que contiene»— **deja de determinar el nombre**: `authorship.ts` pasaría a nombrar a uno de los dos y a esconder al otro, que es peor que nombrar la categoría. Y la categoría existe de verdad, con una razón de fondo **compartida**: la huella contesta ***qué es*** un contenido; la autoría y la delegación contestan ***cómo llegó acá***, y el mismo contenido tiene que dar la misma huella lo traiga quien lo traiga y por el camino que sea. Eso es lo que la palabra *procedencia* nombra, y por eso `provenance.ts` le gana a `outside-fingerprint.ts` —el otro candidato de E1—: aquel nombra la **consecuencia** (no entra en la huella), este la **causa**, y la consecuencia se deriva de la causa pero no al revés. `metadata.ts` y `context.ts` no se consideran: no dicen nada que un criterio pueda aplicar |
+
+### El criterio de membresía — sin él el nombre vuelve a prometer de más
+
+E1 tenía razón en que un nombre de categoría con un solo miembro es una promesa vacía.
+Lo que la vuelve **no vacía** no es tener dos miembros: es tener una **regla que decide
+el tercero**. Va escrita en el encabezado de `provenance.ts` y se repite acá porque es
+una decisión de contrato, no una nota de implementación. Un tipo entra si cumple las
+**tres**, y ninguna sobra:
+
+1. **Dice cómo llegó, no qué es.** Responde quién lo trajo, cuándo, por qué camino.
+2. **La huella tiene que ser ciega a él.** Dos valores suyos distintos sobre el mismo
+   contenido tienen que dar la **misma** huella. Si moverlo *tiene* que mover la huella,
+   es contenido y se queda donde está.
+3. **Viaja pegado al contenido, no al registro.** `OrganizationId` y `DocumentId` pasan
+   (1) y (2) y **no entran**: son la identidad de la fila del tramo 1. Sin (3) el módulo
+   se ensancha hasta ser «todo lo que no es cuerpo», que es el defecto exacto que E1 le
+   señaló a `outside-fingerprint.ts`.
+
+Lo que el criterio **rechaza**, para que se vea que discrimina: `RawNode.attribution`
+tampoco entra en la huella y **no** es procedencia —dice cómo se *reconoció*, no cómo
+llegó: falla (1)—; `ObjectKey` falla (1) por el otro lado, porque es direccionado por
+contenido.
+
+> **La mudanza arrastró `asDelegationId`, y era obligatorio.** Dejar el constructor en
+> `identity.ts` obliga a aquel archivo a importar el tipo de este, y entonces
+> `projection.ts → identity.ts → provenance.ts` es un camino real y la frontera **nace
+> violada** — el mismo modo de falla que la volvía inescribible en el bloque 3b, con los
+> papeles cambiados. Verificado, con el camino impreso. No arrastró nada más:
+> `ActorId`, `Instant` y `Nominal` se quedan y se importan, que es la dirección legal.
 
 ---
 

@@ -73,7 +73,6 @@ export {
   type OrganizationId,
   type DocumentId,
   type ObjectKey,
-  type DelegationId,
   type FragmentId,
   type Instant,
   type ByteHash,
@@ -90,7 +89,6 @@ export {
   asOrganizationId,
   asDocumentId,
   asObjectKey,
-  asDelegationId,
   asFragmentId,
   asInstant,
   asByteHash,
@@ -101,10 +99,13 @@ export {
   asCacheKey,
 } from "./identity.js";
 
-// Autoría. Archivo propio desde el bloque 3b: es lo que vuelve escribible la
-// frontera `projection.ts ↛ authorship.ts`, o sea lo único que puede imponer que la
-// autoría no entre en la huella (`scripts/boundaries.mjs`).
-export { type Authorship } from "./authorship.js";
+// Procedencia — cómo llegó acá un contenido. Archivo propio desde el bloque 3b: es lo
+// que vuelve escribible la frontera `projection.ts ↛ provenance.ts`, o sea lo único
+// que puede imponer que ni la autoría ni la delegación entren en la huella
+// (`scripts/boundaries.mjs`). Nació como `authorship.ts` con un solo miembro y se
+// renombró al mudarse `DelegationId`, que declaraba el mismo invariante sin ninguna
+// frontera que lo impusiera. El criterio de membresía está en su encabezado.
+export { type Authorship, type DelegationId, asDelegationId } from "./provenance.js";
 
 // Ubicación y coordenadas.
 export {

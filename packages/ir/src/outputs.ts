@@ -7,7 +7,6 @@ import type {
   ByteHash,
   ContentHash,
   ContextualFingerprint,
-  DelegationId,
   DocumentId,
   ElementId,
   EmbeddingKey,
@@ -17,9 +16,11 @@ import type {
   ObjectKey,
   OrganizationId,
 } from "./identity.js";
-// La autoría vive en su propio módulo desde el bloque 3b, y no por tamaño: es lo
-// que vuelve escribible `projection.ts ↛ authorship.ts`. Ver su encabezado.
-import type { Authorship } from "./authorship.js";
+// La procedencia vive en su propio módulo desde el bloque 3b, y no por tamaño: es lo
+// que vuelve escribible `projection.ts ↛ provenance.ts`. Nació como `authorship.ts`
+// con un solo miembro; `DelegationId` se le sumó en este bloque y el archivo pasó a
+// llamarse por la categoría, que ya tiene criterio. Ver su encabezado.
+import type { Authorship, DelegationId } from "./provenance.js";
 import type { Body, Shape } from "./shapes.js";
 import type { Token } from "./projection.js";
 import type { Hint, RecognitionLevel, Role } from "./classification.js";
