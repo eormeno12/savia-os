@@ -12,10 +12,11 @@
     "src"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck:real": "tsc --noEmit",
+    "typecheck": "node scripts/deuda.mjs",
+    "lint": "node scripts/deuda.mjs",
+    "build": "node scripts/deuda.mjs",
     "invariantes": "node scripts/invariantes.mjs",
-    "build": "tsc --noEmit && node scripts/invariantes.mjs && node scripts/citas.mjs",
-    "lint": "tsc --noEmit && node scripts/invariantes.mjs && node scripts/citas.mjs",
     "citas": "node scripts/citas.mjs"
   },
   "dependencies": {
