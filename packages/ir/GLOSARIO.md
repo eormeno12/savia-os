@@ -431,6 +431,61 @@ el nombre, así que se decide acá.
 
 ---
 
+## 10 · Bloque 5 — `packages/emision → packages/emission`
+
+**Agregado el 2026-08-13**, antes de escribir una línea del paquete, por la misma
+regla del cierre que produjo §7 y §8. Es la **primera ampliación que no es sobre
+`ir`**: el bloque 5 traduce `packages/emision`, el último paquete en español y el
+único dependiente del contrato, y su vocabulario propio —la ruta, el emisor, los
+sintéticos— nunca pasó por acá porque no es parte del contrato.
+
+**El paquete pasa a llamarse `@savia-os/emission`, y el directorio con él.** Los
+nombres de paquete van en inglés como todo lo demás; no había regla que lo dijera
+porque hasta este bloque ningún paquete se había renombrado.
+
+> **Primero, lo que las reglas SÍ determinaban, para que se vea que se consultaron.**
+> `Emisor → Emitter`, `Emisión → Emission` y `emitir → emit` salen de R1 con el
+> precedente ya escrito en R2 (`NodoEmitido → EmittedNode`), así que **no van en este
+> documento**. Tampoco `piso → floor` (§8, D5 ya fijó `Piso → Floor`), `pila → stack`,
+> `Estado → State`, `caja → box` ni los cinco `por* → by*` de las estrategias
+> (`porNivel → byLevel`, `porCelda → byCell`, `porEspacial → bySpatial`), que son R7
+> exacta — «`por → by` si el símbolo es un mapa o un **método**». Los ocho de abajo
+> son los que quedaban.
+
+| # | Español | **Queda** | Por qué no la que salía sola |
+|---|---|---|---|
+| **B1** | `Ruta` | **`Route`** | R1 admite `Route` **y** `Path`, y ninguna regla elige. Gana `Route` por dos razones concretas. (1) El contrato **ya decidió el verbo**: §4 fija `NodoConRuta → RoutedNode` y descarta ahí mismo `NodeWithPath`, así que la familia `route / routeOf / Routing / RoutedNode` se lee entera y `Path` dejaría a `RoutedNode` hablando de otra cosa. (2) `Path` es la palabra de **rutas de archivo** en este repo —`node:path`, y los propios guardianes tienen un `ruta()` que resuelve rutas de disco—, así que el cognado obvio importaría la ambigüedad justo en el paquete que más la sufre. Arrastra `Ruteo → Routing`, `rutaDe → routeOf` (R11) y el archivo `ruta.ts → route.ts` |
+| **B2** | `sinteticos.ts` | **`src/synthetic.ts`** | §6 dice «los archivos siguen la traducción» pero el adjetivo plural no determina nada: había tres candidatos. E1 («el archivo se llama como lo que contiene») apuntaba a **`cases.ts`**, y se descarta porque lo que estos casos tienen de valioso no es que sean casos, es de **dónde salen** —de una mano, sin un adaptador—: `cases.ts` sobreviviría intacto el día que alguien los llenara con la salida de un adaptador real, que es exactamente lo que el archivo existe para no hacer. **`fixtures.ts`** se descarta porque la primera línea del archivo dice «esto **no** es andamio de test». Y singular sobre plural porque `synthetics` en inglés es un sustantivo que nombra telas y compuestos químicos: la salvedad de R1 |
+| **B3** | `Contenedor` | **`Ancestor`** | **Es el caso inverso a `Marca → Mark` (§4).** Ahí la colisión era del español y el inglés la deshacía sola; acá el español distinguía `Contenedor` (el nodo ya emitido del que van a colgar los que siguen) del valor `container` de `SHAPES`, y **traducir por el cognado los funde** — en los dos archivos que citan la forma en prosa («el tramo 5 agrupa por container», «`container` no lleva hijos») y en un fixture que se llama `CONTAINER`. No es la trampa de `COHESION`/`COHESIONS` (acá un typo no compila: uno es un tipo y el otro un literal de string), pero sí cuesta un párrafo de desambiguación por lectura. `Ancestor` nombra **para qué se usa el registro** y hace que `desdeContenedor → fromAncestor` se lea solo |
+| **B4** | `Falla` | **`Failure`** | R1 admite `Failure` y `Fault`, y no elige. `Fault` nombra la **causa** —el defecto latente— y lo que estos objetos llevan es el **resultado**: son la variante `ok: false` de una unión discriminada. Arrastra `FallaDeRuta → RouteFailure` y `FallaDeEmisión → EmissionFailure` (R2: raíz + modificador, el modificador adelante) |
+| **B5** | `Caso.porqué` | **`why`** | R1 admite `why` y `reason`. Gana `why` porque el guardián **imprime el campo detrás de la palabra «porque»** (`importa porque: …`), así que el nombre del campo y la frase que produce son la misma palabra. Es el precedente de G4 (`propose` / `ProposedAnnotation`) aplicado a un campo: el contrato se lee sin ir a buscar el consumidor |
+| **B6** | `Marco` (el de delegación) | **`DelegationFrame`** | `Frame` a secas es correcto y **reimporta una homonimia que el español tenía**: `marco` es también el marco de una `Box` (`Box.frame` = `"p3"`, `"slide#7"`), que es otra cosa y vive en el mismo paquete. El nombre largo es el que el propio docstring ya usaba en prosa («un marco de delegación abierto»), así que no agrega una palabra: la escribe |
+| **B7** | `Scope` | **`Scope`** — no cambia | Igual que `Nominal` (§4): ya era la palabra inglesa correcta cuando el archivo estaba en español. Se lista para que la ausencia de fila no se lea como un olvido. Su campo `clase` sí pasa a `kind` por §4 (es el discriminante de una unión) |
+| **B8** | los valores de `Scope['kind']` y de `*Failure.kind` | **`node · synthetic`** y **`parent-not-emitted`** | Son **datos** y §5 no los listaba, igual que G7 y D6. Los dos primeros son R1 llana. El tercero conserva el **kebab** que ya tenía (`padre-no-emitido`), contra el snake de §5 y por la razón de G9: §5 es snake **porque** sus valores van a filas de Postgres y al payload de Qdrant, y este no va a ninguno de los dos — nace y muere adentro de una unión de TypeScript. La convención que le corresponde es la del archivo que lo produce |
+
+### Los guardianes del paquete, y una regla que §6 no cubría
+
+```
+invariantes.mjs → invariants.mjs      citas.mjs → citations.mjs
+mutants.mjs                            ← NUEVO, nace en inglés (§6)
+```
+
+§6 ya decía que un guardián nuevo nace en inglés y que los renombres esperan al
+último archivo que el guardián nombra; los tres archivos de `src/` se tradujeron en el
+mismo commit, así que la ventana no llegó a abrirse. Lo que §6 **no** cubría es el
+**prefijo de los mensajes de error**: `EMISION-ERR` pasa a **`EMISSION-ERR`** por §1
+(«mensajes de error → inglés»), y hay que decirlo porque el prefijo está escrito a
+mano en nueve sitios y **ningún compilador lo verifica**. El resto de cada guardián
+—identificadores y prosa— se queda en español, que es lo que ya hacen los seis
+guardianes de `ir`.
+
+> **La corrección de §6 se cierra acá.** La nota de §6 dice que la lista nombraba
+> `invariantes.mjs`, «que **no existe en este paquete** — está en `packages/emision`».
+> Sigue siendo cierto que no es de `ir`; el archivo hoy se llama
+> `packages/emission/scripts/invariants.mjs`.
+
+---
+
 ## La regla que gobierna a este documento
 
 **Si un término no está acá y ninguna regla de §2 lo determina, no se inventa: se

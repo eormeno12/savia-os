@@ -193,7 +193,7 @@ La tabla que hay que tener al lado cuando se escriba el tramo 7.
 | `FragmentShare` = compartir un par `(dueño, Space)` dentro de un grupo (`schema.prisma:482-497`), base de `fragmentScope` (`read-plan.ts:50`) | `Fragmento` = unidad de texto embebible (`salidas.ts:346`) | **Colisión de vocabulario pura**, y justo en el chokepoint que esta capa decidió reusar. Es la **segunda** colisión, después de `organization`/`Organization` |
 
 > **Estado de implementación, para calibrar:** `packages/ir` no tiene todavía ningún
-> consumidor que produzca estos tipos — solo `packages/emision`, que implementa el
+> consumidor que produzca estos tipos — solo `packages/emission`, que implementa el
 > tramo 4. **No existe implementación de los tramos 5, 6 ni 7.** La tabla de arriba
 > contrasta **código corriendo** (legacy) contra **contrato declarado** (IR).
 

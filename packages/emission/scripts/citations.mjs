@@ -1,13 +1,13 @@
 /**
  * Las citas al plan. Cero dependencias.
  *
- * COPIA DELIBERADA de `ir/scripts/citas.mjs`, con el prefijo de error del paquete y
- * el README opcional. Se copia en vez de compartirse porque `emision` no puede
+ * COPIA DELIBERADA de `ir/scripts/citations.mjs`, con el prefijo de error del paquete y
+ * el README opcional. Se copia en vez de compartirse porque `emission` no puede
  * depender de los scripts de `ir` —`ir` se congela y se versiona primero— y porque
  * un paquete cuyo guardián vive en otro repositorio de archivos deja de ser
  * verificable por sí solo. Si divergen, divergen dos guardianes, no dos contratos.
  *
- * `emision` cita el plan en cada docstring, igual que `ir`. Esa garantía es una
+ * `emission` cita el plan en cada docstring, igual que `ir`. Esa garantía es una
  * MENTIRA mientras
  * nadie la ejecutara — el plan es un borrador vivo, y una sola inserción de treinta
  * líneas corre todas las citas de ahí para abajo sin que nada se queje. Ya pasó: al
@@ -154,7 +154,7 @@ const archivos = [
   // Menos este archivo: su docstring MUESTRA citas rotas a propósito, y un
   // verificador que se lee a sí mismo confunde el ejemplo con el caso.
   ...readdirSync(AQUÍ)
-    .filter((f) => f.endsWith(".mjs") && f !== "citas.mjs")
+    .filter((f) => f.endsWith(".mjs") && f !== "citations.mjs")
     .sort()
     .map((f) => [`scripts/${f}`, join(AQUÍ, f)]),
   ...(existsSync(resolve(AQUÍ, "..", "README.md"))
@@ -183,7 +183,7 @@ for (const [archivo, ruta] of archivos) {
     if (cita.tipo === "rota") {
       errores += 1;
       console.error(
-        `EMISION-ERR: ${dónde} — cita mal formada «${cita.crudo}»: el ancla va entre llaves, §{así}.`,
+        `EMISSION-ERR: ${dónde} — cita mal formada «${cita.crudo}»: el ancla va entre llaves, §{así}.`,
       );
       continue;
     }
@@ -191,7 +191,7 @@ for (const [archivo, ruta] of archivos) {
     if (cita.tipo === "número") {
       errores += 1;
       console.error(
-        `EMISION-ERR: ${dónde} — cita ${cita.crudo} al plan por número de línea.\n` +
+        `EMISSION-ERR: ${dónde} — cita ${cita.crudo} al plan por número de línea.\n` +
           "        Los números del plan se corren solos; anclá por sección: §{Qué sale}.",
       );
       continue;
@@ -200,13 +200,13 @@ for (const [archivo, ruta] of archivos) {
     const candidatos = resolverAncla(cita.ancla);
     if (candidatos.length === 0) {
       errores += 1;
-      console.error(`EMISION-ERR: ${dónde} — no hay sección del plan que empiece con «${cita.ancla}»`);
+      console.error(`EMISSION-ERR: ${dónde} — no hay sección del plan que empiece con «${cita.ancla}»`);
       continue;
     }
     if (candidatos.length > 1) {
       errores += 1;
       console.error(
-        `EMISION-ERR: ${dónde} — «${cita.ancla}» es ambigua, ${candidatos.length} secciones responden:\n` +
+        `EMISSION-ERR: ${dónde} — «${cita.ancla}» es ambigua, ${candidatos.length} secciones responden:\n` +
           candidatos.map((c) => `        L${c.línea} · ${c.ancestro} · ${c.título}`).join("\n"),
       );
       continue;
@@ -222,7 +222,7 @@ for (const [archivo, ruta] of archivos) {
 
 console.log("");
 if (errores > 0) {
-  console.error(`EMISION-ERR: ${errores} cita${errores === 1 ? "" : "s"} no resuelve al plan.`);
+  console.error(`EMISSION-ERR: ${errores} cita${errores === 1 ? "" : "s"} no resuelve al plan.`);
   process.exit(1);
 }
 console.log(`citas ok (${secciones} por sección, ${ajenas} a otros documentos)`);

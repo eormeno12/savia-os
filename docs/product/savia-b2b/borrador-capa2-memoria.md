@@ -457,7 +457,7 @@ Honestidad sobre el alcance, para que la lista de arriba no parezca un muro:
 
 **Lo único que conviene no dejar pasar** son los cambios de contrato baratos —
 `C2-P4`, `C2-P11`, `C2-P15` — porque `packages/ir` ya tiene un dependiente
-(`packages/emision`) y cada paquete nuevo encima los encarece.
+(`packages/emission`) y cada paquete nuevo encima los encarece.
 
 Y `C2-P1`, que no es urgente por costo de implementación sino porque **condiciona la
 respuesta de todos los demás**.

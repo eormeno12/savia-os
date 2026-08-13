@@ -1,6 +1,6 @@
 {
   "name": "@savia-os/ir",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "El contrato del pipeline de ingesta: las seis formas, Tipo, Pista, la proyección canónica. CERO dependencias de runtime.",
@@ -18,7 +18,7 @@
     "geometry": "node scripts/geometry.mjs",
     "citations": "node scripts/citations.mjs",
     "numbers": "node scripts/numbers.mjs",
-    "build": "tsc --noEmit && node scripts/boundaries.mjs && node scripts/projection.mjs && node scripts/geometry.mjs && node scripts/citations.mjs && node scripts/numbers.mjs && node scripts/mutants.mjs",
+    "build": "tsc --noEmit && node scripts/boundaries.mjs && node scripts/projection.mjs && node scripts/geometry.mjs && node scripts/citations.mjs && node scripts/numbers.mjs",
     "lint": "tsc --noEmit && node scripts/boundaries.mjs && node scripts/projection.mjs && node scripts/geometry.mjs && node scripts/citations.mjs && node scripts/numbers.mjs && node scripts/mutants.mjs",
     "mutants": "node scripts/mutants.mjs"
   },

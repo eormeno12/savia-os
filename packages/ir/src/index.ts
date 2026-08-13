@@ -1,7 +1,7 @@
 /**
  * `@savia-os/ir` — el contrato del pipeline de ingesta.
  *
- * CERO dependencias. `adaptadores` y `emision` nunca se ven entre sí; `ir` es el
+ * CERO dependencias. `adapters` y `emission` nunca se ven entre sí; `ir` es el
  * único lugar que ambos alcanzan (§{Cómo se agrega}, §{Paquetes}). Se congela y se
  * versiona primero: todo depende de él, él no depende de nada (§{Paquetes}).
  *
@@ -37,10 +37,10 @@
  * argumento original es el orden: se tradujo por bloques, cada uno verde en los
  * SIETE comandos que `package.json` encadena antes del siguiente.
  *
- * El bump de versión mayor de `ir` va acá: la traducción cerró y ningún símbolo
- * exportado sobrevive con su nombre en español. `packages/emision` está escrito
- * contra los nombres viejos y no compila a propósito — ver `packages/emision/DEUDA.md`,
- * que este bump habilita a cerrar (bloque 5).
+ * El bump a `1.0.0` fue acá: la traducción cerró y ningún símbolo exportado
+ * sobrevive con su nombre en español. `packages/emission` —el único consumidor—
+ * se puso al día en el bloque 5 y compila contra estos nombres; su `DEUDA.md`,
+ * que declaraba el rojo mientras tanto, ya no existe.
  *
  * Cómo leer las decisiones forzadas:
  *

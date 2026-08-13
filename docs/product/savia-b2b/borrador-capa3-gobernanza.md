@@ -187,7 +187,7 @@ compartición es el área** — algo que la Capa 1 no toca y que quien diseñe e
 modelo nuevo tiene que decidir de nuevo (→ **C3-P9**).
 
 Corrección de premisa, además: el contrato `packages/ir` **ya tiene un
-dependiente**, no cero — `packages/emision/package.json:21`. La ventana para
+dependiente**, no cero — `packages/emission/package.json:21`. La ventana para
 cambios baratos sigue abierta pero empezó a cerrarse.
 
 ---
@@ -405,7 +405,7 @@ documento anterior de esta capa ya tenía abiertos y siguen sin decidir.
 | **C3-P1** | **Cómo se agrega la sensibilidad al `Fragmento`.** La marca es por nodo (`salidas.ts:516-521`), la unidad recuperable agrupa N nodos (`:356-357`). Opciones visibles: (a) «el máximo», calcado de `certezaMínima` (`:361-375`) — un nodo sensible vuelve sensible al fragmento; (b) el fragmentador no agrupa nodos de sensibilidad distinta; (c) join por `nodos` en el tramo 7, sin campo nuevo | Una decisión de contrato en `packages/ir`, con la contra de (c) escrita ya en el propio tipo: «la promesa depende de una consulta que nadie declaró» (`:369-372`) | Contrato `ir` · tramos 5, 6 y 7 |
 | **C3-P2** | **Quién lee las anotaciones y se niega a indexar.** Ningún tramo lo declara; `ir` dice que no lo puede resolver (`salidas.ts:509-513`) | Lo decide la Capa 1 al diseñar el tramo 7 ([`borrador-pipeline-tecnico.md:2339`](borrador-pipeline-tecnico.md)); esta capa es quien lo necesita y quien define el efecto | Tramos 6 y 7 · toda la R4 |
 | **C3-P3** | **La política de sensibilidad en el modelo nuevo:** qué se marca, con qué efecto, y si sigue siendo binaria (`normal \| sensitive`, como `schema.prisma:30-33`) o gana niveles/etiquetas. Hoy `AnotaciónPropuesta.clase` es abierta (`salidas.ts:475`) y admite cualquiera de las dos | Definir el catálogo de clases de anotación de gobernanza y su semántica en el filtro | Contrato `ir` · chokepoint |
-| **C3-P4** | **`Anotación.actor: ActorId`.** El tipo distingue máquina de humano pero no qué humano (`salidas.ts:516-521`); R4 es una afirmación sobre el dueño (`ACCESS-PRIVACY-RULES.md:25`) | Un campo. Hoy `packages/ir` tiene un solo dependiente (`packages/emision/package.json:21`) | Contrato `ir` · audit · R4 |
+| **C3-P4** | **`Anotación.actor: ActorId`.** El tipo distingue máquina de humano pero no qué humano (`salidas.ts:516-521`); R4 es una afirmación sobre el dueño (`ACCESS-PRIVACY-RULES.md:25`) | Un campo. Hoy `packages/ir` tiene un solo dependiente (`packages/emission/package.json:21`) | Contrato `ir` · audit · R4 |
 | **C3-P5** | **`NodoEnVersión.organización`.** La consulta `hash → documento` puede cruzar tenants y transferir `ElementId` (`salidas.ts:289-294`, `:327-340`) | Un campo, más la decisión de si la consulta se acota por tipo o por convención de la orquestación | Contrato `ir` · tramo 4 · **P12** |
 | **C3-P6** | **Dónde vive el payload gobernable del vector y quién lo tipa.** `Vector` no tiene facetas (`salidas.ts:429-...`); legacy filtra sobre cinco claves (`qdrant-filter.ts:21-40`). Opciones visibles: (a) tipo nuevo en `ir` (cambio de contrato, `index.ts:8-10`); (b) tipo en el paquete de persistencia; (c) que cada consumidor lo fije | Diseñar el tramo 7, que es donde el payload se escribe | Contrato `ir` o tramo 7 · chokepoint |
 | **C3-P7** | **El interruptor per-organización del caché de reconocimiento.** Prometido en prosa (`borrador:348`), inexistente en tipos y en `PARAMETROS` (`params.ts`) | Decidir si es un parámetro del pipeline, una columna de `Organization`, o una política de la capa de gobernanza | Orquestación · `PARAMETROS` |

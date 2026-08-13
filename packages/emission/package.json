@@ -1,5 +1,5 @@
 {
-  "name": "@savia-os/emision",
+  "name": "@savia-os/emission",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,12 +12,12 @@
     "src"
   ],
   "scripts": {
-    "typecheck:real": "tsc --noEmit",
-    "typecheck": "node scripts/deuda.mjs",
-    "lint": "node scripts/deuda.mjs",
-    "build": "node scripts/deuda.mjs",
-    "invariantes": "node scripts/invariantes.mjs",
-    "citas": "node scripts/citas.mjs"
+    "typecheck": "tsc --noEmit",
+    "invariants": "node scripts/invariants.mjs",
+    "citations": "node scripts/citations.mjs",
+    "mutants": "node scripts/mutants.mjs",
+    "lint": "tsc --noEmit && node scripts/invariants.mjs && node scripts/citations.mjs && node scripts/mutants.mjs",
+    "build": "tsc --noEmit && node scripts/invariants.mjs && node scripts/citations.mjs"
   },
   "dependencies": {
     "@savia-os/ir": "workspace:*"

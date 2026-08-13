@@ -14,7 +14,7 @@ savia-os/
 │   └── app/               (vacío — el B2B nuevo va acá; scaffold pendiente)
 ├── packages/
 │   ├── ir/               @savia-os/ir             el contrato del pipeline de ingesta · 0 deps
-│   ├── emision/          @savia-os/emision        tramo 4: ruta + emisor
+│   ├── emission/         @savia-os/emission       tramo 4: ruta + emisor
 │   ├── ui/               @savia-os/ui             sistema de diseño (Atomic Design) sobre Chakra v3
 │   ├── design-tokens/    @savia-os/design-tokens  foundations: tokens Chakra (createSystem)
 │   └── tsconfig/         @savia-os/tsconfig       tsconfigs compartidos
