@@ -225,8 +225,8 @@ const líneas = (texto: string): readonly string[] => texto.split("\n");
  * id), `lenguaje` NO (una re-detección de lenguaje no cambia el contenido), `mime`
  * NO (es derivable de los bytes), `grano` NO (un cambio `entero`↔`fila` es una
  * conclusión del clasificador), `pendientes` NO (además está PROHIBIDO por
- * §{La delegación tardía}), `tipo` NO (ver abajo), `Ubicación` NO (§{Por qué esto},
- * §{Tercera}: mover un párrafo sin editarlo da 0 ids movidos), `Autoría` NO,
+ * §{La delegación tardía}), `tipo` NO (ver abajo), `Location` NO (§{Por qué esto},
+ * §{Tercera}: mover un párrafo sin editarlo da 0 ids movidos), `Authorship` NO,
  * `parentId` NO, `migas` NO, `delegación` NO, `atribución` NO — La ventaja de la
  * regla sobre la lista es que el próximo campo que se agregue a una forma se
  * resuelve solo, que es el criterio que el plan usa en todas partes. COSTO
@@ -336,9 +336,9 @@ export const proyectar = (cuerpo: Cuerpo): readonly Token[] => {
 /**
  * Canonicalización de una `Ventana`.
  *
- * RESIDUO DECLARADO (C4): las coordenadas de `Caja` son ENTEROS en milésimas del
- * marco precisamente para que esto sea exacto. Si alguna vez `Caja` pasa a floats,
- * dos corridas dan `HashMateria` distintos y el caché por página deja de acertar.
+ * RESIDUO DECLARADO (C4): las coordenadas de `Box` son ENTEROS en milésimas del
+ * marco precisamente para que esto sea exacto. Si alguna vez `Box` pasa a floats,
+ * dos corridas dan `MatterHash` distintos y el caché por página deja de acertar.
  */
 export const codificarVentana = (v: Ventana): string => {
   switch (v.scope) {
@@ -349,11 +349,11 @@ export const codificarVentana = (v: Ventana): string => {
     case "region":
       return concatenar(
         v.scope,
-        v.box.marco,
+        v.box.frame,
         String(v.box.x),
         String(v.box.y),
-        String(v.box.ancho),
-        String(v.box.alto),
+        String(v.box.width),
+        String(v.box.height),
         String(v.box.z),
       );
   }
@@ -377,9 +377,15 @@ export type FunciónHash = (preimagen: string) => string;
 
 /**
  * `huellaDe` — el material de la próxima reconciliación (§{Tramo 4 › Qué sale}).
- * El tipo del retorno es `string` en bruto a propósito: quien lo marque como
- * `HuellaNodo` es el llamador, con `comoHuellaNodo(...)`, para que el marcado sea
- * un acto explícito y no un accidente.
+ * El tipo del retorno es `string` en bruto: quien lo marque como `NodeFingerprint`
+ * es el llamador, con `asNodeFingerprint(...)`.
+ *
+ * PENDING(D24): eso NO es una decisión cerrada, es un hueco conocido. Nadie está
+ * OBLIGADO a marcar, así que la familia de marcas de `identity.ts` no tiene un solo
+ * productor tipado. Marcar acá exigiría que este archivo importe `identity.ts`, y
+ * esa arista volvería `Authorship` alcanzable desde el archivo que calcula la
+ * huella — hoy «`Authorship` NO entra en la huella» lo impone justamente que esa
+ * arista no exista. Ver el PENDING(D24) de `NodeFingerprint`.
  */
 export const huellaDe = (cuerpo: Cuerpo, sha256: FunciónHash): string =>
   sha256(preimagenDeHuella(cuerpo));

@@ -4,19 +4,28 @@
 
 import type {
   ActorId,
-  Autoría,
-  ClaveEmbedding,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  Authorship as Autoría,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  ByteHash as HashBytes,
   ContentHash,
-  DelegacionId,
-  DocumentoId,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  ContextualFingerprint as HuellaContextual,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  DelegationId as DelegacionId,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  DocumentId as DocumentoId,
   ElementId,
-  FragmentoId,
-  HashBytes,
-  HuellaContextual,
-  Instante,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  EmbeddingKey as ClaveEmbedding,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  FragmentId as FragmentoId,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  Instant as Instante,
   LocalId,
-  OrganizacionId,
-} from "./identidad.js";
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  OrganizationId as OrganizacionId,
+} from "./identity.js";
 import type {
   // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
   Body as Cuerpo,
@@ -34,7 +43,11 @@ import type {
   // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
   Role as Tipo,
 } from "./classification.js";
-import type { SourceRange, Ubicación } from "./ubicacion.js";
+import type {
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  Location as Ubicación,
+  SourceRange,
+} from "./location.js";
 
 // ─────────────────────────────── La marca nodal ──────────────────────────────
 
@@ -69,7 +82,7 @@ export interface EsNodo {
  * Lo que produce un adaptador y lo ÚNICO que se cachea por `hashBytes`.
  *
  * PROVISIONAL(#22/C8): `NodoCrudo` no lleva `Autoría` — Ver el razonamiento
- * completo en `Autoría` (`identidad.ts`). En una frase: el caché de reconocimiento
+ * completo en `Autoría` (`identity.ts`). En una frase: el caché de reconocimiento
  * cruza organizaciones POR DISEÑO (§{Caché}) y `Autoría` es por documento y por
  * tenant, así que si viajara adentro del árbol cacheado se propagaría la del primer
  * subidor a otro tenant. Partir el tipo mueve el invariante del runtime al

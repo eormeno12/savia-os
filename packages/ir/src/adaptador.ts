@@ -20,7 +20,12 @@ import {
   // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
   PARAMETERS as PARAMETROS,
 } from "./params.js";
-import type { AdaptadorId, HashMateria } from "./identidad.js";
+import type {
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  AdapterId as AdaptadorId,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  MatterHash as HashMateria,
+} from "./identity.js";
 import type {
   // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
   Classification as Clase,
@@ -33,7 +38,12 @@ import type {
   // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
   ObjectRef as RefObjeto,
 } from "./shapes.js";
-import type { Ubicación, UbicaciónLocal } from "./ubicacion.js";
+import type {
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  LocalLocation as UbicaciónLocal,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  Location as Ubicación,
+} from "./location.js";
 import type { Canal, NivelLogrado, NodoCrudo } from "./salidas.js";
 
 // ─────────────────────────────── Evidencia ───────────────────────────────────
@@ -269,7 +279,7 @@ export interface Diagnóstico {
    * documento, y el presupuesto agotado (§{Diagnóstico}) es de corrida — Si se
    * decide al revés, hay que fabricar ubicaciones sintéticas o inventar un
    * centinela, que envejece igual de mal que un `null` disfrazado. (La variante
-   * `{espacio:'fuente'}` de `Coordenada` cubre el caso «toda la fuente», pero no el
+   * `{space:'source'}` de `Coordinate` cubre el caso «toda la fuente», pero no el
    * caso «ninguna fuente en particular».)
    *
    * PROVISIONAL(§{Diagnóstico}): `código` es ABIERTO, con prefijo por tramo — Es el
@@ -430,7 +440,7 @@ export interface Contexto {
  * Compilado contra `Adaptador`, el ejemplo tiene CUATRO defectos, no uno:
  *
  *   1. `id: 'chat'` no es asignable a `AdaptadorId`, que es un tipo marcado.
- *      Exige `comoAdaptadorId('chat')`.
+ *      Exige `asAdapterId('chat')`.
  *   2. `descomponer` es SÍNCRONO y el contrato pide `Promise<readonly Unidad<S>[]>`.
  *   3. `ubicación: { ancla }` no alcanza: `UbicaciónLocal` exige `coordenada`.
  *      La del chat es `{ espacio: 'fuente' }`.
@@ -481,7 +491,7 @@ export interface Fuente {
   bytes(): Promise<Uint8Array>;
   /**
    * `[desde, hasta)` — MEDIA ABIERTA, en BYTES. Misma convención que
-   * `Coordenada.texto` (`ubicacion.ts`), que ya la fija en `[inicio, fin)` para
+   * `Coordinate.text` (`location.ts`), que ya la fija en `[start, end)` para
    * code points. `rango(0, 4)` devuelve 4 bytes: 0, 1, 2 y 3.
    *
    * Esta línea existe porque sin ella la convención se reparte entre doce autores

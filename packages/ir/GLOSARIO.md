@@ -42,7 +42,7 @@ Aplicadas en orden. Si dos reglas compiten, gana la de más arriba.
 | **R1** | **Si hay una sola palabra correcta en inglés, esa es** — cognados (`-ción→-tion`, `-dad→-ity`) y traducciones llanas. **Salvedad: el cognado es la primera opción, no la última palabra.** Si el cognado significa otra cosa en inglés, gana el término de dominio | `Ubicación→Location` · `dueño→owner` · `hoja→sheet` · `ancho/alto→width/height` · pero `recepción→intake` (no `reception`, que es un lobby) y `epigrafe→caption` (no `epigraph`) |
 | **R2** | **Raíz + modificador**, y en inglés el adjetivo va **adelante** | `Nodo→Node` ⇒ `NodoCrudo→RawNode`, `NodoEmitido→EmittedNode` · `Miga→Breadcrumb` ⇒ `MigaEstable→StableBreadcrumb` |
 | **R3** | **Todo predicado lleva `is*`**, empiece o no con `es*` en español | `esNodo→isNode` · `esNodoFila→isRowNode` · `parLegal→isLegalPair` |
-| **R4** | `como*` → `as*` | los 15 constructores de marca: `comoElementId→asElementId` |
+| **R4** | `como*` → `as*` | los 16 constructores de marca: `comoElementId→asElementId` |
 | **R5** | **`Máximo/…` → `max*` y `Mínimo/…` → `min*`**, como prefijo. Las cuatro formas de género y número colapsan en una | `msMáximo→maxMs` · `nodosMáximos→maxNodes` · `bytesMaterializadosMáximos→maxMaterializedBytes` · `similitudMínima→minSimilarity` · `certezaMínima→minCertainty` |
 | **R6** | `Clave*` / `clave*` → `*Key` | `ClaveDeCache→CacheKey` · `ClaveEmbedding→EmbeddingKey` · `claveDeCampo→fieldKey` |
 | **R7** | **`por` → `by` si el símbolo es un mapa o un método** (nombra el criterio); **`per` si es un número** (nombra el denominador). Lo decide el tipo del valor, no la intuición | `porHash→byHash` · `TIPO_POR_FORMA→ROLE_BY_SHAPE` · pero `unidadesPorMarco→unitsPerFrame` · `corridasMáximasPorDocumento→maxRunsPerDocument` |
@@ -204,6 +204,7 @@ Las cuatro que no son obvias:
 | `CellType` | `texto · numero · fecha · booleano · vacio` → `text · number · date · boolean · empty` |
 | `Grain` | `fila · entero` → `row · whole` |
 | `Window['scope']` | `entero · region · rango` → `whole · region · range` |
+| `Coordinate['space']` | `fuente · texto · grid · visual` → `source · text · grid · visual`, **más `time`** |
 | `EnrichmentKind` | `descripcion · ocr · transcripcion` → `description · ocr · transcription` |
 
 > **`entero` → `whole`, en los dos vocabularios donde aparece.** R1 también admitiría
@@ -213,6 +214,24 @@ Las cuatro que no son obvias:
 >
 > **`superscript`/`subscript`, no `sup`/`sub`.** Los cortos son los tags de HTML; los
 > largos son lo que usan mdast y ProseMirror, y son datos que un humano lee.
+>
+> **`Coordinate['space']` tiene dos colisiones que conviene mirar de frente.**
+> (1) `"source"` es el mismo string que la raíz `Fuente → Source`, que ya lleva ⚠: el
+> tipo de adaptador y el espacio de coordenada van a compartir literal en el payload
+> de Qdrant. Es benigna —los dos significan «toda la fuente»— pero es una decisión, no
+> un accidente. (2) `"grid"` **ya es un valor de `SHAPES`**. Hoy también colisiona en
+> español, así que la traducción no lo empeora; se deja porque son dominios distintos
+> y el discriminante los separa. Renombrar cualquiera de los dos es un cambio de
+> DATOS: hoy gratis, después una migración.
+>
+> **`time` es una restitución, no un agregado.** El diseño predecesor declaraba un
+> espacio de intervalo temporal que el código perdió al degradar `'fragment'` en
+> `'visual'`. Entra como quinta variante plana con `start`/`end` en **milisegundos
+> enteros** desde el inicio del medio e intervalo **medio abierto `[start, end)`** —
+> la misma convención que `Fuente.rango` (bytes) y que la variante `text` (code
+> points)—. El caso mixto (un fotograma con una caja dentro de un tramo de video) se
+> expresa **encadenando `Location.within`**, no metiendo dos ejes en una variante.
+> `SourceRange` **no** se amplía: sigue siendo solo `grid`.
 
 ---
 
@@ -233,6 +252,12 @@ ubicacion.ts    → location.ts        salidas.ts      → outputs.ts
 fronteras.mjs → boundaries.mjs    proyeccion.mjs  → projection.mjs
 citas.mjs     → citations.mjs     invariantes.mjs → invariants.mjs
 ```
+
+**Un guardián NUEVO nace en inglés.** La lista de arriba son renombres, y no decía
+nada del caso nuevo. El precedente ya existía —`numbers.mjs` nació así en el bloque 1—
+y `geometry.mjs` lo sigue en el bloque 2. Los renombres, en cambio, esperan a que se
+traduzca el último archivo que el guardián nombra, para no abrir dos veces la ventana
+en que un docstring cita un archivo que ya no existe.
 
 **Los marcadores grepeables:**
 

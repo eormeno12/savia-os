@@ -18,8 +18,8 @@
  */
 
 import { PARAMETERS } from "./params.js";
-import type { ClaveObjeto } from "./identidad.js";
-import { cajaContiene, type Caja } from "./ubicacion.js";
+import type { ObjectKey } from "./identity.js";
+import { boxContains, type Box } from "./location.js";
 
 // ─────────────────────────────── Forma ───────────────────────────────────────
 
@@ -138,7 +138,7 @@ export type Grain = "row" | "whole";
  * Qué parte de un objeto es una materia descomponible.
  *
  * PROVISIONAL(C4): `Window` existe porque `ObjectRef` tiene que dejar de ser una
- * clave opaca — Ver el razonamiento completo en `HashMateria` (`identidad.ts`).
+ * clave opaca — Ver el razonamiento completo en `MatterHash` (`identity.ts`).
  * «Referenciar el original» (§{Dónde frena}) se lee como «no escribir bytes
  * nuevos», no como «no nombrar una subregión»: es la única lectura bajo la cual
  * coexisten la terminación, la guarda de ciclo, el caché por página, la huella de
@@ -149,7 +149,7 @@ export type Grain = "row" | "whole";
  */
 export type Window =
   | { readonly scope: "whole" }
-  | { readonly scope: "region"; readonly box: Caja }
+  | { readonly scope: "region"; readonly box: Box }
   | { readonly scope: "range"; readonly start: number; readonly end: number };
 
 /**
@@ -158,7 +158,7 @@ export type Window =
  * mismo contenido, y el pase 2 los separa por hueco.
  */
 export type ObjectRef = {
-  readonly object: ClaveObjeto;
+  readonly object: ObjectKey;
   readonly window: Window;
 };
 
@@ -321,13 +321,13 @@ export type BodyOf<F extends Shape> = Extract<Body, { shape: F }>;
  * porcentaje inventado y la terminación depende de él.
  *
  * RESIDUO SIN RESOLVER: la canonicalización de `Window` (redondeo de cajas)
- * tiene que ser exacta o dos corridas dan `HashMateria` distintos.
+ * tiene que ser exacta o dos corridas dan `MatterHash` distintos.
  */
 export const windowCovers = (exterior: Window, interior: Window): boolean => {
   if (exterior.scope === "whole") return true;
   if (interior.scope === "whole") return false;
   if (exterior.scope === "region" && interior.scope === "region") {
-    return cajaContiene(exterior.box, interior.box);
+    return boxContains(exterior.box, interior.box);
   }
   if (exterior.scope === "range" && interior.scope === "range") {
     return interior.start >= exterior.start && interior.end <= exterior.end;

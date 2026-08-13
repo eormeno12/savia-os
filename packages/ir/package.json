@@ -15,10 +15,11 @@
     "typecheck": "tsc --noEmit",
     "fronteras": "node scripts/fronteras.mjs",
     "proyeccion": "node scripts/proyeccion.mjs",
+    "geometry": "node scripts/geometry.mjs",
     "citas": "node scripts/citas.mjs",
     "numbers": "node scripts/numbers.mjs",
-    "build": "tsc --noEmit && node scripts/fronteras.mjs && node scripts/proyeccion.mjs && node scripts/citas.mjs && node scripts/numbers.mjs && node scripts/mutantes.mjs",
-    "lint": "tsc --noEmit && node scripts/fronteras.mjs && node scripts/proyeccion.mjs && node scripts/citas.mjs && node scripts/numbers.mjs && node scripts/mutantes.mjs",
+    "build": "tsc --noEmit && node scripts/fronteras.mjs && node scripts/proyeccion.mjs && node scripts/geometry.mjs && node scripts/citas.mjs && node scripts/numbers.mjs && node scripts/mutantes.mjs",
+    "lint": "tsc --noEmit && node scripts/fronteras.mjs && node scripts/proyeccion.mjs && node scripts/geometry.mjs && node scripts/citas.mjs && node scripts/numbers.mjs && node scripts/mutantes.mjs",
     "mutantes": "node scripts/mutantes.mjs"
   },
   "dependencies": {},

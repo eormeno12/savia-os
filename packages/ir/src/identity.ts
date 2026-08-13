@@ -11,8 +11,14 @@
 
 declare const nominal: unique symbol;
 
+// PENDING(glosario D22): `Marcado → Branded` es derivación directa de la raíz
+// `Marca → Brand`, pero NINGUNA regla de composición del glosario cubre los
+// participios. Las otras dos candidatas eran `AlreadyBranded` (dos palabras para un
+// tipo privado de una línea) y `Marked` (colisiona con `Mark`, la marca de estilo
+// inline de `shapes.ts`, que es justamente la colisión que el glosario separó al
+// dar `Brand` y `Mark` a las dos `Marca` del paquete).
 /** Una base que YA lleva marca. Ver la guarda de `Nominal`. */
-type Marcado = { readonly [nominal]: string };
+type Branded = { readonly [nominal]: string };
 
 /**
  * Marca nominal: dos alias de `string` con etiquetas distintas dejan de ser
@@ -23,8 +29,8 @@ type Marcado = { readonly [nominal]: string };
  * la vez `"A"` y `"B"`: una contradicción, no una conjunción. TypeScript reduce el
  * tipo entero a `never`, y como `never` es asignable a TODO, los tipos que iban a
  * quedar más protegidos quedan sin ninguna protección — con el build en verde.
- * Es exactamente lo que pasaba acá: los siete hashes eran `never` y una huella se
- * asignaba a un `number`.
+ * Es exactamente lo que pasaba acá: toda la familia de hashes era `never` y una
+ * huella se asignaba a un `number`.
  *
  * La guarda de abajo hace que la reincidencia sea un error de compilación en el
  * lugar donde se declara el tipo, y no una lista que alguien tenga que mantener:
@@ -34,10 +40,16 @@ type Marcado = { readonly [nominal]: string };
  * sacar la guarda: hay que darle a cada marca su propia clave (`declare const` por
  * tipo), porque dos claves distintas sí componen. Se descartó por costar ~20 líneas
  * de andamio para un subtipado sin un solo consumidor.
+ *
+ * PENDING(glosario D21): el parámetro se llama `Label` por el precedente del
+ * bloque 1 (`Par.etiqueta → label`). «Brand **tag**» es el término de arte de la
+ * técnica, y ninguna regla de composición del glosario elige entre los dos — con la
+ * salvedad de que `label` en `Pair` es un dato que un humano lee y acá es un
+ * discriminante de tipo.
  */
-export type Nominal<Base, Etiqueta extends string> = [Base] extends [Marcado]
+export type Nominal<Base, Label extends string> = [Base] extends [Branded]
   ? { "IR-ERR: marca sobre marca colapsa a never — la marca es PLANA": Base }
-  : Base & { readonly [nominal]: Etiqueta };
+  : Base & { readonly [nominal]: Label };
 
 // ─────────────────────────────── Identificadores ─────────────────────────────
 
@@ -122,7 +134,7 @@ export type ElementId = Nominal<string, "ElementId">;
 export type LocalId = Nominal<string, "LocalId">;
 
 /** Identificador de un adaptador del registro. Único dentro del registro. */
-export type AdaptadorId = Nominal<string, "AdaptadorId">;
+export type AdapterId = Nominal<string, "AdapterId">;
 
 /**
  * Quién dijo algo.
@@ -131,23 +143,23 @@ export type AdaptadorId = Nominal<string, "AdaptadorId">;
  * resolver — §{Tramo 1 › El registro} y el glosario son tajantes: todo lo que se
  * guarda tiene un `User` dueño, sin excepción; para conectores de organización, el
  * usuario raíz. La atribución cruda del documento («María López», del OOXML) viaja
- * en `Autoría.fuente`, que es un `string` libre — Si se decide al revés (unión de
- * usuario Savia y actor externo), todo consumidor de `ActorId` tiene que ramificar
- * y no se compra nada que `fuente` no dé.
+ * en `Authorship.source`, que es un `string` libre — Si se decide al revés (unión
+ * de usuario Savia y actor externo), todo consumidor de `ActorId` tiene que
+ * ramificar y no se compra nada que `source` no dé.
  */
 export type ActorId = Nominal<string, "ActorId">;
 
 /** El tenant. Toda lectura posterior se filtra por acá (§{Tramo 1 › El registro}). */
-export type OrganizacionId = Nominal<string, "OrganizacionId">;
+export type OrganizationId = Nominal<string, "OrganizationId">;
 
 /** La fila `documento` del tramo 1 (§{Tramo 1 › El registro}). */
-export type DocumentoId = Nominal<string, "DocumentoId">;
+export type DocumentId = Nominal<string, "DocumentId">;
 
 /**
  * Dónde quedó un objeto en el almacenamiento direccionado por contenido
  * (§{Tramo 1 › El registro}).
  */
-export type ClaveObjeto = Nominal<string, "ClaveObjeto">;
+export type ObjectKey = Nominal<string, "ObjectKey">;
 
 /**
  * Identificador de un marco de delegación. Lo acuña el orquestador de la
@@ -168,31 +180,36 @@ export type ClaveObjeto = Nominal<string, "ClaveObjeto">;
  * NUNCA entra en la huella: si entrara, la re-emisión por delegación tardía
  * movería ids, contra §{La delegación tardía} («cero identificadores movidos»).
  */
-export type DelegacionId = Nominal<string, "DelegacionId">;
+export type DelegationId = Nominal<string, "DelegationId">;
 
 /**
  * Identificador de un fragmento, para deduplicar resultados de búsqueda
  * (§{Tramo 7} dedupica por `fragmentoId` y `Fragmento` no tiene ese campo —
  * auditoría #69).
  *
- * PROVISIONAL(#69): se deriva de `(DocumentoId, huellaContextual)` — Si fuera el
- * hash a secas, dos fragmentos idénticos de documentos distintos serían el mismo id
- * y el dedupe colapsaría dos documentos en un solo resultado; y a la vez el caché
- * por contenido EXIGE que compartan hash. Derivarlo del par separa la identidad de
- * recuperación de la clave de caché de vectores. Va sobre la huella CONTEXTUAL y no
- * sobre el texto limpio (que ya no existe como huella, ver C2 en
- * `HuellaContextual`): con el texto limpio, dos fragmentos del mismo documento con
- * el mismo texto en secciones distintas serían el mismo id — Si se decide al revés
- * (id acuñado y persistido), hay que declarar su política de estabilidad entre
+ * PROVISIONAL(#69): se deriva de `(DocumentId, contextualFingerprint)` — Si fuera
+ * el hash a secas, dos fragmentos idénticos de documentos distintos serían el mismo
+ * id y el dedupe colapsaría dos documentos en un solo resultado; y a la vez el
+ * caché por contenido EXIGE que compartan hash. Derivarlo del par separa la
+ * identidad de recuperación de la clave de caché de vectores. Va sobre la huella
+ * CONTEXTUAL y no sobre el texto limpio (que ya no existe como huella, ver C2 en
+ * `ContextualFingerprint`): con el texto limpio, dos fragmentos del mismo documento
+ * con el mismo texto en secciones distintas serían el mismo id — Si se decide al
+ * revés (id acuñado y persistido), hay que declarar su política de estabilidad entre
  * re-ingestas, y `nodos` está declarado justamente como «lo que sobrevive a que el
  * fragmento se rearme» (§{Las dos salidas}), lo que sugiere que el id no.
  *
  * NO es un ancla de curación: por R3 la curación cuelga de `ElementId` (§{R3}).
  */
-export type FragmentoId = Nominal<string, "FragmentoId">;
+export type FragmentId = Nominal<string, "FragmentId">;
 
 /**
  * Un instante.
+ *
+ * Es RELOJ DE PARED, no tiempo de medio: el momento en que algo pasó en el mundo,
+ * no un offset dentro de un audio o un video. Eso último es
+ * `Coordinate` con `space: "time"` (`location.ts`), y son enteros en milisegundos
+ * desde el inicio del medio, no un ISO-8601.
  *
  * PROVISIONAL(C8): string ISO-8601 en UTC con precisión de milisegundos
  * (`2026-08-09T14:03:11.000Z`) — Es el único de los tres candidatos (`Date`, epoch
@@ -201,21 +218,36 @@ export type FragmentoId = Nominal<string, "FragmentoId">;
  * el snapshot deja de ser legible y la comparación byte-idéntica de
  * §{El determinismo} pasa a depender de la representación numérica.
  */
-export type Instante = Nominal<string, "Instante">;
+export type Instant = Nominal<string, "Instant">;
 
 // ─────────────────────────────── Familia de hashes ───────────────────────────
 
-// Los siete llevan el MISMO valor en runtime —64 hexadecimales en minúscula— y
+// SEIS tipos marcados y un séptimo NOMBRE, `ContentHash`, que es alias de
+// `NodeFingerprint`. La cifra importa: `invariantes.ts` la fija con seis
+// `Habitado<…>` y seis mensajes propios, y la prosa de este archivo decía «los
+// siete» —residuo de antes de que `HuellaFragmento` se borrara, borrado que este
+// mismo archivo cuenta más abajo—. Es el modo de falla que `M9c` impide en
+// `params.ts` y que acá no verifica nadie: si mañana entra un miembro nuevo, esta
+// línea y las seis de `invariantes.ts` se actualizan juntas.
+//
+// Los seis llevan el MISMO valor en runtime —64 hexadecimales en minúscula— y
 // roles que no se pueden confundir. La FORMA no está en el tipo: no hay un
-// `Sha256Hex` del que los siete deriven, porque (a) marcar sobre marcado colapsa
+// `Sha256Hex` del que los seis deriven, porque (a) marcar sobre marcado colapsa
 // —ver `Nominal`— y (b) un supertipo común sería justo el agujero que esta familia
-// viene a tapar: cualquier función que reciba «un sha256» acepta los siete roles
+// viene a tapar: cualquier función que reciba «un sha256» acepta los seis roles
 // indistintamente. Quien garantiza la forma es la única función que calcula
 // sha256, con un test ahí; validar en cada constructor sería una regex por nodo y
 // por fragmento para atrapar un error de programación, no un error de datos.
 //
 // Las pruebas de que esta familia efectivamente separa están en `invariantes.ts`.
 
+// PENDING(glosario D17): `HashBytes → ByteHash`. El glosario fija el patrón
+// `Hash<X>` ⇒ `<X>Hash` con `HashMateria → MatterHash`, pero no fija el NÚMERO del
+// modificador, y acá el modificador es un plural. `ByteHash` es el compuesto inglés canónico (el modificador va
+// en singular) y coincide con el mensaje que `invariantes.ts` ya tenía escrito
+// («a node fingerprint is accepted as a byte hash»). Las otras dos eran `BytesHash`
+// (conserva el plural, lee mal) y `FileHash` (nombra lo hasheado, e invita justo a
+// la confusión con el checksum multipart que el docstring de abajo descarta).
 /**
  * sha256 del archivo crudo (§{Tramo 1 › El registro}). Dedupe de blobs,
  * idempotencia de reintento y componente de la clave del caché de reconocimiento.
@@ -231,11 +263,27 @@ export type Instante = Nominal<string, "Instante">;
  * dedupe de blobs (§{Tramo 1 › Decisiones}) NO puede ocurrir en la puerta ni ser la
  * clave de escritura del objeto. Eso contradice el orden de §{El orden} y toca C6.
  */
-export type HashBytes = Nominal<string,"HashBytes">;
+export type ByteHash = Nominal<string,"ByteHash">;
 
 /**
- * La huella de identidad de un NODO. Es lo que viaja hacia adelante como material
- * del próximo reconciliador (§{Tramo 4 › Qué sale}).
+ * La huella de identidad de un NODO. Es lo que el próximo reconciliador usa como
+ * material (§{Tramo 4 › Qué sale}).
+ *
+ * PENDING(D24): HOY ESTE TIPO NO TIENE NI UN PRODUCTOR. `huellaDe`
+ * (`proyeccion.ts`) devuelve `string` pelado, así que la marca protege HACIA
+ * ADENTRO —nadie puede pasar una huella donde va una clave de caché— y no protege
+ * hacia afuera: cualquier `string` sirve de huella y nadie está obligado a llamar
+ * a `asNodeFingerprint`. La aserción `_S5` de `invariantes.ts` está verde mientras
+ * eso pasa, así que la promesa es de la prosa, no del tipo.
+ *
+ * NO SE ARREGLA ACÁ, y la razón es el grafo de módulos: para que `huellaDe`
+ * devuelva `NodeFingerprint`, `proyeccion.ts` tendría que importar este archivo, y
+ * con esa arista `Authorship` pasaría a ser ALCANZABLE desde el archivo que calcula
+ * la huella. Hoy «`Authorship` NO entra en la huella» está impuesto por el escalón
+ * ② —`proyeccion.ts` no importa `identity.ts`, punto—, y de ese hecho cuelga que el
+ * caché de reconocimiento pueda cruzar organizaciones (§{Caché}) y que el mismo
+ * contenido subido por dos personas dé la misma huella. Cambiar el retorno sin
+ * reponer esa frontera compraría un tipo y vendería un invariante.
  *
  * PROVISIONAL(ContentHash): el plan usa el MISMO nombre `ContentHash` para esto y
  * para el hash del texto de un fragmento (§{Tramo 4 › Qué sale} vs
@@ -248,16 +296,16 @@ export type HashBytes = Nominal<string,"HashBytes">;
  * (hallazgo 10, §{Cuarta}).
  *
  * Que la separación EXISTA y no sea solo esta prosa lo prueba `PRUEBAS_DE_MARCA`
- * en `invariantes.ts`. Esta misma promesa estuvo escrita acá mientras los siete
+ * en `invariantes.ts`. Esta misma promesa estuvo escrita acá mientras los seis
  * tipos eran `never` y no separaban nada.
  */
-export type HuellaNodo = Nominal<string,"HuellaNodo">;
+export type NodeFingerprint = Nominal<string,"NodeFingerprint">;
 
 /**
- * Alias público de `HuellaNodo`, para que las citas de §{Tramo 4 › Qué sale}
+ * Alias público de `NodeFingerprint`, para que las citas de §{Tramo 4 › Qué sale}
  * sigan verificando.
  */
-export type ContentHash = HuellaNodo;
+export type ContentHash = NodeFingerprint;
 
 /**
  * La huella del texto de un fragmento CON sus migas concatenadas. La ÚNICA huella
@@ -291,9 +339,9 @@ export type ContentHash = HuellaNodo;
  * Y por eso `HuellaFragmento` (sobre texto limpio) se BORRÓ: su propósito declarado
  * era «identidad y diferencia»; la diferencia ya no existe, y la identidad tiene
  * que llevar la miga o dos fragmentos del mismo documento con el mismo texto en
- * secciones distintas colisionan.
+ * secciones distintas colisionan. Ese borrado es el que dejó la familia en SEIS.
  */
-export type HuellaContextual = Nominal<string,"HuellaContextual">;
+export type ContextualFingerprint = Nominal<string,"ContextualFingerprint">;
 
 /**
  * La clave del caché de vectores. Una POR VECTOR, no por fragmento:
@@ -301,14 +349,14 @@ export type HuellaContextual = Nominal<string,"HuellaContextual">;
  *     sha256( miga ‖ texto[rebanada i] ‖ versiónEmbedder )
  *
  * Es exactamente la entrada de la función que se cachea — ver C2 en
- * `HuellaContextual`. No es `HuellaContextual ‖ versiónEmbedder`, que solo
- * coincidiría cuando el fragmento entra en un vector (N = 1): con N > 1 la huella
- * cubre el texto entero y cada rebanada tiene su propia clave, que es lo que hace
- * que el reuso funcione a nivel de rebanada.
+ * `ContextualFingerprint`. No es `ContextualFingerprint ‖ versiónEmbedder`, que
+ * solo coincidiría cuando el fragmento entra en un vector (N = 1): con N > 1 la
+ * huella cubre el texto entero y cada rebanada tiene su propia clave, que es lo que
+ * hace que el reuso funcione a nivel de rebanada.
  *
  * La compone el tramo 6, el único que conoce el embedder y el único que rebana.
  */
-export type ClaveEmbedding = Nominal<string,"ClaveEmbedding">;
+export type EmbeddingKey = Nominal<string,"EmbeddingKey">;
 
 /**
  * La identidad de una MATERIA descomponible: el par (objeto, ventana) ya
@@ -323,45 +371,49 @@ export type ClaveEmbedding = Nominal<string,"ClaveEmbedding">;
  * §{La delegación es emergente} y el «contrato escaneado» que el banco reporta
  * verificado, §{Segunda}), o el punto fijo no dispara jamás. Y el caché por página
  * (§{Caché}) colapsa: si todas las páginas referencian el mismo original, todas
- * colisionan — Separo el valor: `HashMateria = sha256(objeto ‖ ventana canónica)`
+ * colisionan — Separo el valor: `MatterHash = sha256(objeto ‖ ventana canónica)`
  * alimenta el caché por página y la guarda de ciclo (dos páginas → dos ventanas →
  * dos hashes; A→B→A → el A interior es otro objeto con ventana completa → mismo
- * `HashMateria` → corta), y el punto fijo deja de ser igualdad de hashes y pasa a
+ * `MatterHash` → corta), y el punto fijo deja de ser igualdad de hashes y pasa a
  * ser lo que §{Dónde frena} dice en prosa: «descomponer devolvió exactamente un
- * bloque cuya ventana cubre la de entrada» (ver `ventanaCubre` en `formas.ts`) — Si
+ * bloque cuya ventana cubre la de entrada» (ver `windowCovers` en `shapes.ts`) — Si
  * se decide al revés (un solo hash), hay que elegir cuál de los tres mecanismos
  * —punto fijo, ciclo, caché por página— se sacrifica.
  */
-export type HashMateria = Nominal<string,"HashMateria">;
+export type MatterHash = Nominal<string,"MatterHash">;
 
 /**
  * La clave del caché de reconocimiento (§{Caché}).
  * `sha256(hashBytes ‖ idAdaptador ‖ versiónDelAdaptador ‖ versiónDelModelo?)`.
  */
-export type ClaveDeCache = Nominal<string,"ClaveDeCache">;
+export type CacheKey = Nominal<string,"CacheKey">;
 
 // ─────────────────────────────── Constructores ───────────────────────────────
 // `ir` no tiene lógica, pero sin constructores nadie puede producir un valor
 // marcado y el contrato es inusable. Son conversiones, no validaciones: quien
 // construye es responsable de la forma (ULID, hex de 64, ISO-8601).
+//
+// Son DIECISÉIS. R4 del glosario dice «los 15 constructores de marca» y es una
+// errata suya, no del archivo: `grep -c '^export const as' src/identity.ts` = 16.
 
-export const comoElementId = (v: string): ElementId => v as ElementId;
-export const comoLocalId = (v: string): LocalId => v as LocalId;
-export const comoAdaptadorId = (v: string): AdaptadorId => v as AdaptadorId;
-export const comoActorId = (v: string): ActorId => v as ActorId;
-export const comoOrganizacionId = (v: string): OrganizacionId => v as OrganizacionId;
-export const comoDocumentoId = (v: string): DocumentoId => v as DocumentoId;
-export const comoClaveObjeto = (v: string): ClaveObjeto => v as ClaveObjeto;
-export const comoDelegacionId = (v: string): DelegacionId => v as DelegacionId;
-export const comoFragmentoId = (v: string): FragmentoId => v as FragmentoId;
-export const comoInstante = (v: string): Instante => v as Instante;
+export const asElementId = (v: string): ElementId => v as ElementId;
+export const asLocalId = (v: string): LocalId => v as LocalId;
+export const asAdapterId = (v: string): AdapterId => v as AdapterId;
+export const asActorId = (v: string): ActorId => v as ActorId;
+export const asOrganizationId = (v: string): OrganizationId => v as OrganizationId;
+export const asDocumentId = (v: string): DocumentId => v as DocumentId;
+export const asObjectKey = (v: string): ObjectKey => v as ObjectKey;
+export const asDelegationId = (v: string): DelegationId => v as DelegationId;
+export const asFragmentId = (v: string): FragmentId => v as FragmentId;
+export const asInstant = (v: string): Instant => v as Instant;
 
-export const comoHashBytes = (v: string): HashBytes => v as HashBytes;
-export const comoHuellaNodo = (v: string): HuellaNodo => v as HuellaNodo;
-export const comoHuellaContextual = (v: string): HuellaContextual => v as HuellaContextual;
-export const comoClaveEmbedding = (v: string): ClaveEmbedding => v as ClaveEmbedding;
-export const comoHashMateria = (v: string): HashMateria => v as HashMateria;
-export const comoClaveDeCache = (v: string): ClaveDeCache => v as ClaveDeCache;
+export const asByteHash = (v: string): ByteHash => v as ByteHash;
+export const asNodeFingerprint = (v: string): NodeFingerprint => v as NodeFingerprint;
+export const asContextualFingerprint = (v: string): ContextualFingerprint =>
+  v as ContextualFingerprint;
+export const asEmbeddingKey = (v: string): EmbeddingKey => v as EmbeddingKey;
+export const asMatterHash = (v: string): MatterHash => v as MatterHash;
+export const asCacheKey = (v: string): CacheKey => v as CacheKey;
 
 // ─────────────────────────────── Autoría ─────────────────────────────────────
 
@@ -369,31 +421,36 @@ export const comoClaveDeCache = (v: string): ClaveDeCache => v as ClaveDeCache;
  * Quién dijo qué y cuándo. Obligatoria en todos los nodos (§{Tramo 3 › Qué sale}):
  * «esto lo dijo el CFO en marzo» es la mitad del valor de la memoria.
  *
- * PROVISIONAL(C8/#22): `Autoría` NO forma parte de lo que produce un adaptador ni
- * de lo que se cachea. Se inyecta DESPUÉS del caché, al componer `Nodo` a partir de
- * `NodoCrudo` — Resuelve dos cosas de un golpe y es gratis, porque ya está latente
- * en los tipos escritos (`Unidad<S>` de §{`descomponer`} NO lleva autoría y `Nodo`
- * de §{Tramo 3 › Qué sale} sí): (1) el property test de determinismo byte-idéntico
- * (§{El determinismo}) no puede pasar con un timestamp en cada nodo, y sellarlo una
- * vez por documento en el tramo 1 lo arregla sin cambiar ningún tipo; (2) el caché
- * de reconocimiento se indexa por `hashBytes` y el acierto cruza organizaciones POR
- * DISEÑO (§{Caché}), así que si la autoría viajara adentro del árbol cacheado se
- * propagaría la del primer subidor a otro tenant (auditoría #22) — Si se decide al
- * revés, o el property test se declara inaplicable, o el caché deja de cruzar
- * organizaciones y se cae la optimización insignia de §{Caché}.
+ * PROVISIONAL(C8/#22): `Authorship` NO forma parte de lo que produce un adaptador
+ * ni de lo que se cachea. Se inyecta DESPUÉS del caché, al componer `Nodo` a partir
+ * de `NodoCrudo` — Resuelve dos cosas de un golpe y es gratis, porque ya está
+ * latente en los tipos escritos (`Unidad<S>` de §{`descomponer`} NO lleva autoría y
+ * `Nodo` de §{Tramo 3 › Qué sale} sí): (1) el property test de determinismo
+ * byte-idéntico (§{El determinismo}) no puede pasar con un timestamp en cada nodo,
+ * y sellarlo una vez por documento en el tramo 1 lo arregla sin cambiar ningún
+ * tipo; (2) el caché de reconocimiento se indexa por `hashBytes` y el acierto cruza
+ * organizaciones POR DISEÑO (§{Caché}), así que si la autoría viajara adentro del
+ * árbol cacheado se propagaría la del primer subidor a otro tenant (auditoría #22)
+ * — Si se decide al revés, o el property test se declara inaplicable, o el caché
+ * deja de cruzar organizaciones y se cae la optimización insignia de §{Caché}.
  *
- * PROVISIONAL(#14): un subárbol que llega tarde por delegación HEREDA el `cuándo`
- * de su documento, no sella el instante real de la descomposición — Por producto:
+ * PROVISIONAL(#14): un subárbol que llega tarde por delegación HEREDA el `when` de
+ * su documento, no sella el instante real de la descomposición — Por producto:
  * «lo dijo el CFO en marzo» se refiere a marzo, no al momento en que drenó nuestra
- * cola. Y porque si no, dos re-ingestas producen nodos con `cuándo` distinto — Si
- * se decide al revés, cada re-emisión cambia la autoría de todo lo delegado.
+ * cola. Y porque si no, dos re-ingestas producen nodos con `when` distinto — Si se
+ * decide al revés, cada re-emisión cambia la autoría de todo lo delegado.
  *
- * `Autoría` NO entra en la huella. Esto NO está dicho en ningún lado del plan y es
- * la única razón por la que sellar una vez por documento alcanza.
+ * `Authorship` NO entra en la huella. Esto NO está dicho en ningún lado del plan y
+ * es la única razón por la que sellar una vez por documento alcanza. Y hoy lo
+ * IMPONE EL GRAFO DE MÓDULOS, no esta línea: `proyeccion.ts` —el único archivo que
+ * calcula la huella— no importa `identity.ts`, así que `Authorship` ni siquiera es
+ * nombrable desde ahí. Ver PENDING(D24) en `NodeFingerprint`: es el mismo hecho
+ * mirado desde el otro lado, y la razón por la que `huellaDe` sigue devolviendo un
+ * `string`.
  */
-export type Autoría = {
+export type Authorship = {
   readonly actor: ActorId;
-  readonly cuándo: Instante;
+  readonly when: Instant;
   /** Atribución cruda del documento, tal como venía: `"María López (OOXML)"`. */
-  readonly fuente: string;
+  readonly source: string;
 };

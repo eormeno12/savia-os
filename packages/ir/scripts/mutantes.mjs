@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Acredita cada garantía del paquete ROMPIÉNDOLA, y falla si alguna deja de romperse.
 //
-//   node scripts/mutantes.mjs          las 14 mutaciones, ~16 s
+//   node scripts/mutantes.mjs          las 31 mutaciones, ~13 s
 //   node scripts/mutantes.mjs M8       una sola, para iterar
 //
 // POR QUÉ ESTO ES UN SCRIPT Y NO UNA AUDITORÍA CON AGENTES
@@ -17,8 +17,8 @@
 // a correr en cada `pnpm lint`. Una garantía que solo se verificó el día que se
 // escribió es indistinguible de una que nunca funcionó.
 //
-// EN SERIE Y EN EL ÁRBOL, a propósito. `tsc --noEmit` tarda 0,18 s y los cinco
-// guardianes 0,63 s: paralelizar en copias ahorraría trece segundos y costaría
+// EN SERIE Y EN EL ÁRBOL, a propósito. `tsc --noEmit` tarda 0,18 s y los seis
+// guardianes menos de un segundo: paralelizar en copias ahorraría medio minuto y costaría
 // gestión de directorios temporales. El árbol se restaura siempre, incluso si
 // algo explota, y se comprueba verde al principio Y al final.
 
@@ -146,11 +146,147 @@ const MUTANTES = [
     id: "M12d",
     garantía: "el guardián de fronteras avisa si su regex dejó de ver imports",
     cambios: [[
-      `import type { ClaveObjeto } from "./identidad.js";`,
-      `import type { ClaveObjeto } from './identidad.js';`,
+      `import type { ObjectKey } from "./identity.js";`,
+      `import type { ObjectKey } from './identity.js';`,
     ]],
     espera: /no le parece importar nada|frontera/i,
     nota: "con comillas simples el grafo quedaba sin aristas y decía «fronteras ok»",
+  },
+
+  // ── Bloque 2 · identity.ts ─────────────────────────────────────────────────
+  {
+    id: "M18",
+    garantía: "la guarda de Nominal está puesta: marcar sobre marcado no vuelve a ser never",
+    cambios: [[
+      `export type Nominal<Base, Label extends string> = [Base] extends [Branded]\n  ? { "IR-ERR: marca sobre marca colapsa a never — la marca es PLANA": Base }\n  : Base & { readonly [nominal]: Label };`,
+      `export type Nominal<Base, Label extends string> = Base & { readonly [nominal]: Label };\nexport type _BrandedSigueUsado = Branded;`,
+    ]],
+    espera: /the Nominal guard is gone/,
+    nota: "el reemplazo re-exporta Branded a propósito: sin eso queda huérfano y TS6133 mata la corrida antes del testigo (la lección de M12c)",
+  },
+  {
+    id: "M19",
+    garantía: "una marca de dos niveles es un error EN SU LÍNEA, no un never silencioso",
+    cambios: [[
+      `export type NodeFingerprint = Nominal<string,"NodeFingerprint">;`,
+      `export type NodeFingerprint = Nominal<ByteHash,"NodeFingerprint">;`,
+    ]],
+    espera: /marca sobre marca colapsa a never/,
+    nota: "el mensaje que sale es el de la guarda misma, por el as del constructor asNodeFingerprint",
+  },
+  {
+    id: "M20",
+    garantía: "el bug histórico completo — sin guarda, la familia de hashes colapsa a never",
+    cambios: [
+      [
+        `export type Nominal<Base, Label extends string> = [Base] extends [Branded]\n  ? { "IR-ERR: marca sobre marca colapsa a never — la marca es PLANA": Base }\n  : Base & { readonly [nominal]: Label };`,
+        `export type Nominal<Base, Label extends string> = Base & { readonly [nominal]: Label };\nexport type _BrandedSigueUsado = Branded;`,
+      ],
+      [
+        `export type NodeFingerprint = Nominal<string,"NodeFingerprint">;`,
+        `export type NodeFingerprint = Nominal<ByteHash,"NodeFingerprint">;`,
+      ],
+    ],
+    espera: /brand collapsed to never/,
+    nota: "es la falla que el paquete tuvo: la familia entera en never, never asignable a todo, build en verde",
+  },
+  {
+    id: "M21",
+    garantía: "dos marcas no pueden compartir etiqueta (la familia de hashes separa)",
+    cambios: [[
+      `export type EmbeddingKey = Nominal<string,"EmbeddingKey">;`,
+      `export type EmbeddingKey = Nominal<string,"NodeFingerprint">;`,
+    ]],
+    espera: /a node fingerprint is accepted as an embedding key/,
+  },
+  {
+    id: "M22",
+    garantía: "la marca sigue exigiendo su constructor: un string pelado no entra",
+    cambios: [[
+      `  : Base & { readonly [nominal]: Label };`,
+      `  : Base & { readonly [nominal]?: Label };`,
+    ]],
+    espera: /a bare string is accepted as a node fingerprint/,
+    nota: "ablandar la marca a opcional es un carácter y no cambia ninguna firma",
+  },
+  {
+    id: "M23",
+    garantía: "un id acuñado y uno local de adaptador no se confunden (H13)",
+    cambios: [[
+      `export type LocalId = Nominal<string, "LocalId">;`,
+      `export type LocalId = Nominal<string, "ElementId">;`,
+    ]],
+    espera: /an ElementId is accepted as a LocalId/,
+    nota: "la familia de hashes se escribe sin espacio tras la coma y los ids CON espacio: es lo que hace único a cada buscar. Si alguien pasa Prettier sobre identity.ts, seis filas se pudren juntas",
+  },
+  {
+    id: "M29",
+    garantía: "lo que se cachea por hashBytes no puede llevar un id (H13)",
+    cambios: [[
+      `export type NodoCrudo = {\n  readonly tipo: Tipo;`,
+      `export type NodoCrudo = {\n  readonly id: ElementId;\n  readonly tipo: Tipo;`,
+    ]],
+    espera: /what is cached by hashBytes must not carry an id/,
+    nota: "se pudre cuando salidas.ts pase a outputs.ts: hay que reanclarlo en ese bloque",
+  },
+
+  // ── Bloque 2 · location.ts ─────────────────────────────────────────────────
+  {
+    id: "M24",
+    garantía: "SourceRange no puede colapsar a never si el tag de la variante grid se mueve",
+    cambios: [[`      readonly space: "grid";`, `      readonly space: "sheet";`]],
+    espera: /SourceRange collapsed to never/,
+    nota: "Extract que no matchea no es un error: es never, y never es asignable a todo — la misma falla que la familia de hashes",
+  },
+  {
+    id: "M25",
+    garantía: "abrir la unión Coordinate rompe acá (ninguna variante nueva entra muda)",
+    cambios: [[
+      `  | { readonly space: "time"; readonly start: number; readonly end: number };`,
+      `  | { readonly space: "time"; readonly start: number; readonly end: number }\n  | { readonly space: "page"; readonly page: number };`,
+    ]],
+    espera: /Coordinate gained a space/,
+    nota: "la QUINTA variante (time, H4) ya entró de verdad en este bloque y rompió acá, que es el punto: esta fila guarda la sexta. El vocabulario de space es un compromiso con el plan y con los doce adaptadores, igual que ROLES.length === 15",
+  },
+  {
+    id: "M26",
+    garantía: "boxContains exige el MISMO marco",
+    cambios: [[`  if (parent.frame !== child.frame) return false;\n`, ``]],
+    espera: /MARCOS DISTINTOS no se contienen/,
+    nota: "sin esta línea las cajas de las 40 diapositivas de un .pptx se contienen entre sí, y nada se pone rojo",
+  },
+  {
+    id: "M27",
+    garantía: "compareBoxes ordena por área ASCENDENTE",
+    cambios: [[`  if (areaA !== areaB) return areaA - areaB;`, `  if (areaA !== areaB) return areaB - areaA;`]],
+    espera: /área ascendente manda/,
+  },
+  {
+    id: "M28",
+    garantía: "R1 — location.ts no puede alcanzar salidas.ts (una Location que anida un Nodo)",
+    cambios: [[
+      `export type SourceRange = Extract<Coordinate, { space: "grid" }>;`,
+      `import type { Nodo } from "./salidas.js";\nexport type _Anida = Nodo;\nexport type SourceRange = Extract<Coordinate, { space: "grid" }>;`,
+    ]],
+    espera: /frontera/i,
+    nota: "mismo cuidado que M12c: el import tiene que USARSE o TS6133 mata la corrida antes del guardián. La cobertura es TRANSITIVA (shapes.ts → location.ts → salidas.ts): no hace falta una frontera nueva, pero si shapes.ts dejara de importar location.ts esta fila diría NO ROMPIÓ y ahí se vería",
+  },
+  {
+    id: "M30",
+    garantía: "Location.within sigue siendo RECURSIVA (la cita encadenada)",
+    cambios: [[
+      `  readonly within: readonly Location[];`,
+      `  readonly within: readonly LocalLocation[];`,
+    ]],
+    espera: /Location\.within stopped being recursive/,
+    nota: "aplanarla a un solo nivel compila: «la imagen dentro de la página 3 del PDF» deja de ser expresable sin un solo error",
+  },
+  {
+    id: "M31",
+    garantía: "Box.frame es OBLIGATORIO",
+    cambios: [[`  readonly frame: string;`, `  readonly frame?: string;`]],
+    espera: /Box\.frame became optional/,
+    nota: "boxContains compara undefined !== undefined, que es false: opcionalizarlo no rompe ni una línea de código. Sin el testigo, lo agarraba de casualidad proyeccion.ts —que mete el marco en la preimagen de huella— y eso habría acreditado una garantía que el contrato no impone",
   },
 
   // ── Controles ──────────────────────────────────────────────────────────────
@@ -172,17 +308,47 @@ const MUTANTES = [
       `// control MC2: comentario inocuo\nexport type Shape = Body["shape"];`,
     ]],
   },
+  {
+    id: "MC3",
+    control: true,
+    garantía: "reordenar dos campos de la variante grid no cambia el tipo",
+    cambios: [[
+      `      readonly sheet: string;\n      readonly region: string;`,
+      `      readonly region: string;\n      readonly sheet: string;`,
+    ]],
+    nota: "el par de M24: mover el TAG es rojo, mover un campo es verde",
+  },
+  {
+    id: "MC4",
+    control: true,
+    garantía: "una marca nueva con etiqueta propia no rompe nada",
+    cambios: [[
+      `export type CacheKey = Nominal<string,"CacheKey">;`,
+      `export type CacheKey = Nominal<string,"CacheKey">;\nexport type ThumbnailKey = Nominal<string,"ThumbnailKey">;`,
+    ]],
+    nota: "el par de M19/M21: Nominal está abierta a marcas nuevas y cerrada a dos niveles y a etiquetas repetidas",
+  },
 ];
 
 // Dónde vive cada mutación se deduce de su primer `buscar`, así que no hay que
 // mantener la ruta al día por separado.
-const ARCHIVOS = ["src/shapes.ts", "src/classification.ts", "src/params.ts"];
+const ARCHIVOS = [
+  "src/shapes.ts",
+  "src/classification.ts",
+  "src/params.ts",
+  "src/identity.ts",
+  "src/location.ts",
+  // Entra SOLO por M29 (H13). Cuando `salidas.ts` pase a `outputs.ts`, esa fila hay
+  // que reanclarla acá mismo y en el mismo commit.
+  "src/salidas.ts",
+];
 
 const guardianes = () => {
   try {
     const salida = execSync(
       `./node_modules/.bin/tsc --noEmit && node scripts/fronteras.mjs && ` +
-        `node scripts/proyeccion.mjs && node scripts/citas.mjs && node scripts/numbers.mjs`,
+        `node scripts/proyeccion.mjs && node scripts/geometry.mjs && ` +
+        `node scripts/citas.mjs && node scripts/numbers.mjs`,
       { cwd: RAIZ, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
     );
     return { verde: true, salida };

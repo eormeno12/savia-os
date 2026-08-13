@@ -8,8 +8,8 @@
  */
 
 import { SHAPES, type Body, type Shape } from "./shapes.js";
-import type { Caja } from "./ubicacion.js";
-import type { LocalId } from "./identidad.js";
+import type { Box } from "./location.js";
+import type { LocalId } from "./identity.js";
 
 // ─────────────────────────────── Tipo ────────────────────────────────────────
 
@@ -122,7 +122,7 @@ export type Linkage = (typeof LINKAGES)[number];
 
 /**
  * El único dato estructural que produce el tramo 3 (§{La pista}). Lleva jerarquía y
- * nada más: `columna` y `z` se fueron a `Ubicación` (§{La pista}) y no vuelven.
+ * nada más: `columna` y `z` se fueron a `Location` (§{La pista}) y no vuelven.
  *
  * PROVISIONAL(C21): la frontera de delegación NO viaja en la pista — El emisor
  * ramifica sobre «si BAJÓ / si SUBIÓ de un subárbol delegado» (§{2 · Emisor}) y la
@@ -174,7 +174,7 @@ export type Hint =
       readonly region: string;
       readonly row: number;
     }
-  | { readonly linkage: "spatial"; readonly box: Caja }
+  | { readonly linkage: "spatial"; readonly box: Box }
   | { readonly linkage: "none" };
 
 /**

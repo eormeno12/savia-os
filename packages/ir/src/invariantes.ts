@@ -46,16 +46,31 @@ import type {
   ROLES,
 } from "./classification.js";
 import type {
-  ClaveDeCache,
-  ClaveEmbedding,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  ByteHash as HashBytes,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  CacheKey as ClaveDeCache,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  ContextualFingerprint as HuellaContextual,
   ElementId,
-  HashBytes,
-  HashMateria,
-  HuellaContextual,
-  HuellaNodo,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  EmbeddingKey as ClaveEmbedding,
   LocalId,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  MatterHash as HashMateria,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  NodeFingerprint as HuellaNodo,
   Nominal,
-} from "./identidad.js";
+} from "./identity.js";
+import type {
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  Box as Caja,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  Coordinate as Coordenada,
+  // PENDING(bloque N): alias temporal, se borra cuando este archivo se traduzca
+  Location as Ubicación,
+  SourceRange,
+} from "./location.js";
 import { MARCA_NODAL, type Nodo, type NodoCrudo } from "./salidas.js";
 import type { Unidad } from "./adaptador.js";
 
@@ -120,14 +135,23 @@ export type PRUEBAS_DE_ACUÑADO = readonly [_UnidadSinId, _NodoCrudoSinId];
 
 // ══════════════════════════ Invariante 3 · la marca separa ═══════════════════
 // La familia de hashes estuvo escrita en DOS niveles (`Nominal<Sha256Hex, …>`) y
-// los siete tipos eran `never`, o sea asignables a todo: una huella se asignaba a
+// TODOS sus tipos eran `never`, o sea asignables a todo: una huella se asignaba a
 // un `number` y a una `ClaveDeCache`. El docstring que prometía impedirlo estaba
 // escrito y era falso. Estas pruebas son para que no vuelva a poder serlo.
 
-/** Error si `T` colapsó a `never` — un tipo sin valores posibles es asignable a TODO. */
-type Habitado<T> = [T] extends [never]
-  ? { "IR-ERR": ["brand collapsed to never and no longer protects anything", T] }
-  : true;
+/**
+ * Error si `T` colapsó a `never` — un tipo sin valores posibles es asignable a TODO.
+ *
+ * El mensaje es un parámetro con DEFAULT, igual que en `NoVaDonde` y por la misma
+ * razón: el operador nació para marcas nominales pero no es de marcas. `SourceRange`
+ * también puede colapsar —es un `Extract`, y un `Extract` que no matchea da `never`
+ * sin un solo error— y reportar eso como «*brand collapsed to never*» mandaría a
+ * leer `identity.ts`, que no tiene nada que ver.
+ */
+type Habitado<
+  T,
+  Mensaje extends string = "brand collapsed to never and no longer protects anything",
+> = [T] extends [never] ? { "IR-ERR": [Mensaje, T] } : true;
 
 /**
  * Error si un valor de `De` se puede pasar donde se espera `A`.
@@ -136,9 +160,9 @@ type Habitado<T> = [T] extends [never]
  * nominales, porque es donde nació. Pero el operador no es de marcas: es «estos dos
  * tipos no se confunden», y sirve igual para un par rol⇒forma. Sin el mensaje
  * propio, una aserción sobre `RoleFor<…>` falla diciendo «la marca no separa» y
- * manda a leer `identidad.ts`, que no tiene nada que ver — falla cuando tiene que
+ * manda a leer `identity.ts`, que no tiene nada que ver — falla cuando tiene que
  * fallar y manda a buscar el bug al lugar equivocado, que es la mitad del trabajo
- * de un diagnóstico. Hoy NINGUNA aserción usa el default —las siete pasan el suyo,
+ * de un diagnóstico. Hoy NINGUNA aserción usa el default —las nueve pasan el suyo,
  * y así conviene que siga—; queda como red para que agregar una no obligue a
  * inventar el mensaje en el mismo minuto, no como opción legítima.
  */
@@ -172,7 +196,7 @@ type _S4 = Verdadero<
   NoVaDonde<HashMateria, ClaveDeCache, "a matter hash is accepted as a cache key">
 >;
 type _S5 = Verdadero<
-  NoVaDonde<string, HuellaNodo, "a bare string is accepted as a node fingerprint — the brand stopped requiring comoHuellaNodo()">
+  NoVaDonde<string, HuellaNodo, "a bare string is accepted as a node fingerprint — the brand stopped requiring asNodeFingerprint()">
 >;
 type _S6 = Verdadero<
   NoVaDonde<ElementId, LocalId, "an ElementId is accepted as a LocalId — minted and adapter-local ids no longer separate">
@@ -295,6 +319,70 @@ type _SeisFormas = Verdadero<
 >;
 
 export type PRUEBAS_DE_DOMINIO = readonly [_QuinceRoles, _SeisFormas];
+
+// ═══════ Invariante 7 · la coordenada sigue siendo lo que dice ser ═══════════
+// Las cinco propiedades de `location.ts` que estaban escritas en prosa y no las
+// ejecutaba nadie. Las cinco se pueden apagar con una edición de un carácter y
+// ninguna se pone roja sola:
+//
+//   · `SourceRange` es `Extract<Coordinate, {space:"grid"}>`. Un `Extract` que no
+//     matchea NO es un error: es `never`, y `never` es asignable a todo, así que
+//     mover el tag una letra deja `Registro.coordenada` (§{Las dos salidas})
+//     aceptando cualquier cosa, en verde. Es la falla de la familia de hashes en
+//     otro archivo.
+//   · El vocabulario de `space` es un COMPROMISO con el plan, igual que
+//     `ROLES.length === 15`: agregar o sacar una variante tiene que romper acá para
+//     que los doce adaptadores y todo consumidor exhaustivo se actualicen en el
+//     mismo commit. Las dos direcciones van POR SEPARADO —una dice «entró algo»,
+//     la otra «se fue algo»— porque son fallas distintas.
+//   · `within` recursivo es lo único que hace citable la cadena del caso canónico
+//     (§{La delegación es emergente}); aplanarlo a un solo nivel compila.
+//   · `Box.frame` obligatorio es lo que impide que las cajas de 40 diapositivas
+//     convivan en un plano; volverlo opcional no rompe `boxContains`, que
+//     compararía `undefined !== undefined` y daría `false`.
+
+type _SourceRangeExiste = Verdadero<
+  Habitado<
+    SourceRange,
+    "SourceRange collapsed to never — the grid variant of Coordinate lost its tag and DataRecord.coordinate now accepts anything"
+  >
+>;
+type _EspaciosDeclarados = Verdadero<
+  Cubre<
+    Coordenada["space"],
+    "source" | "text" | "grid" | "visual" | "time",
+    "Coordinate gained a space: every exhaustive consumer and the twelve adapters walk a different domain"
+  >
+>;
+type _EspaciosPresentes = Verdadero<
+  Cubre<
+    "source" | "text" | "grid" | "visual" | "time",
+    Coordenada["space"],
+    "Coordinate lost a space: something that used to be citable no longer is"
+  >
+>;
+type _WithinEsRecursivo = Verdadero<
+  Cubre<
+    Ubicación["within"][number],
+    Ubicación,
+    "Location.within stopped being recursive — the chained citation (contract.pdf → pg3 → image) is no longer expressible"
+  >
+>;
+type _MarcoObligatorio = Verdadero<
+  NoVaDonde<
+    undefined,
+    Caja["frame"],
+    "Box.frame became optional — boxes from different frames share one plane and contain each other"
+  >
+>;
+
+export type PRUEBAS_DE_COORDENADA = readonly [
+  _SourceRangeExiste,
+  _EspaciosDeclarados,
+  _EspaciosPresentes,
+  _WithinEsRecursivo,
+  _MarcoObligatorio,
+];
 
 // ─────────────────────────────── Invariantes de runtime ──────────────────────
 

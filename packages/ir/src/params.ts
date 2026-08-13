@@ -169,9 +169,9 @@ export const PARAMETERS = {
 
   geometry: {
     /**
-     * Unidades por marco de una `Caja`: las coordenadas son enteros en milésimas
+     * Unidades por marco de una `Box`: las coordenadas son enteros en milésimas
      * del ancho/alto del marco.
-     * Decide: que `Caja` sea comparable entre adaptadores (un PPTX en EMU y una
+     * Decide: que `Box` sea comparable entre adaptadores (un PPTX en EMU y una
      * imagen en píxeles caen en la misma escala) Y determinística (enteros, no
      * floats derivados de un modelo de layout, que el property test de
      * byte-identidad de §{El determinismo} no toleraría).

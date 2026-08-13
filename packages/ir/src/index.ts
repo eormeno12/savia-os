@@ -12,9 +12,15 @@
  * PROVISIONAL(P1): el paquete está A MEDIO TRADUCIR, y el estado es visible en esta
  * misma lista de exports. El bloque 1 pasó a inglés `shapes.ts`, `classification.ts`
  * y `params.ts` —con ellos los literales de `Role` y de `Linkage`, y sus nombres
- * exportados—; `identidad.ts`, `ubicacion.ts`, `proyeccion.ts`, `salidas.ts`,
- * `adaptador.ts` e `invariantes.ts` siguen en español, con tilde en los exportados
- * (`Ubicación`, `Autoría`, `huellaDe`), que es la mezcla exacta del plan.
+ * exportados—; el bloque 2 pasó `identidad.ts → identity.ts` y
+ * `ubicacion.ts → location.ts`, las dos capas del fondo del grafo de imports.
+ * `proyeccion.ts`, `salidas.ts`, `adaptador.ts` e `invariantes.ts` siguen en
+ * español, con tilde en los exportados (`Diagnóstico`, `huellaDe`), que es la
+ * mezcla exacta del plan. El costo de traducir el fondo primero es visible y
+ * grepeable: `grep -rc "alias temporal" src/` cuenta los alias que los consumidores
+ * todavía en español necesitan, y es la cifra que baja sola con cada bloque
+ * siguiente. (La cuenta se hace sobre el texto del comentario y no sobre el
+ * marcador, para que esta línea no se cuente a sí misma.)
  *
  * El argumento que sostenía el español entero era el cotejo contra el borrador, y
  * caducó: las citas de este paquete nombran SECCIONES, no líneas ni símbolos
@@ -49,50 +55,50 @@ export {
   type Nominal,
   type ElementId,
   type LocalId,
-  type AdaptadorId,
+  type AdapterId,
   type ActorId,
-  type OrganizacionId,
-  type DocumentoId,
-  type ClaveObjeto,
-  type DelegacionId,
-  type FragmentoId,
-  type Instante,
-  type HashBytes,
-  type HuellaNodo,
+  type OrganizationId,
+  type DocumentId,
+  type ObjectKey,
+  type DelegationId,
+  type FragmentId,
+  type Instant,
+  type ByteHash,
+  type NodeFingerprint,
   type ContentHash,
-  type HuellaContextual,
-  type ClaveEmbedding,
-  type HashMateria,
-  type ClaveDeCache,
-  type Autoría,
-  comoElementId,
-  comoLocalId,
-  comoAdaptadorId,
-  comoActorId,
-  comoOrganizacionId,
-  comoDocumentoId,
-  comoClaveObjeto,
-  comoDelegacionId,
-  comoFragmentoId,
-  comoInstante,
-  comoHashBytes,
-  comoHuellaNodo,
-  comoHuellaContextual,
-  comoClaveEmbedding,
-  comoHashMateria,
-  comoClaveDeCache,
-} from "./identidad.js";
+  type ContextualFingerprint,
+  type EmbeddingKey,
+  type MatterHash,
+  type CacheKey,
+  type Authorship,
+  asElementId,
+  asLocalId,
+  asAdapterId,
+  asActorId,
+  asOrganizationId,
+  asDocumentId,
+  asObjectKey,
+  asDelegationId,
+  asFragmentId,
+  asInstant,
+  asByteHash,
+  asNodeFingerprint,
+  asContextualFingerprint,
+  asEmbeddingKey,
+  asMatterHash,
+  asCacheKey,
+} from "./identity.js";
 
 // Ubicación y coordenadas.
 export {
-  type Caja,
-  type Coordenada,
+  type Box,
+  type Coordinate,
   type SourceRange,
-  type UbicaciónLocal,
-  type Ubicación,
-  cajaContiene,
-  compararCajas,
-} from "./ubicacion.js";
+  type LocalLocation,
+  type Location,
+  boxContains,
+  compareBoxes,
+} from "./location.js";
 
 // Las seis formas.
 export {
@@ -227,5 +233,6 @@ export {
   type PRUEBAS_DE_COHESIÓN,
   type PRUEBAS_DE_PAREJA,
   type PRUEBAS_DE_DOMINIO,
+  type PRUEBAS_DE_COORDENADA,
   esNodo,
 } from "./invariantes.js";
