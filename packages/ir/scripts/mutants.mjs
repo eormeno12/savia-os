@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Acredita cada garantía del paquete ROMPIÉNDOLA, y falla si alguna deja de romperse.
 //
-//   node scripts/mutants.mjs           las 49 mutaciones, ~22 s
+//   node scripts/mutants.mjs           las 52 mutaciones, ~24 s
 //   node scripts/mutants.mjs M8        una sola, para iterar
 //
 // POR QUÉ ESTO ES UN SCRIPT Y NO UNA AUDITORÍA CON AGENTES
@@ -330,7 +330,7 @@ const MUTANTES = [
       `  readonly actor: string;\n  readonly annotator: string;`,
     ]],
     espera: /Annotation\.actor stopped being an ActorId/,
-    nota: "`readonly actor: ActorId;` también existe en Authorship (identity.ts), así que el ancla necesita la línea siguiente o `ubicar` encuentra dos archivos. Sin el testigo: NO ROMPÍA",
+    nota: "`readonly actor: ActorId;` también existe en Authorship —`identity.ts` hasta el bloque 3b, `authorship.ts` desde el corte—, así que el ancla necesita la línea siguiente o `ubicar` encuentra dos archivos. Que el corte no la haya podrido es precisamente porque `authorship.ts` ENTRA en ARCHIVOS: si no entrara, el texto pasaría a aparecer en un solo archivo y esta fila quedaría verde por una razón equivocada. Sin el testigo: NO ROMPÍA",
   },
 
   // ── Bloque 3 · el orden de Certainty (hueco cerrado) ──────────────────────
@@ -442,6 +442,54 @@ const MUTANTES = [
     nota: "M25 guarda la dirección «entró una variante»; esta guarda «se fue una», y son fallas distintas. Se BORRA la variante en vez de renombrarle el tag a propósito: renombrarlo es un alta y una baja a la vez, dispara también `_SpacesDeclared`, y la fila quedaría acreditando M25 por segunda vez —verificado, con el tag renombrado el árbol sin `_SpacesPresent` seguía rompiendo—. Borrarla deja `_SpacesDeclared` en verde (cuatro espacios caben en cinco) y a `_SpacesPresent` como el único que grita. Sin la aserción: NO ROMPÍA",
   },
 
+  // ── Bloque 3b · D24 · la marca sin productor, y la frontera que la destrabó ─
+  // Las tres filas cierran el QUINTO caso de garantía verde y falsa del paquete:
+  // `_S5` probaba que la marca separa y NADIE probaba que el productor la usara.
+  {
+    id: "M46",
+    garantía: "R1 — projection.ts no puede alcanzar authorship.ts (la autoría en la huella)",
+    cambios: [[
+      `export type HashFn = (preimage: string) => string;`,
+      // Calcada de M12c, con su lección: el import tiene que USARSE o `tsc` lo mata
+      // con TS6133 antes de que el guardián de fronteras corra, y la fila estaría
+      // acreditando al linter. Verificado a mano ANTES de escribir la frontera: con
+      // el import puesto y usado, los seis guardianes quedaban VERDES.
+      `import type { Authorship } from "./authorship.js";\nexport type _EntraEnLaHuella = Authorship;\nexport type HashFn = (preimage: string) => string;`,
+    ]],
+    espera: /frontera/i,
+    nota: "esta frontera era INESCRIBIBLE hasta el bloque 3b: con `Authorship` en `identity.ts`, el camino projection.ts → shapes.ts → identity.ts ya existía (por `ObjectKey`) y nacía violada. Mover UN tipo es lo que la vuelve escribible, y es la única razón por la que `authorship.ts` existe",
+  },
+  {
+    id: "M47",
+    garantía: "fingerprintOf MARCA la huella: el único productor no puede devolver un string pelado",
+    cambios: [
+      [
+        `): NodeFingerprint =>\n  asNodeFingerprint(sha256(preimageOfFingerprint(body)));`,
+        `): string =>\n  sha256(preimageOfFingerprint(body));`,
+      ],
+      // Sacar la marca deja huérfanos los DOS imports (`NodeFingerprint` y
+      // `asNodeFingerprint`) y TS6133/TS6196 mataría la corrida ANTES del testigo:
+      // sería el caso M33 otra vez, acreditando al linter. Con esta segunda línea el
+      // único error que sale es el de `_FingerprintIsBranded`. Verificado.
+      [
+        `export type HashFn = (preimage: string) => string;`,
+        `export type HashFn = (preimage: string) => string;\nexport type _BrandStillUsed = NodeFingerprint;\nexport const _ctorStillUsed = asNodeFingerprint;`,
+      ],
+    ],
+    espera: /fingerprintOf returns a bare string/,
+    nota: "es el estado que el paquete tuvo hasta el bloque 3b, y era exactamente esto: `fingerprintOf` devolvía `string`, ninguna marca de la familia tenía productor tipado, y los siete guardianes en verde. Verificado ANTES de escribir `_FingerprintIsBranded`, con los imports mantenidos en uso para que la corrida no muriera por el linter: NO ROMPÍA",
+  },
+  {
+    id: "M48",
+    garantía: "el censo de la familia de hashes no se puede desincronizar del AST",
+    cambios: [[
+      `// CENSO(numbers.mjs): 6 marcas en la familia + 1 alias, 6 cubiertas por Inhabited`,
+      `// CENSO(numbers.mjs): 7 marcas en la familia + 1 alias, 6 cubiertas por Inhabited`,
+    ]],
+    espera: /the hash family census published by identity\.ts does not match/,
+    nota: "es M9c aplicado al otro censo del paquete. La prosa decía «la familia son SEIS» y «esta línea y las seis de invariants.ts se actualizan juntas» desde el bloque 2, y NADIE LO CONTABA — el bloque 4 lo dejó escrito como hueco. Verificado antes del chequeo: mover la cifra pasaba en verde",
+  },
+
   // ── Controles ──────────────────────────────────────────────────────────────
   {
     id: "MC1",
@@ -476,10 +524,10 @@ const MUTANTES = [
     control: true,
     garantía: "una marca nueva con etiqueta propia no rompe nada",
     cambios: [[
-      `export type CacheKey = Nominal<string,"CacheKey">;`,
-      `export type CacheKey = Nominal<string,"CacheKey">;\nexport type ThumbnailKey = Nominal<string,"ThumbnailKey">;`,
+      `export type Instant = Nominal<string, "Instant">;`,
+      `export type Instant = Nominal<string, "Instant">;\nexport type ThumbnailKey = Nominal<string, "ThumbnailKey">;`,
     ]],
-    nota: "el par de M19/M21: Nominal está abierta a marcas nuevas y cerrada a dos niveles y a etiquetas repetidas",
+    nota: "el par de M19/M21: Nominal está abierta a marcas nuevas y cerrada a dos niveles y a etiquetas repetidas. SE MUDÓ DE ANCLA EN EL BLOQUE 3b, de debajo de `CacheKey` a debajo de `Instant`, y el motivo es lo interesante: en la sección de la familia de hashes esta fila ya NO es un control —M48 hace ROJO agregar un miembro sin su `Inhabited` y sin actualizar el censo, que es todo el punto del censo—. O sea que hasta este bloque el corredor tenía una fila que EJERCÍA el agujero del censo y lo declaraba inocuo. En la sección de identificadores el control dice lo mismo que decía y sigue siendo cierto",
   },
   {
     id: "MC5",
@@ -527,6 +575,13 @@ const ARCHIVOS = [
   "src/classification.ts",
   "src/params.ts",
   "src/identity.ts",
+  // Nace en el bloque 3b, con el corte que hace escribible `projection.ts ↛
+  // authorship.ts`. No aloja ninguna mutación —M46 muta `projection.ts`, que es el
+  // lado que viola la frontera— y entra igual, por la misma razón que
+  // `invariants.ts`: `readonly actor: ActorId;` vive acá desde el corte y en
+  // `outputs.ts`, así que sin este archivo en la lista el ancla de M35 pasaría a
+  // encontrar UN solo archivo y la fila quedaría verde por una razón equivocada.
+  "src/authorship.ts",
   "src/location.ts",
   // `salidas.ts` → `outputs.ts` (bloque 3). Ya no entra «solo por M29»: ahora aloja
   // los cuatro agregados de contrato (M32–M35) y el control MC5.

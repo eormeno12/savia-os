@@ -1,5 +1,11 @@
 /**
- * Los números del paquete: dónde viven y cuántos son. Dos garantías, un scanner.
+ * Los números del paquete: dónde viven y cuántos son. Cuatro garantías, un scanner.
+ *
+ * La cuarta entró en el bloque 3b y no es de `params.ts`: es el CENSO DE LA FAMILIA
+ * DE HASHES de `identity.ts`. Va acá y no en un guardián nuevo porque es exactamente
+ * la garantía 3 de abajo aplicada a otro docstring —una cifra publicada a mano que
+ * el AST tiene que confirmar—, y ya tiene el scanner puesto. Ver el bloque 4 de
+ * chequeos, al final.
  *
  * `params.ts` abre diciendo que es «el ÚNICO objeto con valores numéricos de todo el
  * paquete», y apoya la regla en el plan (§{5 · Reconciliador}):
@@ -253,11 +259,149 @@ if (publicado === null) {
   }
 }
 
+// ── 4 · El censo de la familia de hashes coincide con el AST ──────────────────
+//
+// `identity.ts` afirma en prosa que la familia son SEIS marcas más un alias, y que
+// «esta línea y las seis de `invariants.ts` se actualizan juntas». Hasta el bloque 3b
+// NADIE LO CONTABA: entrar un séptimo miembro sin su `Inhabited` y sin tocar la
+// prosa pasaba en verde, y el propio corredor tenía una fila —el control `MC4`— que
+// agregaba una marca en esa sección y la declaraba inocua. Es el modo de falla que
+// el chequeo 3 cierra para `params.ts`, aplicado al otro censo del paquete.
+//
+// LA MEMBRESÍA SE DECIDE POR SECCIÓN, y es una decisión, no una comodidad: la
+// familia no tiene marcador de tipo —no lo puede tener, un supertipo común sería el
+// agujero que la familia viene a tapar— así que lo único que la define es dónde está
+// declarada. Si alguien borra o renombra el encabezado de la sección, esto falla
+// RUIDOSO en vez de contar cero y decir que todo está bien.
+
+const FAMILIA = "identity.ts";
+const PRUEBAS = "invariants.ts";
+const HABITADO = "Inhabited";
+
+/** El encabezado que abre la familia, y el patrón de cualquier encabezado. */
+const ABRE_FAMILIA = /^\/\/ ─+ Familia de hashes ─+$/m;
+const CUALQUIER_SECCIÓN = /^\/\/ ─+ .+ ─+$/m;
+
+/** La línea del docstring de `FAMILIA` que publica la cifra. */
+const CENSO_FAMILIA =
+  /CENSO\(numbers\.mjs\):\s*(\d+)\s+marcas en la familia\s*\+\s*(\d+)\s+alias,\s*(\d+)\s+cubiertas por Inhabited/;
+
+/** Los alias de tipo declarados DENTRO de la sección de la familia. */
+const familiaDeHashes = () => {
+  const { texto, fuente } = leer(FAMILIA);
+  const abre = ABRE_FAMILIA.exec(texto);
+  if (abre === null) return null;
+
+  const desde = abre.index + abre[0].length;
+  const resto = texto.slice(desde);
+  const siguiente = CUALQUIER_SECCIÓN.exec(resto);
+  const hasta = siguiente === null ? texto.length : desde + siguiente.index;
+
+  const marcas = [];
+  const alias = [];
+  const recorrer = (nodo) => {
+    if (ts.isTypeAliasDeclaration(nodo)) {
+      const inicio = nodo.getStart(fuente);
+      if (inicio >= desde && inicio < hasta) {
+        const nombre = nodo.name.getText(fuente);
+        if (ts.isTypeReferenceNode(nodo.type)) {
+          const referido = nodo.type.typeName.getText(fuente);
+          if (referido === "Nominal") marcas.push(nombre);
+          else alias.push(nombre);
+        }
+      }
+    }
+    ts.forEachChild(nodo, recorrer);
+  };
+  recorrer(fuente);
+  return { marcas, alias };
+};
+
+/** Los tipos a los que `invariants.ts` les aplica `Inhabited<…>`. */
+const habitados = () => {
+  const { fuente } = leer(PRUEBAS);
+  const vistos = new Set();
+  const recorrer = (nodo) => {
+    if (
+      ts.isTypeReferenceNode(nodo) &&
+      nodo.typeName.getText(fuente) === HABITADO &&
+      nodo.typeArguments !== undefined &&
+      nodo.typeArguments.length > 0
+    ) {
+      vistos.add(nodo.typeArguments[0].getText(fuente));
+    }
+    ts.forEachChild(nodo, recorrer);
+  };
+  recorrer(fuente);
+  return vistos;
+};
+
+const censoFamilia = familiaDeHashes();
+
+if (censoFamilia === null) {
+  fallas += 1;
+  console.error(
+    `IR-ERR: no encuentro la sección «Familia de hashes» en ${FAMILIA}\n` +
+      "        la membresía de la familia se decide por sección: sin el encabezado esto\n" +
+      "        contaría cero y diría que el censo está bien",
+  );
+} else if (censoFamilia.marcas.length === 0) {
+  fallas += 1;
+  console.error(
+    `IR-ERR: la sección «Familia de hashes» de ${FAMILIA} no declara ni una marca\n` +
+      "        o la familia se mudó de archivo, o este chequeo quedó vacuo",
+  );
+} else {
+  const cubiertas = habitados();
+  const sinPrueba = censoFamilia.marcas.filter((m) => !cubiertas.has(m));
+  if (sinPrueba.length > 0) {
+    fallas += 1;
+    console.error(
+      `IR-ERR: a hash brand has no ${HABITADO}<> proof — ${sinPrueba.join(", ")}\n` +
+        `        toda marca de la familia se assertea habitada en ${PRUEBAS}: una que colapse\n` +
+        "        a never es asignable a TODO y deja de proteger nada, en verde",
+    );
+  }
+
+  const publicado = CENSO_FAMILIA.exec(readFileSync(join(SRC, FAMILIA), "utf8"));
+  if (publicado === null) {
+    fallas += 1;
+    console.error(
+      `IR-ERR: ${FAMILIA} no publica la línea «CENSO(numbers.mjs): N marcas en la familia + A alias, C cubiertas por Inhabited»\n` +
+        "        sin ella la cifra vuelve a sostenerse a mano, que es como «los siete» sobrevivió\n" +
+        "        al borrado de HuellaFragmento",
+    );
+  } else {
+    const [, marcas, alias, cubren] = publicado;
+    const real = {
+      marcas: censoFamilia.marcas.length,
+      alias: censoFamilia.alias.length,
+      cubren: censoFamilia.marcas.filter((m) => cubiertas.has(m)).length,
+    };
+    const dicho = { marcas: Number(marcas), alias: Number(alias), cubren: Number(cubren) };
+    if (
+      dicho.marcas !== real.marcas ||
+      dicho.alias !== real.alias ||
+      dicho.cubren !== real.cubren
+    ) {
+      fallas += 1;
+      console.error(
+        `IR-ERR: the hash family census published by ${FAMILIA} does not match the AST\n` +
+          `        dice:    ${dicho.marcas} marcas + ${dicho.alias} alias, ${dicho.cubren} cubiertas por ${HABITADO}\n` +
+          `        el AST:  ${real.marcas} marcas + ${real.alias} alias, ${real.cubren} cubiertas por ${HABITADO}\n` +
+          `        el AST manda: ${censoFamilia.marcas.join(", ")}\n` +
+          "        corregí la línea CENSO(numbers.mjs) del docstring",
+      );
+    }
+  }
+}
+
 if (fallas > 0) process.exit(1);
 
 const enNull = pending.filter((c) => c.enNull).length;
 console.log(
   `números ok (${pending.length + conValor.length} campos en ${HOGAR}: ` +
     `${pending.length} ${PENDIENTE} —${enNull} en null— y ${conValor.length} con valor; ` +
-    `${archivos.length - 1} archivos sin un literal numérico de valor)`,
+    `${archivos.length - 1} archivos sin un literal numérico de valor; ` +
+    `${censoFamilia.marcas.length} marcas de hash censadas en ${FAMILIA})`,
 );

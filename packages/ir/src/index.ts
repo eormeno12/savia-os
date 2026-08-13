@@ -83,7 +83,6 @@ export {
   type EmbeddingKey,
   type MatterHash,
   type CacheKey,
-  type Authorship,
   asElementId,
   asLocalId,
   asAdapterId,
@@ -101,6 +100,11 @@ export {
   asMatterHash,
   asCacheKey,
 } from "./identity.js";
+
+// Autoría. Archivo propio desde el bloque 3b: es lo que vuelve escribible la
+// frontera `projection.ts ↛ authorship.ts`, o sea lo único que puede imponer que la
+// autoría no entre en la huella (`scripts/boundaries.mjs`).
+export { type Authorship } from "./authorship.js";
 
 // Ubicación y coordenadas.
 export {

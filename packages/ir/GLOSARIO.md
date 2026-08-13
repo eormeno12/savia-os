@@ -413,6 +413,24 @@ escrita para que se tome antes de que existan los doce.
 
 ---
 
+## 9 · Bloque 3b — un archivo nuevo
+
+**Agregado el 2026-08-13**, antes de moverlo, por la regla del cierre. §6 dice cómo se
+llaman los archivos **renombrados** («los archivos siguen la traducción») y cómo nace
+un **guardián** nuevo, pero el paquete nunca había agregado un **módulo de `src/`**:
+los nueve venían del diseño original y §6 solo los tradujo. La regla no determinaba
+el nombre, así que se decide acá.
+
+| # | Símbolo | **Queda** | Por qué no la que salía sola |
+|---|---|---|---|
+| **E1** | el módulo que aloja `Authorship` | **`src/authorship.ts`** | El archivo se llama como **lo que contiene**, que es el patrón que los nueve ya siguen (`shapes.ts` ⇒ `Shape`, `location.ts` ⇒ `Location`), y §3 ya fija la raíz `Autoría → Authorship`. Los otros dos candidatos nombraban el **motivo** en vez del contenido y los dos prometían de más: `provenance.ts` («la procedencia») y `outside-fingerprint.ts` («lo que no entra en la huella») describen una categoría de la que hoy hay **un solo** miembro —`DelegationId` declara el mismo invariante y **no se movió**—, así que el nombre afirmaría una membresía que el archivo no tiene. El día que `DelegationId` se mude, el rename es el acto visible que corresponde |
+
+> **El archivo no existe por tamaño.** Existe porque una frontera —`projection.ts ↛
+> authorship.ts`— es inescribible mientras el tipo viva en `identity.ts`. Está dicho en
+> su encabezado y verificado por `scripts/boundaries.mjs`, con su mutante (`M46`).
+
+---
+
 ## La regla que gobierna a este documento
 
 **Si un término no está acá y ninguna regla de §2 lo determina, no se inventa: se

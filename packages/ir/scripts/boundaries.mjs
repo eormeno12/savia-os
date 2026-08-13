@@ -41,6 +41,18 @@ const FRONTERAS = [
     porque:
       "un Body que alcanza a Node puede anidarlo, y el árbol deja de ser plano (§{Tramo 3 › Qué sale})",
   },
+  {
+    // Bloque 3b. Esta frontera NO EXISTÍA porque era INESCRIBIBLE: mientras
+    // `Authorship` vivía en `identity.ts`, el camino `projection.ts → shapes.ts →
+    // identity.ts` ya existía (por `ObjectKey`) y la frontera nacía violada —
+    // verificado, con el camino impreso. Lo que la vuelve escribible es haber mudado
+    // `Authorship` a un archivo propio, y esa es la única razón por la que ese
+    // archivo existe.
+    origen: "projection.ts",
+    prohibido: "authorship.ts",
+    porque:
+      "si la autoría entrara en la huella, el mismo contenido subido por dos personas daría huellas distintas: se caen el caché de reconocimiento, que cruza organizaciones POR DISEÑO (§{Caché}), y la deduplicación",
+  },
 ];
 
 /** Módulos que el BFS encontró importados y no están en disco. */

@@ -34,6 +34,12 @@
 
 import { PARAMETERS } from "./params.js";
 import type { Body, Shape, Window } from "./shapes.js";
+// El import que este archivo NO PODÍA TENER hasta el bloque 3b. Ver `fingerprintOf`:
+// mientras `Authorship` vivía en `identity.ts`, nombrar este módulo la ponía en el
+// alcance léxico del único archivo que calcula la huella, y era lo único —débil, por
+// lectura— que impedía que entrara. Hoy la autoría está en `authorship.ts` y la
+// frontera `projection.ts ↛ authorship.ts` la impone `scripts/boundaries.mjs`.
+import { asNodeFingerprint, type NodeFingerprint } from "./identity.js";
 
 // ─────────────────────────────── El operador `‖` ─────────────────────────────
 
@@ -410,41 +416,47 @@ export type HashFn = (preimage: string) => string;
 
 /**
  * `fingerprintOf` — el material de la próxima reconciliación (§{Tramo 4 › Qué sale}).
- * El tipo del retorno es `string` en bruto: quien lo marque como `NodeFingerprint`
- * es el llamador, con `asNodeFingerprint(...)`.
  *
- * PENDING(D24): eso NO es una decisión cerrada, es un hueco conocido. Nadie está
- * OBLIGADO a marcar, así que la familia de marcas de `identity.ts` no tiene un solo
- * productor tipado.
+ * D24 — CERRADO EN EL BLOQUE 3b. Devuelve `NodeFingerprint`, y la marca se aplica
+ * ACÁ ADENTRO. Hasta este bloque devolvía `string` pelado con «que marque el
+ * llamador» escrito al lado, así que la familia de marcas de `identity.ts` no tenía
+ * UN SOLO productor tipado: la marca probaba que separa —`_S5`, en verde todo el
+ * tiempo— y nadie probaba que el productor la usara.
  *
- * POR QUÉ NO SE ARREGLA ACÁ, con el argumento CORREGIDO en el bloque 3. La versión
- * anterior de este párrafo decía que marcar exigiría importar `identity.ts` y que
- * esa arista volvería `Authorship` ALCANZABLE desde el archivo que calcula la
- * huella, «hoy impedido porque la arista no existe». Eso es falso y se verificó
- * poniendo la frontera a mano:
+ * POR QUÉ LA MARCA VA ADENTRO Y NO EN `HashFn`. La alternativa era
+ * `HashFn = (preimage: string) => NodeFingerprint`, que también obliga, pero obliga
+ * AL LLAMADOR: `node:crypto` devuelve `string`, así que los doce adaptadores y el
+ * emisor tendrían que marcar en su envoltorio de sha256 — y ese mismo envoltorio es
+ * el que va a calcular `ByteHash` y `MatterHash`, que son otras marcas. Una función
+ * de hash que solo sabe producir huellas de nodo o se duplica por marca o se
+ * desmarca con un `as`, y ahí la marca vuelve a ser ceremonia. Con la marca adentro,
+ * `HashFn` sigue siendo «sha256 y nada más» y el único camino a un `NodeFingerprint`
+ * es esta función: producir una huella sin marcar no es algo que un guardián
+ * detecte, es algo que no se puede escribir.
+ *
+ * QUÉ LO DESTRABÓ, porque no se pudo antes y el registro vale: marcar exige importar
+ * `identity.ts`, y ahí vivía `Authorship`, que NO PUEDE ENTRAR EN LA HUELLA. Lo
+ * único que lo impedía era que este archivo no NOMBRARA aquel —protección de
+ * nombrabilidad, sostenida por lectura—, y el import la habría caducado. La frontera
+ * que la reemplaza era INESCRIBIBLE mientras `Authorship` viviera en `identity.ts`,
+ * porque `shapes.ts` importa `ObjectKey` y el camino ya existía:
  *
  *     IR-ERR: frontera violada — projection.ts alcanza identity.ts
  *             camino: projection.ts → shapes.ts → identity.ts
  *
- * La arista YA EXISTE, porque `shapes.ts` importa `ObjectKey`. O sea que una
- * frontera `projection.ts ↛ identity.ts` es hoy INESCRIBIBLE: nace violada, y
- * ningún guardián puede sostener el argumento como estaba escrito.
+ * El bloque 3b mudó `Authorship` a `authorship.ts` —un tipo, el corte mínimo— y con
+ * eso la frontera `projection.ts ↛ authorship.ts` existe, la impone
+ * `scripts/boundaries.mjs` y está acreditada rompiéndola. Recién ahí este import
+ * dejó de comprar un tipo vendiendo un invariante.
  *
- * Lo que SÍ es cierto es más angosto, y es lo único que se afirma acá: este archivo
- * no NOMBRA `identity.ts`, así que `Authorship` no está en su alcance léxico y no
- * se puede escribir. Es una propiedad del texto de este archivo, no del grafo — se
- * mantiene por lectura, no por `scripts/boundaries.mjs`.
- *
- * De que `Authorship` no entre en la huella cuelgan el caché de reconocimiento
- * cross-org (§{Caché}) y que el mismo contenido subido por dos personas dé la misma
- * huella, así que la protección DÉBIL no alcanza. Por eso el bloque 3b parte
- * `identity.ts`: mover `NodeFingerprint` y `asNodeFingerprint` a un módulo del
- * fondo que NO alcance `Authorship` es lo que vuelve la frontera expresable, y
- * recién ahí `fingerprintOf` puede devolver `NodeFingerprint` sin comprar un tipo y
- * vender un invariante. Ver el PENDING(D24) de `NodeFingerprint`.
+ * LO QUE ESTE IMPORT SÍ EMPEORÓ, dicho de frente: `DelegationId` declara el mismo
+ * invariante («NUNCA entra en la huella») y no se movió, así que ahora está en el
+ * alcance léxico de este archivo y no lo protege ninguna frontera. Lo sostiene la
+ * lista de PROVISIONAL(H6) en `project` («`delegation` NO»), que es prosa. Está
+ * escrito en su docstring y en el encabezado de `authorship.ts`.
  */
-export const fingerprintOf = (body: Body, sha256: HashFn): string =>
-  sha256(preimageOfFingerprint(body));
+export const fingerprintOf = (body: Body, sha256: HashFn): NodeFingerprint =>
+  asNodeFingerprint(sha256(preimageOfFingerprint(body)));
 
 // ─────────────────────────────── similarity ──────────────────────────────────
 

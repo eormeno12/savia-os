@@ -7,6 +7,12 @@
  * compilador es un test menos y un bug menos» (§{Estrategia}) — y porque esta
  * familia de valores ya se confundió una vez: el hallazgo 10 del banco
  * (§{Cuarta}) fue exactamente eso.
+ *
+ * LA AUTORÍA NO ESTÁ ACÁ. Vivió en este archivo hasta el bloque 3b y se mudó a
+ * `authorship.ts`, que importa de acá `ActorId` e `Instant`. No es una comodidad ni
+ * un archivo por tamaño: es lo que vuelve escribible la frontera
+ * `projection.ts ↛ authorship.ts`, o sea lo único que puede imponer que la autoría
+ * no entre en la huella. El argumento entero está en el encabezado de aquel archivo.
  */
 
 declare const nominal: unique symbol;
@@ -179,6 +185,18 @@ export type ObjectKey = Nominal<string, "ObjectKey">;
  *
  * NUNCA entra en la huella: si entrara, la re-emisión por delegación tardía
  * movería ids, contra §{La delegación tardía} («cero identificadores movidos»).
+ *
+ * Y ESO NO LO IMPONE NADIE — dicho de frente en el bloque 3b, que lo empeoró. Es el
+ * mismo invariante que `Authorship`, y `Authorship` se mudó a `authorship.ts` para
+ * que una frontera pudiera imponerlo. Este tipo se quedó: no hacía falta moverlo
+ * para que esa frontera cerrara, y el corte se quiso mínimo. El costo es real:
+ * hasta el bloque 3b `projection.ts` no nombraba este archivo y `DelegationId`
+ * tampoco estaba en su alcance léxico; ahora lo nombra —importa `asNodeFingerprint`—
+ * así que la protección pasó de débil a ninguna. Hoy la sostiene una sola línea de
+ * prosa: la lista de PROVISIONAL(H6) en `project` («`delegation` NO»). Cerrarlo es
+ * mudarlo junto a `Authorship` —y entonces ese módulo deja de llamarse «la autoría»
+ * y pasa a ser «lo que no entra en la huella», que es una decisión de contrato— o
+ * darle frontera propia.
  */
 export type DelegationId = Nominal<string, "DelegationId">;
 
@@ -226,9 +244,36 @@ export type Instant = Nominal<string, "Instant">;
 // `NodeFingerprint`. La cifra importa: `invariants.ts` la fija con seis
 // `Inhabited<…>` y seis mensajes propios, y la prosa de este archivo decía «los
 // siete» —residuo de antes de que `HuellaFragmento` se borrara, borrado que este
-// mismo archivo cuenta más abajo—. Es el modo de falla que `M9c` impide en
-// `params.ts` y que acá no verifica nadie: si mañana entra un miembro nuevo, esta
-// línea y las seis de `invariants.ts` se actualizan juntas.
+// mismo archivo cuenta más abajo—.
+//
+// CENSO(numbers.mjs): 6 marcas en la familia + 1 alias, 6 cubiertas por Inhabited
+//
+// Esa línea no es decoración: hasta el bloque 3b la cifra la sostenía esta prosa y
+// NADIE LA CONTABA, que es el modo de falla que `M9c` impide en `params.ts` —el
+// mismo que este párrafo nombraba sin cerrarlo—. Ahora el guardián deriva del AST
+// las marcas declaradas en esta sección y exige que cada una tenga su `Inhabited`
+// en `invariants.ts`: si mañana entra un miembro nuevo, esta línea y las seis de
+// allá se actualizan juntas o el build se pone rojo. Que la sección era una puerta
+// abierta lo probaba el propio corredor: el control `MC4` agregaba una marca acá
+// —justo debajo de `CacheKey`— y quedaba en VERDE, o sea que la suite tenía una
+// fila que ejercía el agujero y lo declaraba inocuo. Ese control se mudó a la
+// sección de identificadores, donde sigue diciendo lo que decía.
+//
+// UNA SOLA DE LAS SEIS TIENE PRODUCTOR, y hay que decirlo porque el bloque 3b cerró
+// D24 solo para ella. `NodeFingerprint` la produce `fingerprintOf` (`projection.ts`),
+// que desde este bloque devuelve la marca puesta. Las otras cinco NO TIENEN PRODUCTOR
+// DE NINGÚN TIPO: el paquete no exporta una función que calcule un `ByteHash`, un
+// `MatterHash`, una `ContextualFingerprint`, una `EmbeddingKey` ni una `CacheKey`.
+// Es un hueco DISTINTO al de D24 —no es «hay productor y no marca», es «no hay
+// productor»— y por eso no se cierra con el mismo gesto: los cinco preimágenes están
+// escritas en prosa acá arriba (`sha256(objeto ‖ ventana canónica)`,
+// `sha256(hashBytes ‖ adapterId ‖ adapterVersion ‖ modelVersion?)`, la miga
+// concatenada de C2) y volverlas función es AGREGAR SUPERFICIE DE CONTRATO: hay que
+// decidir el orden exacto de las partes, quién provee cada componente y en qué tramo
+// vive cada llamada. Cuatro de las cinco las compone un tramo que todavía no existe.
+// Mientras tanto el riesgo es real y es el que `encodeParts` describe: dos
+// implementaciones concatenando distinto producen cachés disjuntos, en silencio.
+// Queda escrito para otro bloque, no resuelto acá.
 //
 // Los seis llevan el MISMO valor en runtime —64 hexadecimales en minúscula— y
 // roles que no se pueden confundir. La FORMA no está en el tipo: no hay un
@@ -269,56 +314,49 @@ export type ByteHash = Nominal<string,"ByteHash">;
  * La huella de identidad de un NODO. Es lo que el próximo reconciliador usa como
  * material (§{Tramo 4 › Qué sale}).
  *
- * PENDING(D24): HOY ESTE TIPO NO TIENE NI UN PRODUCTOR. `fingerprintOf`
- * (`projection.ts`) devuelve `string` pelado, así que la marca protege HACIA
- * ADENTRO —nadie puede pasar una huella donde va una clave de caché— y no protege
- * hacia afuera: cualquier `string` sirve de huella y nadie está obligado a llamar
- * a `asNodeFingerprint`. La aserción `_S5` de `invariants.ts` está verde mientras
- * eso pasa, así que la promesa es de la prosa, no del tipo.
+ * D24 — CERRADO EN EL BLOQUE 3b. `fingerprintOf` (`projection.ts`) devuelve
+ * `NodeFingerprint` y aplica `asNodeFingerprint` adentro, así que esta marca tiene
+ * UN productor tipado y no hay forma de obtener una huella sin marcar salvo llamando
+ * al constructor a mano. Hasta entonces devolvía `string` pelado: la marca protegía
+ * HACIA ADENTRO —nadie puede pasar una huella donde va una clave de caché— y no
+ * hacia afuera, o sea que cualquier `string` servía de huella y nadie estaba
+ * obligado a marcar. La aserción `_S5` de `invariants.ts` estaba VERDE todo ese
+ * tiempo, porque prueba que la marca separa y no que el productor la use; el
+ * escalón que faltaba lo pone `_FingerprintIsBranded` (invariante 3), acreditado.
  *
- * NO SE ARREGLA ACÁ, y el argumento se CORRIGIÓ en el bloque 3 porque el que estaba
- * escrito era más fuerte de lo que ningún guardián puede sostener. Decía que
- * «`Authorship` NO entra en la huella» lo impone el escalón ② —«`projection.ts` no
- * importa `identity.ts`, punto»— y que agregar el import volvería `Authorship`
- * ALCANZABLE. `boundaries.mjs` mide ALCANCE, y el alcance ya existe: verificado
- * poniendo la frontera a mano,
+ * POR QUÉ NO SE ARREGLÓ ANTES, que es el registro que vale la pena conservar: para
+ * marcar hay que importar `identity.ts` desde `projection.ts`, y acá vivía
+ * `Authorship`, que NO PUEDE ENTRAR EN LA HUELLA (si entrara, el mismo contenido
+ * subido por dos personas daría huellas distintas y se rompen el caché de
+ * reconocimiento —que cruza organizaciones por diseño, §{Caché}— y la
+ * deduplicación). Ese invariante no lo imponía nada verificable:
+ *   · El argumento original decía que lo imponía el grafo de módulos —«`projection.ts`
+ *     no importa `identity.ts`, punto»—. El bloque 3 lo CORRIGIÓ: es falso.
+ *     `boundaries.mjs` mide ALCANCE y el alcance ya existía, verificado poniendo la
+ *     frontera a mano,
  *
- *     IR-ERR: frontera violada — projection.ts alcanza identity.ts
- *             camino: projection.ts → shapes.ts → identity.ts
+ *         IR-ERR: frontera violada — projection.ts alcanza identity.ts
+ *                 camino: projection.ts → shapes.ts → identity.ts
  *
- * porque `shapes.ts` importa `ObjectKey` de acá. O sea que la frontera
- * `projection.ts ↛ identity.ts` es hoy INESCRIBIBLE: nace violada.
+ *     porque `shapes.ts` importa `ObjectKey` de acá. La frontera
+ *     `projection.ts ↛ identity.ts` era INESCRIBIBLE: nacía violada.
+ *   · Lo único cierto era más angosto: `projection.ts` no NOMBRABA este archivo, así
+ *     que `Authorship` no estaba en su alcance léxico. Propiedad del texto de aquel
+ *     archivo, sostenida por lectura y no por un guardián.
  *
- * Lo que sí es cierto es más angosto: `projection.ts` no NOMBRA este archivo, así
- * que `Authorship` no está en su alcance léxico. Eso es una propiedad del texto de
- * aquel archivo, no del grafo, y se sostiene por lectura y no por un guardián.
+ * QUÉ LO DESTRABÓ: partir el archivo. `Authorship` se fue a `authorship.ts` —un tipo,
+ * el corte mínimo— y la frontera pasó a ser `projection.ts ↛ authorship.ts`, que sí
+ * es escribible, la impone `boundaries.mjs` y está acreditada rompiéndola. Recién
+ * con eso puesto, importar `identity.ts` desde `projection.ts` dejó de comprar un
+ * tipo vendiendo un invariante. El plan que este mismo docstring traía escrito era el
+ * corte INVERSO —mudar la familia de hashes y `ObjectKey` a un módulo del fondo— y se
+ * descartó por tamaño: mueve diez tipos y ocho constructores, toca cinco archivos y
+ * cierra exactamente la misma frontera que mover uno.
  *
- * De que `Authorship` no entre en la huella cuelgan que el caché de reconocimiento
- * pueda cruzar organizaciones (§{Caché}) y que el mismo contenido subido por dos
- * personas dé la misma huella, así que la protección débil no alcanza y cambiar el
- * retorno ahora compraría un tipo y vendería un invariante. Por eso el bloque 3b
- * PARTE ESTE ARCHIVO: mover `NodeFingerprint`, `asNodeFingerprint`, la familia de
- * hashes y `ObjectKey` a un módulo del fondo que no alcance `Authorship` no es una
- * comodidad, es la única forma de que la frontera sea expresable — y ahí sí la
- * puede imponer `boundaries.mjs`, con su propio mutante.
- *
- * DOS COSAS QUE EL BLOQUE 4 LE AGREGA A LA CHECKLIST DE 3b, y ninguna es una deuda
- * nueva — el bloque 4 dejó a D24 exactamente donde estaba:
- *   1. `adapter.ts` nombra símbolos de LOS DOS LADOS del corte propuesto: importa
- *      `MatterHash` (que va al módulo de hashes) y `AdapterId` (que se queda acá).
- *      Después del split va a importar de DOS módulos. No viola ninguna frontera
- *      —ninguna lo nombra— pero es una línea de import más a mover.
- *   2. El invariante 10 de `invariants.ts` le da a `MatterHash` un consumidor fuera
- *      de este archivo que además es una GARANTÍA ACREDITADA (M41). Es evidencia a
- *      favor del split: la familia de hashes tiene vida propia. Y si 3b mueve
- *      `MatterHash` de módulo, M41 se pudre y falla RUIDOSO («el texto a mutar
- *      aparece en 0 archivos»), que es lo correcto.
- *
- * Y UN HUECO QUE EL BLOQUE 4 ENCONTRÓ Y NO ARREGLA, porque es de este archivo: el
- * censo de más arriba afirma que la familia son SEIS y que «esta línea y las seis de
- * `invariants.ts` se actualizan juntas». NADIE LO VERIFICA. Es el modo de falla que
- * `M9c` impide en `params.ts` —el mismo que la propia línea nombra— y se cierra con
- * el mismo patrón: un `CENSO(...)` en el docstring que un guardián AST coteje.
+ * DOS COSAS QUE EL BLOQUE 4 LE HABÍA DEJADO A ESTA CHECKLIST, las dos disueltas por
+ * el corte que se eligió: `adapter.ts` no importa de dos módulos (importa
+ * `MatterHash` y `AdapterId` de acá, como antes) y `M41` no se pudrió, porque
+ * `MatterHash` no se movió.
  *
  * PROVISIONAL(ContentHash): el plan usa el MISMO nombre `ContentHash` para esto y
  * para el hash del texto de un fragmento (§{Tramo 4 › Qué sale} vs
@@ -449,49 +487,3 @@ export const asContextualFingerprint = (v: string): ContextualFingerprint =>
 export const asEmbeddingKey = (v: string): EmbeddingKey => v as EmbeddingKey;
 export const asMatterHash = (v: string): MatterHash => v as MatterHash;
 export const asCacheKey = (v: string): CacheKey => v as CacheKey;
-
-// ─────────────────────────────── Autoría ─────────────────────────────────────
-
-/**
- * Quién dijo qué y cuándo. Obligatoria en todos los nodos (§{Tramo 3 › Qué sale}):
- * «esto lo dijo el CFO en marzo» es la mitad del valor de la memoria.
- *
- * PROVISIONAL(C8/#22): `Authorship` NO forma parte de lo que produce un adaptador
- * ni de lo que se cachea. Se inyecta DESPUÉS del caché, al componer `Node` a partir
- * de `RawNode` — Resuelve dos cosas de un golpe y es gratis, porque ya está
- * latente en los tipos escritos (`Unidad<S>` de §{`descomponer`} NO lleva autoría y
- * `Node` de §{Tramo 3 › Qué sale} sí): (1) el property test de determinismo
- * byte-idéntico (§{El determinismo}) no puede pasar con un timestamp en cada nodo,
- * y sellarlo una vez por documento en el tramo 1 lo arregla sin cambiar ningún
- * tipo; (2) el caché de reconocimiento se indexa por `hashBytes` y el acierto cruza
- * organizaciones POR DISEÑO (§{Caché}), así que si la autoría viajara adentro del
- * árbol cacheado se propagaría la del primer subidor a otro tenant (auditoría #22)
- * — Si se decide al revés, o el property test se declara inaplicable, o el caché
- * deja de cruzar organizaciones y se cae la optimización insignia de §{Caché}.
- *
- * PROVISIONAL(#14): un subárbol que llega tarde por delegación HEREDA el `when` de
- * su documento, no sella el instante real de la descomposición — Por producto:
- * «lo dijo el CFO en marzo» se refiere a marzo, no al momento en que drenó nuestra
- * cola. Y porque si no, dos re-ingestas producen nodos con `when` distinto — Si se
- * decide al revés, cada re-emisión cambia la autoría de todo lo delegado.
- *
- * `Authorship` NO entra en la huella. Esto NO está dicho en ningún lado del plan y
- * es la única razón por la que sellar una vez por documento alcanza. Hoy lo sostiene
- * que `projection.ts` —el único archivo que calcula la huella— no NOMBRE este
- * archivo, así que `Authorship` no está en su alcance léxico y no se puede escribir.
- *
- * OJO, Y ESTO SE CORRIGIÓ EN EL BLOQUE 3: no lo impone el grafo de módulos. La
- * versión anterior de esta línea decía que sí, y es falso — `shapes.ts` importa
- * `ObjectKey` de acá, así que `projection.ts` YA ALCANZA `identity.ts` y una
- * frontera que lo prohíba nace violada (verificado). La protección es de
- * nombrabilidad, que es más débil y se sostiene por lectura. Ver PENDING(D24) en
- * `NodeFingerprint`: es el mismo hecho mirado desde el otro lado, la razón por la
- * que `fingerprintOf` sigue devolviendo un `string`, y lo que el bloque 3b arregla
- * partiendo este archivo.
- */
-export type Authorship = {
-  readonly actor: ActorId;
-  readonly when: Instant;
-  /** Atribución cruda del documento, tal como venía: `"María López (OOXML)"`. */
-  readonly source: string;
-};

@@ -37,9 +37,10 @@
  * Este archivo es un inventario de garantías, así que se audita como tal: una
  * aserción que nadie vio DISPARAR es indistinguible de una que no puede fallar, y
  * una aserción que no puede fallar es el mismo pecado que `never`. El censo, al
- * cerrar el bloque 4:
+ * cerrar el bloque 3b (el 4 cerró con 42 · 26 · 16; la que entró es
+ * `_FingerprintIsBranded`, con su mutante M47):
  *
- *   42 aserciones de tipo · 26 con mutante que las acredita · 16 sin
+ *   43 aserciones de tipo · 27 con mutante que las acredita · 16 sin
  *
  * Las 16 sin mutante NO son 16 huecos, y decirlo es más útil que escribir 16 filas
  * que no compran nada:
@@ -99,6 +100,11 @@ import type {
   OrganizationId,
 } from "./identity.js";
 import type { Box, Coordinate, Location, SourceRange } from "./location.js";
+// Se importa el VALOR y no un tipo: la aserción es sobre `ReturnType<typeof
+// fingerprintOf>`, o sea sobre la firma real y no sobre una copia que pueda
+// discrepar. `import type` alcanza —`typeof` sobre un valor importado como tipo es
+// legal— y así este archivo no le agrega una arista de runtime al grafo.
+import type { fingerprintOf } from "./projection.js";
 import {
   NODE_BRAND,
   type Annotation,
@@ -185,6 +191,12 @@ export type MINTING_PROOFS = readonly [_UnitHasNoId, _RawNodeHasNoId];
 // TODOS sus tipos eran `never`, o sea asignables a todo: una huella se asignaba a
 // un `number` y a una `CacheKey`. El docstring que prometía impedirlo estaba
 // escrito y era falso. Estas pruebas son para que no vuelva a poder serlo.
+//
+// Y desde el bloque 3b el invariante tiene DOS mitades, porque tenerlas separadas es
+// lo que hizo visible el hueco: que la marca SEPARE (`_S1`–`_S6`, y las seis
+// `Inhabited`) y que alguien la PONGA (`_FingerprintIsBranded`). La primera estuvo en
+// verde durante cinco bloques mientras el único productor de huellas del paquete
+// devolvía un `string` pelado.
 
 /**
  * Error si `T` colapsó a `never` — un tipo sin valores posibles es asignable a TODO.
@@ -213,13 +225,15 @@ type Inhabited<
  * y así conviene que siga—; queda como red para que agregar una no obligue a
  * inventar el mensaje en el mismo minuto, no como opción legítima.
  *
- * Las nueve, recontadas en el bloque 4 (`_S1`–`_S6`, `_GuardFires`,
- * `_IllegalPairStaysIllegal`, `_FrameRequired`): la cifra NO cambió, porque los
- * invariantes 10 y 11 usan `Covers` y no este operador. Se recuenta a propósito —
- * es exactamente la clase de número que este paquete ya publicó mal dos veces
- * (`M9c` en `params.ts`, «los siete» en `identity.ts`), y una cifra que sobrevive
- * un bloque sin que nadie la vuelva a contar es una cifra que va a mentir en el
- * siguiente.
+ * Las DIEZ, recontadas en el bloque 3b (`_S1`–`_S6`, `_GuardFires`,
+ * `_IllegalPairStaysIllegal`, `_FrameRequired`, `_FingerprintIsBranded`). Eran
+ * nueve al cerrar el bloque 4 —los invariantes 10 y 11 usan `Covers` y no este
+ * operador— y la décima entró con D24. Se recuenta a propósito, y en este bloque el
+ * recuento sirvió: es exactamente la clase de número que este paquete ya publicó mal
+ * dos veces (`M9c` en `params.ts`, «los siete» en `identity.ts`), y una cifra que
+ * sobrevive un bloque sin que nadie la vuelva a contar es una cifra que va a mentir
+ * en el siguiente. Esta se sigue sosteniendo a mano: el censo que el bloque 3b SÍ
+ * ató al AST es el de la familia de hashes (`numbers.mjs`, M48).
  *
  * El nombre es del bloque 4 (GLOSARIO.md, D7): `NotAssignableTo` es la semántica
  * exacta de TypeScript y CONSERVA LA DIRECCIÓN. `Separates<A,B>` se lee simétrico y
@@ -294,11 +308,42 @@ type _GuardFires = True<
   NotAssignableTo<_BrandOverBrand, string, "branding an already branded type yielded a string — the Nominal guard is gone">
 >;
 
+/**
+ * LA MARCA TIENE UN PRODUCTOR, Y EL PRODUCTOR LA USA (D24, bloque 3b).
+ *
+ * `_S5` prueba que un `string` pelado no entra donde va un `NodeFingerprint`. Eso es
+ * la mitad: prueba que la marca SEPARA, no que alguien la PONGA. Mientras
+ * `fingerprintOf` devolvió `string` —el único productor de huellas del paquete— la
+ * familia entera no tenía un solo productor tipado y `_S5` estuvo en verde igual.
+ * Fue el quinto caso de garantía verde y falsa de este paquete: la promesa era de la
+ * prosa, no del tipo.
+ *
+ * Se assertea sobre `ReturnType<typeof fingerprintOf>` y no sobre una firma copiada
+ * acá, porque una firma copiada es otra vez dos fuentes que pueden discrepar.
+ *
+ * LA MITAD QUE NO SE ESCRIBE, dicho de frente: que el retorno sea EXACTAMENTE
+ * `NodeFingerprint` y no otra marca de la familia (`Covers<ReturnType<…>,
+ * NodeFingerprint>`). Se omite porque no hay edición de UNA línea que la dispare —
+ * cambiar el constructor por `asMatterHash` rompe en la línea de `fingerprintOf`,
+ * contra su propia anotación de retorno, y para escaparse hace falta cambiar
+ * coordinadamente la anotación TAMBIÉN. Es el mismo criterio con el que el bloque 4
+ * dejó seis aserciones sin mutante: sin mutación plausible, la fila acreditaría al
+ * compilador. Queda escrito, no escondido.
+ */
+type _FingerprintIsBranded = True<
+  NotAssignableTo<
+    string,
+    ReturnType<typeof fingerprintOf>,
+    "fingerprintOf returns a bare string — the only producer of the node fingerprint brand stopped applying it, so nothing forces a fingerprint to be branded (D24)"
+  >
+>;
+
 export type BRAND_PROOFS = readonly [
   _H1, _H2, _H3, _H4, _H5, _H6,
   _S1, _S2, _S3, _S4, _S5, _S6,
   _UsableAsString,
   _GuardFires,
+  _FingerprintIsBranded,
 ];
 
 // ═════════ Invariante 4 · «código siempre `solo`» sigue siendo exacto ════════

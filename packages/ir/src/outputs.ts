@@ -4,7 +4,6 @@
 
 import type {
   ActorId,
-  Authorship,
   ByteHash,
   ContentHash,
   ContextualFingerprint,
@@ -18,6 +17,9 @@ import type {
   ObjectKey,
   OrganizationId,
 } from "./identity.js";
+// La autoría vive en su propio módulo desde el bloque 3b, y no por tamaño: es lo
+// que vuelve escribible `projection.ts ↛ authorship.ts`. Ver su encabezado.
+import type { Authorship } from "./authorship.js";
 import type { Body, Shape } from "./shapes.js";
 import type { Token } from "./projection.js";
 import type { Hint, RecognitionLevel, Role } from "./classification.js";
