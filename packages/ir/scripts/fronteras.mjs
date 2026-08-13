@@ -64,6 +64,23 @@ const importsDe = (archivo) => {
   }
   const código = readFileSync(join(SRC, archivo), "utf8");
   const rutas = [...código.matchAll(/from\s+"(\.\/[^"]+)"/g)].map((m) => m[1]);
+
+  // Un segundo conteo, LAXO y por otro camino, para detectar que el primero se
+  // quedó ciego. Un regex que deja de reconocer un import no falla: devuelve una
+  // arista menos, el BFS no encuentra el camino prohibido, y el guardián imprime
+  // «frontera ok» sin haber verificado nada. Chequear `length > 0` no alcanza —
+  // con tres imports y uno roto quedan dos, y el conteo sigue pareciendo sano.
+  const laxo = [...código.matchAll(/from\s+['"`]\.\//g)].length;
+  if (laxo !== rutas.length) {
+    console.error(
+      `IR-ERR: el guardián no ve todos los imports de ${archivo}\n` +
+        `        cuenta laxa: ${laxo} · reconocidos por el regex: ${rutas.length}\n` +
+        `        el regex de importsDe() se quedó corto (¿comillas? ¿import multilínea?):\n` +
+        `        el grafo tiene menos aristas que el código y «frontera ok» no significaría nada`,
+    );
+    process.exit(1);
+  }
+
   // `verbatimModuleSyntax` obliga a la extensión `.js`; en disco es `.ts`.
   return rutas.map((r) => r.replace(/^\.\//, "").replace(/\.js$/, ".ts"));
 };

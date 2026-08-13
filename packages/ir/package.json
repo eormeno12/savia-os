@@ -17,8 +17,9 @@
     "proyeccion": "node scripts/proyeccion.mjs",
     "citas": "node scripts/citas.mjs",
     "numbers": "node scripts/numbers.mjs",
-    "build": "tsc --noEmit && node scripts/fronteras.mjs && node scripts/proyeccion.mjs && node scripts/citas.mjs && node scripts/numbers.mjs",
-    "lint": "tsc --noEmit && node scripts/fronteras.mjs && node scripts/proyeccion.mjs && node scripts/citas.mjs && node scripts/numbers.mjs"
+    "build": "tsc --noEmit && node scripts/fronteras.mjs && node scripts/proyeccion.mjs && node scripts/citas.mjs && node scripts/numbers.mjs && node scripts/mutantes.mjs",
+    "lint": "tsc --noEmit && node scripts/fronteras.mjs && node scripts/proyeccion.mjs && node scripts/citas.mjs && node scripts/numbers.mjs && node scripts/mutantes.mjs",
+    "mutantes": "node scripts/mutantes.mjs"
   },
   "dependencies": {},
   "devDependencies": {
