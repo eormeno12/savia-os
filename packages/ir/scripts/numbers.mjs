@@ -34,8 +34,8 @@
  * exacta que el tipo existe para hacer visible. Cuando se mida de verdad, se borra
  * la anotación y el valor entra como los otros once, con unidad y con cómo se midió.
  *
- * QUÉ NO CUENTA. Un literal numérico en posición de TIPO (`Cubre<…, 15, …>` en
- * `invariantes.ts`) no es un valor: no puede decidir comportamiento en runtime, que
+ * QUÉ NO CUENTA. Un literal numérico en posición de TIPO (`Covers<…, 15, …>` en
+ * `invariants.ts`) no es un valor: no puede decidir comportamiento en runtime, que
  * es lo que gobierna la regla de `params.ts`. Fijar 15 y 6 a nivel de tipo es lo
  * contrario de inventar un umbral — es atar el contrato al plan para que quitar un
  * rol rompa el build. La distinción se hace por AST (`ts.isLiteralTypeNode` en el
@@ -72,7 +72,7 @@ const PENDIENTE = "Pending";
 const CENSO =
   /CENSO\(numbers\.mjs\):\s*(\d+)\s+numéricos\s*=\s*(\d+)\s+pending en null\s*\+\s*(\d+)\s+con valor/;
 
-// Mismo cuidado que en `fronteras.mjs`: el archivo exento se nombra por STRING. Si
+// Mismo cuidado que en `boundaries.mjs`: el archivo exento se nombra por STRING. Si
 // se renombra y nadie toca esta línea, el guardián deja de eximirlo —eso se nota, el
 // build se pone rojo— pero si además alguien "arregla" el rojo agregando el nombre
 // nuevo sin borrar el viejo, la exención queda apuntando a la nada. Se chequea acá.
@@ -94,7 +94,7 @@ const leer = (archivo) => {
 };
 
 /**
- * `true` si el literal está en posición de tipo. `15` en `Cubre<…, 15, …>` cuelga de
+ * `true` si el literal está en posición de tipo. `15` en `Covers<…, 15, …>` cuelga de
  * un `LiteralTypeNode`; `-1` en posición de tipo cuelga de un unario que cuelga de
  * uno. En posición de valor, el padre es una expresión.
  */

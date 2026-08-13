@@ -34,19 +34,19 @@ import type { Location, SourceRange } from "./location.js";
  * reemplazo recursivo tampoco veía el nodo a través de un campo opcional, de una
  * unión con `null`, de `(Node | null)[]`, de `Node | string`, ni más allá de seis
  * niveles. Hoy el invariante lo impone el GRAFO DE MÓDULOS: `shapes.ts` no puede
- * alcanzar este archivo (`scripts/fronteras.mjs`), y como `NODE_BRAND` vive solo
+ * alcanzar este archivo (`scripts/boundaries.mjs`), y como `NODE_BRAND` vive solo
  * acá, un `Node` dentro de un `Body` es inexpresable en vez de detectable.
  * La marca sigue siendo necesaria: TypeScript es estructural, así que sin ella
  * cualquier objeto que casualmente se parezca a un `Node` lo sería.
  * Con la marca, el detector es EXACTO — COSTO: `Node` deja de ser un objeto plano
  * construible por literal suelto y hay que usar `asNode`. Son dos sitios en todo
- * el sistema (la composición Unidad+Clase→Node y el emisor), no los doce
- * adaptadores, que construyen `Unidad` — Si se decide al revés (sin marca), el
+ * el sistema (la composición Unit+Classification→Node y el emisor), no los doce
+ * adaptadores, que construyen `Unit` — Si se decide al revés (sin marca), el
  * invariante siempre pasa y es indistinguible de uno que funciona.
  *
  * LA INTERFAZ SE LLAMA `BrandedAsNode` Y NO `IsNode` (GLOSARIO.md, G2): R3 manda
  * `es*→is*`, pero `IsNode` quedaría a una mayúscula de `isNode`, el type guard de
- * runtime de `invariantes.ts`, y son cosas distintas — un tipo y un predicado.
+ * runtime de `invariants.ts`, y son cosas distintas — un tipo y un predicado.
  */
 export const NODE_BRAND: unique symbol = Symbol("savia.ir.node");
 
@@ -120,7 +120,7 @@ export type RawNode = {
    * prominencia, geometría y modelo son los tres `inferred` — NO entra en la huella
    * (si entrara, mejorar un clasificador movería todos los ids) ni en la
    * comparación de similitud de los pases 2 y 3 — Si se decide al revés (por
-   * `Diagnóstico`), son 50 000 avisos en una planilla.
+   * `Diagnostics`), son 50 000 avisos en una planilla.
    */
   readonly attribution: string | null;
   /**
@@ -282,7 +282,7 @@ export type ReconciliationMetrics = {
  * `EmittedNode`, que es solo el lado nuevo. El tramo 7 tiene que borrar filas y
  * puntos de lo que ya no existe y NADIE LE ENTREGA LA LISTA: sin eso el índice
  * acumula contenido borrado que sigue siendo recuperable con procedencia confiable
- * — Si se decide al revés (bajas por `Diagnóstico`), pierden tipo y el tramo 7 no
+ * — Si se decide al revés (bajas por `Diagnostics`), pierden tipo y el tramo 7 no
  * las puede consumir programáticamente.
  *
  * SIGUE ABIERTO (auditoría #19): qué pasa con una anotación cuyo nodo es una baja.
@@ -591,7 +591,7 @@ export type ProposedAnnotation = {
    * especificación) y el conjunto de clases es abierto por diseño, así que el
    * payload de una clase que todavía no existe no es tipable desde el contrato. Es
    * uno de los DOS `unknown` que llevan datos en todo el paquete (el otro es
-   * `AdaptadorOpaco.reconocer`), y está acá porque el plan realmente no lo
+   * `OpaqueAdapter.recognize`), y está acá porque el plan realmente no lo
    * determina — Cada anotador valida el suyo; `ir` solo garantiza la envoltura.
    */
   readonly value: unknown;
@@ -689,8 +689,8 @@ export type AnnotationKey = Pick<
  * explícito y determinismo verificado en CI. Y «cuestan cero pasadas extra»
  * (§{Los anotadores viajan}) es una afirmación sobre PASADAS, usada como si fuera
  * sobre COSTO: ocho expresiones regulares sobre 50 000 nodos-fila no son
- * microsegundos. Vale anotar que la mitad es cerrable sin inventar nada: `Presupuesto`
- * y `SeñalDeCancelación` YA existen exportados en `adaptador.ts` y este contrato no
+ * microsegundos. Vale anotar que la mitad es cerrable sin inventar nada: `Budget`
+ * y `CancellationSignal` YA existen exportados en `adapter.ts` y este contrato no
  * los recibe, así que el mecanismo está y lo que falta es la decisión de usarlo.
  */
 export interface Annotator {
@@ -751,10 +751,10 @@ export type Ingestion = {
 /**
  * Los cuatro canales (§{Tramo 1 › El registro}, §{La sonda}).
  *
- * PROVISIONAL(#445): UNA sola grafía — El plan usa `'carpeta'` en `Sonda.origen`
+ * PROVISIONAL(#445): UNA sola grafía — El plan usa `'carpeta'` en `Probe.origin`
  * (§{La sonda}) y `'carpeta local'` en `documento.canal` (§{Tramo 1 › El registro})
  * para lo mismo. Elijo la forma corta, que es la que aparece en un tipo — Si se
- * decide al revés, hay que cambiar la unión de `Sonda.origen`.
+ * decide al revés, hay que cambiar la unión de `Probe.origin`.
  */
 export const CHANNELS = ["chat", "frontend", "folder", "connector"] as const;
 export type Channel = (typeof CHANNELS)[number];
@@ -766,7 +766,7 @@ export type Channel = (typeof CHANNELS)[number];
  * propio ejemplo estrella: 198 páginas estructuradas + 2 delegadas
  * (§{La delegación es emergente}). Es el campo que «vuelve visible la degradación»
  * (§{Tramo 1 › El registro}) y alimenta la métrica de §{Observabilidad} — Se deriva
- * de la evidencia ganadora del tramo 2 (ver `Selección` en `adaptador.ts`), que hoy
+ * de la evidencia ganadora del tramo 2 (ver `Selection` en `adapter.ts`), que hoy
  * `seleccionar()` descarta.
  *
  * `plain_text` y no `texto plano` (GLOSARIO.md, G6): el valor del plan lleva

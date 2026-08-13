@@ -35,8 +35,8 @@ import type { AdapterId } from "./identity.js";
  * diapositivas de un `.pptx` conviven en el mismo plano y se contienen entre sí. La
  * contención solo se evalúa entre cajas del mismo marco — Si se decide al revés,
  * `.pptx` necesita que la vía sea mixta (un container por diapositiva + geometría
- * dentro). Que siga siendo obligatorio lo impone `_MarcoObligatorio`
- * (`invariantes.ts`): volverlo opcional no rompe `boxContains`, que compararía
+ * dentro). Que siga siendo obligatorio lo impone `_FrameRequired`
+ * (`invariants.ts`): volverlo opcional no rompe `boxContains`, que compararía
  * `undefined !== undefined` y daría `false`.
  *
  * PROVISIONAL(C23): `z` vive acá, dentro de `Box` — El plan afirma dos veces que
@@ -79,17 +79,17 @@ export type Box = {
  * queda sin la mitad exacta.
  *
  * EL VOCABULARIO DE `space` ES CERRADO Y ES UN COMPROMISO, no una comodidad:
- * `_EspaciosDeclarados` y `_EspaciosPresentes` (`invariantes.ts`) rompen el build
+ * `_SpacesDeclared` y `_SpacesPresent` (`invariants.ts`) rompen el build
  * si entra o sale una variante, para que el plan, los doce adaptadores y todo
  * consumidor exhaustivo se actualicen en el MISMO commit. Es el mismo mecanismo con
- * el que `_QuinceRoles` fija `ROLES.length === 15`. Sin él, abrir la unión compila
+ * el que `_FifteenRoles` fija `ROLES.length === 15`. Sin él, abrir la unión compila
  * verde y `SourceRange` —que es un `Extract`— ni siquiera se entera.
  */
 export type Coordinate =
   /**
    * Toda la fuente. Es la coordenada del chat («un mensaje no tiene página, hoja ni
    * offset», §{Tramo 3 › Qué sale}), del `.zip/.eml`, del piso de texto, y de los
-   * avisos de `Diagnóstico` que no cuelgan de ninguna unidad (presupuesto agotado,
+   * avisos de `Diagnostics` que no cuelgan de ninguna unidad (presupuesto agotado,
    * zip bomb, fallo de decodificación).
    */
   | { readonly space: "source" }
@@ -162,7 +162,7 @@ export type Coordinate =
    * reloj de pared en ISO-8601, otra cosa.
    *
    * INTERVALO MEDIO ABIERTO `[start, end)`. No es una convención nueva: el paquete
-   * ya la fija dos veces, en `Fuente.rango` (bytes, `adaptador.ts`) y en la
+   * ya la fija dos veces, en `Source.range` (bytes, `adapter.ts`) y en la
    * variante `text` de acá (code points). Escribirlo cerrado sería la tercera
    * convención del mismo paquete para la misma idea.
    *
@@ -192,9 +192,9 @@ export type Coordinate =
  *
  * OJO CON EL `Extract`: si el tag de la variante `grid` se moviera una letra, esto
  * NO sería un error — sería `never`, y `never` es asignable a todo, así que
- * `Registro.coordenada` pasaría a aceptar CUALQUIER COSA, en verde. Es la misma
+ * `DataRecord.coordinate` pasaría a aceptar CUALQUIER COSA, en verde. Es la misma
  * falla que tuvo la familia de hashes, en otro archivo. Lo agarra
- * `_SourceRangeExiste` (`invariantes.ts`).
+ * `_SourceRangeExists` (`invariants.ts`).
  */
 export type SourceRange = Extract<Coordinate, { space: "grid" }>;
 
@@ -209,12 +209,12 @@ export type SourceRange = Extract<Coordinate, { space: "grid" }>;
  * correcta» (§{Chat}) no compila contra el tipo del mismo documento. Quien invocó
  * al adaptador es el único que sabe con certeza cuál es — Si se decide al revés
  * (cada adaptador lo rellena), son doce repeticiones de una constante que ya está
- * en `Adaptador.id`, y un adaptador que la copie mal rompe la citación sin que nada
+ * en `Adapter.id`, y un adaptador que la copie mal rompe la citación sin que nada
  * se ponga rojo.
  *
  * OJO: sacar `adapter` es NECESARIO y NO SUFICIENTE. El ejemplo del chat tiene
  * CUATRO defectos frente al contrato, enumerados y verificados con el compilador en
- * `PROVISIONAL(§{Chat})` de `Unidad` (`adaptador.ts`). Este de acá es uno.
+ * `PROVISIONAL(§{Chat})` de `Unit` (`adapter.ts`). Este de acá es uno.
  *
  * PROVISIONAL(#ancla): `anchor` es opaca, NO es identidad, NO tiene garantía de
  * estabilidad entre versiones, y tiene que ser única dentro de (documento,
@@ -247,7 +247,7 @@ export type LocalLocation = {
  *
  * Aplanarla a `readonly LocalLocation[]` COMPILA, y ahí «la imagen dentro de la
  * página 3 del PDF» deja de ser expresable sin un solo error. Lo agarra
- * `_WithinEsRecursivo` (`invariantes.ts`).
+ * `_WithinIsRecursive` (`invariants.ts`).
  */
 export type Location = LocalLocation & {
   readonly adapter: AdapterId;

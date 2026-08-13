@@ -23,7 +23,7 @@ import type { LocalId } from "./identity.js";
  * transcripción. Este archivo ya NO la conserva: los quince literales y los nombres
  * exportados están en inglés, según `GLOSARIO.md`, que es la autoridad de nombres.
  * Lo que sostenía el español era poder cotejar cada símbolo contra su LÍNEA del
- * borrador; el cotejo pasó a ser por SECCIÓN —las anclas de `scripts/citas.mjs`— y
+ * borrador; el cotejo pasó a ser por SECCIÓN —las anclas de `scripts/citations.mjs`— y
  * una sección sobrevive a un rename mientras un número de línea no. P1 sigue
  * pendiente para los archivos que no entraron al bloque 1 — ver PROVISIONAL(P1) en
  * `index.ts`.
@@ -83,7 +83,7 @@ export type Certainty = (typeof CERTAINTIES)[number];
  * cuál es la peor sin inventarlo.
  *
  * LA DIRECCIÓN ESTÁ ATADA A NIVEL DE TIPO, igual que `ROLES.length === 15`: ver
- * `PRUEBAS_DE_CERTEZA` en `invariantes.ts`. Invertir esta tabla marcaría como
+ * `CERTAINTY_PROOFS` en `invariants.ts`. Invertir esta tabla marcaría como
  * «declarado» lo que el pipeline adivinó — la promesa de §{La escalera} exactamente
  * al revés— y sin la aserción compila en verde.
  */
@@ -245,7 +245,7 @@ export type Hint =
  *
  * PROVISIONAL(#61): la certeza NO la produce el clasificador. Por eso el tipo del
  * retorno de un eslabón es `Classification`, y lo que sale de `enCascada` es
- * `Classification & {level}` — ver `Eslabón` en `adaptador.ts`.
+ * `Classification & {level}` — ver `CascadeLink` en `adapter.ts`.
  *
  * CORREGIDO EN EL BLOQUE 3: este párrafo decía que la cascada ESTAMPA la certeza al
  * devolver (`{...r, certeza}`, §{La única}). Ya no estampa nada, porque `RawNode`
@@ -310,7 +310,7 @@ export const COHESION_BY_ROLE: Partial<Record<Role, Cohesion>> & {
   // entradas; ahora son inescribibles de otro modo. Los tres tipos son LITERALES a
   // propósito: ensancharlos a `Cohesion` dejaba pasar `"normal"` —y lo dejaba pasar
   // EN VERDE, porque nada verificaba que siguieran siendo literales—. Eso ya no:
-  // `PRUEBAS_DE_COHESIÓN` (`invariantes.ts`) asevera los tres campos contra `"solo"`
+  // `COHESION_PROOFS` (`invariants.ts`) asevera los tres campos contra `"solo"`
   // exacto, así que ensanchar cualquiera de ellos rompe el build.
   readonly code: "solo";
   readonly formula: "solo";
@@ -449,7 +449,7 @@ export const roleFromBody = (body: Body): Role =>
  * `role in REQUIRED_SHAPE` (un chequeo de runtime sobre claves string), devuelve
  * `true` para todo: `ILLEGAL_PAIRS` pasa de 25 pares a 0 sin un solo error.
  * Sacarlo no rompía nada: apagaba tres garantías en silencio. Ahora lo ataja
- * `PRUEBAS_DE_PAREJA` (`invariantes.ts`), que asevera por separado que las claves de
+ * `PAIR_PROOFS` (`invariants.ts`), que asevera por separado que las claves de
  * este mapa siguen siendo `Role` y que la pareja obligada sigue restringiendo.
  */
 export const REQUIRED_SHAPE = {
@@ -486,7 +486,7 @@ export const isLegalPair = (role: Role, shape: Shape): boolean => {
  * PROVISIONAL(C22): parte estática PARCIAL + aserción de runtime, y hay que decirlo
  * — §{La pareja} dice «no se corrige en runtime: SE VERIFICA. Un adaptador que la
  * viola no entra al registro» y §{Estrategia} la lista como «aserción en el
- * registro, ningún test». Pero `Adaptador` no expone qué pares emitirá: `detectar`
+ * registro, ningún test». Pero `Adapter` no expone qué pares emitirá: `detect`
  * recibe la unidad y devuelve `Classification` sin ligarse al `cuerpo.shape` de esa
  * unidad, así que decidirlo exige EJECUTAR sobre entradas — que es cómo lo atrapó
  * la simulación (§{La pareja}). Es una propiedad de runtime presentada como
@@ -534,6 +534,6 @@ export const ILLEGAL_PAIRS: readonly (readonly [Role, Shape])[] =
 // el re-export de `index.ts`. Y como cifra de runtime no cubría nada — borrar un rol
 // bajaba `totalPairs` de 90 a 84 y los cuatro comandos seguían en verde, porque un
 // valor derivado que nadie compara contra nada no es una garantía, es un espejo.
-// Lo que sí es garantía está ahora en `PRUEBAS_DE_DOMINIO` (`invariantes.ts`), que
+// Lo que sí es garantía está ahora en `DOMAIN_PROOFS` (`invariants.ts`), que
 // fija 15 y 6 A NIVEL DE TIPO: quitar un rol rompe el build en vez de mover
 // calladamente un número que nadie lee.

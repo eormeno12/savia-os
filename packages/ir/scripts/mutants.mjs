@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Acredita cada garantía del paquete ROMPIÉNDOLA, y falla si alguna deja de romperse.
 //
-//   node scripts/mutantes.mjs          las 41 mutaciones, ~17 s
-//   node scripts/mutantes.mjs M8       una sola, para iterar
+//   node scripts/mutants.mjs           las 49 mutaciones, ~22 s
+//   node scripts/mutants.mjs M8        una sola, para iterar
 //
 // POR QUÉ ESTO ES UN SCRIPT Y NO UNA AUDITORÍA CON AGENTES
 //
@@ -78,7 +78,7 @@ const MUTANTES = [
     garantía: "«código siempre solo» — el TIPO no se puede ensanchar",
     cambios: [[`  readonly code: "solo";`, `  readonly code: Cohesion;`]],
     espera: /widened past the literal/,
-    nota: "pasaba en verde hasta PRUEBAS_DE_COHESIÓN (bloque 1b)",
+    nota: "pasaba en verde hasta COHESION_PROOFS (bloque 1b)",
   },
   {
     id: "M7",
@@ -102,7 +102,7 @@ const MUTANTES = [
     garantía: "el barrido 15×6 recorre el dominio que dice recorrer",
     cambios: [[`  "quote",\n  "list",`, `  "list",`]],
     espera: /ROLES no longer has 15 roles/,
-    nota: "pasaba en verde hasta PRUEBAS_DE_DOMINIO (bloque 1b)",
+    nota: "pasaba en verde hasta DOMAIN_PROOFS (bloque 1b)",
   },
   {
     id: "M9b",
@@ -159,7 +159,7 @@ const MUTANTES = [
     id: "M18",
     garantía: "la guarda de Nominal está puesta: marcar sobre marcado no vuelve a ser never",
     cambios: [[
-      `export type Nominal<Base, Label extends string> = [Base] extends [Branded]\n  ? { "IR-ERR: marca sobre marca colapsa a never — la marca es PLANA": Base }\n  : Base & { readonly [nominal]: Label };`,
+      `export type Nominal<Base, Label extends string> = [Base] extends [Branded]\n  ? { "IR-ERR: branding an already branded type collapses to never — the brand is FLAT": Base }\n  : Base & { readonly [nominal]: Label };`,
       `export type Nominal<Base, Label extends string> = Base & { readonly [nominal]: Label };\nexport type _BrandedSigueUsado = Branded;`,
     ]],
     espera: /the Nominal guard is gone/,
@@ -172,7 +172,7 @@ const MUTANTES = [
       `export type NodeFingerprint = Nominal<string,"NodeFingerprint">;`,
       `export type NodeFingerprint = Nominal<ByteHash,"NodeFingerprint">;`,
     ]],
-    espera: /marca sobre marca colapsa a never/,
+    espera: /branding an already branded type collapses to never/,
     nota: "el mensaje que sale es el de la guarda misma, por el as del constructor asNodeFingerprint",
   },
   {
@@ -180,7 +180,7 @@ const MUTANTES = [
     garantía: "el bug histórico completo — sin guarda, la familia de hashes colapsa a never",
     cambios: [
       [
-        `export type Nominal<Base, Label extends string> = [Base] extends [Branded]\n  ? { "IR-ERR: marca sobre marca colapsa a never — la marca es PLANA": Base }\n  : Base & { readonly [nominal]: Label };`,
+        `export type Nominal<Base, Label extends string> = [Base] extends [Branded]\n  ? { "IR-ERR: branding an already branded type collapses to never — the brand is FLAT": Base }\n  : Base & { readonly [nominal]: Label };`,
         `export type Nominal<Base, Label extends string> = Base & { readonly [nominal]: Label };\nexport type _BrandedSigueUsado = Branded;`,
       ],
       [
@@ -294,7 +294,7 @@ const MUTANTES = [
   // Los cuatro campos entraron porque el dato que llevan NO SE RECONSTRUYE a
   // posteriori. Los cuatro son marcas nominales sobre `string`, así que la edición
   // que los rompe no es borrarlos: es cambiarles la marca por otra de la familia, y
-  // sin `PRUEBAS_DE_ENVOLTORIO` (invariante 8) las cuatro compilan.
+  // sin `WRAPPER_PROOFS` (invariante 8) las cuatro compilan.
   {
     id: "M32",
     garantía: "Ingestion.version es el hash de los BYTES, no la huella de un nodo",
@@ -377,6 +377,71 @@ const MUTANTES = [
     nota: "los casos de discriminación comparan cuerpos ENTRE SÍ y son ciegos al cambio que los mueve a TODOS: renombrar un valor de TokenKind cambia toda huella del corpus. Verificado antes de fijar las canónicas: «word» → «wrd» pasaba tsc y los cinco .mjs en verde. Este bloque HACE ese cambio doce veces, y por eso la tabla se fija en el mismo commit",
   },
 
+  // ── Bloque 4 · adapter.ts · la superficie que implementan los doce ──────────
+  // Tres de las seis filas de este bloque acreditan aserciones que YA EXISTÍAN y
+  // que nadie había visto disparar nunca. Una aserción escrita que nadie vio
+  // disparar es indistinguible de una que no puede fallar.
+  {
+    id: "M40",
+    garantía: "la salida del adaptador no puede llevar un id (H13(a))",
+    cambios: [[`  readonly signals: S;`, `  readonly id: string;\n  readonly signals: S;`]],
+    espera: /adapter output must not carry an id/,
+    nota: "`_UnitHasNoId` existe desde el bloque 1b y NUNCA tuvo mutante. Se muta a `string` y no a `ElementId` a propósito — `ElementId` no está importado en `adapter.ts` y la corrida moriría con TS2304 antes del testigo, acreditando el compilador en vez del contrato (la lección de M12c). Sin el testigo: NO ROMPÍA",
+  },
+  {
+    id: "M41",
+    garantía: "Context.ancestors sigue siendo una cadena de MatterHash (la recursión termina)",
+    cambios: [
+      [`  readonly ancestors: readonly MatterHash[];`, `  readonly ancestors: readonly string[];`],
+      // El import de `MatterHash` queda huérfano si no se lo usa en otro lado, y
+      // `TS6133`/`TS6196` mataría la corrida ANTES del testigo. Es exactamente el
+      // caso M33 del bloque 3, evitado a mano: sin esta segunda línea el mutante
+      // acreditaría el linter. Verificado.
+      [`export type Unit<S> = {`, `export type _MatterHashStillUsed = MatterHash;\nexport type Unit<S> = {`],
+    ],
+    espera: /Context\.ancestors is no longer a chain of MatterHash/,
+    nota: "misma familia que M32–M35 (una marca nominal sobre `string` en un campo que nadie reconstruye después) con un agravante: `ancestors` no direcciona un dato, DECIDE SI EL PROCESO TERMINA. Ensancharlo a `string` deja la guarda de ciclo comparando hashes de otra familia, compila, y no rompe una línea de código. Sin el testigo (invariante 10): NO ROMPÍA. Y si 3b parte `identity.ts` y `MatterHash` cambia de módulo, esta fila se pudre y falla ruidoso («0 archivos»), que es lo correcto",
+  },
+  {
+    id: "M42",
+    garantía: "EVIDENCE_SCALE sigue en el orden del que se derivan los seis valores de Evidence",
+    cambios: [[`  "Content",\n  "Extension",`, `  "Extension",\n  "Content",`]],
+    espera: /EVIDENCE_SCALE was reordered/,
+    nota: "`Evidence` no lleva sus números escritos: los deriva de `indexOf` sobre este arreglo (PROVISIONAL(#429)). Esa decisión compra que la escala no diverja de sus valores y NO compra que el orden siga siendo el del plan: mover una fila cambia los seis números —`Signature` deja de ser 4— y con eso cambia quién gana cada archivo entre los doce adaptadores. Es el compromiso deliberado de `ROLES.length === 15` aplicado al tramo 2. Sin el testigo (invariante 11): NO ROMPÍA",
+  },
+
+  // ── Bloque 4 · tres aserciones viejas que nunca tuvieron quién las acreditara ─
+  // Salieron del censo del bloque 4: de las 39 aserciones que el archivo tenía
+  // ANTES de traducirse (hoy `invariants.ts`, 42), 20
+  // tenían mutante y 19 no. Estas tres son las que tenían mutación PLAUSIBLE de
+  // una línea; de las otras dieciséis, diez son la misma aserción sobre otro
+  // miembro de una familia ya acreditada y seis no tienen mutación que las aísle
+  // — las seis van con nombre y apellido en el encabezado de `invariants.ts`.
+  {
+    id: "M43",
+    garantía: "el barrido 15×6 recorre SEIS formas, y duplicar una no pasa",
+    cambios: [[`  "grid",\n  "fields",`, `  "grid",\n  "grid",\n  "fields",`]],
+    espera: /SHAPES no longer has 6 shapes/,
+    nota: "`_SixShapes` era la única mitad de DOMAIN_PROOFS sin fila propia. Se DUPLICA una forma en vez de borrarla porque borrar dispara primero `_ArrayCoversShapes` (que es M2) y la fila acreditaría la otra aserción: un duplicado sigue satisfaciendo el `satisfies` y sigue cubriendo las seis, así que lo único que se mueve es la longitud. Sin la aserción: NO ROMPÍA",
+  },
+  {
+    id: "M44",
+    garantía: "la pareja obligatoria RESTRINGE: text_span ⇒ code sigue sin compilar",
+    cambios: [[`  code: "verbatim",\n  formula: "verbatim",`, `  formula: "verbatim",`]],
+    espera: /RoleFor<text_span> admits code/,
+    nota: "M8 acredita la MITAD de PAIR_PROOFS («las claves siguen siendo roles»); la otra mitad —que además restrinjan— no tenía fila. Sacar `code` de `REQUIRED_SHAPE` no rompe el `satisfies`, no deja imports huérfanos y no cambia ninguna firma: `RoleFor<'text_span'>` pasa a admitir `code` y el par que `ILLEGAL_PAIRS` cuenta como ilegal empieza a compilar. Sin la aserción: NO ROMPÍA",
+  },
+  {
+    id: "M45",
+    garantía: "sacarle una variante a Coordinate rompe acá (algo citable dejó de serlo)",
+    cambios: [[
+      `  | { readonly space: "time"; readonly start: number; readonly end: number };`,
+      `  ;`,
+    ]],
+    espera: /Coordinate lost a space/,
+    nota: "M25 guarda la dirección «entró una variante»; esta guarda «se fue una», y son fallas distintas. Se BORRA la variante en vez de renombrarle el tag a propósito: renombrarlo es un alta y una baja a la vez, dispara también `_SpacesDeclared`, y la fila quedaría acreditando M25 por segunda vez —verificado, con el tag renombrado el árbol sin `_SpacesPresent` seguía rompiendo—. Borrarla deja `_SpacesDeclared` en verde (cuatro espacios caben en cinco) y a `_SpacesPresent` como el único que grita. Sin la aserción: NO ROMPÍA",
+  },
+
   // ── Controles ──────────────────────────────────────────────────────────────
   {
     id: "MC1",
@@ -436,6 +501,23 @@ const MUTANTES = [
     ]],
     nota: "el par de M39: las canónicas fijan el VOCABULARIO de tokens, no la prosa. Sin este control, una tabla golden demasiado sensible sería indistinguible de una que verifica lo que dice",
   },
+  {
+    id: "MC7",
+    control: true,
+    garantía: "reordenar las CLAVES del objeto Evidence no cambia ningún valor",
+    cambios: [[
+      `  Signature: valueOfEvidence("Signature"),\n  Structure: valueOfEvidence("Structure"),`,
+      `  Structure: valueOfEvidence("Structure"),\n  Signature: valueOfEvidence("Signature"),`,
+    ]],
+    nota: "el par de M42, y es el control que hace que el invariante 11 signifique algo: el orden que decide los seis números es el del ARREGLO, no el del objeto que los expone. Un testigo que también se pusiera rojo acá estaría fijando prosa",
+  },
+  {
+    id: "MC8",
+    control: true,
+    garantía: "agregarle a Unit un campo que NO es un id no rompe nada",
+    cambios: [[`  readonly signals: S;`, `  readonly trace?: string;\n  readonly signals: S;`]],
+    nota: "el par de M40, sobre la MISMA ancla y con una sola palabra de diferencia: `id` es rojo, cualquier otro campo es verde. `_UnitHasNoId` asevera `'id' extends keyof Unit`, no «Unit está cerrada» — sin este control, la fila de arriba sería indistinguible de una que congela el tipo entero",
+  },
 ];
 
 // Dónde vive cada mutación se deduce de su primer `buscar`, así que no hay que
@@ -451,14 +533,24 @@ const ARCHIVOS = [
   "src/outputs.ts",
   // Entra en el bloque 3 con M37, M38, M39 y el control MC6.
   "src/projection.ts",
+  // `adaptador.ts` → `adapter.ts` (bloque 4). Entra con M40, M41, M42 y los
+  // controles MC7 y MC8: es la superficie que van a implementar los doce
+  // adaptadores, y hasta este bloque no tenía UNA sola fila.
+  "src/adapter.ts",
+  // `invariantes.ts` → `invariants.ts` (bloque 4). No aloja ninguna mutación
+  // todavía —las filas mutan el CONTRATO y miran si el testigo grita—, pero entra
+  // igual: es el archivo donde viven los mensajes que las `espera` de arriba
+  // matchean, y tenerlo en la lista es lo que hace que `ubicar()` avise si mañana
+  // alguien muta uno de esos mensajes desde dos lados.
+  "src/invariants.ts",
 ];
 
 const guardianes = () => {
   try {
     const salida = execSync(
-      `./node_modules/.bin/tsc --noEmit && node scripts/fronteras.mjs && ` +
+      `./node_modules/.bin/tsc --noEmit && node scripts/boundaries.mjs && ` +
         `node scripts/projection.mjs && node scripts/geometry.mjs && ` +
-        `node scripts/citas.mjs && node scripts/numbers.mjs`,
+        `node scripts/citations.mjs && node scripts/numbers.mjs`,
       { cwd: RAIZ, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
     );
     return { verde: true, salida };
@@ -471,7 +563,7 @@ const ubicar = (buscar) => {
   // Si `ARCHIVOS` nombra un archivo que no está en disco —un rename a medio hacer—,
   // el `readFileSync` de abajo salía con un ENOENT CRUDO de Node: stack trace, y un
   // mensaje que habla de `fs` y no de mutantes, así que el que lo lee no sabe si se
-  // rompió el arnés o el contrato. Es el MISMO bug que `fronteras.mjs` documenta
+  // rompió el arnés o el contrato. Es el MISMO bug que `boundaries.mjs` documenta
   // haber arreglado en sí mismo, y el bloque 3 (`salidas.ts` → `outputs.ts`) es el
   // primero donde el caso se ejerce de verdad. Con la lista corrida, además, un
   // mutante que no encuentra su texto es indistinguible de uno podrido.

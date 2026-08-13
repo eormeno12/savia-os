@@ -43,7 +43,7 @@ import { boxContains, type Box } from "./location.js";
  * un alias igual a `never` compila.
  *
  * Queda UNA dirección que ninguna anotación cubre —que al arreglo no le FALTE una
- * forma— porque un tipo no se puede enumerar en runtime. Vive en `invariantes.ts`.
+ * forma— porque un tipo no se puede enumerar en runtime. Vive en `invariants.ts`.
  */
 export const SHAPES = [
   "text_span",

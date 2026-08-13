@@ -13,14 +13,14 @@
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "fronteras": "node scripts/fronteras.mjs",
+    "boundaries": "node scripts/boundaries.mjs",
     "projection": "node scripts/projection.mjs",
     "geometry": "node scripts/geometry.mjs",
-    "citas": "node scripts/citas.mjs",
+    "citations": "node scripts/citations.mjs",
     "numbers": "node scripts/numbers.mjs",
-    "build": "tsc --noEmit && node scripts/fronteras.mjs && node scripts/projection.mjs && node scripts/geometry.mjs && node scripts/citas.mjs && node scripts/numbers.mjs && node scripts/mutantes.mjs",
-    "lint": "tsc --noEmit && node scripts/fronteras.mjs && node scripts/projection.mjs && node scripts/geometry.mjs && node scripts/citas.mjs && node scripts/numbers.mjs && node scripts/mutantes.mjs",
-    "mutantes": "node scripts/mutantes.mjs"
+    "build": "tsc --noEmit && node scripts/boundaries.mjs && node scripts/projection.mjs && node scripts/geometry.mjs && node scripts/citations.mjs && node scripts/numbers.mjs && node scripts/mutants.mjs",
+    "lint": "tsc --noEmit && node scripts/boundaries.mjs && node scripts/projection.mjs && node scripts/geometry.mjs && node scripts/citations.mjs && node scripts/numbers.mjs && node scripts/mutants.mjs",
+    "mutants": "node scripts/mutants.mjs"
   },
   "dependencies": {},
   "devDependencies": {

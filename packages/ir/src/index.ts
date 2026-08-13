@@ -9,32 +9,38 @@
  * falta en otro lado, se importa. Si hace falta uno nuevo, se agrega ACÁ y es un
  * cambio de contrato, visible como tal en el diff (§{Cómo se agrega}).
  *
- * PROVISIONAL(P1): el paquete está A MEDIO TRADUCIR, y el estado es visible en esta
- * misma lista de exports. El bloque 1 pasó a inglés `shapes.ts`, `classification.ts`
- * y `params.ts` —con ellos los literales de `Role` y de `Linkage`, y sus nombres
- * exportados—; el bloque 2 pasó `identidad.ts → identity.ts` y
- * `ubicacion.ts → location.ts`, las dos capas del fondo del grafo de imports; el
- * bloque 3 pasó `proyeccion.ts → projection.ts` y `salidas.ts → outputs.ts`, las
- * capas 3 y 4. Quedan DOS: `adaptador.ts` e `invariantes.ts`, con tilde en los
- * exportados (`Diagnóstico`, `Autoría`), que es la mezcla exacta del plan. El costo
- * de traducir el fondo primero es visible y grepeable:
+ * El paquete está ENTERO EN INGLÉS. La traducción se hizo en cuatro bloques, de
+ * abajo hacia arriba del grafo de imports: el 1 pasó `shapes.ts`,
+ * `classification.ts` y `params.ts` —con ellos los literales de `Role` y de
+ * `Linkage`—; el 2, `identidad.ts → identity.ts` y `ubicacion.ts → location.ts`;
+ * el 3, `proyeccion.ts → projection.ts` y `salidas.ts → outputs.ts`; el 4,
+ * `adaptador.ts → adapter.ts` e `invariantes.ts → invariants.ts`, y con ellos los
+ * guardianes (`fronteras.mjs → boundaries.mjs`, `citas.mjs → citations.mjs`,
+ * `mutantes.mjs → mutants.mjs`). Los comentarios y las anclas de cita se quedan en
+ * español a propósito: son el razonamiento, y el plan al que apuntan es un
+ * documento de producto (GLOSARIO.md, sección 1).
+ *
+ * El costo de traducir el fondo primero fue visible y grepeable mientras duró:
  *
  *     grep -rc "alias temporal" src/
  *
- * cuenta los alias que los consumidores todavía en español necesitan, y es la cifra
- * que baja sola con cada bloque siguiente. La cuenta se hace sobre el texto del
- * comentario y no sobre el marcador — con la salvedad, corregida acá en el bloque 3,
- * de que ESTA LÍNEA CONTIENE EL TEXTO Y SE CUENTA A SÍ MISMA: el total real es el
- * del grep menos uno. La versión anterior de este párrafo afirmaba lo contrario y
- * publicaba una cifra que estaba uno arriba.
+ * contaba los alias que los consumidores todavía en español necesitaban. Hoy da UNO,
+ * y ese uno es ESTA LÍNEA, que contiene el texto y se cuenta a sí misma. El total
+ * real es CERO. (La versión anterior de este párrafo publicaba la cifra uno arriba;
+ * el bloque 3 lo corrigió y el 4 lo deja en su caso degenerado. Se conserva igual:
+ * es lo que vuelve VERIFICABLE la afirmación «entero en inglés», y el día que
+ * alguien introduzca un alias nuevo la cifra deja de ser 1.)
  *
  * El argumento que sostenía el español entero era el cotejo contra el borrador, y
  * caducó: las citas de este paquete nombran SECCIONES, no líneas ni símbolos
- * (`scripts/citas.mjs`), y una sección sobrevive a un rename. Lo que queda del
- * argumento original es el orden: se traduce por bloques, cada uno verde en los
- * SIETE comandos que `package.json` encadena antes del siguiente, y el bump de
- * versión mayor de `ir` va cuando el último bloque cierre — nunca de contrabando
- * dentro de otro cambio.
+ * (`scripts/citations.mjs`), y una sección sobrevive a un rename. Lo que queda del
+ * argumento original es el orden: se tradujo por bloques, cada uno verde en los
+ * SIETE comandos que `package.json` encadena antes del siguiente.
+ *
+ * El bump de versión mayor de `ir` va acá: la traducción cerró y ningún símbolo
+ * exportado sobrevive con su nombre en español. `packages/emision` está escrito
+ * contra los nombres viejos y no compila a propósito — ver `packages/emision/DEUDA.md`,
+ * que este bump habilita a cerrar (bloque 5).
  *
  * Cómo leer las decisiones forzadas:
  *
@@ -44,7 +50,7 @@
  *
  * Cómo cotejar contra el plan:
  *
- *     node scripts/citas.mjs
+ *     node scripts/citations.mjs
  *
  * Toda cita de este paquete nombra una SECCIÓN del borrador, no una línea. El
  * script las resuelve, imprime el texto de cada sección al lado, y falla si alguna
@@ -212,39 +218,41 @@ export {
 
 // Contrato de adaptador.
 export {
-  ESCALA_EVIDENCIA,
-  type NombreDeEvidencia,
-  Evidencia,
-  type Origen,
-  type SondaFría,
-  type Sonda,
-  type Evidenciador,
-  type Selección,
-  type Diagnóstico,
-  type Aviso,
-  type Degradación,
-  type Presupuesto,
-  type ClaseDeGasto,
-  type SeñalDeCancelación,
-  type Contexto,
-  type Unidad,
-  type Fuente,
-  type Eslabón,
-  type Adaptador,
-  type AdaptadorOpaco,
-  BYTES_MAGICOS,
-} from "./adaptador.js";
+  EVIDENCE_SCALE,
+  type EvidenceName,
+  Evidence,
+  type Origin,
+  type ColdProbe,
+  type Probe,
+  type EvidenceFn,
+  type Selection,
+  type Diagnostics,
+  type Notice,
+  type Degradation,
+  type Budget,
+  type SpendKind,
+  type CancellationSignal,
+  type Context,
+  type Unit,
+  type Source,
+  type CascadeLink,
+  type Adapter,
+  type OpaqueAdapter,
+  MAGIC_BYTES,
+} from "./adapter.js";
 
 // Invariantes de compilación.
 export {
-  type PRUEBAS_DE_FORMA,
-  type PRUEBAS_DE_ACUÑADO,
-  type PRUEBAS_DE_MARCA,
-  type PRUEBAS_DE_COHESIÓN,
-  type PRUEBAS_DE_PAREJA,
-  type PRUEBAS_DE_DOMINIO,
-  type PRUEBAS_DE_COORDENADA,
-  type PRUEBAS_DE_ENVOLTORIO,
-  type PRUEBAS_DE_CERTEZA,
-  esNodo,
-} from "./invariantes.js";
+  type SHAPE_PROOFS,
+  type MINTING_PROOFS,
+  type BRAND_PROOFS,
+  type COHESION_PROOFS,
+  type PAIR_PROOFS,
+  type DOMAIN_PROOFS,
+  type COORDINATE_PROOFS,
+  type WRAPPER_PROOFS,
+  type CERTAINTY_PROOFS,
+  type RECURSION_PROOFS,
+  type EVIDENCE_PROOFS,
+  isNode,
+} from "./invariants.js";

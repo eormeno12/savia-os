@@ -28,7 +28,7 @@
  * Nomenclatura: este archivo YA está en inglés — el bloque 1 ejecutó P1 acá, sobre
  * `shapes.ts` y sobre `classification.ts`. El argumento que sostenía el español
  * («que cada símbolo se pueda cotejar contra su línea del borrador») caducó cuando
- * el cotejo pasó a hacerlo `scripts/citas.mjs` contra SECCIONES del plan: una
+ * el cotejo pasó a hacerlo `scripts/citations.mjs` contra SECCIONES del plan: una
  * sección sobrevive al rename de un símbolo, un número de línea no. El plan sigue
  * en español y las anclas de sección lo citan tal cual. Ver PROVISIONAL(P1) en
  * `index.ts` para lo que todavía no se tradujo.
@@ -59,7 +59,7 @@ export const PARAMETERS = {
      * documentos en espera) y qué evidenciadores pueden responder sin leer el
      * objeto. Se mide: no se mide, se declara. Fijado en 4096 (potencia de dos) y
      * no en 4000, para que coincida con el tamaño de bloque de cualquier lector.
-     * Ver PROVISIONAL(bytesMágicos) en `adaptador.ts`.
+     * Ver PROVISIONAL(magicBytes) en `adapter.ts`.
      */
     magicBytes: 4096,
 

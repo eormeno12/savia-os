@@ -86,6 +86,11 @@ Todo lo demás se deriva de acá por las reglas de §2.
 | `Ventana` | `Window` | | `Anotación` | `Annotation` |
 | `Rebanada` | `Slice` | | `Fuente` | `Source` ⚠ |
 | `Unidad` | `Unit` | | `Presupuesto` | `Budget` |
+| `Prueba` | `Proof` ⚠ | | | |
+
+> **`Prueba → Proof` entra en el bloque 4** (§8, D8) y no estaba acá: R1 admitía
+> `Proof` y `Test`, y `Test` era el falso amigo exacto. Con la raíz puesta, los once
+> `*_PROOFS` de `invariants.ts` salen solos por R2+R9.
 
 ---
 
@@ -251,9 +256,16 @@ ubicacion.ts    → location.ts        salidas.ts      → outputs.ts
 **Los scripts guardianes también**, junto con su salida — son parte del sistema:
 
 ```
-fronteras.mjs → boundaries.mjs    proyeccion.mjs  → projection.mjs
-citas.mjs     → citations.mjs     invariantes.mjs → invariants.mjs
+fronteras.mjs → boundaries.mjs    citas.mjs    → citations.mjs
+mutantes.mjs  → mutants.mjs       proyeccion.mjs → projection.mjs   ✔ hecho
 ```
+
+> **Esta lista tuvo dos errores hasta el bloque 4.** Nombraba `invariantes.mjs`, que
+> **no existe en este paquete** —está en `packages/emision`, y se coló al copiar su
+> lista de scripts—, y omitía `mutantes.mjs`, que sí existe: no estaba escrito porque
+> el corredor de mutación nació después de esta sección. Un guardián que la lista no
+> nombra es un guardián que el rename se olvida, y **un guardián que no corre no avisa
+> que no corrió**.
 
 **Un guardián NUEVO nace en inglés.** La lista de arriba son renombres, y no decía
 nada del caso nuevo. El precedente ya existía —`numbers.mjs` nació así en el bloque 1—
@@ -332,6 +344,11 @@ nombra».
   ventana que la regla existe para cerrar — un docstring citando un archivo que ya no
   existe. Va escrito acá como decisión, no escondido como olvido.
 
+> **Cerrado en el bloque 4.** `invariants.ts` se tradujo, y el `git mv` de
+> `fronteras.mjs → boundaries.mjs` fue en el **mismo commit** que la línea de prosa
+> que lo citaba (hoy `invariants.ts:22-25`). La ventana nunca llegó a abrirse.
+> `citas.mjs → citations.mjs` y `mutantes.mjs → mutants.mjs` fueron con él.
+
 ### Y tres que el bloque 3 agregó al contrato
 
 No son renombres, así que **nacen en inglés** y ninguna regla de §2 los cubría.
@@ -341,6 +358,58 @@ No son renombres, así que **nacen en inglés** y ninguna regla de §2 los cubr�
 | `Fragment.minLevel: RecognitionLevel` | R5 da el prefijo `min*` y §3 la raíz. **Reemplaza a `certezaMínima→minCertainty`**, que prometía «la peor certeza» sobre un tipo del que el paquete **no exporta orden** — y peor: la peor sería el *máximo* mientras el campo se llama `min`. Sobre `RecognitionLevel` el orden ya existe (`rank`, `indexOf`) y es el correcto, y la certeza **se deriva** con `certaintyOfLevel` en vez de almacenarse |
 | `Fragment.confidence: { min; hasNull } \| null` | `min` es R5. **`hasNull`** es nombre nuevo: dice si alguno de los nodos agrupados no reportaba confianza. No hay palabra en español que traducir — el campo no existía |
 | `CERTAINTY_RANK` / `worstCertainty` | R9 para la tabla; `worst` es la palabra del docstring que el campo prometía y nadie podía computar («la PEOR certeza de los nodos agrupados») |
+
+---
+
+## 8 · Bloque 4 — los ocho que ninguna regla determinaba
+
+**Agregado el 2026-08-13**, antes de escribir una línea de `adapter.ts` /
+`invariants.ts`, por la misma regla del cierre que produjo §7. Los ocho estaban en esa
+situación: o el cognado de R1 significaba otra cosa en inglés, o R1 admitía dos
+palabras correctas y ninguna regla elegía, o el símbolo es un **dato** que §5 no
+listaba.
+
+| # | Español | **Queda** | Por qué no la que salía sola |
+|---|---|---|---|
+| **D1** | `Diagnóstico` | **`Diagnostics`** | R1 da `Diagnostic`, que en inglés nombra **un hallazgo** (`ts.Diagnostic`), no el canal por el que se reporta — y acá los hallazgos ya tienen nombre propio (`Notice`, `Degradation`), así que el singular se los robaría. El plural es *la* palabra para la facilidad de reporte. Arrastra el campo `Contexto.diagnóstico → Context.diagnostics` |
+| **D2** | `Aviso` / `aviso()` | **`Notice`** / **`notice()`** | Tres palabras inglesas correctas y distintas (`Notice`, `Warning`, `Advisory`) y ninguna regla elige. `Warning` **afirma una severidad que el contrato no declara**: el `código` es ABIERTO a propósito (`PROVISIONAL(§{Diagnóstico})`), así que un aviso puede ser una nota informativa. `Notice` es el registro neutro que el sumidero acumula, que es lo que vuelve verificable «ninguna información se descarta en silencio» (§{Invariantes}) |
+| **D3** | `ClaseDeGasto` + sus 5 valores | **`SpendKind`** = `ms · nodes · materializedBytes · invocation · expansion` | `clase→kind` da el sufijo (§4, precedente `EnrichmentKind`), pero `gasto` no está en §3 y los cinco valores no están en §5. Gana `SpendKind` sobre `ExpenseKind`/`CostKind` porque el método es `gastar→spend` y **el tipo y el método tienen que ser la misma palabra** — el precedente exacto es G4 (`propose` / `ProposedAnnotation`). Valores en **camelCase**, no snake: no van a Postgres ni a Qdrant (precedente G9) |
+| **D4** | `SondaFría.tipoDetectado` | **`detectedFormat`** ⚠ | **`Tipo→Role` daría `detectedRole`, y sería FALSO.** Acá `tipo` no es el rol semántico del nodo: es el **formato del archivo** que la sonda cree haber identificado. Es el caso `TipoCelda→CellType` calcado (§4: «es un tipo de dato, no un rol semántico: `CellRole` diría algo falso»), y por eso **no lo resuelve la raíz `Tipo`**. Entre los dos candidatos honestos gana `detectedFormat` sobre `detectedType` porque el propio docstring del campo dice «nada en el diseño identifica **formatos** por nombre» y porque lo que falta para producirlo es «un catálogo de **firmas**» |
+| **D5** | los 6 de `ESCALA_EVIDENCIA` | **`None·Floor·Content·Extension·Structure·Signature`** | No estaban en §5 y **son datos**: los seis nombres son también las claves del objeto `Evidence`. `Piso→Floor` conserva la metáfora que el paquete ya usa en prosa («el piso físico», «el adaptador piso de texto»); `Ninguna→None` empata con `Linkage.none` de §5. Se conserva la **mayúscula inicial**, contra el snake de §5, porque no van a Postgres ni a Qdrant y son claves de un objeto TS (precedente G9) |
+| **D6** | `Origen['clase']` | **`channel · delegated`** | R1 llana, pero **son datos** y §5 no los listaba. Se escriben acá porque hoy cambiarlos es gratis y después es una migración — el mismo motivo que G7 |
+| **D7** | `NoVaDonde<De,A,M>` | **`NotAssignableTo<From,To,Message>`** | Ninguna regla de §2 lo cubre: es un idiom, no una palabra. Es la semántica exacta de TypeScript y **conserva la dirección**. `Separates<A,B>` se lee simétrico y el operador **no lo es** (`[De] extends [A]` es direccional): sería reimportar el defecto que `Cubre` ya tiene (ver la nota de abajo). `DoesNotFitIn` dice lo mismo con tres palabras |
+| **D8** | `Prueba` (raíz, faltaba en §3) | **`Proof`** | R1 admite `Proof` **y** `Test`, y **`Test` es el falso amigo exacto**: el archivo abre diciendo «los invariantes que se verifican en el BUILD y **no llevan test**». Nombrarlos `*_TESTS` diría lo contrario de su tesis. Va a **§3 como raíz** para que los once `*_PROOFS` salgan solos por R2+R9 |
+
+### Los dos vocabularios de runtime que se quedan como están escritos
+
+`EVIDENCE_SCALE` (D5), `Origin['kind']` (D6) y `SpendKind` (D3) son los tres
+vocabularios cerrados de `adapter.ts`, y **ninguno de los tres va a Postgres ni a
+Qdrant, ni entra en la preimagen de la huella**. Por el precedente G9 —«la convención
+que les corresponde es la del archivo que los produce»— conservan su forma actual:
+`EVIDENCE_SCALE` en `PascalCase` porque sus valores son las claves del objeto
+`Evidence`, `SpendKind` en `camelCase` (`materializedBytes`). **No** snake. Es la
+diferencia con §5, y es deliberada: §5 es snake **porque** sus valores son filas.
+
+### Un problema de nombre que la traducción HEREDA, dicho de frente
+
+`Cubre<De, A>` significa «`A` cubre a `De`», pero los parámetros van en el orden
+`(De, A)`: el nombre y la lectura van **al revés**. En español pasaba desapercibido;
+en inglés `Covers<From, To>` invita a leer «From covers To», que es lo contrario.
+Arreglarlo es `FitsIn<Sub, Super>` o invertir el orden de los parámetros — un cambio
+de 34 sitios de llamada que **no es traducción**. El bloque 4 **no lo hace**, y lo deja
+escrito acá para que sea una decisión pendiente y no un olvido. `NotAssignableTo`
+(D7) se eligió justamente para no repetirlo.
+
+### Un escalón que `Evidence` podría subir y NO sube en el bloque 4
+
+`export type Evidence = number` (`adapter.ts`). O sea: **cualquier número es una
+`Evidence`**; un `EvidenceFn` puede devolver `42` y el selector lo ordena.
+`Nominal<number, "Evidence">` volvería inexpresable un ordinal fuera de la escala y
+seguiría permitiendo la aritmética del selector (una marca es una intersección, no un
+envoltorio). **No se decide acá** y no es un hueco de nombre: el costo son los seis
+constructores del objeto `Evidence` **más los doce adaptadores**, cada vez que
+devuelven una evidencia calculada. Es una decisión del dueño del contrato, y va
+escrita para que se tome antes de que existan los doce.
 
 ---
 

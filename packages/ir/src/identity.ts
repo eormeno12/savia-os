@@ -48,7 +48,7 @@ type Branded = { readonly [nominal]: string };
  * discriminante de tipo.
  */
 export type Nominal<Base, Label extends string> = [Base] extends [Branded]
-  ? { "IR-ERR: marca sobre marca colapsa a never — la marca es PLANA": Base }
+  ? { "IR-ERR: branding an already branded type collapses to never — the brand is FLAT": Base }
   : Base & { readonly [nominal]: Label };
 
 // ─────────────────────────────── Identificadores ─────────────────────────────
@@ -67,8 +67,8 @@ export type Nominal<Base, Label extends string> = [Base] extends [Branded]
  * test de determinismo; si son derivados vuelve la fórmula de una sola versión»— y
  * una de las dos mordazas no existe. El test dice «para cada adaptador a:
  * a.reconocer(f) ≡ a.reconocer(f), árbol byte-idéntico»: compara LA SALIDA DE UN
- * ADAPTADOR, y esa salida NO TIENE IDS. `Unidad<S>` lleva `señales`, `cuerpo`,
- * `ubicación` y `autoríaPropia`; `RawNode` tampoco lleva id. El `id` nace dos
+ * ADAPTADOR, y esa salida NO TIENE IDS. `Unit<S>` lleva `signals`, `body`,
+ * `location` y `ownAuthorship`; `RawNode` tampoco lleva id. El `id` nace dos
  * pasos después, en `EmittedNode`, que produce el tramo 4. Un test que compara
  * artefactos sin ids no puede romperse por cómo se acuñan los ids.
  *
@@ -223,12 +223,12 @@ export type Instant = Nominal<string, "Instant">;
 // ─────────────────────────────── Familia de hashes ───────────────────────────
 
 // SEIS tipos marcados y un séptimo NOMBRE, `ContentHash`, que es alias de
-// `NodeFingerprint`. La cifra importa: `invariantes.ts` la fija con seis
-// `Habitado<…>` y seis mensajes propios, y la prosa de este archivo decía «los
+// `NodeFingerprint`. La cifra importa: `invariants.ts` la fija con seis
+// `Inhabited<…>` y seis mensajes propios, y la prosa de este archivo decía «los
 // siete» —residuo de antes de que `HuellaFragmento` se borrara, borrado que este
 // mismo archivo cuenta más abajo—. Es el modo de falla que `M9c` impide en
 // `params.ts` y que acá no verifica nadie: si mañana entra un miembro nuevo, esta
-// línea y las seis de `invariantes.ts` se actualizan juntas.
+// línea y las seis de `invariants.ts` se actualizan juntas.
 //
 // Los seis llevan el MISMO valor en runtime —64 hexadecimales en minúscula— y
 // roles que no se pueden confundir. La FORMA no está en el tipo: no hay un
@@ -239,12 +239,12 @@ export type Instant = Nominal<string, "Instant">;
 // sha256, con un test ahí; validar en cada constructor sería una regex por nodo y
 // por fragmento para atrapar un error de programación, no un error de datos.
 //
-// Las pruebas de que esta familia efectivamente separa están en `invariantes.ts`.
+// Las pruebas de que esta familia efectivamente separa están en `invariants.ts`.
 
 // PENDING(glosario D17): `HashBytes → ByteHash`. El glosario fija el patrón
 // `Hash<X>` ⇒ `<X>Hash` con `HashMateria → MatterHash`, pero no fija el NÚMERO del
 // modificador, y acá el modificador es un plural. `ByteHash` es el compuesto inglés canónico (el modificador va
-// en singular) y coincide con el mensaje que `invariantes.ts` ya tenía escrito
+// en singular) y coincide con el mensaje que `invariants.ts` ya tenía escrito
 // («a node fingerprint is accepted as a byte hash»). Las otras dos eran `BytesHash`
 // (conserva el plural, lee mal) y `FileHash` (nombra lo hasheado, e invita justo a
 // la confusión con el checksum multipart que el docstring de abajo descarta).
@@ -273,14 +273,14 @@ export type ByteHash = Nominal<string,"ByteHash">;
  * (`projection.ts`) devuelve `string` pelado, así que la marca protege HACIA
  * ADENTRO —nadie puede pasar una huella donde va una clave de caché— y no protege
  * hacia afuera: cualquier `string` sirve de huella y nadie está obligado a llamar
- * a `asNodeFingerprint`. La aserción `_S5` de `invariantes.ts` está verde mientras
+ * a `asNodeFingerprint`. La aserción `_S5` de `invariants.ts` está verde mientras
  * eso pasa, así que la promesa es de la prosa, no del tipo.
  *
  * NO SE ARREGLA ACÁ, y el argumento se CORRIGIÓ en el bloque 3 porque el que estaba
  * escrito era más fuerte de lo que ningún guardián puede sostener. Decía que
- * «`Authorship` NO entra en la huella» lo impone el escalón ② —«`proyeccion.ts` no
+ * «`Authorship` NO entra en la huella» lo impone el escalón ② —«`projection.ts` no
  * importa `identity.ts`, punto»— y que agregar el import volvería `Authorship`
- * ALCANZABLE. `fronteras.mjs` mide ALCANCE, y el alcance ya existe: verificado
+ * ALCANZABLE. `boundaries.mjs` mide ALCANCE, y el alcance ya existe: verificado
  * poniendo la frontera a mano,
  *
  *     IR-ERR: frontera violada — projection.ts alcanza identity.ts
@@ -300,7 +300,25 @@ export type ByteHash = Nominal<string,"ByteHash">;
  * PARTE ESTE ARCHIVO: mover `NodeFingerprint`, `asNodeFingerprint`, la familia de
  * hashes y `ObjectKey` a un módulo del fondo que no alcance `Authorship` no es una
  * comodidad, es la única forma de que la frontera sea expresable — y ahí sí la
- * puede imponer `fronteras.mjs`, con su propio mutante.
+ * puede imponer `boundaries.mjs`, con su propio mutante.
+ *
+ * DOS COSAS QUE EL BLOQUE 4 LE AGREGA A LA CHECKLIST DE 3b, y ninguna es una deuda
+ * nueva — el bloque 4 dejó a D24 exactamente donde estaba:
+ *   1. `adapter.ts` nombra símbolos de LOS DOS LADOS del corte propuesto: importa
+ *      `MatterHash` (que va al módulo de hashes) y `AdapterId` (que se queda acá).
+ *      Después del split va a importar de DOS módulos. No viola ninguna frontera
+ *      —ninguna lo nombra— pero es una línea de import más a mover.
+ *   2. El invariante 10 de `invariants.ts` le da a `MatterHash` un consumidor fuera
+ *      de este archivo que además es una GARANTÍA ACREDITADA (M41). Es evidencia a
+ *      favor del split: la familia de hashes tiene vida propia. Y si 3b mueve
+ *      `MatterHash` de módulo, M41 se pudre y falla RUIDOSO («el texto a mutar
+ *      aparece en 0 archivos»), que es lo correcto.
+ *
+ * Y UN HUECO QUE EL BLOQUE 4 ENCONTRÓ Y NO ARREGLA, porque es de este archivo: el
+ * censo de más arriba afirma que la familia son SEIS y que «esta línea y las seis de
+ * `invariants.ts` se actualizan juntas». NADIE LO VERIFICA. Es el modo de falla que
+ * `M9c` impide en `params.ts` —el mismo que la propia línea nombra— y se cierra con
+ * el mismo patrón: un `CENSO(...)` en el docstring que un guardián AST coteje.
  *
  * PROVISIONAL(ContentHash): el plan usa el MISMO nombre `ContentHash` para esto y
  * para el hash del texto de un fragmento (§{Tramo 4 › Qué sale} vs
@@ -312,8 +330,8 @@ export type ByteHash = Nominal<string,"ByteHash">;
  * `hashBytes` donde va una huella: es la confusión que el documento ya pagó una vez
  * (hallazgo 10, §{Cuarta}).
  *
- * Que la separación EXISTA y no sea solo esta prosa lo prueba `PRUEBAS_DE_MARCA`
- * en `invariantes.ts`. Esta misma promesa estuvo escrita acá mientras los seis
+ * Que la separación EXISTA y no sea solo esta prosa lo prueba `BRAND_PROOFS`
+ * en `invariants.ts`. Esta misma promesa estuvo escrita acá mientras los seis
  * tipos eran `never` y no separaban nada.
  */
 export type NodeFingerprint = Nominal<string,"NodeFingerprint">;
@@ -401,7 +419,7 @@ export type MatterHash = Nominal<string,"MatterHash">;
 
 /**
  * La clave del caché de reconocimiento (§{Caché}).
- * `sha256(hashBytes ‖ idAdaptador ‖ versiónDelAdaptador ‖ versiónDelModelo?)`.
+ * `sha256(hashBytes ‖ adapterId ‖ adapterVersion ‖ modelVersion?)`.
  */
 export type CacheKey = Nominal<string,"CacheKey">;
 

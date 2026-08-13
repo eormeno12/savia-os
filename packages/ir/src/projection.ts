@@ -44,7 +44,7 @@ import type { Body, Shape, Window } from "./shapes.js";
  *
  * PROVISIONAL(#27): longitud prefijada por componente (`len:valor`), no separador
  * improbable ni concatenación desnuda — Sin longitud ni delimitador, un
- * `idAdaptador` terminado en dígitos seguido de una versión numérica colisiona con
+ * `adapterId` terminado en dígitos seguido de una versión numérica colisiona con
  * otra terna y el caché sirve árboles equivocados EN SILENCIO, que es el modo de
  * falla que la sección del caché existe para evitar. Con longitud prefijada es
  * inyectiva POR CONSTRUCCIÓN, sin verificación que alguien pueda olvidarse — es la
@@ -89,7 +89,7 @@ export const encodeParts = (...parts: readonly string[]): string =>
  * caso de normalización. Ahora lo tiene —compuesto vs descompuesto, y CRLF vs LF—
  * y el mutante M38 lo rompe a propósito en cada `pnpm lint`. La distinción importa
  * porque «una garantía que solo se verificó el día que se escribió es
- * indistinguible de una que nunca funcionó» (`scripts/mutantes.mjs`).
+ * indistinguible de una que nunca funcionó» (`scripts/mutants.mjs`).
  */
 export const normalize = (text: string, shape: Shape): string => {
   const base = text.normalize("NFC").replace(/\r\n?/gu, "\n");
@@ -433,7 +433,7 @@ export type HashFn = (preimage: string) => string;
  * Lo que SÍ es cierto es más angosto, y es lo único que se afirma acá: este archivo
  * no NOMBRA `identity.ts`, así que `Authorship` no está en su alcance léxico y no
  * se puede escribir. Es una propiedad del texto de este archivo, no del grafo — se
- * mantiene por lectura, no por `scripts/fronteras.mjs`.
+ * mantiene por lectura, no por `scripts/boundaries.mjs`.
  *
  * De que `Authorship` no entre en la huella cuelgan el caché de reconocimiento
  * cross-org (§{Caché}) y que el mismo contenido subido por dos personas dé la misma

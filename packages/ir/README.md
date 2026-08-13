@@ -62,7 +62,7 @@ Todos los valores numéricos del paquete viven en **un solo objeto**, `PARAMETER
 (`src/params.ts`). Ningún otro archivo tiene un literal numérico **en posición de
 valor** — lo verifica `scripts/numbers.mjs` sobre el AST, no es una promesa de
 estilo. (Un literal en posición de *tipo*, como el `15` con el que
-`invariantes.ts` fija la cantidad de roles, no cuenta: no puede decidir
+`invariants.ts` fija la cantidad de roles, no cuenta: no puede decidir
 comportamiento en runtime, que es lo que esta regla gobierna.)
 
 Cada parámetro lleva su unidad, qué decide y cómo se mediría el definitivo. Los que
@@ -87,22 +87,24 @@ porque una aserción rota y una que funciona compilan igual.
 | Invariante | Quién lo impone | Qué pasa al violarlo |
 |---|---|---|
 | `Shape` ≡ `Body['shape']` | `Shape` se **deriva** de `Body`; `SHAPES` lleva `satisfies` | no hay dos conjuntos que puedan discrepar; un nombre de más falla en el arreglo |
-| A `SHAPES` no le falta ninguna forma | aserción en `invariantes.ts` — **irreducible**, un tipo no se enumera en runtime | error nombrando la forma faltante |
+| A `SHAPES` no le falta ninguna forma | aserción en `invariants.ts` — **irreducible**, un tipo no se enumera en runtime | error nombrando la forma faltante |
 | El piso físico nunca da un par `rol⇒forma` ilegal | la **anotación** de `ROLE_BY_SHAPE` | error en la línea de la tabla |
 | «Código siempre atómico» (§{Invariantes}) | la **anotación** de `COHESION_BY_ROLE` | error en la línea de la tabla |
-| …y esa anotación sigue siendo un **literal**, no `Cohesion` | `PRUEBAS_DE_COHESIÓN` en `invariantes.ts` | error — sin esto, ensanchar el campo y poner `"normal"` apaga la fila de arriba en verde |
-| El `satisfies` de `REQUIRED_SHAPE` sigue atando las claves a `Role` | `PRUEBAS_DE_PAREJA` en `invariantes.ts` | error — sin esto, sacarlo lleva `ILLEGAL_PAIRS` de 25 pares a 0 sin un solo aviso |
-| El barrido del banco recorre 15 × 6 (§{Estrategia}) | `PRUEBAS_DE_DOMINIO` en `invariantes.ts` — fija las dos cifras a nivel de tipo | error — quitar un rol obliga a actualizar plan y barrido en el mismo commit |
-| Ningún payload anida un nodo (§{Tramo 3 › Qué sale}) | el **grafo de módulos**: `shapes.ts` no alcanza `outputs.ts` (`scripts/fronteras.mjs`) | `pnpm lint` falla y muestra el camino |
-| Las marcas nominales separan | `PRUEBAS_DE_MARCA` en `invariantes.ts` — **irreducible**, es una propiedad de tipos | error nombrando las dos marcas que se confunden |
-| La salida del adaptador no lleva `id` | `PRUEBAS_DE_ACUÑADO` en `invariantes.ts` | error — y el acuñado al azar deja de estar justificado |
-| `SourceRange` no colapsa, el vocabulario de `Coordinate['space']` es cerrado, `Location.within` es recursiva y `Box.frame` es obligatorio | `PRUEBAS_DE_COORDENADA` en `invariantes.ts` | error — un `Extract` que deja de matchear da `never`, no un error, y `never` es asignable a todo |
+| …y esa anotación sigue siendo un **literal**, no `Cohesion` | `COHESION_PROOFS` en `invariants.ts` | error — sin esto, ensanchar el campo y poner `"normal"` apaga la fila de arriba en verde |
+| El `satisfies` de `REQUIRED_SHAPE` sigue atando las claves a `Role` | `PAIR_PROOFS` en `invariants.ts` | error — sin esto, sacarlo lleva `ILLEGAL_PAIRS` de 25 pares a 0 sin un solo aviso |
+| El barrido del banco recorre 15 × 6 (§{Estrategia}) | `DOMAIN_PROOFS` en `invariants.ts` — fija las dos cifras a nivel de tipo | error — quitar un rol obliga a actualizar plan y barrido en el mismo commit |
+| Ningún payload anida un nodo (§{Tramo 3 › Qué sale}) | el **grafo de módulos**: `shapes.ts` no alcanza `outputs.ts` (`scripts/boundaries.mjs`) | `pnpm lint` falla y muestra el camino |
+| Las marcas nominales separan | `BRAND_PROOFS` en `invariants.ts` — **irreducible**, es una propiedad de tipos | error nombrando las dos marcas que se confunden |
+| La salida del adaptador no lleva `id` | `MINTING_PROOFS` en `invariants.ts` | error — y el acuñado al azar deja de estar justificado |
+| `SourceRange` no colapsa, el vocabulario de `Coordinate['space']` es cerrado, `Location.within` es recursiva y `Box.frame` es obligatorio | `COORDINATE_PROOFS` en `invariants.ts` | error — un `Extract` que deja de matchear da `never`, no un error, y `never` es asignable a todo |
 | `boxContains` exige el mismo marco · `compareBoxes` ordena por área ascendente, es antisimétrico y **no** es total | `scripts/geometry.mjs` — son de **comportamiento** | `pnpm lint` falla nombrando el caso y qué se pierde |
 | **Cuerpos distintos ⟹ huellas distintas** | `scripts/projection.mjs` — es de **comportamiento**, ningún tipo la expresa | `pnpm lint` falla nombrando los cuerpos que colisionan |
 | **El vocabulario de `TokenKind` no se mueve en silencio** | `scripts/projection.mjs` — la tabla de **preimágenes canónicas**, una por forma | `pnpm lint` falla mostrando la preimagen esperada y la obtenida |
-| Los cuatro campos del envoltorio siguen marcados (versión, original, organización, actor) | `PRUEBAS_DE_ENVOLTORIO` en `invariantes.ts` | error — sin esto, cambiar una marca por otra de la misma familia compila y direcciona lo que no es |
-| `Certainty` tiene un orden, y va en el sentido de la escalera | `PRUEBAS_DE_CERTEZA` en `invariantes.ts` — fija las dos cifras a nivel de tipo | error — invertirla marca como `declared` lo que el pipeline adivinó |
-| Toda cita al plan apunta a una sección que existe | `scripts/citas.mjs` — el plan es un borrador vivo y las citas por número se corren solas, en silencio | `pnpm lint` falla nombrando la cita y la sección que no aparece |
+| Los cuatro campos del envoltorio siguen marcados (versión, original, organización, actor) | `WRAPPER_PROOFS` en `invariants.ts` | error — sin esto, cambiar una marca por otra de la misma familia compila y direcciona lo que no es |
+| `Certainty` tiene un orden, y va en el sentido de la escalera | `CERTAINTY_PROOFS` en `invariants.ts` — fija las dos cifras a nivel de tipo | error — invertirla marca como `declared` lo que el pipeline adivinó |
+| `Context.ancestors` sigue siendo una cadena de `MatterHash` | `RECURSION_PROOFS` en `invariants.ts` | error — es lo único que corta la recursión de la delegación; cambiarle la marca deja la guarda de ciclo comparando hashes de otra familia, en verde |
+| El orden de `EVIDENCE_SCALE` es el del plan | `EVIDENCE_PROOFS` en `invariants.ts` — una tupla de strings, sin un solo número | error — los seis valores de `Evidence` se derivan de ese orden: mover una fila cambia quién gana cada archivo entre los doce adaptadores, sin un aviso |
+| Toda cita al plan apunta a una sección que existe | `scripts/citations.mjs` — el plan es un borrador vivo y las citas por número se corren solas, en silencio | `pnpm lint` falla nombrando la cita y la sección que no aparece |
 | Ningún número suelto fuera de `params.ts`, y la cifra publicada es la real | `scripts/numbers.mjs` — scanner de AST, no regex | `pnpm lint` falla nombrando archivo, línea y literal, o la discrepancia entre el censo y el AST |
 
 ### La huella es de comportamiento, no de tipos
@@ -177,16 +179,18 @@ se vea, no.
 pnpm --filter @savia-os/ir lint
 ```
 
-Son **siete** comandos encadenados —`tsc --noEmit`, `fronteras`, `projection`,
-`geometry`, `citas`, `numbers` y `mutantes`— y hacen falta los siete: `typecheck`
+Son **siete** comandos encadenados —`tsc --noEmit`, `boundaries`, `projection`,
+`geometry`, `citations`, `numbers` y `mutants`— y hacen falta los siete: `typecheck`
 solo cubre la mitad de la tabla de arriba, y las filas que impone un `.mjs` quedarían
 en verde sin haberse mirado.
 
-El séptimo es el que acredita a los otros seis. `mutantes.mjs` rompe cada garantía a
+El séptimo es el que acredita a los otros seis. `mutants.mjs` rompe cada garantía a
 propósito y falla si alguna **deja de romperse**: sin él, una fila de esta tabla que
-dejó de verificar nada es indistinguible de una que funciona. Hoy son **35 garantías
-y 6 controles**; los controles existen porque una suite donde todo falla es
+dejó de verificar nada es indistinguible de una que funciona. Hoy son **41 garantías
+y 8 controles**; los controles existen porque una suite donde todo falla es
 indistinguible de una donde el compilador está roto.
 
 > El README decía «cinco» y `package.json` encadenaba siete desde el bloque 2:
-> faltaban `geometry` y `mutantes`. Corregido en el bloque 3.
+> faltaban `geometry` y `mutantes`. Corregido en el bloque 3. Los nombres de tres de
+> los siete cambiaron en el bloque 4 (`fronteras → boundaries`, `citas → citations`,
+> `mutantes → mutants`): el paquete quedó entero en inglés, guardianes incluidos.

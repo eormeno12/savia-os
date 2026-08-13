@@ -148,7 +148,7 @@ const archivos = [
   // Menos este archivo: su docstring MUESTRA citas rotas a propósito, y un
   // verificador que se lee a sí mismo confunde el ejemplo con el caso.
   ...readdirSync(AQUÍ)
-    .filter((f) => f.endsWith(".mjs") && f !== "citas.mjs")
+    .filter((f) => f.endsWith(".mjs") && f !== "citations.mjs")
     .sort()
     .map((f) => [`scripts/${f}`, join(AQUÍ, f)]),
   ["README.md", resolve(AQUÍ, "..", "README.md")],

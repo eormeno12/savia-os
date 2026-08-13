@@ -1,0 +1,690 @@
+/**
+ * Los invariantes que se verifican en el BUILD y no llevan test.
+ *
+ * «Lo que no necesita test porque no compila importa tanto como lo que sí: cada
+ * invariante que se mueve del runtime al compilador es un test menos que mantener
+ * y un bug menos que puede llegar a producción» (§{Estrategia}).
+ *
+ * REGLA DE ESTE ARCHIVO — el valor de fallo de una aserción NUNCA puede ser
+ * asignable a su tipo de éxito. `never` queda descartado por construcción: es
+ * asignable a todo, así que una aserción que falla hacia `never` no puede fallar.
+ * El fallo se expresa con un OBJETO de error, y cada condición se assertea por
+ * separado — nunca intersecadas, porque `true & {error}` sigue siendo asignable a
+ * `true`. Las tres garantías que este paquete anunciaba y no cumplía violaban las
+ * tres esta misma regla.
+ *
+ * Y ANTES DE ESCRIBIR UNA ASERCIÓN ACÁ: preguntarse si la violación se puede volver
+ * IRREPRESENTABLE en vez de detectable. Tres de las cuatro que había se borraron
+ * así, restringiendo el dato donde se escribe:
+ *   · `Shape` ≡ `Body['shape']` → `Shape` se deriva de `Body` (`shapes.ts`)
+ *   · el piso físico nunca da un par ilegal → anotación de `ROLE_BY_SHAPE`
+ *   · «código siempre atómico» → anotación de `COHESION_BY_ROLE`
+ * La cuarta —ningún payload anida un nodo— la impone el grafo de módulos:
+ * `shapes.ts` no puede alcanzar `outputs.ts`, verificado por
+ * `scripts/boundaries.mjs`. Sin ese import, un `Node` dentro de un `Body` es
+ * inexpresable.
+ *
+ * Pero «restringir donde se escribe» solo cuenta mientras la restricción SIGA
+ * siendo la que se escribió. Las tres anotaciones de arriba son las que se pueden
+ * aflojar sin un solo error —ensanchar un literal a su unión, sacar un `satisfies`,
+ * borrar un elemento de un arreglo `as const`— y las tres, aflojadas, apagan la
+ * garantía en silencio. Por eso los invariantes 4, 5 y 6 no verifican los datos:
+ * verifican que la RESTRICCIÓN siga vigente.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * EL INVENTARIO, Y CUÁNTO DE ÉL ESTÁ ACREDITADO
+ *
+ * Este archivo es un inventario de garantías, así que se audita como tal: una
+ * aserción que nadie vio DISPARAR es indistinguible de una que no puede fallar, y
+ * una aserción que no puede fallar es el mismo pecado que `never`. El censo, al
+ * cerrar el bloque 4:
+ *
+ *   42 aserciones de tipo · 26 con mutante que las acredita · 16 sin
+ *
+ * Las 16 sin mutante NO son 16 huecos, y decirlo es más útil que escribir 16 filas
+ * que no compran nada:
+ *
+ *   · 10 son la MISMA aserción sobre otro miembro de una familia ya acreditada.
+ *     `_H1`, `_H3`, `_H4`, `_H5`, `_H6` son `Inhabited` aplicado a otros cinco
+ *     hashes y M20 acredita el operador vía `_H2`; `_S2`, `_S3`, `_S4` son M21
+ *     sobre otros tres pares; `_FormulaIsSolo` e `_ImageIsSolo` son M6 sobre otros
+ *     dos roles. Un mutante por miembro agregaría filas y cero información.
+ *   · 6 NO TIENEN MUTACIÓN PLAUSIBLE de una línea, y van con nombre y apellido
+ *     abajo, en `SIN ACREDITACIÓN POSIBLE`. Ninguna se deja pasar en silencio.
+ *
+ * SIN ACREDITACIÓN POSIBLE — las seis, dichas de frente
+ *
+ *   · `_UsableAsString` — la única edición que la dispara es cambiar `Nominal`
+ *     para que no intersecte con `Base`, y eso rompe PRIMERO en los 16
+ *     constructores `as*` de `identity.ts`: el mutante acreditaría al compilador,
+ *     no a esta línea. Lo que la protege de verdad es `_GuardFires` (M18), que fija
+ *     la forma de `Nominal`. Queda como SEGURO SIN ACREDITACIÓN, escrito.
+ *   · las cinco mitades «hacia atrás» — `_IngestionVersionInhabited`,
+ *     `_OriginalInhabited`, `_VersionOrganizationInhabited`,
+ *     `_AnnotationActorInhabited` (invariante 8) y `_AncestorsInhabited`
+ *     (invariante 10). Las cinco agarran el colapso a `never` de una marca nominal
+ *     sobre `string`, y ese colapso es prácticamente inalcanzable: ensanchar la
+ *     marca la agarra la mitad de ADELANTE, y no hay edición de una línea que la
+ *     lleve a `never` sin romper antes `identity.ts`. Se conservan igual —son
+ *     baratas y el día que `Nominal` cambie de forma son lo único que queda— pero
+ *     se conservan SABIENDO que ningún mutante las va a poner rojas.
+ *
+ * Lo que el bloque 4 SÍ arregló de esas cinco: **compartían mensaje con su mitad de
+ * adelante**, así que si alguna disparara, el error mandaría a leer otra cosa. Es
+ * exactamente el defecto que `Inhabited` y `NotAssignableTo` documentan haber
+ * evitado con sus mensajes con default. Ahora cada una dice lo suyo.
+ */
+
+import { SHAPES, type Shape } from "./shapes.js";
+import type {
+  CERTAINTY_RANK,
+  COHESION_BY_ROLE,
+  Role,
+  RoleFor,
+  RoleWithRequiredShape,
+  ROLES,
+} from "./classification.js";
+import type {
+  ActorId,
+  ByteHash,
+  CacheKey,
+  ContextualFingerprint,
+  ElementId,
+  EmbeddingKey,
+  LocalId,
+  MatterHash,
+  NodeFingerprint,
+  Nominal,
+  ObjectKey,
+  OrganizationId,
+} from "./identity.js";
+import type { Box, Coordinate, Location, SourceRange } from "./location.js";
+import {
+  NODE_BRAND,
+  type Annotation,
+  type Ingestion,
+  type Node,
+  type NodeInVersion,
+  type RawNode,
+} from "./outputs.js";
+import { EVIDENCE_SCALE, type Context, type Unit } from "./adapter.js";
+
+// ─────────────────────────────── Maquinaria ──────────────────────────────────
+
+type True<T extends true> = T;
+
+/**
+ * `true` si `From` cabe en `To`; si no, un OBJETO de error que nombra el desfase.
+ *
+ * El fallo NO puede ser `never`: `never` es asignable a todo, así que
+ * `True<never>` compila y la aserción queda vacua. Es el error exacto que
+ * tenía `_FormaEsCuerpoForma`, la aserción que vivía en `shapes.ts` y se borró, y
+ * también el arreglo que la auditoría proponía para él. Un objeto no es asignable a
+ * `true` y rompe el build.
+ *
+ * Y por eso mismo dos condiciones se assertean por SEPARADO y nunca con `&`:
+ * `true & {error}` sigue siendo asignable a `true`.
+ *
+ * ADVERTENCIA HEREDADA DE LA TRADUCCIÓN, dicha de frente: el nombre y el orden de
+ * los parámetros se leen al revés. `Covers<From, To>` significa «`To` cubre a
+ * `From`», no «`From` cubre a `To`». En español (`Cubre<De, A>`) el defecto pasaba
+ * desapercibido; en inglés invita al error. Arreglarlo es `FitsIn<Sub, Super>` o
+ * invertir los parámetros — 34 sitios de llamada, que NO es traducción y por eso el
+ * bloque 4 no lo hizo. Queda escrito en `GLOSARIO.md` (sección 8) como decisión pendiente.
+ */
+type Covers<From, To, Message extends string> = [From] extends [To]
+  ? true
+  : { "IR-ERR": [Message, From, To] };
+
+// ══════════════════ Invariante 1 · el arreglo cubre todas las formas ══════════
+// La única dirección que ninguna anotación puede imponer: `Shape` se DERIVA de
+// `Body` y `SHAPES` lleva `satisfies` (los dos en `shapes.ts`), así que el
+// arreglo no puede nombrar una forma que no exista. Pero que no le FALTE ninguna
+// no se puede escribir como restricción, porque un tipo no se enumera en runtime.
+// Si falta una, `ROLE_BY_SHAPE` queda incompleto y el barrido «15×6 = 90»
+// (§{Estrategia})
+// recorre un dominio viejo — los dos fallos, mudos.
+
+type _ArrayCoversShapes = True<
+  Covers<Shape, (typeof SHAPES)[number], "SHAPES is missing a shape of Body">
+>;
+
+export type SHAPE_PROOFS = readonly [_ArrayCoversShapes];
+
+// ═══════════ Invariante 2 · la salida del adaptador no tiene ids (H13) ═══════
+// El acuñado al azar de `ElementId` descansa en un hecho verificable: el property
+// test de determinismo del tramo 3 —«para cada adaptador a: a.reconocer(f) ≡
+// a.reconocer(f), árbol byte-idéntico»— compara artefactos que NO LLEVAN ID, así que
+// no se puede romper por cómo se acuñan los ids. Ese hecho era hasta ahora una
+// lectura de dos archivos, y una lectura no falla cuando deja de ser cierta.
+//
+// Si alguien agrega un `id` a `Unit` o a `RawNode`, la tenaza que H13 declara
+// inexistente vuelve a existir — y el build lo dice acá, no seis meses después.
+//
+// `_UnitHasNoId` está escrita desde el bloque 1b y hasta el bloque 4 NADIE LA VIO
+// DISPARAR: sin ella, agregarle un `id` a `Unit` no rompía una línea. La acredita
+// M40, con MC8 como control — el control es lo que distingue «`Unit` no puede
+// llevar un id» de «`Unit` está congelada».
+
+/** Error si `T` tiene la clave `K`. */
+type WithoutKey<T, K extends string, Message extends string> = K extends keyof T
+  ? { "IR-ERR": [Message, K, T] }
+  : true;
+
+type _UnitHasNoId = True<
+  WithoutKey<Unit<unknown>, "id", "adapter output must not carry an id — see H13(a)">
+>;
+type _RawNodeHasNoId = True<
+  WithoutKey<RawNode, "id", "what is cached by hashBytes must not carry an id — see H13(a)">
+>;
+
+export type MINTING_PROOFS = readonly [_UnitHasNoId, _RawNodeHasNoId];
+
+// ══════════════════════════ Invariante 3 · la marca separa ═══════════════════
+// La familia de hashes estuvo escrita en DOS niveles (`Nominal<Sha256Hex, …>`) y
+// TODOS sus tipos eran `never`, o sea asignables a todo: una huella se asignaba a
+// un `number` y a una `CacheKey`. El docstring que prometía impedirlo estaba
+// escrito y era falso. Estas pruebas son para que no vuelva a poder serlo.
+
+/**
+ * Error si `T` colapsó a `never` — un tipo sin valores posibles es asignable a TODO.
+ *
+ * El mensaje es un parámetro con DEFAULT, igual que en `NotAssignableTo` y por la
+ * misma razón: el operador nació para marcas nominales pero no es de marcas.
+ * `SourceRange` también puede colapsar —es un `Extract`, y un `Extract` que no
+ * matchea da `never` sin un solo error— y reportar eso como «*brand collapsed to
+ * never*» mandaría a leer `identity.ts`, que no tiene nada que ver.
+ */
+type Inhabited<
+  T,
+  Message extends string = "brand collapsed to never and no longer protects anything",
+> = [T] extends [never] ? { "IR-ERR": [Message, T] } : true;
+
+/**
+ * Error si un valor de `From` se puede pasar donde se espera `To`.
+ *
+ * El tercer parámetro tiene DEFAULT y el default es vocabulario de marcas
+ * nominales, porque es donde nació. Pero el operador no es de marcas: es «estos dos
+ * tipos no se confunden», y sirve igual para un par rol⇒forma. Sin el mensaje
+ * propio, una aserción sobre `RoleFor<…>` falla diciendo «la marca no separa» y
+ * manda a leer `identity.ts`, que no tiene nada que ver — falla cuando tiene que
+ * fallar y manda a buscar el bug al lugar equivocado, que es la mitad del trabajo
+ * de un diagnóstico. Hoy NINGUNA aserción usa el default —las nueve pasan el suyo,
+ * y así conviene que siga—; queda como red para que agregar una no obligue a
+ * inventar el mensaje en el mismo minuto, no como opción legítima.
+ *
+ * Las nueve, recontadas en el bloque 4 (`_S1`–`_S6`, `_GuardFires`,
+ * `_IllegalPairStaysIllegal`, `_FrameRequired`): la cifra NO cambió, porque los
+ * invariantes 10 y 11 usan `Covers` y no este operador. Se recuenta a propósito —
+ * es exactamente la clase de número que este paquete ya publicó mal dos veces
+ * (`M9c` en `params.ts`, «los siete» en `identity.ts`), y una cifra que sobrevive
+ * un bloque sin que nadie la vuelva a contar es una cifra que va a mentir en el
+ * siguiente.
+ *
+ * El nombre es del bloque 4 (GLOSARIO.md, D7): `NotAssignableTo` es la semántica
+ * exacta de TypeScript y CONSERVA LA DIRECCIÓN. `Separates<A,B>` se lee simétrico y
+ * el operador no lo es.
+ */
+type NotAssignableTo<
+  From,
+  To,
+  Message extends string = "these two types do not separate",
+> = [From] extends [To] ? { "IR-ERR": [Message, From, To] } : true;
+
+// Toda la familia está habitada. Es la propiedad que se rompió.
+type _H1 = True<Inhabited<ByteHash>>;
+type _H2 = True<Inhabited<NodeFingerprint>>;
+type _H3 = True<Inhabited<ContextualFingerprint>>;
+type _H4 = True<Inhabited<EmbeddingKey>>;
+type _H5 = True<Inhabited<MatterHash>>;
+type _H6 = True<Inhabited<CacheKey>>;
+
+// Y separa: los roles no se confunden entre sí ni con un `string` pelado. Cada uno
+// dice QUÉ se confundió con qué, porque el mensaje es lo único que el desarrollador
+// va a leer: el tipo del error ya trae los dos operandos, pero no por qué importan.
+type _S1 = True<
+  NotAssignableTo<NodeFingerprint, EmbeddingKey, "a node fingerprint is accepted as an embedding key">
+>;
+type _S2 = True<
+  NotAssignableTo<NodeFingerprint, ByteHash, "a node fingerprint is accepted as a byte hash">
+>;
+type _S3 = True<
+  NotAssignableTo<ContextualFingerprint, EmbeddingKey, "a contextual fingerprint is accepted as an embedding key">
+>;
+type _S4 = True<
+  NotAssignableTo<MatterHash, CacheKey, "a matter hash is accepted as a cache key">
+>;
+type _S5 = True<
+  NotAssignableTo<string, NodeFingerprint, "a bare string is accepted as a node fingerprint — the brand stopped requiring asNodeFingerprint()">
+>;
+type _S6 = True<
+  NotAssignableTo<ElementId, LocalId, "an ElementId is accepted as a LocalId — minted and adapter-local ids no longer separate">
+>;
+
+/**
+ * Pero una huella SIGUE siendo un `string` hacia afuera: se concatena y sirve de
+ * clave de mapa sin ceremonia. Una marca que obligue a desmarcar para usarla no
+ * la usa nadie.
+ *
+ * Hasta el bloque 4 esta era la ÚNICA aserción del archivo que fallaba MUDA:
+ * `True<NodeFingerprint extends string ? true : false>` no viola la regla del
+ * archivo —`false` no es asignable a `true`, así que rompe— pero rompe con un
+ * `TS2344` pelado que dice «Type 'false' does not satisfy the constraint 'true'» y
+ * no dice QUÉ se rompió, en un archivo cuya tesis es que el mensaje es lo único que
+ * el desarrollador va a leer. Ahora pasa por `Covers` y habla.
+ *
+ * SIGUE SIN MUTANTE, y la razón está en el encabezado: la única edición que la
+ * dispara rompe primero en los 16 constructores `as*`.
+ */
+type _UsableAsString = True<
+  Covers<
+    NodeFingerprint,
+    string,
+    "a NodeFingerprint is no longer usable as a string — the brand stopped being an intersection, and every concatenation and map key that treats it as text broke"
+  >
+>;
+
+/**
+ * La guarda de `Nominal` dispara: marcar sobre marcado da un OBJETO de error, no
+ * un string marcado. Si alguien sacara la guarda, `_BrandOverBrand` volvería a
+ * ser `never`, `never extends string` es cierto, y esta línea deja de compilar.
+ */
+type _BrandOverBrand = Nominal<NodeFingerprint, "Other">;
+type _GuardFires = True<
+  NotAssignableTo<_BrandOverBrand, string, "branding an already branded type yielded a string — the Nominal guard is gone">
+>;
+
+export type BRAND_PROOFS = readonly [
+  _H1, _H2, _H3, _H4, _H5, _H6,
+  _S1, _S2, _S3, _S4, _S5, _S6,
+  _UsableAsString,
+  _GuardFires,
+];
+
+// ═════════ Invariante 4 · «código siempre `solo`» sigue siendo exacto ════════
+// La anotación de `COHESION_BY_ROLE` dice que los tres atómicos son LITERALES «a
+// propósito: ensancharlos a `Cohesion` deja pasar `"normal"` en verde». Esa frase
+// describía una propiedad que NADA verificaba: ensanchar el campo a `Cohesion` y
+// escribir `code: "normal"` compilaba en verde, y el invariante del banco «código
+// siempre `solo`» (§{Invariantes}) —que la anotación dice IMPONER— se apagaba mudo.
+// Acá el campo se obliga a ser EXACTAMENTE `"solo"`, no un supertipo suyo.
+
+type _CodeIsSolo = True<
+  Covers<
+    (typeof COHESION_BY_ROLE)["code"],
+    "solo",
+    "COHESION_BY_ROLE.code widened past the literal and no longer forces solo"
+  >
+>;
+type _FormulaIsSolo = True<
+  Covers<
+    (typeof COHESION_BY_ROLE)["formula"],
+    "solo",
+    "COHESION_BY_ROLE.formula widened past the literal and no longer forces solo"
+  >
+>;
+type _ImageIsSolo = True<
+  Covers<
+    (typeof COHESION_BY_ROLE)["image"],
+    "solo",
+    "COHESION_BY_ROLE.image widened past the literal and no longer forces solo"
+  >
+>;
+
+export type COHESION_PROOFS = readonly [_CodeIsSolo, _FormulaIsSolo, _ImageIsSolo];
+
+// ══════════ Invariante 5 · el `satisfies` de REQUIRED_SHAPE sigue atando ══════
+// Su docstring dice que ese `satisfies` es LOAD-BEARING: sin él
+// `RoleWithRequiredShape` queda disjunto de `Role`, `RoleFor<F>` pasa a ser los 15
+// roles para toda forma, la anotación de `ROLE_BY_SHAPE` deja de restringir e
+// `ILLEGAL_PAIRS` queda vacío — «sacarlo no rompe nada: apaga tres garantías en
+// silencio». El silencio era literal: sacarlo compilaba. Las dos líneas van POR
+// SEPARADO porque miden cosas distintas e independientes — que las claves SEAN
+// roles, y que la pareja obligatoria efectivamente RESTRINJA.
+//
+// Y esa segunda mitad estuvo escrita desde el bloque 1b SIN NADIE QUE LA
+// ACREDITARA: M8 cubría solo la primera. La acredita M44, sacándole `code` a
+// `REQUIRED_SHAPE` — que no rompe el `satisfies`, no deja imports huérfanos y no
+// cambia ninguna firma: `RoleFor<'text_span'>` simplemente pasa a admitir `code`.
+
+/** Las 5 claves del mapa son roles de verdad. Muere si el `satisfies` se va. */
+type _RequiredShapeKeysAreRoles = True<
+  Covers<
+    RoleWithRequiredShape,
+    Role,
+    "REQUIRED_SHAPE keys are no longer Role — did the satisfies go away?"
+  >
+>;
+
+/** Y restringen: `code` exige `verbatim`, así que no es rol válido para `text_span`. */
+type _IllegalPairStaysIllegal = True<
+  NotAssignableTo<
+    "code",
+    RoleFor<"text_span">,
+    "RoleFor<text_span> admits code — the required pair stopped restricting and text_span ⇒ code compiles"
+  >
+>;
+
+export type PAIR_PROOFS = readonly [
+  _RequiredShapeKeysAreRoles,
+  _IllegalPairStaysIllegal,
+];
+
+// ══════════ Invariante 6 · el dominio del barrido sigue siendo 15 × 6 ═════════
+// El barrido exhaustivo del banco es «15×6 = 90» (§{Estrategia}), y hasta acá esas
+// dos cifras no estaban atadas a nada: borrar un rol de `ROLES` bajaba el dominio
+// de 90 a 84 y los cuatro comandos seguían en verde. Fijarlas es un COMPROMISO
+// DELIBERADO con el plan, no una comodidad: agregar o quitar un rol tiene que
+// romper acá, para que el plan y el barrido se actualicen en el mismo commit.
+//
+// Las dos cifras son literales de TIPO, no valores. Por eso `scripts/numbers.mjs`
+// —que prohíbe literales numéricos fuera de `params.ts`— no las cuenta: un literal
+// de tipo no puede decidir comportamiento en runtime, que es lo que la regla de
+// `params.ts` existe para gobernar. Fijar un hecho del contrato es lo contrario de
+// inventar un umbral.
+//
+// Las dos mitades tienen mutante desde el bloque 4: M14 la de los roles (bloque 1b)
+// y M43 la de las formas, que estuvo escrita sin fila propia hasta acá. M43 DUPLICA
+// una forma en vez de borrarla, porque borrarla dispara primero `_ArrayCoversShapes`
+// y la fila acreditaría el invariante 1.
+
+type _FifteenRoles = True<
+  Covers<
+    (typeof ROLES)["length"],
+    15,
+    "ROLES no longer has 15 roles: the 15×6 = 90 sweep (§{Estrategia}) walks a different domain"
+  >
+>;
+type _SixShapes = True<
+  Covers<
+    (typeof SHAPES)["length"],
+    6,
+    "SHAPES no longer has 6 shapes: the 15×6 = 90 sweep (§{Estrategia}) walks a different domain"
+  >
+>;
+
+export type DOMAIN_PROOFS = readonly [_FifteenRoles, _SixShapes];
+
+// ═══════ Invariante 7 · la coordenada sigue siendo lo que dice ser ═══════════
+// Las cinco propiedades de `location.ts` que estaban escritas en prosa y no las
+// ejecutaba nadie. Las cinco se pueden apagar con una edición de un carácter y
+// ninguna se pone roja sola:
+//
+//   · `SourceRange` es `Extract<Coordinate, {space:"grid"}>`. Un `Extract` que no
+//     matchea NO es un error: es `never`, y `never` es asignable a todo, así que
+//     mover el tag una letra deja `DataRecord.coordinate` (§{Las dos salidas})
+//     aceptando cualquier cosa, en verde. Es la falla de la familia de hashes en
+//     otro archivo.
+//   · El vocabulario de `space` es un COMPROMISO con el plan, igual que
+//     `ROLES.length === 15`: agregar o sacar una variante tiene que romper acá para
+//     que los doce adaptadores y todo consumidor exhaustivo se actualicen en el
+//     mismo commit. Las dos direcciones van POR SEPARADO —una dice «entró algo»,
+//     la otra «se fue algo»— porque son fallas distintas. Y hasta el bloque 4 solo
+//     la primera tenía mutante (M25): `_SpacesPresent` estaba escrita y nadie la
+//     había visto disparar. La acredita M45, BORRANDO una variante — renombrarle el
+//     tag dispara también `_SpacesDeclared` y la fila acreditaría M25 de nuevo.
+//   · `within` recursivo es lo único que hace citable la cadena del caso canónico
+//     (§{La delegación es emergente}); aplanarlo a un solo nivel compila.
+//   · `Box.frame` obligatorio es lo que impide que las cajas de 40 diapositivas
+//     convivan en un plano; volverlo opcional no rompe `boxContains`, que
+//     compararía `undefined !== undefined` y daría `false`.
+
+type _SourceRangeExists = True<
+  Inhabited<
+    SourceRange,
+    "SourceRange collapsed to never — the grid variant of Coordinate lost its tag and DataRecord.coordinate now accepts anything"
+  >
+>;
+type _SpacesDeclared = True<
+  Covers<
+    Coordinate["space"],
+    "source" | "text" | "grid" | "visual" | "time",
+    "Coordinate gained a space: every exhaustive consumer and the twelve adapters walk a different domain"
+  >
+>;
+type _SpacesPresent = True<
+  Covers<
+    "source" | "text" | "grid" | "visual" | "time",
+    Coordinate["space"],
+    "Coordinate lost a space: something that used to be citable no longer is"
+  >
+>;
+type _WithinIsRecursive = True<
+  Covers<
+    Location["within"][number],
+    Location,
+    "Location.within stopped being recursive — the chained citation (contract.pdf → pg3 → image) is no longer expressible"
+  >
+>;
+type _FrameRequired = True<
+  NotAssignableTo<
+    undefined,
+    Box["frame"],
+    "Box.frame became optional — boxes from different frames share one plane and contain each other"
+  >
+>;
+
+export type COORDINATE_PROOFS = readonly [
+  _SourceRangeExists,
+  _SpacesDeclared,
+  _SpacesPresent,
+  _WithinIsRecursive,
+  _FrameRequired,
+];
+
+// ════ Invariante 8 · los cuatro campos del envoltorio siguen marcados (H3/H13) ══
+// Los cuatro entraron en el bloque 3 porque el dato que llevan NO SE RECONSTRUYE a
+// posteriori: en qué versión de bytes apareció un nodo, de qué organización es esa
+// fila del índice, dónde están los bytes originales, y QUIÉN curó. Los cuatro son
+// marcas nominales sobre `string`, y ahí está el problema: la edición que los rompe
+// NO es borrarlos —eso se ve en el diff y rompe a todos los consumidores— sino
+// cambiarles la marca por otra de la MISMA FAMILIA. Las cuatro compilan:
+// `ObjectKey → DocumentId`, `ByteHash → ContentHash`, `OrganizationId → DocumentId`
+// y `ActorId → string` son todos `string` por debajo, así que ninguna línea de
+// código deja de funcionar y el campo sigue existiendo, direccionando lo que no es.
+//
+// Verificado sin estas aserciones: tres de las cuatro mutaciones NO ROMPÍAN NADA, y
+// la cuarta rompía por casualidad —`TS6196`, un import que quedaba huérfano—, o sea
+// acreditando el linter en vez del contrato. Ver M32–M35 en `scripts/mutants.mjs`.
+//
+// Cada campo va en DOS aserciones, no en una intersección: hacia adelante agarra el
+// cambio de marca y el ensanchamiento a `string`; hacia atrás agarra el colapso a
+// `never`, que es asignable a todo y pasaría la primera en verde. Es la misma razón
+// por la que `SourceRange` necesita `Inhabited` además de su tag.
+//
+// LAS CUATRO DE ATRÁS NO TIENEN MUTANTE Y NO LO VAN A TENER — ver el encabezado.
+// Hasta el bloque 4 compartían mensaje con su mitad de adelante, así que si alguna
+// disparara mandaría a leer lo que no es. Ahora cada una dice lo suyo.
+
+type _IngestionVersionIsBytes = True<
+  Covers<
+    Ingestion["version"],
+    ByteHash,
+    "Ingestion.version is no longer the ByteHash of the received bytes"
+  >
+>;
+type _IngestionVersionInhabited = True<
+  Covers<
+    ByteHash,
+    Ingestion["version"],
+    "Ingestion.version collapsed to never — the field still typechecks everywhere and addresses nothing"
+  >
+>;
+
+type _OriginalIsAnObject = True<
+  Covers<
+    Ingestion["original"],
+    ObjectKey,
+    "Ingestion.original stopped being an ObjectKey — the verbatim asset is addressed by a Postgres row instead of an object"
+  >
+>;
+type _OriginalInhabited = True<
+  Covers<
+    ObjectKey,
+    Ingestion["original"],
+    "Ingestion.original collapsed to never — the field still typechecks everywhere and addresses nothing"
+  >
+>;
+
+type _VersionOrganizationSeparates = True<
+  Covers<
+    NodeInVersion["organization"],
+    OrganizationId,
+    "NodeInVersion.organization stopped being an OrganizationId — the hash → document lookup filters by the wrong thing and crosses tenants"
+  >
+>;
+type _VersionOrganizationInhabited = True<
+  Covers<
+    OrganizationId,
+    NodeInVersion["organization"],
+    "NodeInVersion.organization collapsed to never — the field still typechecks everywhere and filters nothing"
+  >
+>;
+
+type _AnnotationActorIsActor = True<
+  Covers<
+    Annotation["actor"],
+    ActorId,
+    "Annotation.actor stopped being an ActorId — curation is no longer attributable and the dedup key stops separating two curators"
+  >
+>;
+type _AnnotationActorInhabited = True<
+  Covers<
+    ActorId,
+    Annotation["actor"],
+    "Annotation.actor collapsed to never — the field still typechecks everywhere and attributes nothing"
+  >
+>;
+
+export type WRAPPER_PROOFS = readonly [
+  _IngestionVersionIsBytes,
+  _IngestionVersionInhabited,
+  _OriginalIsAnObject,
+  _OriginalInhabited,
+  _VersionOrganizationSeparates,
+  _VersionOrganizationInhabited,
+  _AnnotationActorIsActor,
+  _AnnotationActorInhabited,
+];
+
+// ═════════ Invariante 9 · el orden de `Certainty` va en el sentido que dice ═════
+// `CERTAINTY_RANK` (`classification.ts`) cerró un hueco real: hasta el bloque 3 el
+// paquete no exportaba NINGÚN orden sobre `Certainty`, y `Fragment.minCertainty`
+// prometía «la peor certeza de los nodos agrupados», que no era computable con lo
+// que el contrato daba.
+//
+// Pero una tabla de dos filas se invierte con una edición de dos palabras, y las dos
+// versiones compilan: `Record<Certainty, number>` no dice nada de los valores. Y
+// invertida no es un bug cualquiera — marca como `declared` lo que el pipeline
+// ADIVINÓ, o sea la promesa de §{La escalera} exactamente al revés, y en el único
+// dato que el plan hace viajar «hasta la skill que consuma esa memoria».
+//
+// Las dos cifras son literales de TIPO, igual que el `15` de `ROLES`: no deciden
+// comportamiento en runtime, así que `scripts/numbers.mjs` no las cuenta. Fijar un
+// hecho del contrato es lo contrario de inventar un umbral.
+
+type _DeclaredIsBest = True<
+  Covers<
+    (typeof CERTAINTY_RANK)["declared"],
+    0,
+    "CERTAINTY_RANK.declared moved: the ladder now ranks what the pipeline GUESSED as the safest certainty"
+  >
+>;
+type _InferredIsWorst = True<
+  Covers<
+    (typeof CERTAINTY_RANK)["inferred"],
+    1,
+    "CERTAINTY_RANK.inferred moved: the ladder now ranks a guess above a declared fact"
+  >
+>;
+
+export type CERTAINTY_PROOFS = readonly [_DeclaredIsBest, _InferredIsWorst];
+
+// ══════ Invariante 10 · la cadena que corta la recursión sigue siendo materia ══
+// `Context.ancestors` es lo único que corta la recursión de la delegación
+// (§{Dónde frena}). Es la MISMA familia que el invariante 8 —una marca nominal sobre
+// `string` en un campo que nadie reconstruye después— con un agravante que lo pone
+// en otra categoría: acá el campo no direcciona un dato, DECIDE SI EL PROCESO
+// TERMINA.
+//
+// Cambiarle la marca por otra de la familia (`ByteHash`, `ContentHash`) o
+// ensancharla a `string` compila, no rompe una línea, y la guarda de ciclo pasa a
+// comparar hashes de otra cosa. Y el paquete YA DECLARÓ que ahí no hay red: el #7 de
+// `adapter.ts` dice textualmente que «el invariante "la recursión termina"
+// (§{Invariantes}) no se sigue de las reglas escritas» y que separar los contadores
+// «le devuelve a la recursión una medida decreciente». Esa medida se apoya en que la
+// cadena sea de materia.
+//
+// Acreditado por M41. Sin él: NO ROMPÍA. La fila lleva un SEGUNDO cambio que
+// reexporta `MatterHash` en `adapter.ts`, porque la mutación natural deja el import
+// huérfano y `TS6133` mataría la corrida antes del testigo — la trampa de M33,
+// calcada.
+
+type _AncestorsAreMatter = True<
+  Covers<
+    Context["ancestors"][number],
+    MatterHash,
+    "Context.ancestors is no longer a chain of MatterHash — the cycle guard compares hashes of another family and the recursion has no decreasing measure"
+  >
+>;
+type _AncestorsInhabited = True<
+  Covers<
+    MatterHash,
+    Context["ancestors"][number],
+    "Context.ancestors collapsed to never — the chain still typechecks everywhere and can hold nothing, so the cycle guard never fires"
+  >
+>;
+
+export type RECURSION_PROOFS = readonly [_AncestorsAreMatter, _AncestorsInhabited];
+
+// ══════════ Invariante 11 · el orden de `EVIDENCE_SCALE` es el del plan ═══════
+// `Evidence` no lleva sus seis números escritos: los DERIVA del orden de este
+// arreglo, y el #429 de `adapter.ts` explica por qué eso es mejor que seis
+// constantes a mano — «elimina la posibilidad de que la escala y los valores
+// diverjan».
+//
+// Lo que esa decisión NO compra, y el docstring no decía: que el orden SIGA siendo
+// el del plan. Mover una fila cambia los seis números a la vez —`Signature` deja de
+// ser 4, `Floor` deja de ser 0— sin un solo error. Y `Floor = 0` no es decorativo:
+// el filtro del selector es `x.e > Evidence.None` y el criterio de `achievedLevel`
+// es `evidence > Floor`. Con la escala movida cambia QUIÉN GANA CADA ARCHIVO entre
+// los doce adaptadores y qué cae al piso de texto, en verde.
+//
+// Es la misma familia que `ROLES.length === 15`, `Coordinate['space']` y
+// `CERTAINTY_RANK`: un hecho del contrato atado para que cambiarlo sea un ACTO
+// VISIBLE.
+//
+// El literal es una TUPLA DE STRINGS, no un número: `scripts/numbers.mjs` no tiene
+// nada que contar acá, y el orden queda fijado sin escribir un solo `4` — que es
+// mejor que la solución obvia (asertar `Evidence.Signature === 4`), porque
+// `valueOfEvidence` devuelve `number` y esa aserción ni siquiera sería expresable a
+// nivel de tipo.
+//
+// Acreditado por M42, con MC7 como control: el orden que decide los seis números es
+// el del ARREGLO, no el del objeto que los expone. Un testigo que también se pusiera
+// rojo al reordenar las claves de `Evidence` estaría fijando prosa.
+
+type _EvidenceScaleOrder = True<
+  Covers<
+    typeof EVIDENCE_SCALE,
+    readonly ["None", "Floor", "Content", "Extension", "Structure", "Signature"],
+    "EVIDENCE_SCALE was reordered: the six values of Evidence are derived from this order (§{Evidencia}), so Signature is no longer 4 and Floor is no longer 0 — which adapter wins a file changed"
+  >
+>;
+
+export type EVIDENCE_PROOFS = readonly [_EvidenceScaleOrder];
+
+// ─────────────────────────────── Invariantes de runtime ──────────────────────
+
+/**
+ * Que la marca nodal exista en runtime es lo que vuelve exacta la pertenencia: sin
+ * ella el chequeo sería estructural y daría `true` para cualquier objeto que
+ * casualmente se parezca a un `Node`.
+ *
+ * HUECO CONOCIDO: es la única garantía de este archivo que NO tiene ni mutante ni
+ * guardián, porque no hay arnés de runtime para `outputs.ts` / `invariants.ts`.
+ * `geometry.mjs` demuestra que el patrón existe (compila a un temporal e importa
+ * `index.js`), así que lo que falta es un guardián nuevo —que nace en inglés por
+ * GLOSARIO.md, sección 6— y no una fila de mutante. Queda para el bloque 5.
+ */
+export const isNode = (v: object): v is Node => NODE_BRAND in v;
