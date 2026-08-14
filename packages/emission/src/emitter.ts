@@ -200,28 +200,41 @@ export const emit = (nodes: readonly Node[], sha256: HashFn): Emission => {
     // no puede fallar. Vuelve el día que el emisor EMITA los abrir/cerrar —el
     // streaming que §{2 · Emisor} promete—, porque ahí sí hay un observador que
     // distingue «no cambió nada» de «cerré y reabrí todo».
-    state.stack = [...routing.route];
+    //
+    // LA RUTA DEL NODO Y LA PILA DEJARON DE SER LO MISMO, Y ESE ES EL ARREGLO DEL
+    // PASO 3. La asignación era incondicional, así que un nodo que nombró a su padre
+    // MOVÍA el contexto de todos los que venían atrás: después de un ítem de lista,
+    // el primer bloque que abstiene colgaba del ítem, y un contenedor no tenía forma
+    // de terminar. Ahora la pila la mueve solo lo que salió de ella; la ruta del
+    // nodo —lo que sale a `localParent`, a las migas y al registro de ancestros— es
+    // `route`, siempre, venga de donde venga.
+    const route = routing.route;
+    if (routing.from === "stack") state.stack = [...route];
 
     const local = localOfNode(i);
     output.push({
       ...node,
       local,
-      localParent: parentOf(state.stack),
-      breadcrumbs: breadcrumbsOf(state.stack),
+      localParent: parentOf(route),
+      breadcrumbs: breadcrumbsOf(route),
       // La huella NO ve la ruta ni las migas. Es lo que hace que editar un título
       // no despegue la curación de su sección (§{Por qué esto funciona}).
       hash: asNodeFingerprint(fingerprintOf(node.body, sha256)),
     });
 
     const own: Scope = { kind: "node", local, breadcrumb: breadcrumbOf(node, local) };
-    const ancestor = { route: [...state.stack], scope: own };
+    const ancestor = { route: [...route], scope: own };
     if (node.hint !== null) {
       if (node.hint.linkage === "parent") state.byAdapterId.set(node.hint.id, ancestor);
       if (node.hint.linkage === "spatial") {
         state.boxes.push({ ...ancestor, box: node.hint.box });
       }
     }
-    if (routing.opens !== null) {
+    // `from === "stack"` no es una guarda redundante: es lo que el TIPO exige para
+    // que `opens` exista. Una ruta por referencia no tiene el campo, y por eso «abrir
+    // un scope sobre una pila que no se movió» es inexpresable y no hay que
+    // acordarse de no escribirlo.
+    if (routing.from === "stack" && routing.opens !== null) {
       state.levelOf.set(local, routing.opens.level);
       state.stack.push(own);
     }

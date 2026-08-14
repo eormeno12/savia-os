@@ -40,7 +40,11 @@
  * cerrar el bloque 3b (el 4 cerró con 42 · 26 · 16; la que entró es
  * `_FingerprintIsBranded`, con su mutante M47):
  *
- *   43 aserciones de tipo · 27 con mutante que las acredita · 16 sin
+ *   46 aserciones de tipo · 30 con mutante que las acredita · 16 sin
+ *
+ * El paso 3a sumó TRES, las tres acreditadas: `_LocalFragmentHasNoId` (M53),
+ * `_S7` (M54) y `_S8` (M55) — las salidas del tramo 5, PROVISIONAL(#75) en
+ * `outputs.ts`. Las 16 sin mutante no se movieron.
  *
  * El bloque 3c NO movió estas tres cifras y conviene decir por qué, para que la
  * ausencia de cambio no se lea como que no se miró: sus dos filas nuevas no acreditan
@@ -117,10 +121,14 @@ import type { fingerprintOf } from "./projection.js";
 import {
   NODE_BRAND,
   type Annotation,
+  type Fragment,
   type Ingestion,
+  type LocalDataRecord,
+  type LocalFragment,
   type Node,
   type NodeInVersion,
   type RawNode,
+  type StableDataRecord,
 } from "./outputs.js";
 import { EVIDENCE_SCALE, type Context, type Unit } from "./adapter.js";
 
@@ -222,7 +230,25 @@ type _RawNodeHasNoId = True<
   WithoutKey<RawNode, "id", "what is cached by hashBytes must not carry an id — see H13(a)">
 >;
 
-export type MINTING_PROOFS = readonly [_UnitHasNoId, _RawNodeHasNoId];
+// LA TERCERA ES DEL PASO 3a Y ES OTRA SALIDA, no otro productor. El tramo 5 tampoco
+// acuña identidad, y por un motivo que ninguna de las dos de arriba tiene:
+// `FragmentId` se DERIVA de `(DocumentId, contextualFingerprint)` (PROVISIONAL(#69))
+// y el tramo 5 no tiene documento — el `DocumentId` vive en `Ingestion`, un tramo más
+// arriba. O sea que un `id` acá no sería «un id de más»: sería un id IMPOSIBLE DE
+// CALCULAR, y el único modo de tenerlo sería inventarle otra derivación.
+//
+// El campo estuvo en `Fragment` hasta este paso y nada lo señalaba, porque nadie
+// había intentado producir un fragmento todavía. Ver PROVISIONAL(#75) en
+// `outputs.ts`.
+type _LocalFragmentHasNoId = True<
+  WithoutKey<LocalFragment, "id", "the tramo-5 fragment must not carry a FragmentId — it is derived from (DocumentId, contextualFingerprint) and neither exists yet">
+>;
+
+export type MINTING_PROOFS = readonly [
+  _UnitHasNoId,
+  _RawNodeHasNoId,
+  _LocalFragmentHasNoId,
+];
 
 // ══════════════════════════ Invariante 3 · la marca separa ═══════════════════
 // La familia de hashes estuvo escrita en DOS niveles (`Nominal<Sha256Hex, …>`) y
@@ -265,10 +291,13 @@ type Inhabited<
  * cuenta las dos cosas por separado, para que «ninguna usa el default» tampoco quede
  * sostenido por esta frase.
  *
- * CENSO(numbers.mjs): 10 llamadas a NotAssignableTo, 10 con mensaje propio
+ * CENSO(numbers.mjs): 12 llamadas a NotAssignableTo, 12 con mensaje propio
  *
- * Son `_S1`–`_S6`, `_GuardFires`, `_IllegalPairStaysIllegal`, `_FrameRequired` y
+ * Son `_S1`–`_S8`, `_GuardFires`, `_IllegalPairStaysIllegal`, `_FrameRequired` y
  * `_FingerprintIsBranded`. Los invariantes 10 y 11 usan `FitsIn` y no este operador.
+ * Las dos que entraron en el paso 3a son `_S7` y `_S8`, las dos referencias del
+ * tramo 5 (PROVISIONAL(#75) en `outputs.ts`). La cifra la sigue derivando el AST: si
+ * este párrafo se corrige a medias otra vez, `numbers.mjs` lo dice.
  *
  * LA CIFRA LA DERIVA EL AST DESDE ESTE BLOQUE, y hay motivo. Estuvo sostenida a mano
  * desde el bloque 4 y falló exactamente como falla una cifra a mano: se publicó
@@ -322,6 +351,23 @@ type _S5 = True<
 >;
 type _S6 = True<
   NotAssignableTo<ElementId, LocalId, "an ElementId is accepted as a LocalId — minted and adapter-local ids no longer separate">
+>;
+
+// LAS DOS DEL PASO 3a. `_S6` dice que los dos ESPACIOS DE ID no se confunden; estas
+// dicen que las dos SALIDAS DEL TRAMO 5 tampoco, que no se sigue de aquella: un tipo
+// genérico mal parametrizado —`type LocalFragment = Fragment<ElementId>`— deja `_S6`
+// intacta y colapsa igual los dos extremos del pipeline.
+//
+// Van sobre `Fragment<ElementId>` y no sobre `StableFragment`, y la diferencia es la
+// que separa acreditar de aparentar: `StableFragment` tiene DOS CAMPOS DE MÁS, así
+// que contra él la no-asignabilidad se cumple sola —por los campos ausentes— y
+// seguiría cumpliéndose con las dos referencias iguales. Contra `Fragment<ElementId>`
+// lo ÚNICO que las separa es `Ref`, que es lo que estas filas existen para fijar.
+type _S7 = True<
+  NotAssignableTo<LocalFragment, Fragment<ElementId>, "a tramo-5 fragment is accepted where a reconciled one is required — the two ref spaces of Fragment collapsed">
+>;
+type _S8 = True<
+  NotAssignableTo<LocalDataRecord, StableDataRecord, "a tramo-5 data record is accepted where a reconciled one is required — the two ref spaces of DataRecord collapsed">
 >;
 
 /**
@@ -390,7 +436,7 @@ type _FingerprintIsBranded = True<
 
 export type BRAND_PROOFS = readonly [
   _H1, _H2, _H3, _H4, _H5, _H6,
-  _S1, _S2, _S3, _S4, _S5, _S6,
+  _S1, _S2, _S3, _S4, _S5, _S6, _S7, _S8,
   _UsableAsString,
   _GuardFires,
   _FingerprintIsBranded,

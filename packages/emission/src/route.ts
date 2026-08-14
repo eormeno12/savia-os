@@ -126,6 +126,11 @@ export type State = {
    * LA PILA. «El árbol nunca existe como estructura: es la pila durante el
    * recorrido» (§{2 · Emisor}). Después de cada nodo vale la RUTA VIGENTE: lo que
    * hereda el que abstiene.
+   *
+   * «LO QUE HEREDA EL QUE ABSTIENE» ES LA DEFINICIÓN, y desde el paso 3 el emisor la
+   * respeta: solo la mueven las rutas que salieron DE ELLA (`Routing.from === "stack"`).
+   * Una ruta por referencia es el lugar de UN nodo, no un contexto: si la pila la
+   * siguiera, el párrafo que va después de una lista colgaría del último ítem.
    */
   stack: Scope[];
   /**
@@ -175,9 +180,35 @@ export type RouteFailure = {
   readonly parent: LocalId;
 };
 
+/**
+ * DE DÓNDE SALIÓ LA RUTA, que es lo que decide si pasa a ser LA RUTA VIGENTE.
+ *
+ * Las dos variantes son la implementación de una regla que el paso 2 no tenía que
+ * escribir y el 3 sí: **una ruta calculada desde la pila pasa a ser la pila; una
+ * calculada por referencia, no**. El que abstiene hereda «la pila vigente»
+ * (PROVISIONAL(#43) en `ir/src/classification.ts`), y una referencia es un salto
+ * PUNTUAL y NOMINADO —el nodo dijo de quién cuelga, o la geometría lo ubicó— que no
+ * dice nada sobre lo que viene después. Con la pila siguiendo el salto, el primer
+ * nodo que abstiene después de un ítem de lista cuelga DEL ÍTEM, y el contenedor no
+ * tiene forma de terminar: es el defecto que el paso 3 midió al intentar emitir el
+ * árbol de un `.md`.
+ *
+ * `opens` VIVE SOLO EN LA VARIANTE `stack`, y eso no es acomodo: lo único que abre
+ * scope por sí mismo es un título de vía `level`, que se calcula desde la pila. Con
+ * un solo registro y un campo opcional, «una ruta por referencia que además abre un
+ * scope» sería escribible y no significaría nada — la pila no se movió, así que no
+ * hay dónde apoyar lo que abre. En la unión NO SE PUEDE ESCRIBIR.
+ *
+ * `from` y no `kind` (GLOSARIO.md, F1): `kind` es el discriminante genérico —lo usan
+ * `Scope` y `RouteFailure` en este mismo archivo— y no dice nada; R11 fija
+ * `De/Desde → Of/From` para el conector que dice DE DÓNDE SALE ALGO, que es
+ * exactamente lo que este campo contesta.
+ */
 export type Routing =
   | {
       readonly ok: true;
+      /** La ruta se calculó DESDE LA PILA, así que pasa a ser la pila vigente. */
+      readonly from: "stack";
       readonly route: Route;
       /**
        * No-null ⟺ el nodo ABRE SU PROPIO SCOPE, y trae el nivel ya resuelto con
@@ -186,6 +217,15 @@ export type Routing =
        * `level`, y lo único que hace falta saber de él después es su nivel.
        */
       readonly opens: { readonly level: number } | null;
+    }
+  | {
+      readonly ok: true;
+      /**
+       * La ruta se calculó por REFERENCIA —el nodo nombró a su padre, o la
+       * geometría lo ubicó—. Es la ruta DE ESE NODO y no mueve la vigente.
+       */
+      readonly from: "reference";
+      readonly route: Route;
     }
   | { readonly ok: false; readonly failure: RouteFailure };
 
@@ -299,28 +339,54 @@ const bySpatial = (state: State, box: Box): Route => {
  * vigente, que es la que muestra el ejemplo canónico (§{1 · Ruta}: un párrafo con
  * pista «—» y ruta `[Contrato, Cláusula primera]`). `{linkage:'none'}` = «raíz», y
  * con ambos significando lo mismo el árbol de todo DOCX colapsa.
+ *
+ * DECISIÓN DEL PASO 3 — `{linkage:'parent', parent:null}` SIGNIFICA «HEREDO MI RUTA»,
+ * y ANTES significaba «raíz». El paso 3 midió que `Hint` no sabía decir «declaro mi
+ * id y heredo mi ruta», que es lo que un `<ul>` de markdown necesita: declarar un id
+ * (para que sus ítems cuelguen de él) Y quedar bajo su `##`. Las dos lecturas que
+ * existían fallaban — con `parent:null` la lista se iba a la raíz y arrastraba a
+ * todo lo que la seguía; con `hint:null` la lista no se despegaba pero sus ítems
+ * quedaban hermanos suyos, porque sin `linkage:'parent'` nadie se registra en
+ * `byAdapterId` (`emitter.ts`).
+ *
+ * Se eligió esto y no un tercer estado en `Hint.parent` (`undefined` = heredo) porque
+ * NO INVENTA VOCABULARIO: «raíz» ya se dice, y se dice con `{linkage:'none'}`, que
+ * existe desde el bloque 1 y significa exactamente eso. Cero tipos nuevos en `ir`, y
+ * un valor menos con dos significados.
+ *
+ * LO QUE LA DECISIÓN CUESTA, dicho de frente: `ir` NO documenta qué significa
+ * `Hint.parent === null` —lo dejaba a quien caminara la pista, y el que caminaba era
+ * este archivo—, así que el significado vive acá y no en el contrato. Un segundo
+ * consumidor de `Hint` puede volver a leerlo como «raíz». Cerrarlo es una línea de
+ * docstring en `ir/src/classification.ts` y va declarado como pendiente, no hecho de
+ * costado: el paso 3a solo abre `ir` por el desajuste `ElementId`/`Ref`.
  */
 export const routeOf = (state: State, hint: Hint | null): Routing => {
-  if (hint === null) return { ok: true, route: [...state.stack], opens: null };
+  if (hint === null) return { ok: true, from: "stack", route: [...state.stack], opens: null };
   switch (hint.linkage) {
     case "none":
-      return { ok: true, route: root(state), opens: null };
+      return { ok: true, from: "stack", route: root(state), opens: null };
     case "level": {
       const { route, level } = byLevel(state, hint.level);
-      return { ok: true, route, opens: { level } };
+      return { ok: true, from: "stack", route, opens: { level } };
     }
     case "cell":
-      return { ok: true, route: byCell(state, hint), opens: null };
+      return { ok: true, from: "reference", route: byCell(state, hint) };
     case "parent": {
-      if (hint.parent === null) return { ok: true, route: root(state), opens: null };
+      // «Heredo mi ruta». No abre scope en la pila y no hace falta: sus hijos lo
+      // encuentran por `byAdapterId`, o sea POR NOMBRE, y por eso el contenedor sabe
+      // terminar — el primero que no lo nombra ya está afuera.
+      if (hint.parent === null) {
+        return { ok: true, from: "stack", route: [...state.stack], opens: null };
+      }
       const parent = state.byAdapterId.get(hint.parent);
       if (parent === undefined) {
         return { ok: false, failure: { kind: "parent-not-emitted", parent: hint.parent } };
       }
-      return { ok: true, route: fromAncestor(parent), opens: null };
+      return { ok: true, from: "reference", route: fromAncestor(parent) };
     }
     case "spatial":
-      return { ok: true, route: bySpatial(state, hint.box), opens: null };
+      return { ok: true, from: "reference", route: bySpatial(state, hint.box) };
   }
 };
 

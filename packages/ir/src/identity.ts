@@ -95,7 +95,14 @@ export type Nominal<Base, Label extends string> = [Base] extends [Branded]
  * `depth`, `siblingIndex` y `ordinal`. La tabla de nodos sí lleva su columna
  * `documento` (borrado en cascada, filtro por tenant, particionado); las
  * referencias no la repiten. Los tipos ya lo asumían: `Fragment.nodes` y
- * `DataRecord.node` son `ElementId` a secas.
+ * `DataRecord.node` llevan la referencia PELADA, sin documento adosado.
+ *
+ * CORREGIDO EN EL PASO 3a: este párrafo decía «son `ElementId` a secas», y desde
+ * PROVISIONAL(#75) los dos tipos están parametrizados por `Ref` — `StableFragment` y
+ * `StableDataRecord` son los que llevan `ElementId`; el tramo 5 produce las variantes
+ * `Local*`, porque corre antes del reconciliador. El hecho de fondo —que la
+ * referencia NO arrastra su documento— no cambió, que es lo que este párrafo
+ * argumenta.
  *
  * H13(c) — UN ID ES ESTABLE DESDE QUE SE PERSISTE. La idempotencia del emisor no
  * la da el acuñado: la da el reconciliador. Volver a emitir no acuña ids frescos —
@@ -179,8 +186,11 @@ export type ObjectKey = Nominal<string, "ObjectKey">;
 
 /**
  * Identificador de un fragmento, para deduplicar resultados de búsqueda
- * (§{Tramo 7} dedupica por `fragmentoId` y `Fragment` no tiene ese campo —
- * auditoría #69).
+ * (§{Tramo 7} dedupica por `fragmentoId` y el `Fragment` del plan no tiene ese campo
+ * — auditoría #69). Desde el paso 3a vive en `StableFragment` y NO en `Fragment`: lo
+ * que el tramo 5 produce todavía no lo puede derivar, porque el par del que sale
+ * —`(DocumentId, contextualFingerprint)`— no existe hasta un tramo más arriba. Ver
+ * PROVISIONAL(#75) en `outputs.ts`.
  *
  * PROVISIONAL(#69): se deriva de `(DocumentId, contextualFingerprint)` — Si fuera
  * el hash a secas, dos fragmentos idénticos de documentos distintos serían el mismo

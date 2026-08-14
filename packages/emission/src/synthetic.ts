@@ -39,10 +39,12 @@ import {
   type Authorship,
   type Body,
   type Box,
+  type Coordinate,
   type DelegationId,
   type Hint,
   type Location,
   type Node,
+  type RecognitionLevel,
   type Role,
 } from "@savia-os/ir";
 
@@ -232,6 +234,56 @@ const CONTAINER: Case = {
   trace: [null, "lista", "lista", "Segundo", "sublista"],
 };
 
+const STEPS = asLocalId("mdast:list:steps");
+
+/**
+ * UN CONTENEDOR BAJO UNA SECCIÓN: hereda, abre y CIERRA. Nace en el paso 3, del
+ * único bloqueante que el plan encontró midiendo: `Hint` no sabía decir «declaro mi
+ * id y heredo mi ruta», que es lo que un `<ul>` de markdown necesita.
+ *
+ * Las tres cosas que este caso observa, y ningún caso del paso 2 observaba:
+ *
+ *   1. `{linkage:'parent', parent:null}` HEREDA. La lista cuelga de su `#`, no de la
+ *      raíz. Antes del paso 3 significaba «raíz», y con eso la lista se despegaba de
+ *      su sección.
+ *   2. …y ABRE para sus hijos. Los ítems cuelgan de la lista, que no está en la pila:
+ *      la encuentran por `byAdapterId`, o sea POR NOMBRE.
+ *   3. …y CIERRA. El párrafo que sigue a los ítems ABSTIENE, y cuelga de la sección,
+ *      no del último ítem. Es el precio que la vía `level` cobraba —un contenedor que
+ *      solo terminaba cuando llegaba otro título— y acá no se paga: una ruta por
+ *      referencia no mueve la pila vigente.
+ *
+ * Y el último nodo dice «raíz» con `{linkage:'none'}`, que es donde quedó a vivir ese
+ * significado: el caso es también la comprobación de que las dos cosas se pueden
+ * decir por separado.
+ */
+const CONTAINED: Case = {
+  name: "un contenedor bajo una sección (hereda, abre y cierra)",
+  why: "si el contenedor no hereda se despega de su sección, y si no cierra, todo lo que sigue a una lista cuelga del último ítem hasta el próximo título",
+  nodes: [
+    heading("Guía de instalación", 1),
+    node(
+      "pasos",
+      "list",
+      { shape: "container", ordered: false, schema: null },
+      { linkage: "parent", id: STEPS, parent: null },
+    ),
+    paragraph("Descargar el paquete", {
+      linkage: "parent",
+      id: asLocalId("mdast:item:s1"),
+      parent: STEPS,
+    }),
+    paragraph("Ejecutar el instalador", {
+      linkage: "parent",
+      id: asLocalId("mdast:item:s2"),
+      parent: STEPS,
+    }),
+    paragraph("El instalador pide permisos de administrador."),
+    paragraph("Pie del documento.", { linkage: "none" }),
+  ],
+  trace: [null, "Guía de instalación", "pasos", "pasos", "Guía de instalación", null],
+};
+
 const D1 = asDelegationId("delegacion:1");
 
 /**
@@ -309,16 +361,24 @@ const CELLS: Case = {
 /**
  * Vía `spatial`: «la contención ES una relación de padre, solo que calculada con
  * geometría en vez de leída» (§{1 · Ruta}).
+ *
+ * EL CUARTO NODO ABSTIENE, Y ES DEL PASO 3. `spatial` es una ruta POR REFERENCIA
+ * —la geometría ubicó a ESE nodo— y por lo tanto no mueve la pila vigente. Sin un
+ * nodo que abstenga después, la afirmación no se ejerce nunca: los tres primeros
+ * traen su propia caja, así que da igual qué haya en la pila y la clasificación de
+ * la vía pasaba EN VERDE con las dos respuestas. Con el cuarto puesto, el mutante
+ * que la cambia se pone rojo.
  */
 const SPATIAL: Case = {
   name: "vía spatial (contención geométrica)",
-  why: "si `spatial` no reusara el caminador de `parent`, habría dos semánticas de árbol",
+  why: "si `spatial` no reusara el caminador de `parent`, habría dos semánticas de árbol; y si moviera la pila, lo que abstiene después quedaría dentro del último recuadro",
   nodes: [
     paragraph("Marco entero", { linkage: "spatial", box: box(0, 0, 1000, 1000) }),
     paragraph("Recuadro", { linkage: "spatial", box: box(100, 100, 400, 400) }),
     paragraph("Sello dentro del recuadro", { linkage: "spatial", box: box(150, 150, 100, 100) }),
+    paragraph("Nota al margen, sin caja."),
   ],
-  trace: [null, "Marco entero", "Recuadro"],
+  trace: [null, "Marco entero", "Recuadro", null],
 };
 
 /**
@@ -388,6 +448,7 @@ export const CASES: readonly Case[] = [
   NESTED,
   LEVEL_JUMP,
   CONTAINER,
+  CONTAINED,
   DELEGATED,
   CELLS,
   SPATIAL,
@@ -412,4 +473,287 @@ export const DANGLING_PARENT: readonly Node[] = [
     id: asLocalId("mdast:item:9"),
     parent: asLocalId("mdast:list:inexistente"),
   }),
+];
+
+// ══════════════════════════ Los casos de AGRUPACIÓN (paso 3a) ════════════════
+//
+// Mismo argumento que arriba, un tramo más adelante: nodos a mano, CERO adaptadores.
+// El paso 2 probó que el EMISOR no necesita un adaptador para escribirse; estos casos
+// lo prueban de la AGRUPACIÓN, que es el otro consumidor de `cohesionOf`. Si para
+// ejercitar el tramo 5 hubiera hecho falta un `.md`, el borde R1 no sería real.
+//
+// VIVEN EN ESTE ARCHIVO Y NO EN UNO PROPIO, contra lo que el plan del paso 3
+// presupuestaba (`synthetic-rows.ts`). La razón es la de B2 en el GLOSARIO: lo que
+// estos casos tienen de valioso es DE DÓNDE SALEN, y eso es lo que nombra
+// `synthetic`. Un segundo archivo con la misma tesis parte el archivo por TRAMO, que
+// es la única cosa que estos casos no distinguen — y agrega una pieza.
+//
+// Y CUBREN LA MITAD σ, que ningún adaptador del paso 3 alcanza: una tabla de markdown
+// es la tabla chica (`grain: "whole"`) y NO emite registros, así que sin nodos-fila
+// escritos a mano «un recorrido, DOS salidas» quedaría acreditado a medias.
+
+/**
+ * Un caso de agrupación: los nodos, y las DOS salidas esperadas escritas a mano.
+ *
+ * `fragments` y `records` son el GOLDEN, y son de la misma especie que `Case.trace`:
+ * lo único que este paquete compara contra algo EXTERNO al código. Van acá y no en un
+ * archivo de snapshot a propósito — un snapshot se regenera con una tecla, y eso es
+ * exactamente el modo de falla que `M18` existe para impedir. Escrito en `src/` y
+ * tipado, editarlo para que el test pase es un acto visible en el diff, y tiene su
+ * propio mutante.
+ */
+export type GroupingCase = {
+  readonly name: string;
+  /** Qué se rompería si el tramo 5 lo tratara mal. */
+  readonly why: string;
+  readonly nodes: readonly Node[];
+  /**
+   * El tamaño objetivo con el que se agrupa ESTE caso.
+   *
+   * ES UN PARÁMETRO DEL BANCO, NO DEL PRODUCTO, y va dicho para que nadie lo lea
+   * como una medición: `PARAMETERS.grouping.targetSizeChars` sigue en `null` porque
+   * el plan lo declara medible («evaluación de recuperación sobre corpus real») y
+   * este paso no lo midió. Los valores de abajo están elegidos para que el corte
+   * ocurra —o no ocurra— sobre un caso de seis líneas.
+   */
+  readonly targetSizeChars: number;
+  /** El `text` esperado de cada fragmento, en orden de lectura. */
+  readonly fragments: readonly string[];
+  /** Las claves esperadas de cada registro, en orden. Ver `fieldKey` en `ir`. */
+  readonly records: readonly (readonly string[])[];
+};
+
+const withLevel = (t: string, level: RecognitionLevel, confidence: number | null): Node =>
+  asNode({
+    role: "paragraph",
+    body: prose(t),
+    location: location(t),
+    hint: null,
+    delegation: [],
+    attribution: null,
+    level,
+    confidence,
+    authorship: AUTHORSHIP,
+  });
+
+/**
+ * Dos secciones seguidas, y un título final que no alcanzó a contextualizar nada.
+ *
+ * Las tres cosas que fija: un `lead` CIERRA el fragmento en curso (si no, el
+ * fragmento cruza la frontera de sección y se archiva bajo la equivocada); un `lead`
+ * NO arranca un fragmento con su texto (si no, el título se embebe dos veces, una en
+ * el cuerpo y otra en la miga); y el título que no contextualizó nada NO se evapora.
+ */
+const TWO_SECTIONS: GroupingCase = {
+  name: "dos secciones y un título que no contextualizó nada",
+  why: "sin el cierre, el filtro por sección del tramo 7 devuelve texto de otra sección y el error es MUDO; sin el fragmento propio, el último título desaparece del índice en silencio",
+  nodes: [
+    heading("Cláusula primera", 1),
+    paragraph("El proveedor entrega el equipo."),
+    paragraph("El pago es a treinta días."),
+    heading("Cláusula segunda", 1),
+    paragraph("La confidencialidad dura dos años."),
+    heading("Anexo", 1),
+  ],
+  targetSizeChars: 200,
+  fragments: [
+    "El proveedor entrega el equipo.\nEl pago es a treinta días.",
+    "La confidencialidad dura dos años.",
+    "Anexo",
+  ],
+  records: [],
+};
+
+/**
+ * El bloque de código: el argumento del «vector turbio», en sus dos direcciones.
+ *
+ * `code` es `solo` por la tabla de `ir`, y `solo` tiene que cortar HACIA ATRÁS —no se
+ * pega al párrafo que lo precede— y HACIA ADELANTE —el párrafo que lo sigue no se le
+ * pega a él—. Las dos mitades se rompen por separado y por eso hacen falta los tres
+ * nodos: con dos, cerrar al ABRIR no dice nada sobre qué pasa DESPUÉS de cerrar.
+ */
+const CODE_BLOCK: GroupingCase = {
+  name: "el bloque de código no se mezcla con sus vecinos",
+  why: "un bloque de código con el párrafo que lo precede no representa bien a ninguno de los dos, y el vector queda turbio para los dos",
+  nodes: [
+    heading("Instalación", 1),
+    paragraph("Corré el comando:"),
+    node("cmd", "code", { shape: "verbatim", text: "pnpm install", language: "bash" }, null),
+    paragraph("Y listo."),
+  ],
+  targetSizeChars: 200,
+  fragments: ["Corré el comando:", "pnpm install", "Y listo."],
+  records: [],
+};
+
+/**
+ * La imagen y su epígrafe: el ÚNICO par que exige `solo` y `satellite` a la vez, y
+ * el caso canónico de PROVISIONAL(C16) en `ir`.
+ *
+ * La imagen es `asset`, así que `render` da `null` y su fragmento arranca SIN texto
+ * (PROVISIONAL(#53)): el nodo entra igual, y el epígrafe le pone el texto. Si el
+ * satélite no se pegara, quedarían dos fragmentos —uno vacío con la imagen y otro de
+ * una línea con el epígrafe— y ninguno de los dos sirve para recuperar nada.
+ */
+const CAPTIONED_IMAGE: GroupingCase = {
+  name: "la imagen y su epígrafe son una unidad",
+  why: "«un epígrafe termina siendo un fragmento de una línea sin su imagen» es exactamente lo que PROVISIONAL(C16) de `ir` decide evitar",
+  nodes: [
+    heading("Anexo fotográfico", 1),
+    node(
+      "foto",
+      "image",
+      {
+        shape: "asset",
+        ref: { object: asObjectKey("sha256:bbb"), window: { scope: "whole" } },
+        mime: "image/png",
+        deferred: [],
+      },
+      null,
+    ),
+    node("epigrafe", "caption", prose("Figura 1 — el tablero."), null),
+    paragraph("El tablero se instaló en marzo."),
+  ],
+  targetSizeChars: 200,
+  fragments: ["Figura 1 — el tablero.", "El tablero se instaló en marzo."],
+  records: [],
+};
+
+/**
+ * El corte por tamaño, y el ÚNICO caso que solo ve el golden.
+ *
+ * No lleva invariante propio a propósito: `targetSizeChars` es `Pending` en
+ * `params.ts` («se mide: evaluación de recuperación sobre corpus real»), así que
+ * escribir un invariante sobre el número sería inventar la medición que el plan
+ * declara pendiente. Lo que el golden fija es que el número DECIDE algo.
+ */
+const SIZE_CUT: GroupingCase = {
+  name: "el tamaño objetivo decide dónde corta un `normal`",
+  why: "el número de fragmentos es el que fija toda huella de fragmento y toda clave de caché de embeddings: si el objetivo dejara de decidir, el documento entero sería un solo vector",
+  nodes: [
+    heading("Notas", 1),
+    paragraph("Uno."),
+    paragraph("Dos."),
+    paragraph("Tres."),
+  ],
+  targetSizeChars: 8,
+  fragments: ["Uno.\nDos.", "Tres."],
+  records: [],
+};
+
+/**
+ * Un fragmento que agrupa un nodo declarativo y uno perceptual.
+ *
+ * Es el único caso donde los dos campos que `ir` justifica en el #74 se EJERCEN:
+ * `minLevel` tiene que ser el PEOR por `rank()` —el máximo, aunque el campo se llame
+ * `min`— y `confidence` tiene que distinguir «no reportó» de «reportó bajo». Sin un
+ * nodo que reporte confianza y otro que no, `hasNull` es constante y su mutación pasa
+ * en verde.
+ */
+const MIXED_LEVELS: GroupingCase = {
+  name: "niveles y confianzas mezclados en un fragmento",
+  why: "«la certeza viaja con el nodo, sobrevive a la fragmentación y llega hasta la skill» (§{La escalera}) no tiene mecanismo si el fragmento comprime mal",
+  nodes: [
+    heading("Escaneo", 1),
+    withLevel("Leído del formato.", "declarative", null),
+    withLevel("Adivinado por un modelo.", "perceptual", 0.42),
+  ],
+  targetSizeChars: 200,
+  fragments: ["Leído del formato.\nAdivinado por un modelo."],
+  records: [],
+};
+
+// ─────────────────────────────── La mitad σ ──────────────────────────────────
+
+const REGION = asLocalId("region#A");
+
+const at = (row: number): Coordinate => ({
+  space: "grid",
+  sheet: "Hoja1",
+  region: "A",
+  row,
+  column: null,
+});
+
+/** El container lleva EL ESQUEMA; las filas no. Ver §{Las filas}. */
+const region = (schema: readonly string[]): Node =>
+  asNode({
+    role: "list",
+    body: { shape: "container", ordered: false, schema },
+    location: {
+      adapter: asAdapterId("sintetico"),
+      anchor: "region#A",
+      coordinate: at(1),
+      within: [],
+    },
+    hint: { linkage: "parent", id: REGION, parent: null },
+    delegation: [],
+    attribution: null,
+    level: "declarative",
+    confidence: null,
+    authorship: AUTHORSHIP,
+  });
+
+/** Un nodo-FILA: `grid` con `headers: null`, exactamente una fila y `grain: "row"`. */
+const rowNode = (row: number, texts: readonly string[]): Node =>
+  asNode({
+    role: "table",
+    body: {
+      shape: "grid",
+      headers: null,
+      rows: [texts.map((text) => ({ text, type: null }))],
+      grain: "row",
+    },
+    location: {
+      adapter: asAdapterId("sintetico"),
+      anchor: `row#${row}`,
+      coordinate: at(row),
+      within: [],
+    },
+    hint: { linkage: "parent", id: asLocalId(`row#${row}`), parent: REGION },
+    delegation: [],
+    attribution: null,
+    level: "declarative",
+    confidence: null,
+    authorship: AUTHORSHIP,
+  });
+
+/**
+ * Una región de planilla: la mitad σ del split π/σ, y la única salida EXACTA.
+ *
+ * El esquema vive en el CONTAINER y no en la fila: «si cada fila cargara sus
+ * etiquetas, renombrar una columna cambiaría el hash de las 50 000 y destruiría todas
+ * las anclas» (§{Las filas}). La contrapartida declarada es que la composición del
+ * fragmento va a BUSCARLO — por eso cada fila se renderiza con su línea de
+ * encabezado.
+ *
+ * La tercera columna del esquema está VACÍA y la cuarta REPITE a la primera: es
+ * exactamente lo que `fieldKey` existe para resolver, y una planilla real las tiene.
+ */
+const SPREADSHEET: GroupingCase = {
+  name: "región de planilla · dos filas",
+  why: "las filas son nodos y el esquema vive en el container; sin registros, la mitad σ del split π/σ no existe y la planilla solo se puede buscar por similitud",
+  nodes: [
+    region(["proveedor", "cuit", "", "proveedor"]),
+    rowNode(2, ["Acme", "30-1", "x", "Acme SA"]),
+    rowNode(3, ["Beta", "30-2", "y", "Beta SRL"]),
+  ],
+  targetSizeChars: 200,
+  fragments: [
+    "proveedor\tcuit\t\tproveedor\nAcme\t30-1\tx\tAcme SA\n" +
+      "proveedor\tcuit\t\tproveedor\nBeta\t30-2\ty\tBeta SRL",
+  ],
+  records: [
+    ["proveedor", "cuit", "col_2", "proveedor__3"],
+    ["proveedor", "cuit", "col_2", "proveedor__3"],
+  ],
+};
+
+export const GROUPING_CASES: readonly GroupingCase[] = [
+  TWO_SECTIONS,
+  CODE_BLOCK,
+  CAPTIONED_IMAGE,
+  SIZE_CUT,
+  MIXED_LEVELS,
+  SPREADSHEET,
 ];

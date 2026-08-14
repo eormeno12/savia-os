@@ -508,7 +508,7 @@ const MUTANTES = [
     id: "M50",
     garantía: "la cifra de llamadas a NotAssignableTo no se puede desincronizar del AST",
     cambios: [[
-      ` * CENSO(numbers.mjs): 10 llamadas a NotAssignableTo, 10 con mensaje propio`,
+      ` * CENSO(numbers.mjs): 12 llamadas a NotAssignableTo, 12 con mensaje propio`,
       ` * CENSO(numbers.mjs): 9 llamadas a NotAssignableTo, 9 con mensaje propio`,
     ]],
     espera: /the NotAssignableTo census published by invariants\.ts does not match/,
@@ -537,6 +537,43 @@ const MUTANTES = [
     ]],
     espera: /`build` chains the mutation runner/,
     nota: "equivalente de I11b de `packages/emission`. No es una excepción a M51: es la otra mitad. `mutants.mjs` muta los archivos del árbol EN EL LUGAR y `turbo` agenda `lint` y `build` del mismo paquete en paralelo, así que el segundo captura como «original» un archivo que el primero ya mutó. No es hipotético y le pasó a ESTE paquete: dejó ocho archivos de `packages/ir/src` con mutaciones pegadas. `emission` tenía el chequeo desde su bloque 5 y `ir`, que fue el que se lo comió, no",
+  },
+
+  // ── Paso 3a · las dos salidas del tramo 5 (PROVISIONAL(#75)) ───────────────
+  //
+  // Las tres acreditan el mismo hallazgo por sus tres mitades: `Fragment` y
+  // `DataRecord` referenciaban `ElementId`, que no existe hasta la reconciliación, y
+  // `Fragment` llevaba además un `id` que el tramo 5 no puede derivar. Se
+  // parametrizaron por `Ref`, como ya estaba hecho para las migas.
+  {
+    id: "M53",
+    garantía: "el fragmento del tramo 5 no puede llevar un `FragmentId` (H13(a), tercera salida)",
+    cambios: [[
+      `export type Fragment<Ref> = {\n  /** LIMPIO — las migas no van adentro`,
+      `export type Fragment<Ref> = {\n  readonly id: FragmentId;\n  /** LIMPIO — las migas no van adentro`,
+    ]],
+    espera: /the tramo-5 fragment must not carry a FragmentId/,
+    nota: "es el campo TAL COMO ESTABA hasta el paso 3a, restituido: `Fragment` declaraba `id: FragmentId` y nadie lo señalaba porque nadie había intentado producir un fragmento todavía. No es M40 sobre otro tipo: el motivo es distinto y más fuerte —`FragmentId` se DERIVA de `(DocumentId, contextualFingerprint)` y el tramo 5 no tiene documento, así que el id no es de más, es incalculable—. Se muta a `FragmentId` y no a `string` porque acá el tipo SÍ está importado en `outputs.ts` (la lección de M40 al revés). Sin el testigo: NO ROMPÍA",
+  },
+  {
+    id: "M54",
+    garantía: "las dos referencias de `Fragment` no se confunden",
+    cambios: [[
+      `export type LocalFragment = Fragment<LocalId>;`,
+      `export type LocalFragment = Fragment<ElementId>;`,
+    ]],
+    espera: /the two ref spaces of Fragment collapsed/,
+    nota: "es el defecto que un tipo genérico HACE POSIBLE y que el tipo plano no tenía: parametrizar mal el alias colapsa los dos extremos del pipeline sin tocar `ElementId` ni `LocalId`, así que `_S6` —la fila que separa los dos espacios de id— sigue EN VERDE. Por eso `_S7` existe y no alcanza con la de identidad",
+  },
+  {
+    id: "M55",
+    garantía: "…y las de `DataRecord` tampoco — son la otra salida del MISMO recorrido",
+    cambios: [[
+      `export type LocalDataRecord = DataRecord<LocalId>;`,
+      `export type LocalDataRecord = DataRecord<ElementId>;`,
+    ]],
+    espera: /the two ref spaces of DataRecord collapsed/,
+    nota: "el par de M54, y hace falta porque son DOS tipos parametrizados por separado: acertarle a uno no dice nada del otro, y «un recorrido, dos salidas» (§{Las dos salidas}) es exactamente la promesa de que las dos viajan juntas",
   },
 
   // ── Controles ──────────────────────────────────────────────────────────────

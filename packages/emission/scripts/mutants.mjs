@@ -76,11 +76,14 @@ const MUTANTES = [
     id: "M2",
     garantía: "I2 — un `localParent` que apunta hacia ADELANTE no pasa",
     cambios: [[
-      `      localParent: parentOf(state.stack),`,
-      `      localParent: parentOf(state.stack) === null ? null : localOfNode(i + ONE),`,
+      `      localParent: parentOf(route),`,
+      `      localParent: parentOf(route) === null ? null : localOfNode(i + ONE),`,
     ]],
     espera: /I2 · padre emitido antes/,
     nota:
+      "REANCLADA EN EL PASO 3, y la razón es el hallazgo del paso: `state.stack` y la ruta del nodo " +
+      "dejaron de ser lo mismo. La mutación es la de siempre —el padre apunta hacia adelante— sobre " +
+      "el argumento que hoy lleva la ruta. " +
       "ACREDITACIÓN POR CASUALIDAD, ENCONTRADA Y CERRADA. La primera versión reemplazaba la " +
       "llamada entera por `localOfNode(i + ONE)` y el mutante SÍ se ponía rojo — con " +
       "«TS6133: 'parentOf' is declared but its value is never read». O sea que la fila la " +
@@ -149,11 +152,13 @@ const MUTANTES = [
     id: "M8",
     garantía: "I8 — las migas CRUZAN la frontera de delegación",
     cambios: [[
-      `      breadcrumbs: breadcrumbsOf(state.stack),`,
-      `      breadcrumbs: breadcrumbsOf(state.stack.slice(state.floor)),`,
+      `      breadcrumbs: breadcrumbsOf(route),`,
+      `      breadcrumbs: breadcrumbsOf(route.slice(state.floor)),`,
     ]],
     espera: /migas a través de la frontera de delegación/,
     nota:
+      "REANCLADA EN EL PASO 3 por la misma razón que M2: las migas se derivan de la RUTA DEL NODO y " +
+      "no de la pila, que desde el paso 3 pueden diferir. La mutación no cambió: " +
       "es la mutación «el subárbol delegado empieza sus migas en su propia raíz», que suena " +
       "razonable y rompe la cita encadenada contrato → página → imagen: el acta escaneada dejaría " +
       "de saber de qué contrato salió",
@@ -236,8 +241,8 @@ const MUTANTES = [
     id: "M16",
     garantía: "la abstención (`hint === null`) NO es `{linkage:'none'}` — PROVISIONAL(#43)",
     cambios: [[
-      `  if (hint === null) return { ok: true, route: [...state.stack], opens: null };`,
-      `  if (hint === null) return { ok: true, route: root(state), opens: null };`,
+      `  if (hint === null) return { ok: true, from: "stack", route: [...state.stack], opens: null };`,
+      `  if (hint === null) return { ok: true, from: "stack", route: root(state), opens: null };`,
     ]],
     espera: /I7 · el árbol esperado — títulos anidados/,
     nota:
@@ -250,8 +255,8 @@ const MUTANTES = [
     id: "M17",
     garantía: "…y al revés: `{linkage:'none'}` tampoco es la abstención",
     cambios: [[
-      `    case "none":\n      return { ok: true, route: root(state), opens: null };`,
-      `    case "none":\n      return { ok: true, route: [...state.stack], opens: null };`,
+      `    case "none":\n      return { ok: true, from: "stack", route: root(state), opens: null };`,
+      `    case "none":\n      return { ok: true, from: "stack", route: [...state.stack], opens: null };`,
     ]],
     espera: /I7 · el árbol esperado — un subárbol delegado/,
     nota:
@@ -359,7 +364,7 @@ const MUTANTES = [
     garantía: "I10 — una referencia rota no degrada a raíz",
     cambios: [[
       `        return { ok: false, failure: { kind: "parent-not-emitted", parent: hint.parent } };`,
-      `        return { ok: true, route: root(state), opens: null };`,
+      `        return { ok: true, from: "stack", route: root(state), opens: null };`,
     ]],
     espera: /I10 · el padre colgante falla con un objeto de error/,
     nota:
@@ -429,8 +434,8 @@ const MUTANTES = [
     id: "M29",
     garantía: "I11 — sacar un guardián de `lint` no pasa",
     cambios: [[
-      `    "lint": "tsc --noEmit && node scripts/invariants.mjs && node scripts/citations.mjs && node scripts/mutants.mjs",`,
-      `    "lint": "tsc --noEmit && node scripts/invariants.mjs && node scripts/mutants.mjs",`,
+      `&& node scripts/invariants.mjs && node scripts/citations.mjs && node scripts/mutants.mjs",`,
+      `&& node scripts/invariants.mjs && node scripts/mutants.mjs",`,
     ]],
     espera: /I11a · ningún guardián queda fuera de `lint`/,
     nota:
@@ -444,8 +449,8 @@ const MUTANTES = [
     id: "M30",
     garantía: "I11b — `build` NO puede encadenar el corredor de mutación",
     cambios: [[
-      `    "build": "tsc --noEmit && node scripts/invariants.mjs && node scripts/citations.mjs"`,
-      `    "build": "tsc --noEmit && node scripts/invariants.mjs && node scripts/citations.mjs && node scripts/mutants.mjs"`,
+      `&& node scripts/invariants.mjs && node scripts/citations.mjs"`,
+      `&& node scripts/invariants.mjs && node scripts/citations.mjs && node scripts/mutants.mjs"`,
     ]],
     espera: /I11b · `build` no puede encadenar/,
     nota:
@@ -455,6 +460,377 @@ const MUTANTES = [
       "segundo captura como «original» un archivo que el primero ya mutó. Pasó de verdad — dejó " +
       "ocho archivos de `packages/ir/src` con mutaciones pegadas. La regla de fondo es más simple " +
       "que la carrera: un build no muta su fuente",
+  },
+
+  // ── El contenedor: hereda, abre y cierra (paso 3) ──────────────────────────
+  //
+  // Las cinco filas de este bloque acreditan la decisión del paso 3: `parent: null`
+  // pasa a significar «heredo mi ruta» y «raíz» se dice con `{linkage:'none'}`. Son
+  // cinco y no una porque las cinco mitades se rompen POR SEPARADO — heredar, abrir,
+  // cerrar, que la pila sí se mueva cuando corresponde, y que la clasificación de
+  // cada vía sea la que es.
+  {
+    id: "M31",
+    garantía: "`{linkage:'parent', parent:null}` HEREDA la ruta vigente; ya no es «raíz»",
+    cambios: [[
+      `      if (hint.parent === null) {\n        return { ok: true, from: "stack", route: [...state.stack], opens: null };\n      }`,
+      `      if (hint.parent === null) {\n        return { ok: true, from: "stack", route: root(state), opens: null };\n      }`,
+    ]],
+    espera: /I7 · el árbol esperado — un contenedor bajo una sección/,
+    nota:
+      "es la lectura que el paso 3 midió y descartó: con `parent:null` = raíz, la lista de un `.md` " +
+      "se despega de su `##` y arrastra a todo lo que la sigue. El caso `un contenedor bajo una " +
+      "sección` nació de acá y de ninguna otra fila: ningún caso del paso 2 tenía un container con " +
+      "algo abierto por encima, así que la mutación pasaba EN VERDE contra los diez",
+  },
+  {
+    id: "M32",
+    garantía: "una ruta POR REFERENCIA no mueve la pila vigente — el contenedor CIERRA",
+    cambios: [[
+      `    if (routing.from === "stack") state.stack = [...route];`,
+      `    state.stack = [...route];`,
+    ]],
+    espera: /I7 · el árbol esperado — un contenedor bajo una sección/,
+    nota:
+      "ES EL CÓDIGO DEL PASO 2 TAL COMO ESTABA: la asignación era incondicional. La mutación " +
+      "restituye el defecto que el paso 3 encontró — después de un ítem de lista, el primer bloque " +
+      "que abstiene cuelga DEL ÍTEM, y un contenedor no tiene forma de terminar. El caso `un " +
+      "container (y uno anidado)` del paso 2 NO la ve: sus cinco nodos nombran a su padre, así que " +
+      "nadie hereda nada y la pila da igual",
+  },
+  {
+    id: "M33",
+    garantía: "el contenedor ABRE para sus hijos: el hijo cuelga DE él, no al lado",
+    cambios: [[
+      `const fromAncestor = (a: Ancestor): Route => [...a.route, a.scope];`,
+      `const fromAncestor = (a: Ancestor): Route => [...a.route];`,
+    ]],
+    espera: /I7 · el árbol esperado — un contenedor bajo una sección/,
+    nota:
+      "«`route(parent) ++ [scope(parent)]`» es la definición entera del caminador y NADA la " +
+      "verificaba: sin el `++`, el hijo queda HERMANO de su padre y el árbol se aplana un nivel en " +
+      "las dos vías que lo reusan (`parent` y `spatial`). Con la mutación puesta se ponen rojos " +
+      "tres casos, que es lo que corresponde a una función que sostiene dos vías",
+  },
+  {
+    id: "M34",
+    garantía: "…y al revés: una ruta DESDE LA PILA sí pasa a ser la pila",
+    cambios: [[
+      `    if (routing.from === "stack") state.stack = [...route];`,
+      `    if (routing.from === "stack" && route.length < ZERO) state.stack = [...route];`,
+    ]],
+    espera: /I3 · migas = los lead abiertos — títulos anidados/,
+    nota:
+      "el par de M32, y hace falta porque las dos mitades se rompen por separado: «no la muevas por " +
+      "referencia» no dice nada sobre «movela cuando salió de ella». La guarda imposible es la " +
+      "lección de M3 —sin ella `route` y `routing` quedarían sin uso y la fila la acreditaría " +
+      "TS6133—. Lo que se ve NO es el árbol sino las MIGAS: con la pila sin truncar, «Cláusula " +
+      "segunda» no cierra a «Cláusula primera», el párrafo que la sigue sigue teniendo el padre " +
+      "correcto y arrastra una miga de más. Un padre bien elegido con migas de más es exactamente " +
+      "el error que I3 existe para ver",
+  },
+  {
+    id: "M35",
+    garantía: "`spatial` también es una referencia: la geometría ubica UN nodo, no un contexto",
+    cambios: [[
+      `      return { ok: true, from: "reference", route: bySpatial(state, hint.box) };`,
+      `      return { ok: true, from: "stack", route: bySpatial(state, hint.box), opens: null };`,
+    ]],
+    espera: /I7 · el árbol esperado — vía spatial/,
+    nota:
+      "ACREDITACIÓN POR CASUALIDAD ENCONTRADA Y CERRADA: con los tres nodos originales de `vía " +
+      "spatial` esta fila pasaba EN VERDE, porque los tres traen su propia caja y ninguno hereda. " +
+      "La clasificación de la vía existía, estaba escrita y NADA la verificaba. Se cerró agregando " +
+      "un cuarto nodo que ABSTIENE — «Nota al margen, sin caja» — que es la única forma de que el " +
+      "árbol note la diferencia",
+  },
+
+  // ── Tramo 5 · un recorrido, dos salidas (paso 3a) ──────────────────────────
+  //
+  // LO QUE ESTE BLOQUE CAMBIA RESPECTO DE LOS 35 DE ARRIBA. Hasta acá casi todas las
+  // garantías eran de TIPOS o de estructura del árbol, y una mutación de tipos rompe
+  // el compilador. Agrupar es código que CORRE: una mutación de comportamiento no
+  // rompe nada, PRODUCE OTRA SALIDA. Por eso cada fila de abajo dice qué salida se
+  // mueve, y por eso los casos de `GROUPING_CASES` traen su agrupación esperada
+  // escrita a mano: sin la salida esperada escrita ANTES, la mitad de estas filas
+  // pasaría en verde.
+  {
+    id: "M36",
+    garantía: "un `lead` CIERRA el fragmento en curso — rompe LAS MIGAS",
+    cambios: [[
+      `        if (open !== null) sealed.push(sealOf(open));\n        open = null;\n        break;`,
+      `        break;`,
+    ]],
+    espera: /I15 · un fragmento no cruza una frontera de sección/,
+    nota:
+      "el fragmento resultante agrupa nodos de DOS secciones y lleva las migas de su primer nodo para " +
+      "todos, así que el filtro por sección del tramo 7 devuelve texto de otra sección y el error es " +
+      "MUDO. El invariante que lo atrapa NO es el golden a propósito: un golden que cambia no dice QUÉ " +
+      "se rompió",
+  },
+  {
+    id: "M37",
+    garantía: "un `lead` no arranca un fragmento con SU texto — rompe EL CUERPO",
+    cambios: [[
+      `        if (open !== null) sealed.push(sealOf(open));\n        open = null;\n        break;\n      case "satellite":`,
+      `        open = reopen(i, n, text, cohesion);\n        break;\n      case "satellite":`,
+    ]],
+    espera: /I13 · los títulos no se duplican/,
+    nota:
+      "es la mitad de C15 que el propio `ir` documenta: con el título adentro del cuerpo vuelve el " +
+      "solapamiento que §{Los títulos} declara innecesario —se embebe dos veces, una en el texto y otra " +
+      "en la miga— y el fragmento nº 12 de una sección larga sigue sin llevar su contexto. Comparte " +
+      "ancla con M36 y no garantía: aquella pregunta si el título CIERRA, esta si además ABRE",
+  },
+  {
+    id: "M38",
+    garantía: "`solo` no se mezcla con vecinos: cierra el fragmento abierto",
+    cambios: [[
+      `      case "solo":\n        // «Fragmento propio, sin mezclarse con vecinos»: el vector turbio.\n        open = reopen(i, n, text, cohesion);`,
+      `      case "solo":\n        open = open === null ? reopen(i, n, text, cohesion) : add(open, n, text);`,
+    ]],
+    espera: /I16 · `solo` no se mezcla con vecinos/,
+    nota:
+      "es el argumento del vector turbio, y es la razón por la que `solo` existe como valor separado: " +
+      "un bloque de código pegado al párrafo que lo precede produce un vector que no representa bien a " +
+      "ninguno de los dos",
+  },
+  {
+    id: "M39",
+    garantía: "…y al revés: un `normal` tampoco se pega a un fragmento `solo`",
+    cambios: [[`          open.cohesion !== "solo" &&\n`, ``]],
+    espera: /I16 · `solo` no se mezcla con vecinos/,
+    nota:
+      "el par de M38, y hace falta porque las dos direcciones se rompen por separado: cerrar al ABRIR " +
+      "un `solo` no dice nada sobre qué pasa DESPUÉS de cerrarlo. Acá el que se contamina es el vector " +
+      "del código, con el párrafo que lo sigue adentro",
+  },
+  {
+    id: "M40",
+    garantía: "un `satellite` se pega al fragmento vivo (PROVISIONAL(C16) de `ir`)",
+    cambios: [[
+      `          open !== null && acceptsSatellite(open.cohesion)\n            ? add(open, n, text)\n            : reopen(i, n, text, cohesion);`,
+      `          open !== null && !acceptsSatellite(open.cohesion)\n            ? add(open, n, text)\n            : reopen(i, n, text, cohesion);`,
+    ]],
+    espera: /I16 · un satélite nunca queda solo/,
+    nota:
+      "«un epígrafe termina siendo un fragmento de una línea sin su imagen» es el caso que C16 decide " +
+      "evitar, y al rebote deja a la IMAGEN en un fragmento sin una sola letra. Es también la mutación " +
+      "que en el prototipo destapó un bug real —la rama que abría sin sellar—: acá esa rama ya no " +
+      "existe como sitio propio, ver `reopen` y M45",
+  },
+  {
+    id: "M41",
+    garantía: "el tamaño objetivo decide dónde corta un `normal`",
+    cambios: [[`text.length <= targetSizeChars`, `text.length <= targetSizeChars * 1000`]],
+    espera: /I19 · la agrupación esperada — el tamaño objetivo/,
+    nota:
+      "LA ÚNICA FILA DEL BLOQUE QUE NO TIENE INVARIANTE PROPIO, y es a propósito: " +
+      "`PARAMETERS.grouping.targetSizeChars` es `Pending` («se mide: evaluación de recuperación sobre " +
+      "corpus real»), así que escribir un invariante sobre el número sería inventar la medición que el " +
+      "plan declara pendiente. Lo que el golden fija es que el número DECIDE algo — y con él decidiendo " +
+      "de más, el documento entero es un solo fragmento, un solo vector y una sola clave de caché",
+  },
+  {
+    id: "M42",
+    garantía: "`minLevel` es el PEOR nivel de los nodos agrupados, por `rank()`",
+    cambios: [[
+      `ls.reduce((worst, l) => (rank(l) > rank(worst) ? l : worst), "declarative");`,
+      `ls.reduce((worst, l) => (rank(l) < rank(worst) ? l : worst), "declarative");`,
+    ]],
+    espera: /I17 · minLevel es el PEOR nivel/,
+    nota:
+      "rompe LA CERTEZA QUE LLEGA A LA SKILL: un fragmento con un nodo adivinado por un modelo se " +
+      "declara declarativo. Es la trampa que `ir` documenta en el #74 — el campo se llamaba " +
+      "`minCertainty`, la peor era el MÁXIMO del rank, y un consumidor razonable escribía `Math.min` y " +
+      "obtenía lo contrario de lo prometido, en verde",
+  },
+  {
+    id: "M43",
+    garantía: "`confidence.hasNull` distingue «no reportó» de «reportó bajo»",
+    cambios: [[`    hasNull: reported.length !== cs.length,`, `    hasNull: false,`]],
+    espera: /I17 · la confianza distingue/,
+    nota:
+      "rompe LA DECISIÓN DE CITAR: un fragmento con un nodo sobre el que no se sabe nada se ve igual de " +
+      "confiable que uno enteramente declarativo. La forma de DOS campos es la que `ir` justifica en el " +
+      "#74, y solo es observable con un caso que MEZCLE — por eso existe `niveles y confianzas " +
+      "mezclados` y no alcanza con los otros cinco",
+  },
+  {
+    id: "M44",
+    garantía: "el `text` del fragmento es LIMPIO: las migas no van adentro",
+    cambios: [[
+      `  text: o.parts.join("\\n"),`,
+      `  text: [...o.breadcrumbs.map((b) => b.text), ...o.parts].join("\\n"),`,
+    ]],
+    espera: /I15 · el texto del fragmento es LIMPIO/,
+    nota:
+      "«el tramo 6 las concatena al embeber» (§{Las dos salidas}): si ya vinieran adentro, el título se " +
+      "concatena dos veces y la clave del caché deja de ser la entrada de la función que cachea — la " +
+      "regla que cierra C2 en `ir`",
+  },
+  {
+    id: "M45",
+    garantía: "abrir un fragmento SELLA el anterior — el bug que `reopen` vuelve inescribible",
+    cambios: [[
+      `    if (open !== null) sealed.push(sealOf(open));\n    return started(i, n, text, cohesion);`,
+      `    return started(i, n, text, cohesion);`,
+    ]],
+    espera: /I12 · ningún nodo se pierde/,
+    nota:
+      "ES UN BUG REAL DEL PROTOTIPO, RESTITUIDO. Vivía en la rama `else` de `satellite`, que es " +
+      "INALCANZABLE —`acceptsSatellite` solo rechaza `lead` y un `lead` nunca deja fragmento abierto—, " +
+      "así que ningún invariante lo veía y lo destapó un mutante que forzaba la rama. Acá el par " +
+      "sellar-y-abrir existe UNA sola vez, y sus dos sitios alcanzables (`solo` y el corte de `normal`) " +
+      "lo acreditan: con la mutación, el fragmento en curso se pierde entero y sus nodos desaparecen " +
+      "del índice sin un solo aviso",
+  },
+  {
+    id: "M46",
+    garantía: "las migas del fragmento son las de su PRIMER nodo, no una segunda estructura",
+    cambios: [[
+      `    parts: text === "" ? [] : [text],\n    breadcrumbs: n.breadcrumbs,`,
+      `    parts: text === "" ? [] : [text],\n    breadcrumbs: [],`,
+    ]],
+    espera: /I15 · las migas del fragmento son las de su primer nodo/,
+    nota:
+      "rompe EL CONTEXTO: los fragmentos salen sin sección y el filtro exacto del tramo 7 no matchea " +
+      "nada. El tramo 5 NO construye migas: las toma de la pila del emisor. Si las construyera habría " +
+      "DOS estructuras que pueden discrepar, que es exactamente lo que I3 existía para impedir un tramo " +
+      "antes",
+  },
+  {
+    id: "M47",
+    garantía: "un título que no contextualizó nada emite su propio fragmento",
+    cambios: [[
+      `    if (referenced.has(n.local)) continue;`,
+      `    if (referenced.has(n.local) || nodes.length > ZERO) continue;`,
+    ]],
+    espera: /I14 · el título que no contextualizó nada emite su propio fragmento/,
+    nota:
+      "rompe LA COBERTURA: el último título del documento desaparece de la salida, en silencio. La " +
+      "guarda imposible mantiene `referenced` en uso — sin ella el mutante muere con TS6133 y la fila " +
+      "quedaría acreditada por el linter (la lección de M3). El caso lo trae el `Anexo` final de `dos " +
+      "secciones`, que está ahí por esta fila y por ninguna otra",
+  },
+  {
+    id: "M48",
+    garantía: "un nodo sin texto legible entra igual (PROVISIONAL(#53) de `ir`)",
+    cambios: [[
+      `    const text = render(n.body, schema) ?? "";`,
+      `    const rendered = render(n.body, schema);\n    if (rendered === null) continue;\n    const text = rendered;`,
+    ]],
+    espera: /I12 · ningún nodo se pierde/,
+    nota:
+      "rompe LA COBERTURA por el otro lado que M45: la imagen y los containers desaparecen del índice " +
+      "sin un solo aviso. `render` devuelve `null` para `asset` y `container` justamente para OBLIGAR " +
+      "al tramo 5 a decidir en vez de embeber cadena vacía por accidente; la decisión que `ir` " +
+      "recomienda es emitir el fragmento con `text: ''`, y omitirlo hace falso «un nodo entra entero en " +
+      "algún fragmento, siempre»",
+  },
+  {
+    id: "M49",
+    garantía: "un nodo-FILA emite además un registro (la mitad σ del split π/σ)",
+    cambios: [[`    if (isRowNode(n.body)) {`, `    if (isRowNode(n.body) && n.local === n.localParent) {`]],
+    espera: /I18 · un registro por nodo-fila/,
+    nota:
+      "rompe LA SALIDA EXACTA: la planilla se puede buscar por similitud y no se puede consultar. La " +
+      "guarda imposible conserva `isRowNode` en uso. Es la mitad del recorrido que NINGÚN adaptador del " +
+      "paso 3 ejercita —una tabla de markdown es la tabla chica, `grain: 'whole'`— y por eso el caso es " +
+      "sintético: está escrito, no tapado",
+  },
+  {
+    id: "M50",
+    garantía: "el esquema del registro viene del CONTAINER, no de la fila",
+    cambios: [[`      const record = recordOf(n, schema);`, `      const record = recordOf(n, null);`]],
+    espera: /I18 · un registro por nodo-fila, con las claves de/,
+    nota:
+      "rompe LAS CLAVES: `proveedor` pasa a ser `col_0` y la planilla deja de ser consultable por " +
+      "nombre. «Si cada fila cargara sus etiquetas, renombrar una columna cambiaría el hash de las " +
+      "50 000 y destruiría todas las anclas» (§{Las filas}) es la razón de que el esquema viva arriba, " +
+      "y esta fila es la contrapartida: quien compone tiene que ir a buscarlo",
+  },
+  {
+    id: "M51",
+    garantía: "`fieldKey` desambigua etiquetas vacías Y repetidas",
+    cambios: [[`fieldKey(schema?.[i] ?? null, i, used)`, `fieldKey(schema?.[i] ?? null, i, new Set())`]],
+    espera: /I18 · un registro por nodo-fila, con las claves de/,
+    nota:
+      "rompe LAS CLAVES por el otro lado: dos columnas distintas colapsan en la misma y una se pierde " +
+      "al construir el mapa. El `Record<string,string>` del plan exige claves únicas y no vacías, y una " +
+      "planilla real tiene columnas sin encabezado y encabezados repetidos — por eso el esquema del " +
+      "caso lleva una vacía y una repetida",
+  },
+  {
+    id: "M52",
+    garantía: "la fila se RENDERIZA con el esquema de su container",
+    cambios: [[`    const text = render(n.body, schema) ?? "";`, `    const text = render(n.body, null) ?? "";`]],
+    espera: /I18 · la fila se renderiza con el esquema de su container/,
+    nota:
+      "misma ancla que M48 y otra garantía: M48 pregunta si el nodo ENTRA, esta si entra COMPLETO. La " +
+      "fila sola es un `grid` con `headers: null`, o sea celdas sin encabezado, así que sin el esquema " +
+      "se indexa como `Acme⇥30-1⇥x⇥Acme SA` y deja de ser recuperable por nombre de columna",
+  },
+
+  {
+    id: "M56",
+    garantía: "el registro apunta a SU fila — las dos salidas referencian el mismo nodo",
+    cambios: [[
+      `  return { coordinate: n.location.coordinate, values, node: n.local };`,
+      `  return { coordinate: n.location.coordinate, values, node: n.localParent ?? n.local };`,
+    ]],
+    espera: /I18 · las dos salidas referencian el mismo nodo-fila/,
+    nota:
+      "es la mutación PLAUSIBLE, no la absurda: apuntar el registro a la región suena razonable —«el " +
+      "registro pertenece a la planilla»— y rompe la única cosa que hace citable una respuesta exacta. " +
+      "Se sabría QUÉ dice la celda y no de qué fila salió. La fila nació buscando aserciones que no " +
+      "pueden fallar: el chequeo anterior en este sitio miraba que `coordinate.space` fuera `grid`, y " +
+      "eso el TIPO ya lo impide — se borró y se puso esta, que sí se puede romper",
+  },
+
+  // ── R1 · las fronteras, hechas grafo (paso 3a) ─────────────────────────────
+  {
+    id: "M53",
+    garantía: "R1 — `emission` no puede alcanzar `adapters`, y el error NOMBRA la frontera",
+    cambios: [[
+      `import {\n  PARAMETERS,\n  acceptsSatellite,`,
+      `import { markdownAdapter } from "@savia-os/adapters";\nexport const _cruza = markdownAdapter;\nimport {\n  PARAMETERS,\n  acceptsSatellite,`,
+    ]],
+    espera: /frontera cruzada · src\/grouping\.ts {2}↛ {2}@savia-os\/adapters/,
+    nota:
+      "ES LA FILA QUE VUELVE NO-VACÍA UNA FRASE QUE ERA CIERTA POR CONSTRUCCIÓN. Hasta el paso 3 no " +
+      "había adaptador que importar, así que «`adapters` y `emission` nunca se ven» no podía fallar. " +
+      "El `export const _cruza` mantiene el import en uso: sin él, TS6133 mata la corrida y la fila la " +
+      "acreditaría el linter (la lección de M3). Y por esto el guardián de fronteras corre ANTES que " +
+      "`tsc` en la cadena: el paquete no existe, así que el resolvedor de módulos moriría primero con " +
+      "«Cannot find module», que no nombra ninguna frontera y manda a AGREGAR la dependencia",
+  },
+  {
+    id: "M54",
+    garantía: "…y tampoco nada más: `emission` tiene CERO dependencias de runtime",
+    cambios: [[
+      `import {\n  PARAMETERS,\n  asNodeFingerprint,`,
+      `import { createHash } from "node:crypto";\nexport const _sha = createHash;\nimport {\n  PARAMETERS,\n  asNodeFingerprint,`,
+    ]],
+    espera: /src\/emitter\.ts importa `node:crypto`/,
+    nota:
+      "la mitad que M53 no cubre, y es la que distingue este guardián de un resolvedor de módulos: " +
+      "`node:crypto` SÍ resuelve, así que `tsc` lo acepta sin una palabra y el paquete queda con una " +
+      "dependencia de runtime en verde. `emit` recibe `sha256` POR PARÁMETRO exactamente para que eso " +
+      "no pase, y hasta esta fila nada lo impedía",
+  },
+  {
+    id: "M55",
+    garantía: "el grafo DECLARADO coincide con el usado: `dependencies` es solo `ir`",
+    cambios: [[
+      `  "dependencies": {\n    "@savia-os/ir": "workspace:*"\n  },`,
+      `  "dependencies": {\n    "@savia-os/ir": "workspace:*",\n    "typescript": "^5.9.3"\n  },`,
+    ]],
+    espera: /`dependencies` declara algo más que `ir`/,
+    nota:
+      "sin esta mitad, M53 y M54 se satisfacen agregando la dependencia y el import EL MISMO DÍA — y " +
+      "el que lo hace está siguiendo al pie de la letra lo que le dijo «Cannot find module». Lo que de " +
+      "verdad impone R1 es el grafo de PAQUETES (§{Paquetes}), y este es el único chequeo que lo mira",
   },
 
   // ── Controles ──────────────────────────────────────────────────────────────
@@ -513,13 +889,81 @@ const MUTANTES = [
     control: true,
     garantía: "editar el `description` de `package.json` no rompe nada",
     cambios: [[
-      `  "description": "Tramo 4, piezas 1 y 2:`,
-      `  "description": "control MC7 · tramo 4, piezas 1 y 2:`,
+      `  "description": "Tramos 4 y 5:`,
+      `  "description": "control MC7 · tramos 4 y 5:`,
     ]],
     nota:
       "el par de M29–M30: `I11` lee `package.json` y lo que fija son las CADENAS de guardianes, no " +
       "el archivo entero. Sin este control, las dos filas de arriba serían indistinguibles de un " +
       "chequeo que congela el manifiesto",
+  },
+  {
+    id: "MC8",
+    control: true,
+    garantía: "clasificar `cell` como ruta DESDE LA PILA no rompe nada — y no es porque esté verificado",
+    cambios: [[
+      `      return { ok: true, from: "reference", route: byCell(state, hint) };`,
+      `      return { ok: true, from: "stack", route: byCell(state, hint), opens: null };`,
+    ]],
+    nota:
+      "TERCER HALLAZGO INCÓMODO DEL PAQUETE, Y ES EL MISMO QUE MC5 POR OTRO LADO. La vía `cell` " +
+      "está clasificada como referencia por el mismo argumento que `parent` y `spatial` —la " +
+      "coordenada ubica a ESE nodo—, y la clasificación es INOBSERVABLE: los tres scopes de una " +
+      "celda son SINTÉTICOS, así que H5 hace que el padre sea el primer ancestro que sí es nodo, y " +
+      "una pila que quedó con `[hoja, región, fila]` produce exactamente el mismo `localParent` " +
+      "—`null`— y las mismas migas —ninguna— que una que no se movió. A diferencia de M35, acá NO " +
+      "alcanza con agregar un nodo que abstenga: el defecto no llega a la salida por ninguna vía. " +
+      "Queda escrito en vez de dejar el docstring prometiendo de más. El día que un scope sintético " +
+      "lleve algo legible, esta fila se pone roja y deja de ser un control",
+  },
+  {
+    id: "MC9",
+    control: true,
+    garantía: "un comentario nuevo en `grouping.ts` no rompe nada",
+    cambios: [[
+      `const worstLevel = (`,
+      `// control MC9: comentario inocuo\nconst worstLevel = (`,
+    ]],
+  },
+  {
+    id: "MC10",
+    control: true,
+    garantía: "renombrar una variable local del recorrido de agrupación no cambia nada",
+    cambios: [[
+      `  const sealed: (LocalFragment & { readonly order: number })[] = [];`,
+      `  const cerrados: (LocalFragment & { readonly order: number })[] = [];\n  const sealed = cerrados;`,
+    ]],
+    nota:
+      "el par de M36–M52: lo que esas filas fijan es el COMPORTAMIENTO del recorrido, no cómo se llaman " +
+      "sus variables",
+  },
+  {
+    id: "MC11",
+    control: true,
+    garantía: "editar la prosa de un caso de agrupación no rompe nada",
+    cambios: [[`  why: "las filas son nodos`, `  why: "control MC11 · las filas son nodos`]],
+    nota:
+      "el par de M49–M52: el `why` viaja al mensaje de error del guardián y no a ninguna comparación. " +
+      "Sin el control, un guardián demasiado sensible sería indistinguible de uno que verifica lo que " +
+      "dice — es MC3 aplicado a la otra mitad del paquete",
+  },
+  {
+    id: "MC12",
+    control: true,
+    garantía: "la mitad «el satélite NO se acepta» no decide nada — y eso está escrito",
+    cambios: [[
+      `          open !== null && acceptsSatellite(open.cohesion)`,
+      `          open !== null && (acceptsSatellite(open.cohesion) || true)`,
+    ]],
+    nota:
+      "CUARTO HALLAZGO INCÓMODO DEL PAQUETE, PINCHADO PARA QUE NO SE VUELVA MENTIRA. " +
+      "`acceptsSatellite` solo rechaza `lead` (PROVISIONAL(C16) de `ir`) y un `lead` NUNCA deja " +
+      "fragmento abierto, así que la rama «no se acepta» es INALCANZABLE desde este tramo y forzar el " +
+      "predicado a `true` no mueve una sola salida. La llamada se conserva igual, y no por prolijidad: " +
+      "la regla vive en `ir` y consultarla es lo que impide que `emission` la re-derive, que es R2. El " +
+      "`|| true` mantiene la llamada en uso porque sin ella el import muere en TS6133 y el control " +
+      "quedaría rojo por el linter. El día que exista una cohesión que la rechace de verdad —o que un " +
+      "`lead` pueda dejar fragmento abierto— esta fila se pone roja y deja de ser un control",
   },
   {
     id: "MC6",
@@ -545,6 +989,7 @@ const MUTANTES = [
 const ARCHIVOS = [
   "src/route.ts",
   "src/emitter.ts",
+  "src/grouping.ts",
   "src/synthetic.ts",
   "src/index.ts",
   "package.json",

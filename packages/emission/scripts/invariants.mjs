@@ -103,11 +103,21 @@ try {
   const destinoEmission = join(salida, "emission");
   compilar(RAIZ, destinoEmission);
 
-  const { emit, CASES, CANONICAL_CASE, DELEGATED_CASE, EDITED_HEADING, DANGLING_PARENT } =
-    await import(pathToFileURL(join(destinoEmission, "index.js")).href);
-  const { isLead, isNode, render } = await import(
+  const {
+    emit,
+    group,
+    CASES,
+    GROUPING_CASES,
+    CANONICAL_CASE,
+    DELEGATED_CASE,
+    EDITED_HEADING,
+    DANGLING_PARENT,
+  } = await import(pathToFileURL(join(destinoEmission, "index.js")).href);
+  const { cohesionOf, isLead, isNode, isRowNode, rank, render } = await import(
     pathToFileURL(join(destinoIr, "index.js")).href
   );
+
+  const igual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
   const sha256 = (preimagen) => createHash("sha256").update(preimagen, "utf8").digest("hex");
 
@@ -404,12 +414,323 @@ try {
     }
   }
 
+  // ══════════════════ TRAMO 5 · UN RECORRIDO, DOS SALIDAS (paso 3a) ═════════
+  //
+  // Los ocho de abajo son de COMPORTAMIENTO, todos escalón ⑤, y eso va dicho y no
+  // disimulado: agrupar es comportamiento y ningún tipo puede rechazar «este
+  // fragmento agrupó mal». Lo único que sí subió de escalón es la forma del fallo, y
+  // ya estaba resuelta un tramo antes.
+  for (const caso of GROUPING_CASES) {
+    const emitidos = emit(caso.nodes, sha256);
+    if (!emitidos.ok) {
+      fallar(
+        `emisión fallida — ${caso.name}`,
+        `falla: ${JSON.stringify(emitidos.failure)}`,
+        "los casos de agrupación son todos emisibles por construcción",
+      );
+      continue;
+    }
+    const nodos = emitidos.nodes;
+    const porLocal = new Map(nodos.map((n) => [n.local, n]));
+    const g = group(nodos, caso.targetSizeChars);
+    const cohesión = (local) => {
+      const n = porLocal.get(local);
+      return n === undefined ? null : cohesionOf(n.role, n.body.shape);
+    };
+
+    // ── I12 · NINGÚN NODO SE PIERDE ─────────────────────────────────────────
+    // EL ENUNCIADO LITERAL DEL PLAN ES FALSO Y `ir` YA LO SABÍA. «Un nodo entra
+    // entero en algún fragmento, SIEMPRE» (§{El recorrido}) no se cumple para
+    // NINGÚN `lead`: un título «no arranca un fragmento con su texto, cierra el
+    // anterior y entra a las migas» (§{Los títulos}), así que no está en `nodes` de
+    // ninguno. Es textualmente el punto (1) de PROVISIONAL(C15/#50/#73) en
+    // `ir/src/outputs.ts`. La forma verificable es «o está en `nodes`, o lo
+    // referencia una miga», y lo segundo solo es expresable porque `Breadcrumb`
+    // lleva `ref` — la mitad que el bloque 3 de `ir` agregó a propósito.
+    {
+      const apariciones = g.fragments.flatMap((f) => f.nodes);
+      const cubiertos = new Set(apariciones);
+      const referidos = new Set(g.fragments.flatMap((f) => f.breadcrumbs.map((b) => b.ref)));
+      const perdidos = nodos.filter((n) => !cubiertos.has(n.local) && !referidos.has(n.local));
+      if (perdidos.length > 0 || apariciones.length !== cubiertos.size) {
+        fallar(
+          `I12 · ningún nodo se pierde — ${caso.name}`,
+          `${nodos.length} nodos, ${apariciones.length} apariciones, ${cubiertos.size} distintas` +
+            (perdidos.length > 0
+              ? `\n        se perdieron: ${JSON.stringify(perdidos.map((n) => n.location.anchor))}`
+              : ""),
+          "«no hay ninguna rama que corte» (§{El recorrido}): un nodo que no entra en ningún fragmento ni queda referenciado no existe para la búsqueda, y desaparece sin que nada se ponga rojo",
+        );
+      }
+    }
+
+    // ── I13 · LOS TÍTULOS NO SE DUPLICAN ────────────────────────────────────
+    // Un `lead` NO comparte fragmento con nadie. Si entrara al cuerpo de sus
+    // descendientes se embebería dos veces —una en el texto y otra en la miga— y
+    // volvería el solapamiento que §{Los títulos} declara innecesario. El único
+    // fragmento en el que un `lead` puede estar es el suyo propio, y ese caso lo
+    // gobierna I14.
+    {
+      const mezclados = g.fragments.filter(
+        (f) => f.nodes.length > 1 && f.nodes.some((l) => cohesión(l) === "lead"),
+      );
+      if (mezclados.length > 0) {
+        fallar(
+          `I13 · los títulos no se duplican — ${caso.name}`,
+          `${mezclados.length} fragmentos llevan un título adentro del cuerpo: ${JSON.stringify(
+            mezclados.map((f) => f.text),
+          )}`,
+          "el tramo 6 concatena la miga al embeber: si el título además estuviera en el texto, se embebe dos veces por fragmento y el vector queda sesgado hacia el título",
+        );
+      }
+    }
+
+    // ── I14 · UN TÍTULO QUE NO CONTEXTUALIZÓ NADA NO SE EVAPORA ─────────────
+    {
+      const referidos = new Set(g.fragments.flatMap((f) => f.breadcrumbs.map((b) => b.ref)));
+      const huérfanos = nodos.filter(
+        (n) => isLead(n.role, n.body.shape) && !referidos.has(n.local),
+      );
+      const propios = huérfanos.filter((n) =>
+        g.fragments.some((f) => igual(f.nodes, [n.local])),
+      );
+      if (propios.length !== huérfanos.length) {
+        fallar(
+          `I14 · el título que no contextualizó nada emite su propio fragmento — ${caso.name}`,
+          `${huérfanos.length} títulos sin descendencia, ${propios.length} con fragmento propio`,
+          "es un caso raro y la única alternativa es perder información en silencio, que §{Estrategia} declara el peor modo de falla",
+        );
+      }
+    }
+
+    // ── I15 · EL TEXTO ES LIMPIO, LAS MIGAS SON DEL PRIMER NODO, Y EL ───────
+    //          FRAGMENTO NO CRUZA UNA SECCIÓN
+    {
+      const sucios = g.fragments.filter((f) =>
+        f.breadcrumbs.some((b) => b.text !== "" && f.text.startsWith(b.text)),
+      );
+      if (sucios.length > 0) {
+        fallar(
+          `I15 · el texto del fragmento es LIMPIO — ${caso.name}`,
+          `${sucios.length} fragmentos arrancan con su propia miga`,
+          "«el tramo 6 las concatena al embeber» (§{Las dos salidas}): si ya vinieran adentro se concatenarían dos veces y la clave del caché dejaría de ser la entrada de la función que cachea (C2 en `ir`)",
+        );
+      }
+      const desalineados = g.fragments.filter((f) => {
+        const primero = porLocal.get(f.nodes[0]);
+        return primero !== undefined && !igual(f.breadcrumbs, primero.breadcrumbs);
+      });
+      if (desalineados.length > 0) {
+        fallar(
+          `I15 · las migas del fragmento son las de su primer nodo — ${caso.name}`,
+          `${desalineados.length} fragmentos con migas propias`,
+          "el tramo 5 NO construye migas: las toma de la pila del emisor. Si las construyera habría una SEGUNDA estructura que puede discrepar, que es lo que I3 existe para impedir un tramo antes",
+        );
+      }
+      // Y TODOS los nodos del fragmento tienen que compartirlas. Es lo que hace
+      // NECESARIO que un `lead` cierre: sin el cierre, un fragmento cruza un título
+      // y lleva las migas de su primer nodo PARA TODOS — queda archivado bajo una
+      // sección a la que la mitad de su texto no pertenece, y ninguna otra
+      // comprobación lo ve.
+      const mezclaSecciones = g.fragments.filter((f) =>
+        f.nodes.some((l) => {
+          const n = porLocal.get(l);
+          return n !== undefined && !igual(n.breadcrumbs, f.breadcrumbs);
+        }),
+      );
+      if (mezclaSecciones.length > 0) {
+        fallar(
+          `I15 · un fragmento no cruza una frontera de sección — ${caso.name}`,
+          `${mezclaSecciones.length} fragmentos agrupan nodos de secciones distintas`,
+          "«un `lead` cierra el fragmento en curso» (§{El recorrido}) existe para esto: sin el cierre, el filtro por sección del tramo 7 devuelve texto de otra sección y el error es MUDO",
+        );
+      }
+    }
+
+    // ── I16 · `solo` NO SE MEZCLA, `satellite` NUNCA QUEDA SOLO ────────────
+    {
+      const mezclados = g.fragments.filter(
+        (f) =>
+          f.nodes.some((l) => cohesión(l) === "solo") &&
+          f.nodes.some((l) => cohesión(l) === "normal"),
+      );
+      if (mezclados.length > 0) {
+        fallar(
+          `I16 · \`solo\` no se mezcla con vecinos — ${caso.name}`,
+          `${mezclados.length} fragmentos mezclan solo con normal: ${JSON.stringify(
+            mezclados.map((f) => f.text),
+          )}`,
+          "es el argumento del vector turbio: un bloque de código con el párrafo que lo precede no representa bien a ninguno de los dos",
+        );
+      }
+      // «NUNCA QUEDA SOLO» SE MIDE CONTRA SU VECINO, y esta forma es del segundo
+      // intento. La primera miraba si el satélite había quedado ÉL SOLO en un
+      // fragmento, y el mutante que invierte `acceptsSatellite` pasaba en verde por
+      // la razón más incómoda posible: despegado de su imagen, el epígrafe se pegaba
+      // al párrafo que venía DESPUÉS, así que nunca quedaba solo y el invariante no
+      // veía nada — mientras la imagen quedaba en un fragmento sin una sola letra.
+      // Solo lo movía el golden, y un golden que cambia no dice QUÉ se rompió.
+      //
+      // La forma de hoy es PROVISIONAL(C16) + PROVISIONAL(#52) literales: un
+      // satélite va con el nodo que lo precede, salvo que ese nodo sea un `lead` —
+      // en cuyo caso no hay fragmento vivo que aceptarlo y abrir uno propio es lo
+      // correcto. Es universal, no una propiedad de estos seis casos.
+      const despegados = nodos.filter((n, i) => {
+        if (cohesionOf(n.role, n.body.shape) !== "satellite") return false;
+        const previo = nodos[i - 1];
+        if (previo === undefined) return false;
+        if (cohesionOf(previo.role, previo.body.shape) === "lead") return false;
+        return !g.fragments.some(
+          (f) => f.nodes.includes(n.local) && f.nodes.includes(previo.local),
+        );
+      });
+      if (despegados.length > 0) {
+        fallar(
+          `I16 · un satélite nunca queda solo — ${caso.name}`,
+          `${JSON.stringify(despegados.map((n) => n.location.anchor))} no comparte fragmento con el nodo que lo precede`,
+          "«un epígrafe termina siendo un fragmento de una línea sin su imagen» es exactamente lo que PROVISIONAL(C16) de `ir` decide evitar, y al rebote deja a la imagen en un fragmento sin texto",
+        );
+      }
+    }
+
+    // ── I17 · minLevel ES EL PEOR, Y LA CONFIANZA DISTINGUE null DE CERO ────
+    // Los dos se RECALCULAN desde `nodes`, que es una segunda fuente independiente
+    // del acumulador que los produjo. `null` es «NO APLICA» —el fragmento
+    // enteramente declarativo, el MÁS confiable— y leerlo como cero invierte
+    // exactamente el sentido (#74 en `ir/src/outputs.ts`).
+    for (const f of g.fragments) {
+      const suyos = f.nodes.map((l) => porLocal.get(l)).filter((n) => n !== undefined);
+      const peor = suyos.reduce(
+        (w, n) => (rank(n.level) > rank(w) ? n.level : w),
+        "declarative",
+      );
+      if (f.minLevel !== peor) {
+        fallar(
+          `I17 · minLevel es el PEOR nivel — ${caso.name}`,
+          `el fragmento ${JSON.stringify(f.text)} declara ${f.minLevel} y sus nodos dan ${peor}`,
+          caso.why,
+        );
+      }
+      const reportadas = suyos.map((n) => n.confidence).filter((c) => c !== null);
+      const esperada =
+        reportadas.length === 0
+          ? null
+          : { min: Math.min(...reportadas), hasNull: reportadas.length !== suyos.length };
+      if (!igual(f.confidence, esperada)) {
+        fallar(
+          `I17 · la confianza distingue «no reportó» de «reportó bajo» — ${caso.name}`,
+          `el fragmento ${JSON.stringify(f.text)} declara ${JSON.stringify(
+            f.confidence,
+          )} y sus nodos dan ${JSON.stringify(esperada)}`,
+          "con un solo número, «todos confiables» es indistinguible de «hay un nodo sobre el que no sé nada», que es la pregunta exacta que la capa de skills hace donde decide citar",
+        );
+      }
+    }
+
+    // ── I18 · UN REGISTRO POR NODO-FILA ─────────────────────────────────────
+    {
+      const filas = nodos.filter((n) => isRowNode(n.body));
+      if (g.records.length !== filas.length) {
+        fallar(
+          `I18 · un registro por nodo-fila — ${caso.name}`,
+          `${filas.length} nodos-fila y ${g.records.length} registros`,
+          "sin la mitad σ la planilla se puede buscar por similitud y no se puede CONSULTAR, que es la única cosa para la que existe el split π/σ",
+        );
+      }
+      const claves = g.records.map((r) => r.values.map((v) => v.label));
+      if (!igual(claves, caso.records)) {
+        fallar(
+          `I18 · un registro por nodo-fila, con las claves de \`fieldKey\` — ${caso.name}`,
+          `esperadas ${JSON.stringify(caso.records)}\n        obtenidas ${JSON.stringify(claves)}`,
+          "«si cada fila cargara sus etiquetas, renombrar una columna cambiaría el hash de las 50 000» (§{Las filas}): el esquema vive en el container y la política de claves en `ir`, para que dos consumidores no inventen dos registros distintos de la misma planilla",
+        );
+      }
+      // «LA COORDENADA DEL REGISTRO ES `SourceRange`» NO SE VERIFICA ACÁ, Y NO ES UN
+      // OLVIDO. Estuvo escrito y se borró al buscar aserciones que no pueden fallar:
+      // `LocalDataRecord.coordinate` ES `SourceRange` —o sea `Extract<Coordinate,
+      // {space:"grid"}>`— y `recordOf` corta antes de construir el registro si la
+      // coordenada no es de grilla, así que la violación es INEXPRESABLE y el
+      // chequeo era un booleano que nadie lee. El único modo de falla que quedaba
+      // —que el `Extract` colapse a `never` y el campo pase a aceptar cualquier
+      // cosa, EN VERDE— vive en `ir` y lo agarra `_SourceRangeExists`, con su
+      // mutante. Subir de escalón es borrar el test, no agregarlo.
+
+      // LAS DOS SALIDAS REFERENCIAN EL MISMO NODO. Es la forma verificable de «un
+      // recorrido, dos salidas» (§{Las dos salidas}): la fila se recupera por
+      // similitud DENTRO de un fragmento y se consulta EXACTO por su registro, y las
+      // dos tienen que apuntar al mismo nodo o la respuesta exacta no se puede citar
+      // de vuelta a su origen.
+      const enFragmento = new Set(g.fragments.flatMap((f) => f.nodes));
+      const locales = new Set(filas.map((n) => n.local));
+      const descolgados = g.records.filter(
+        (r) => !locales.has(r.node) || !enFragmento.has(r.node),
+      );
+      if (descolgados.length > 0) {
+        fallar(
+          `I18 · las dos salidas referencian el mismo nodo-fila — ${caso.name}`,
+          `${descolgados.length} registros apuntan a un nodo que no es su fila o que no está en ningún fragmento`,
+          "un registro que apunta al container en vez de a su fila hace incitable la respuesta exacta: se sabe QUÉ dice la celda y no de qué fila salió, que es la mitad del valor de la salida σ",
+        );
+      }
+      // SEGURO SIN ACREDITACIÓN, ESCRITO: la segunda mitad —que el nodo del registro
+      // esté ADEMÁS en un fragmento— no la pone roja ninguna mutación de una línea
+      // de hoy, porque una fila se renderiza siempre y siempre entra en alguno. Se
+      // conserva porque es la mitad que se cae el día que alguien haga que la salida
+      // σ salte el recorrido, que es exactamente lo que el split π/σ prohíbe.
+      // La fila sola es un `grid` con `headers: null`, o sea celdas sin encabezado:
+      // si la composición no fuera a buscar el esquema al container, la fila se
+      // indexa sin sus etiquetas y deja de ser recuperable por nombre de columna.
+      for (const n of filas) {
+        const suyo = g.fragments.find((f) => f.nodes.includes(n.local));
+        const conEsquema =
+          n.localParent === null
+            ? null
+            : porLocal.get(n.localParent)?.body.schema ?? null;
+        if (conEsquema !== null && (suyo === undefined || !suyo.text.includes(conEsquema[0]))) {
+          fallar(
+            `I18 · la fila se renderiza con el esquema de su container — ${caso.name}`,
+            `la fila "${n.location.anchor}" se embebe como ${JSON.stringify(suyo?.text)}`,
+            "el esquema vive en el container justamente para que renombrar una columna toque UN nodo; si la composición no va a buscarlo, la fila se indexa sin sus etiquetas",
+          );
+        }
+      }
+    }
+
+    // ── I19 · LA AGRUPACIÓN ESPERADA, Y LAS DOS SALIDAS DEL MISMO RECORRIDO ─
+    // Es el único de los ocho que compara contra algo EXTERNO al tramo 5: los otros
+    // siete verifican que la salida sea coherente consigo misma, y una salida puede
+    // ser perfectamente coherente y ser la agrupación equivocada.
+    {
+      const textos = g.fragments.map((f) => f.text);
+      if (!igual(textos, caso.fragments)) {
+        fallar(
+          `I19 · la agrupación esperada — ${caso.name}`,
+          `esperada ${JSON.stringify(caso.fragments)}\n        obtenida ${JSON.stringify(textos)}`,
+          caso.why,
+        );
+      }
+      // Determinismo: es el único que un golden NO atrapa, porque una salida no
+      // determinística es golden respecto de sí misma.
+      const otra = group(nodos, caso.targetSizeChars);
+      if (!igual(otra, g)) {
+        fallar(
+          `I19 · determinismo de la agrupación — ${caso.name}`,
+          "dos corridas sobre la misma entrada dieron salidas distintas",
+          "sin determinismo la huella del fragmento se mueve sola y el caché de vectores falla en cada re-ingesta",
+        );
+      }
+    }
+  }
+
   if (fallas > 0) process.exit(1);
   console.log(
     `invariantes ok (${CASES.length} casos sintéticos · I1 plana · I2 padre-antes · ` +
       `I3 migas · I4 nada se pierde · I5 determinismo · I6 locales únicos · ` +
       `I7 traza canónica · I8 delegación · I9 título editado · I10 padre colgante · ` +
-      `I11 cadena completa)`,
+      `I11 cadena completa || ${GROUPING_CASES.length} casos de agrupación · ` +
+      `I12 nada se pierde · I13 títulos no duplicados · I14 título huérfano · ` +
+      `I15 texto limpio y migas · I16 solo y satélite · I17 nivel y confianza · ` +
+      `I18 registros · I19 golden y determinismo)`,
   );
 } finally {
   rmSync(salida, { recursive: true, force: true });

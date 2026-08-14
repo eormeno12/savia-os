@@ -570,6 +570,76 @@ contenido.
 
 ---
 
+## 12 · Paso 3, fase 1 — el discriminante que decide qué es «la ruta vigente»
+
+**Agregado el 2026-08-13**, antes de escribir la línea, por la regla del cierre. El
+paso 3 encontró midiendo que `Hint` no sabía decir «declaro mi id y **heredo** mi
+ruta», y la decisión que lo desbloquea —`{linkage:'parent', parent:null}` pasa a
+significar «heredo» y «raíz» se dice con `{linkage:'none'}`— **no agrega ningún
+nombre**: reusa dos valores que ya están en `LINKAGES` (§5). Lo que sí agrega un
+nombre es el arreglo que la decisión destapó en el emisor, y es el único de la fase.
+
+> **Lo que las reglas SÍ determinaban**, para que se vea que se consultaron:
+> `Contenedor → Ancestor` y `desdeContenedor → fromAncestor` ya están en §10 (B3);
+> `Ruteo → Routing` y `pila → stack` también (B1 y la nota de §10); `referencia →
+> reference` es R1 llana. Ninguno va en este documento.
+
+| # | Símbolo | **Queda** | Por qué no la que salía sola |
+|---|---|---|---|
+| **F1** | el discriminante de `Routing`, y sus dos valores | **`from`** = `stack · reference` | **`kind` era lo que salía solo** —§4 lo fija como *el* nombre del discriminante de una unión, y `Scope.kind` y `RouteFailure.kind` ya lo usan en el mismo archivo— y acá dice **nada**: las dos variantes no se distinguen por «qué clase de cosa son» sino por **de dónde salió la ruta**, que es lo que decide si pasa a ser la pila vigente. Para eso hay regla: **R11**, «conector de derivación — dice de dónde sale algo, `De/Desde → Of/From`». `source` queda descartada por la colisión que §5 ya declara (`Coordinate['space'] = "source"` y la raíz `Fuente → Source`, las dos con ⚠). Los **valores** son **datos** —igual que G7, D6 y B8— y no van a Postgres ni a Qdrant: nacen y mueren adentro de una unión de TypeScript, así que conservan la convención del archivo que los produce (precedente G9), o sea minúscula llana y no snake |
+
+> **Por qué son dos variantes y no un campo booleano.** `opens` vive **solo** en la
+> variante `stack`, y eso es lo que vuelve INEXPRESABLE «una ruta por referencia que
+> además abre un scope» — que no significa nada, porque la pila no se movió y no hay
+> dónde apoyar lo que abre. Es el mismo movimiento que `Scope` (§10, B7): «la regla no
+> se puede olvidar porque no se puede escribir de otro modo».
+
+> **Lo que la fase 1 NO cerró, dicho de frente.** `ir/src/classification.ts` no
+> documenta qué significa `Hint.parent === null`: lo dejaba a quien caminara la pista,
+> y el único que la caminaba era `emission/src/route.ts`. La decisión vive hoy en el
+> consumidor, así que un segundo consumidor de `Hint` puede volver a leerlo como
+> «raíz». Cerrarlo es una línea de docstring en el contrato y va escrito acá como
+> pendiente, no hecho de costado.
+
+---
+
+## 13 · Paso 3a — el tramo 5 y las dos salidas
+
+**Agregado el 2026-08-13**, antes de escribir una línea de `grouping.ts`, por la regla
+del cierre. Es la segunda ampliación que no es sobre `ir` —el módulo vive en
+`packages/emission`— pero dos de las tres filas SÍ tocan el contrato, así que van acá
+y no en una nota del paquete.
+
+> **Primero, lo que las reglas SÍ determinaban.** `Agrupación → Grouping` y
+> `agrupar → group` salen de R1 con la raíz `Fragmento → Fragment` de §3.
+> `sellar → seal` está implícita en R8 (`sellado → sealedAt`) y da `sealOf` por R11,
+> igual que `confidenceOf`, `recordOf` y `worstLevel` (R11 + R5 + el precedente
+> `worstCertainty` de §7). **`Open` para el fragmento vivo ya está decidido**: §4 lo
+> fija al nombrar `cohesiónDelFragmentoVivo → openFragmentCohesion`, con el argumento
+> de que «`open` no es metáfora nueva — `lead` ya marca dónde ABRE un chunk», así que
+> `reopen` es R1 sobre esa raíz. `targetSizeChars` es R12 literal. `GroupingCase` es
+> R2 sobre el `Case` que el paquete ya tiene, y el guardián nuevo
+> `emission/scripts/boundaries.mjs` nace en inglés por §6. **Ninguno de estos va en
+> este documento.**
+
+| # | Símbolo | **Queda** | Por qué no la que salía sola |
+|---|---|---|---|
+| **F2** | el módulo del tramo 5 | **`src/grouping.ts`** | El patrón de §9 (E1) —«el archivo se llama como **lo que contiene**»— **no determina**, y por una razón concreta: este archivo contiene **dos** salidas, `Fragment` **y** `DataRecord`, así que `fragments.ts` nombraría a una y escondería a la otra. Es el caso de E2 (§11) con los papeles cambiados: allá el archivo pasó de nombrar un miembro a nombrar la categoría; acá **no hay categoría que los contenga** —un fragmento difuso y un registro exacto no son parientes, son el split π/σ—. Lo único que los dos comparten es **el acto**, que es lo que el plan llama «un recorrido, dos salidas», y por eso el nombre es el acto y no el contenido. `grouper.ts` se descarta por el precedente de `Evidenciador → EvidenceFn` (§4): nombrar al agente cuando lo que hay es una función libre |
+| **F3** | el fragmento y el registro **antes** de la reconciliación | **`Fragment<Ref>` + `LocalFragment` / `StableFragment`**, ídem `DataRecord<Ref>` | R2 daría `RoutedFragment` por analogía con `NodoConRuta → RoutedNode`, y **el argumento de §4 dice justamente lo contrario**: allí `Routed` se eligió porque «la ruta no es un campo que lleva, es algo que ya se le hizo», y a un fragmento del tramo 5 **no se le hizo** nada — le **falta** algo. El precedente que sí aplica es `Breadcrumb<Ref>` / `LocalBreadcrumb` / `StableBreadcrumb`, que este mismo archivo (`outputs.ts`) ya tiene para el MISMO desajuste, y **eso era un hecho, no una regla**: nadie lo había escrito como tal. Se escribe ahora ⇒ **`Local*` es lo que existe antes de acuñar identidad y `Stable*` lo que existe después; el genérico se llama como el concepto y no lleva sufijo.** Con la regla puesta, las seis salen solas |
+| **F4** | dónde viven los nodos-fila sintéticos | **`src/synthetic.ts`**, con `GroupingCase` al lado de `Case` | El plan del paso 3 presupuestaba un archivo aparte (`synthetic-rows.ts`) y **no se hace**. El criterio es el de §10 (B2): lo que estos casos tienen de valioso **no es de qué tramo son, es de dónde salen** —de una mano, sin un adaptador—, y eso es exactamente lo que nombra `synthetic`. Partirlos por tramo parte el archivo por la única dimensión que no los distingue, y agrega una pieza y un nombre con guión que ningún otro módulo del repo tiene. El día que el criterio de `synthetic` deje de aplicarles —por ejemplo si se llenaran con la salida de un adaptador real— el rename es el acto visible que corresponde, igual que E1 lo dejó escrito para `authorship.ts` |
+
+> **La regla de F3, dicha aparte porque vale para todo lo que venga.** El pipeline
+> acuña identidad en el paso 11 y **todo lo que se produce antes** tiene el mismo
+> problema: referencia nodos que todavía no tienen `ElementId`. Ya pasó tres veces
+> —las migas, los nodos (`RoutedNode`/`EmittedNode`) y ahora las dos salidas del
+> tramo 5— y las tres veces se resolvió distinto porque la regla no estaba escrita.
+> Queda escrita: **el tipo se parametriza por `Ref` y los dos extremos se nombran
+> `Local*` y `Stable*`.** `RoutedNode`/`EmittedNode` **no se renombran** —son un caso
+> distinto: además del `Ref` cambia la forma— y se anota acá para que la excepción
+> sea una decisión y no una inconsistencia.
+
+---
+
 ## La regla que gobierna a este documento
 
 **Si un término no está acá y ninguna regla de §2 lo determina, no se inventa: se

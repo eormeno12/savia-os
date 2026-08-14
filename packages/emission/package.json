@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Tramo 4, piezas 1 y 2: ruta (de dónde cuelga cada nodo) y emisor (un solo recorrido con una pila). El reconciliador es el paso 11 y NO vive todavía acá.",
+  "description": "Tramos 4 y 5: ruta (de dónde cuelga cada nodo), emisor (un solo recorrido con una pila) y agrupación (un recorrido, dos salidas). El reconciliador es el paso 11 y NO vive todavía acá.",
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts"
@@ -13,11 +13,12 @@
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "boundaries": "node scripts/boundaries.mjs",
     "invariants": "node scripts/invariants.mjs",
     "citations": "node scripts/citations.mjs",
     "mutants": "node scripts/mutants.mjs",
-    "lint": "tsc --noEmit && node scripts/invariants.mjs && node scripts/citations.mjs && node scripts/mutants.mjs",
-    "build": "tsc --noEmit && node scripts/invariants.mjs && node scripts/citations.mjs"
+    "lint": "node scripts/boundaries.mjs && tsc --noEmit && node scripts/invariants.mjs && node scripts/citations.mjs && node scripts/mutants.mjs",
+    "build": "node scripts/boundaries.mjs && tsc --noEmit && node scripts/invariants.mjs && node scripts/citations.mjs"
   },
   "dependencies": {
     "@savia-os/ir": "workspace:*"

@@ -396,23 +396,42 @@ export type NodeInVersion = {
  *
  * Dos desviaciones del literal, las dos marcadas en su campo: `hash` se parte en
  * dos (C2) y `breadcrumbs` gana referencia (C15).
+ *
+ * PROVISIONAL(#75): el tipo se PARAMETRIZA por `Ref` y pierde DOS campos, que pasan
+ * a `StableFragment` — El tipo declaraba `nodes: ElementId[]` y `breadcrumbs:
+ * StableBreadcrumb[]`, y el tramo 5 corre ANTES del reconciliador: no hay forma de
+ * que produzca un `ElementId`. Es el MISMO desajuste que este archivo ya resolvió
+ * para las migas (`Breadcrumb<Ref>` / `LocalBreadcrumb` / `StableBreadcrumb`,
+ * PROVISIONAL(C15/#50/#73)) y para los nodos (`RoutedNode` / `EmittedNode`,
+ * PROVISIONAL(#66)), así que la respuesta es la misma y no una tercera.
+ *
+ * PARAMETRIZAR SOLO POR `Ref` NO ALCANZABA, y eso se midió: quedaban DOS campos que
+ * el tramo 5 tampoco puede producir, y por razones distintas.
+ *   · `id: FragmentId` se deriva de `(DocumentId, contextualFingerprint)`
+ *     (PROVISIONAL(#69)) y el tramo 5 no tiene documento: el `DocumentId` vive en el
+ *     envoltorio `Ingestion`, un tramo más arriba. Es el mismo argumento de H13(a)
+ *     que ya deja a `Unit` y a `RawNode` sin `id`, y se asevera igual —
+ *     `_LocalFragmentHasNoId` en `invariants.ts`.
+ *   · `contextualFingerprint` es `sha256(miga ‖ texto)` y la miga entra en la
+ *     preimagen. La NORMALIZACIÓN de ese texto está declarada ABIERTA en
+ *     `Breadcrumb` (auditoría #50, `PARAMETERS.grouping.maxBreadcrumbLength` en
+ *     `null`): calcularla hoy congela una preimagen cuya regla el propio contrato
+ *     dice que no está decidida, y esa preimagen es la base de la clave del caché de
+ *     vectores. Un hash mal preimaginado no falla: sirve el vector de otro para
+ *     siempre.
+ *
+ * Si se decide al revés (un solo `Fragment` con `ElementId`), el tramo 5 no tiene
+ * tipo de salida y lo declara localmente en `emission` — que es exactamente lo que
+ * el encabezado de `index.ts` prohíbe: «ninguna definición de este paquete se
+ * re-declara afuera».
  */
-export type Fragment = {
-  /** Ver PROVISIONAL(#69) en `FragmentId`. */
-  readonly id: FragmentId;
+export type Fragment<Ref> = {
   /** LIMPIO — las migas no van adentro (§{Las dos salidas}). */
   readonly text: string;
   /** El tramo 6 las concatena al embeber (§{Las dos salidas}). */
-  readonly breadcrumbs: readonly StableBreadcrumb[];
+  readonly breadcrumbs: readonly Breadcrumb<Ref>[];
   /** Procedencia; sobrevive a que el fragmento se rearme (§{Las dos salidas}). */
-  readonly nodes: readonly ElementId[];
-  /**
-   * La ÚNICA huella del fragmento: `sha256(miga ‖ texto)`. Identidad, dedupe y base
-   * de `FragmentId`. Ver C2 en `ContextualFingerprint` — la huella sobre texto
-   * limpio se borró. NO es la clave del caché de vectores: esa es por rebanada y
-   * lleva además la versión del embedder.
-   */
-  readonly contextualFingerprint: ContextualFingerprint;
+  readonly nodes: readonly Ref[];
   /**
    * PROVISIONAL(#74): campo NUEVO, el PEOR nivel de reconocimiento de los nodos
    * agrupados, por `rank()` — «La certeza no se queda en este tramo: viaja con el
@@ -477,6 +496,35 @@ export type Fragment = {
     readonly min: number;
     readonly hasNull: boolean;
   } | null;
+};
+
+/**
+ * El fragmento tal como sale del TRAMO 5: agrupado, sin identidad y sin huella.
+ * Referencia los nodos por su `LocalId`, que es lo único que existe antes del
+ * reconciliador.
+ */
+export type LocalFragment = Fragment<LocalId>;
+
+/**
+ * El fragmento ya reconciliado e identificado: lo que el tramo 6 embebe y el tramo 7
+ * indexa. Es el `Fragment` que el plan declara (§{Las dos salidas}).
+ *
+ * LOS DOS CAMPOS DE MÁS NO SON UN ADORNO DEL NOMBRE: son EXACTAMENTE lo que separa a
+ * los dos tramos. `id` sale de la reconciliación (por `contextualFingerprint`, y ese
+ * por las migas ya estables); la huella sale de una preimagen cuya normalización el
+ * contrato todavía declara abierta. Mientras las dos cosas falten, no hay `Fragment`
+ * completo que producir — y el tipo lo dice en vez de dejarlo a la disciplina.
+ */
+export type StableFragment = Fragment<ElementId> & {
+  /** Ver PROVISIONAL(#69) en `FragmentId`. */
+  readonly id: FragmentId;
+  /**
+   * La ÚNICA huella del fragmento: `sha256(miga ‖ texto)`. Identidad, dedupe y base
+   * de `FragmentId`. Ver C2 en `ContextualFingerprint` — la huella sobre texto
+   * limpio se borró. NO es la clave del caché de vectores: esa es por rebanada y
+   * lleva además la versión del embedder.
+   */
+  readonly contextualFingerprint: ContextualFingerprint;
 };
 
 /**
@@ -562,12 +610,23 @@ export type FieldValue = {
  * SIGUE ABIERTO (auditoría #56): los `DataRecord` no tienen destino — ni tabla, ni
  * clave, ni idempotencia en la re-ingesta, ni superficie de consulta. El tramo 7
  * (§{Tramo 7}) no los menciona.
+ *
+ * PROVISIONAL(#75): parametrizado por `Ref`, igual que `Fragment` y por la misma
+ * razón — las DOS salidas del tramo 5 salen del MISMO recorrido, así que las dos
+ * referencian nodos que todavía no tienen `ElementId`. Acá NO hay campos que sacar:
+ * un registro no lleva identidad propia ni huella, así que `StableDataRecord` es el
+ * mismo tipo con el otro `Ref` y nada más.
  */
-export type DataRecord = {
+export type DataRecord<Ref> = {
   readonly coordinate: SourceRange;
   readonly values: readonly FieldValue[];
-  readonly node: ElementId;
+  readonly node: Ref;
 };
+
+/** El registro tal como sale del TRAMO 5, antes del reconciliador. */
+export type LocalDataRecord = DataRecord<LocalId>;
+/** El registro ya reconciliado: lo que el tramo 7 hace consultable. */
+export type StableDataRecord = DataRecord<ElementId>;
 
 // ─────────────────────────────── Anotaciones (R3) ────────────────────────────
 
