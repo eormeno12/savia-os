@@ -13,7 +13,7 @@
 // asignaba a este paquete; S58 en adelante son de este paso, y cada una dice por qué
 // existe. Las que faltan viven en `emission` (S1–S16) y en `adapters` (S17–S38, S41–S57).
 
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { resolve, dirname, join } from "node:path";
 import { tmpdir } from "node:os";
@@ -21,6 +21,14 @@ import { fileURLToPath } from "node:url";
 
 const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const ruta = (r) => resolve(RAIZ, r);
+
+// Las anclas de las filas `D…`, que mutan ESTE MISMO ARCHIVO, se arman EN DOS PEDAZOS a
+// propósito: escritas enteras, cada texto aparecería DOS VECES en `scripts/mutants.mjs`
+// —la línea real y la fila que la nombra— y `soloUno()` se pondría rojo con razón. Es el
+// precio de que el arnés se mute a sí mismo, y va dicho acá y no descubierto después.
+const AL_DIARIO = `apuntar(archivo, ` + `antes);`;
+const AL_ARCHIVO = `writeFileSync(ruta(archivo), antes.replace(buscar, ` + `reemplazar), "utf8");`;
+const LADO_SEGURO = `return e.code !== ` + `"ESRCH";`;
 
 /**
  * Cada fila es una garantía y la forma exacta de romperla.
@@ -31,6 +39,13 @@ const ruta = (r) => resolve(RAIZ, r);
  *   RAZÓN correcta.
  * - `rompe`: qué SALIDA se mueve.
  * - `control`: no rompe nada y tiene que quedar VERDE.
+ * - `archivo`: opcional, y hoy lo llevan SOLO las filas `D…`, que mutan este mismo
+ *   archivo. `scripts/mutants.mjs` NO PUEDE entrar en `ARCHIVOS`: contiene literalmente el
+ *   `buscar` de todas las filas, así que `ubicar()` vería DOS archivos para cada una y la
+ *   suite entera se pondría roja. Con el destino DICHO, la unicidad la sostiene
+ *   `soloUno()` adentro del archivo, que es la mitad que importa cuando no hay a dónde
+ *   equivocarse. Mutar el arnés en caliente es inofensivo —node ya lo tiene en memoria—:
+ *   lo que cambia es lo que el guardián LEE DE DISCO, que es donde vive la garantía.
  */
 const MUTANTES = [
   // ── La orquestación ────────────────────────────────────────────────────────
@@ -362,7 +377,71 @@ const MUTANTES = [
       "único que puede acreditarlo es el que lo sufre",
   },
 
+  // ── El diario de deshacer del propio arnés ─────────────────────────────────
+  // LAS TRES FILAS QUE NO VIENEN DEL PLAN, y las únicas que llevan EL MISMO ID EN LOS
+  // CUATRO PAQUETES: acreditan la MISMA garantía sobre cuatro copias autónomas del mismo
+  // diseño. Mutan `scripts/mutants.mjs` —el único archivo que el arnés no puede ubicar
+  // solo, ver el campo `archivo` arriba— y el testigo es el guardián que sí lo lee DE
+  // DISCO.
+  //
+  // LO QUE ESTAS TRES NO ACREDITAN, dicho acá y no descubierto después: que la reparación
+  // FUNCIONE. Eso no se acredita con un mutante de texto — se acredita matando una corrida
+  // de verdad con `SIGKILL` y mirando qué hace la siguiente. Lo que estas tres fijan es que
+  // las TRES formas de perder la propiedad EDITANDO EL ARNÉS tengan un testigo que grite.
+  {
+    id: "D1",
+    garantía: "el original va al diario ANTES de que el archivo se mute",
+    rompe: "la reparación, en la ventana exacta que el diario existe para no tener",
+    archivo: "scripts/mutants.mjs",
+    cambios: [[`${AL_DIARIO}\n      ${AL_ARCHIVO}`, `${AL_ARCHIVO}\n      ${AL_DIARIO}`]],
+    espera: /muta ANTES de anotar el original/,
+    nota:
+      "invertir las dos líneas deja un intervalo en el que el archivo YA CAMBIÓ y el candado todavía no " +
+      "lo sabe. Un `SIGKILL` ahí adentro es indistinguible del bug original: mutación pegada y nadie que " +
+      "sepa revertirla. Es la fila que separa «hay un diario» de «el diario sirve»",
+  },
+  {
+    id: "D2",
+    garantía: "sin escribir el original al candado no hay nada que reparar",
+    rompe: "el diario entero: queda un candado que DETECTA y no repara",
+    archivo: "scripts/mutants.mjs",
+    cambios: [[`${AL_DIARIO}\n      `, ``]],
+    espera: /no escribe el original al candado/,
+    nota:
+      "es el estado ANTERIOR a este paso escrito como mutante: el mapa en memoria alcanzaba para el " +
+      "`finally`, para la excepción y para `SIGINT`/`SIGTERM`, y moría con el proceso ante un `SIGKILL` — " +
+      "que es justo la señal que `turbo` usa para matar las tareas concurrentes cuando otra falla",
+  },
+  {
+    id: "D3",
+    garantía: "la duda sobre si el pid del candado vive cae del lado de «vivo»",
+    rompe: "la exclusión mutua: una corrida repara encima de otra que está mutando",
+    archivo: "scripts/mutants.mjs",
+    cambios: [[LADO_SEGURO, `return false;`]],
+    espera: /da por muerto un pid del que solo duda/,
+    nota:
+      "`process.kill(pid, 0)` tira `EPERM` cuando el proceso EXISTE y es de otro usuario, y los PID se " +
+      "reusan en máquinas de mucho uptime. Con `return false` cualquier errno pasa a significar «muerto»: " +
+      "el arnés borra el candado ajeno, restaura encima de archivos que la otra corrida está mutando y las " +
+      "dos siguen. El error caro es ese, no el de negarse a arrancar",
+  },
+
   // ── Controles ──────────────────────────────────────────────────────────────
+  {
+    id: "DC1",
+    control: true,
+    garantía: "editar la prosa del docstring del diario no rompe nada",
+    archivo: "scripts/mutants.mjs",
+    cambios: [[
+      `El estado dejó de depender ` + `de que el proceso viva.`,
+      `El estado dejó de depender ` + `de que el proceso viva (control DC1).`,
+    ]],
+    nota:
+      "el par de D1, D2 y D3. Lo que el guardián mira del arnés son TRES FORMAS —que la anotación exista, " +
+      "que esté antes de la mutación y que la sonda de vida caiga del lado seguro—, no el archivo entero. " +
+      "Sin este control, un guardián que congelara el texto del corredor sería indistinguible de uno que " +
+      "verifica su forma, y congelarlo es la forma más rápida de que nadie lo mejore",
+  },
   {
     id: "SC13",
     control: true,
@@ -514,40 +593,182 @@ if (soloEste && lista.length === 0) {
   process.exit(1);
 }
 
-// ── Exclusión mutua ──────────────────────────────────────────────────────────
-// ESTE ARNÉS MUTA EL ÁRBOL DE TRABAJO EN EL LUGAR: dos corridas a la vez se pisan y al
-// restaurar dejan la mutación puesta. Falla en vez de esperar — un arnés que espera
-// parece colgado. El candado vive en el temporal del sistema: un archivo suelto en
-// `scripts/` habría que ignorarlo en git, y uno versionado por accidente es peor que no
-// tenerlo.
+// ── Exclusión mutua Y DIARIO DE DESHACER ─────────────────────────────────────
+/**
+ * UN SOLO ARCHIVO EN `tmpdir()` HACE DOS COSAS, y conviene no confundirlas:
+ *
+ *   (a) CANDADO — impide DOS corridas a la vez sobre el mismo árbol. Se pisan: la
+ *       segunda captura como «original» un archivo que la primera ya mutó, y al
+ *       restaurar deja la mutación puesta.
+ *   (b) DIARIO DE DESHACER — el original de cada archivo se escribe ACÁ, EN DISCO, ANTES
+ *       de mutarlo, y se borra de acá al restaurarlo. Es lo ÚNICO que sobrevive a un
+ *       `SIGKILL`.
+ *
+ * POR QUÉ (b), MEDIDO DOS VECES EN DOS DÍAS. El mapa de originales vivía SOLO EN MEMORIA
+ * y se volcaba desde el handler de `exit`, que cubre la salida normal, la excepción,
+ * `SIGINT` y `SIGTERM` — y NO cubre `SIGKILL`, que POR DEFINICIÓN no ejecuta ningún
+ * handler. `turbo` mata las tareas concurrentes cuando otra falla, y el disparador era el
+ * `lint` de `design-tokens`, que nombraba un `eslint` que ese paquete no instala. Las dos
+ * veces el mapa murió con el proceso: una dejó `src/markdown.ts` con `role: "heading"`
+ * pegado, la otra ocho archivos de `packages/ir/src`. El candado sobrevivía y bloqueaba la
+ * corrida siguiente con el mensaje correcto, pero SOLO DETECTABA: reparar quedaba para un
+ * humano con el `git diff` en la mano. Con el diario, la corrida siguiente REPARA SOLA y
+ * lo dice. El estado dejó de depender de que el proceso viva.
+ *
+ * ENCONTRAR EL CANDADO YA NO SIGNIFICA UNA SOLA COSA. Antes era «hay otra corrida». Ahora
+ * es eso O «alguien murió y hay que reparar», y confundirlos es PEOR que el problema
+ * original: un huérfano que bloquea para siempre, o dos corridas que se pisan creyendo
+ * cada una que la otra murió. Se distinguen por si el PID que escribió el candado SIGUE
+ * VIVO (`process.kill(pid, 0)`).
+ *
+ * EL LADO SEGURO DE LA DUDA ES «ESTÁ VIVO», y lo decide la ASIMETRÍA DEL ERROR, no la
+ * probabilidad. `process.kill(pid, 0)` tira `ESRCH` cuando el proceso no existe y `EPERM`
+ * cuando existe pero es de otro usuario; y en una máquina de mucho uptime un PID muerto
+ * puede haberse REUSADO, así que ni siquiera «vivo» prueba que sea nuestra corrida. Por
+ * eso SOLO `ESRCH` cuenta como muerto: `EPERM`, cualquier otro errno y un candado que no
+ * parsea se tratan como corrida VIVA y el arnés se niega a arrancar. Un falso «está vivo»
+ * cuesta una corrida que no arranca y un mensaje que dice exactamente qué mirar y qué
+ * borrar — recuperable a mano. Un falso «está muerto» hace que dos corridas se pisen, o
+ * que una repare encima de otra que está a mitad de mutar, que es EL defecto que el
+ * candado existe para impedir.
+ *
+ * El candado vive en el directorio temporal del sistema y no adentro del paquete: un
+ * archivo suelto en `scripts/` habría que ignorarlo en git, y un candado versionado por
+ * accidente es peor que no tenerlo. La clave es la ruta del paquete, que es lo que
+ * identifica al árbol que se está mutando.
+ */
 const CANDADO = join(tmpdir(), `savia-mutants-${Buffer.from(RAIZ).toString("base64url")}.lock`);
-if (existsSync(CANDADO)) {
-  console.error(
-    `ORCHESTRATION-ERR: ya hay otra corrida de mutantes en este árbol (${CANDADO}).\n` +
-      `  Este arnés muta \`src/\` en el lugar: dos a la vez se pisan y dejan mutaciones pegadas.\n` +
-      `  Si estás seguro de que no hay ninguna corriendo, borrá el archivo.`,
-  );
-  process.exit(1);
-}
-writeFileSync(CANDADO, `${process.pid}\n`, "utf8");
-const soltar = () => rmSync(CANDADO, { force: true });
+const PARCIAL = `${CANDADO}.${process.pid}.parcial`;
+
+/** Sólo `ESRCH` prueba que no está. Todo lo demás cae del lado de «vivo» — ver arriba. */
+const vivo = (pid) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return e.code !== "ESRCH";
+  }
+};
+
+const DIARIO = { pid: process.pid, desde: new Date().toISOString(), originales: {} };
 
 /**
- * LO QUE HAY QUE DEVOLVER SI EL PROCESO MUERE, y por qué no alcanza con el `finally` de
- * la vuelta.
+ * El diario se escribe ENTERO en un archivo aparte y se RENOMBRA encima. Un `SIGKILL` en
+ * la mitad de un `writeFileSync` dejaría un diario truncado —el único estado del que YA NO
+ * SE PUEDE reparar, porque no se sabe qué falta devolver—, y `rename` sobre el mismo
+ * filesystem es atómico: el candado es siempre o el de antes o el de después.
+ */
+const volcar = () => {
+  writeFileSync(PARCIAL, JSON.stringify(DIARIO), "utf8");
+  renameSync(PARCIAL, CANDADO);
+};
+
+/**
+ * Toma el candado, o devuelve el texto del que ya está. `wx` CREA-O-FALLA en UNA sola
+ * llamada al sistema: con `existsSync` y después `writeFileSync` hay una ventana entre las
+ * dos en la que dos corridas ven el candado libre y las dos lo escriben. Reintenta una vez
+ * si el candado desaparece entre el `wx` y la lectura — eso es una corrida ajena que acaba
+ * de terminar, no un huérfano.
+ */
+const tomar = () => {
+  for (let intento = 0; intento < 2; intento += 1) {
+    try {
+      writeFileSync(CANDADO, JSON.stringify(DIARIO), { encoding: "utf8", flag: "wx" });
+      return null;
+    } catch (e) {
+      if (e.code !== "EEXIST") throw e;
+    }
+    try {
+      return readFileSync(CANDADO, "utf8");
+    } catch (e) {
+      if (e.code !== "ENOENT") throw e;
+    }
+  }
+  return "";
+};
+
+{
+  let previo = tomar();
+  if (previo !== null) {
+    let ajeno = null;
+    try {
+      const leído = JSON.parse(previo);
+      if (leído !== null && typeof leído === "object" && Number.isInteger(leído.pid)) ajeno = leído;
+    } catch {
+      ajeno = null;
+    }
+
+    if (ajeno === null || vivo(ajeno.pid)) {
+      console.error(
+        `ORCHESTRATION-ERR: hay otro candado de mutantes en este árbol y NO se puede dar por muerto.\n` +
+          `  candado: ${CANDADO}\n` +
+          `  ${ajeno === null ? "no parsea: no dice de quién es ni qué habría que devolver" : `lo tiene el pid ${ajeno.pid}, y ese pid sigue vivo`}\n` +
+          `  Este arnés muta el árbol EN EL LUGAR: dos corridas a la vez se pisan y dejan mutaciones\n` +
+          `  pegadas. La duda cae del lado de «está vivo» a propósito: negarse a correr se arregla a\n` +
+          `  mano, pisarse no. Si estás seguro de que no hay ninguna corriendo, mirá \`git diff\` y\n` +
+          `  borrá el archivo.`,
+      );
+      process.exit(1);
+    }
+
+    // HUÉRFANO: el pid está muerto y lo que dejó anotado es exactamente lo que falta
+    // devolver. Se restaura ANTES de tomar el candado, y el orden importa poco porque
+    // reparar es IDEMPOTENTE: si esto se muere en la mitad, el diario sigue en disco y la
+    // corrida siguiente vuelve a escribir los mismos bytes.
+    const pendientes = Object.entries(ajeno.originales ?? {});
+    for (const [archivo, texto] of pendientes) writeFileSync(ruta(archivo), texto, "utf8");
+    rmSync(CANDADO, { force: true });
+    previo = tomar();
+    if (previo !== null) {
+      console.error(
+        `ORCHESTRATION-ERR: reparé el candado huérfano del pid ${ajeno.pid} y otra corrida se lo llevó\n` +
+          `  antes que yo. No sigo: dos corridas a la vez se pisan.`,
+      );
+      process.exit(1);
+    }
+    console.error(
+      pendientes.length === 0
+        ? `ORCHESTRATION-AVISO: había un candado HUÉRFANO (pid ${ajeno.pid}, muerto) sin nada pendiente. Lo tomé y sigo.`
+        : `ORCHESTRATION-AVISO: había un candado HUÉRFANO (pid ${ajeno.pid}, muerto) con ${pendientes.length} archivo(s) sin restaurar.\n` +
+            `  Los devolví antes de arrancar — la corrida anterior murió sin poder hacerlo, que es para lo\n` +
+            `  que el original va al candado ANTES de mutar:\n` +
+            pendientes.map(([a]) => `    ${a}`).join("\n"),
+    );
+  }
+}
+
+const soltar = () => {
+  rmSync(CANDADO, { force: true });
+  rmSync(PARCIAL, { force: true });
+};
+
+/**
+ * LO QUE HAY QUE DEVOLVER SI EL PROCESO MUERE, en los DOS lugares donde vive.
  *
- * SE MIDIÓ EN ESTE PASO. `turbo` MATA las tareas concurrentes cuando otra falla, y un
- * `SIGTERM` no ejecuta el `finally` del bucle: la corrida se cortó con la mutación de
- * `S18` puesta y dejó `src/markdown.ts` con `role: "heading"` pegado. El síntoma en la
- * corrida siguiente fue «el árbol NO está verde antes de mutar», que es el mensaje
- * correcto — pero recién en la corrida SIGUIENTE, y con el árbol de trabajo sucio en el
- * medio. El mapa vive afuera del bucle y se vacía en el handler de `exit`, que node sí
- * corre en el camino de `process.exit()` y que es síncrono, igual que `writeFileSync`.
+ * `ORIGINALES` es el mapa en memoria y `DIARIO.originales` su copia en disco: las dos se
+ * escriben en `apuntar()` —ANTES de mutar— y las dos se vacían en `restaurar()`. El
+ * handler de `exit` cubre lo que el `finally` de la vuelta NO cubre (la señal), y node lo
+ * corre también en el camino de `process.exit()`; es síncrono, igual que `writeFileSync`.
+ * El diario cubre lo que NINGÚN handler cubre: `SIGKILL`.
+ *
+ * EL ORDEN DE `restaurar()` NO ES CASUAL: primero los archivos, DESPUÉS el diario. Si se
+ * muere en el medio, el diario todavía nombra archivos que ya volvieron y la corrida
+ * siguiente les escribe los mismos bytes, que es inofensivo. Al revés, la ventana dejaría
+ * archivos mutados que ya nadie sabe deshacer.
  */
 const ORIGINALES = new Map();
+const apuntar = (archivo, texto) => {
+  if (ORIGINALES.has(archivo)) return;
+  ORIGINALES.set(archivo, texto);
+  DIARIO.originales[archivo] = texto;
+  volcar();
+};
 const restaurar = () => {
+  if (ORIGINALES.size === 0) return;
   for (const [archivo, texto] of ORIGINALES) writeFileSync(ruta(archivo), texto, "utf8");
   ORIGINALES.clear();
+  DIARIO.originales = {};
+  volcar();
 };
 process.on("exit", () => {
   restaurar();
@@ -568,10 +789,10 @@ let fallos = 0;
 for (const m of lista) {
   try {
     for (const [buscar, reemplazar] of m.cambios) {
-      const archivo = ubicar(buscar);
+      const archivo = m.archivo ?? ubicar(buscar);
       const antes = readFileSync(ruta(archivo), "utf8");
-      if (!ORIGINALES.has(archivo)) ORIGINALES.set(archivo, antes);
       soloUno(antes, buscar, m.id);
+      apuntar(archivo, antes);
       writeFileSync(ruta(archivo), antes.replace(buscar, reemplazar), "utf8");
     }
 

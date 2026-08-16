@@ -124,6 +124,72 @@ const FRONTERAS = [
   }
 }
 
+// ── El DIARIO DE DESHACER del corredor de mutación · dueño ÚNICO ─────────────
+// La tercera mitad de la regla de arriba, y la que cubre el modo de falla que las otras
+// dos NO ven. El corredor muta el árbol EN EL LUGAR, así que lo único que lo hace seguro
+// es que el original de cada archivo esté EN DISCO antes de que el archivo cambie. Un
+// `SIGKILL` —el que `turbo` manda a las tareas concurrentes cuando otra falla— NO EJECUTA
+// NINGÚN HANDLER: un mapa en memoria muere con el proceso y la mutación queda pegada sin
+// nadie que sepa revertirla. Pasó dos veces en dos días, y una fue ACÁ: ocho archivos de
+// `packages/ir/src` mutados, más `adapters/src/markdown.ts` con `role: "heading"` puesto.
+//
+// Se mira ACÁ porque el corredor NO PUEDE correrse a sí mismo adentro de su propia cadena
+// —se quita de ella por eso—, así que el único testigo posible de su forma es un guardián
+// que lo lea de disco. Tres formas de perder la propiedad EDITANDO EL CORREDOR, y una fila
+// de mutación por cada una (D1, D2, D3):
+//
+//   (a) que la anotación NO ESTÉ;
+//   (b) que esté DESPUÉS de la mutación — deja una ventana en la que el archivo ya cambió
+//       y el diario todavía no lo sabe, que es el estado exacto que el diario existe para
+//       no tener;
+//   (c) que la sonda de vida dé por MUERTO un pid del que solo duda. `process.kill(pid, 0)`
+//       tira `EPERM` cuando el proceso existe y es de otro usuario, y los PID se reusan:
+//       solo `ESRCH` prueba que no está. Un falso «muerto» hace que una corrida repare
+//       encima de otra VIVA, que es el defecto que el candado existe para impedir.
+//
+// NO se congela el texto del corredor: se miran esas tres formas y nada más. El control
+// DC1 del propio corredor es el que lo deja verificado.
+{
+  const arnés = readFileSync(join(RAIZ, MUTANTES), "utf8");
+  const anotar = arnés.indexOf(`apuntar(archivo, antes);`);
+  const mutar = arnés.indexOf(`writeFileSync(ruta(archivo), antes.replace(buscar, reemplazar), "utf8");`);
+  const desde = arnés.indexOf("const vivo = (pid)");
+  const hasta = arnés.indexOf("const DIARIO =");
+  const sonda = desde === -1 || hasta <= desde ? "" : arnés.slice(desde, hasta);
+
+  if (anotar === -1) {
+    console.error(
+      `IR-ERR: el corredor de mutación no escribe el original al candado — ${MUTANTES}\n` +
+        "        no anota el texto de antes en el diario antes de mutar\n" +
+        "        el candado vuelve a ser un DETECTOR: avisa en la corrida siguiente y deja la\n" +
+        "        reparación para un humano con `git diff`. Un `SIGKILL` no ejecuta handlers, así\n" +
+        "        que el mapa en memoria no es un respaldo de nada",
+    );
+    process.exit(1);
+  }
+  if (mutar === -1 || anotar > mutar) {
+    console.error(
+      `IR-ERR: el corredor de mutación muta ANTES de anotar el original — ${MUTANTES}\n` +
+        "        escribe el archivo mutado y recién después toca el diario\n" +
+        "        entre las dos escrituras hay un intervalo en el que el archivo YA CAMBIÓ y el\n" +
+        "        candado no lo sabe: morir ahí adentro es indistinguible de no tener diario.\n" +
+        "        El orden es la garantía, no la presencia",
+    );
+    process.exit(1);
+  }
+  if (!sonda.includes(`e.code !== "ESRCH"`) || sonda.includes("return false;")) {
+    console.error(
+      `IR-ERR: el corredor de mutación da por muerto un pid del que solo duda — ${MUTANTES}\n` +
+        "        la sonda de vida del candado no trata `ESRCH` como el ÚNICO errno que prueba la\n" +
+        "        muerte. `process.kill(pid, 0)` tira `EPERM` cuando el proceso existe y es de otro\n" +
+        "        usuario, y los PID se reusan. Un falso «está muerto» hace que dos corridas se\n" +
+        "        pisen —el defecto que el candado existe para impedir—; un falso «está vivo» solo\n" +
+        "        cuesta una corrida que no arranca, y eso se arregla a mano",
+    );
+    process.exit(1);
+  }
+}
+
 /** Módulos que el BFS encontró importados y no están en disco. */
 const faltantes = new Set();
 
