@@ -453,6 +453,134 @@ const MUTANTES = [
       "descubrir en producción",
   },
 
+  // ── Paso 4 · el piso de texto ──────────────────────────────────────────────
+  //
+  // Las siete filas de este bloque acreditan un camino que hasta hoy NUNCA había
+  // corrido: el `.md` siempre gana su archivo, así que `Evidence.Floor`, el segundo
+  // nivel del `pool` y `achievedLevel:'plain_text'` estaban escritos en el contrato y
+  // no los tocaba ningún caso.
+  {
+    id: "S74",
+    garantía: "el piso decide por CONTENIDO, nunca por la extensión",
+    rompe: "el piso entero: pasa a ser un adaptador de `.txt` disfrazado",
+    cambios: [[
+      `      printableProportionOf(probe.magicBytes) >= minPrintableProportion\n        ? Evidence.Floor\n        : Evidence.None,`,
+      `      probe.extension === "txt" &&\n      printableProportionOf(probe.magicBytes) >= minPrintableProportion\n        ? Evidence.Floor\n        : Evidence.None,`,
+    ]],
+    espera: /I15 · el piso reclama por contenido, no por extensión/,
+    nota:
+      "ES LA MUTACIÓN PLAUSIBLE Y LA QUE MÁS DUELE: leer la extensión es un renglón más corto que " +
+      "medir la ventana, y el resultado sobre un `.txt` es idéntico. Lo que se pierde son EXACTAMENTE " +
+      "los archivos por los que el piso existe —el `.conf`, el `.ini`, el `.properties`, el `.log` sin " +
+      "extensión conocida— que en una empresa son todos los que hay, porque `.txt` no lo escribe nadie. " +
+      "POR ESO EL CORPUS NO TIENE UN `.txt`: con uno adentro esta fila pasaría en verde y la propiedad " +
+      "quedaría sin probar. La mutación CONSERVA la medición para que el parámetro siga en uso — con " +
+      "`probe.extension === \"txt\"` a secas el mutante muere en TS6133 y la fila la acreditaría el " +
+      "linter en vez del guardián",
+  },
+  {
+    id: "S75",
+    garantía: "el gate de imprimibles CORTA: lo que no es texto no entra por el piso",
+    rompe: "la confianza en la memoria — basura binaria indexada, que el plan declara IRREVERSIBLE",
+    cambios: [[
+      `      printableProportionOf(probe.magicBytes) >= minPrintableProportion`,
+      `      printableProportionOf(probe.magicBytes) <= minPrintableProportion`,
+    ]],
+    espera: /I16 · C · lo que no es texto y nadie sabe leer no se indexa/,
+    nota:
+      "una comparación dada vuelta, que es de las mutaciones más baratas de escribir sin querer. El " +
+      "archivo de texto SIGUE ENTRANDO —mide exactamente el umbral, así que el `<=` también lo acepta— " +
+      "y por eso ni el golden ni la rama A se mueven: lo único que cambia es que el `.png` pasa a " +
+      "indexarse. Es el falso positivo que el umbral existe para minimizar, y su costo es el que el " +
+      "plan carga con todas las letras: «erosiona la confianza en la memoria, que es el producto " +
+      "entero» (§{Qué se acepta})",
+  },
+  {
+    id: "S76",
+    garantía: "`U+FFFD` cuenta como NO imprimible: es la huella de un binario leído como texto",
+    rompe: "el detector: un archivo de bytes arbitrarios mide 1.00 y entra entero",
+    cambios: [[`const UNPRINTABLE = /\\p{C}|\\uFFFD/u;`, `const UNPRINTABLE = /\\p{C}/u;`]],
+    espera: /I15 · lo que no es UTF-8 válido no mide como texto/,
+    nota:
+      "ACREDITACIÓN POR CASUALIDAD BUSCADA Y CERRADA, Y ES LA CARA DE LA CLASE CARA. `U+FFFD` es " +
+      "categoría `So` y no `C`, así que quitarlo del regex compila y se lee razonable. La primera " +
+      "versión de esta fila apoyaba el caso en el `.png` del corpus y PASABA EN VERDE: medido, el " +
+      "binario da 0.4402 con la regla y 0.8120 sin ella, o sea que sigue por debajo del umbral y la " +
+      "rama C no se mueve. El invariante se reescribió con una ventana propia —cuatro bytes que ningún " +
+      "decodificador puede leer, que sin la regla miden 1.00 exacto— y recién ahí la fila acredita algo",
+  },
+  {
+    id: "S77",
+    garantía: "el piso nunca declara más que `Floor`",
+    rompe: "la selección: le gana archivos a los adaptadores que sí saben leerlos",
+    cambios: [[`        ? Evidence.Floor\n        : Evidence.None,`, `        ? Evidence.Extension\n        : Evidence.None,`]],
+    espera: /I15 · el piso nunca declara más que `Floor`/,
+    nota:
+      "`Floor` es el escalón que la escala le RESERVA y el único que el `pool` de dos niveles trata " +
+      "aparte (PROVISIONAL(#429) de `ir`). Con un peldaño más el piso entra al `pool` de arriba, y ahí " +
+      "el desempate lo decide el ORDEN ALFABÉTICO del id — o sea que qué adaptador lee un archivo " +
+      "pasaría a depender de cómo alguien llamó al suyo. Es también la fila que explica por qué " +
+      "`achievedLevel` NO se deriva de `a.id === 'piso'`: con la comparación por identidad, esta " +
+      "mutación dejaría el nivel diciendo `plain_text` sobre un archivo que ganó por `Extension`",
+  },
+  {
+    id: "S78",
+    garantía: "el piso se ABSTIENE siempre: no inventa estructura donde no hay formato",
+    rompe: "la métrica de atribución — un clasificador aparece resolviendo lo que nadie miró",
+    cambios: [[
+      `  detect: () => (): Classification | null => null,`,
+      `  detect: () => (): Classification | null => ({ role: "paragraph", hint: null }),`,
+    ]],
+    espera: /I17 · todo nodo del piso lo resolvió el piso físico/,
+    nota:
+      "EL ROL NO CAMBIA —`roleFromBody` de un `text_span` ya da `paragraph`— y esa es justamente la " +
+      "trampa: la salida se ve idéntica salvo por dos campos que nadie renderiza. Lo que se pierde es " +
+      "que `attribution: null` significa «lo resolvió el piso» y NADIE MÁS lo escribe: con el piso " +
+      "disfrazado de eslabón, «si en DOCX el 60 % lo resuelve `porProminencia` en vez de `porStyleId`, " +
+      "hay un mapa de estilos incompleto» (§{Observabilidad}) es una lectura imposible. Es la razón por " +
+      "la que el piso NO tiene cascada: un eslabón que mirara líneas cortas inventaría títulos y los " +
+      "estamparía como si el documento los hubiera dicho",
+  },
+  {
+    id: "S79",
+    garantía: "el salto de línea de adentro de un bloque se conserva; el corte es la línea EN BLANCO",
+    rompe: "el texto indexado: tres líneas de configuración se vuelven una oración",
+    cambios: [[`  text: open.text.join("\\n"),`, `  text: open.text.join(" "),`]],
+    espera: /I17 · el salto de línea de adentro de un bloque se conserva/,
+    nota:
+      "el piso NO SABE si el salto lo puso el autor o el ancho de una terminal, y adivinarlo es leer un " +
+      "formato que no existe. La huella no se mueve —`text_span` se proyecta por PALABRA— así que la " +
+      "identidad del nodo es idéntica y ningún invariante de proyección se entera: lo único que cambia " +
+      "es lo que un humano lee en el resultado de una búsqueda. El sellado vive en UN solo sitio " +
+      "(`sealOf`) y por eso esta fila tiene un ancla única; con las dos copias que tenía la primera " +
+      "versión, `ubicar` habría rechazado la fila en vez de mutar",
+  },
+  {
+    id: "S80",
+    garantía: "el umbral entra POR PARÁMETRO: `minPrintableProportion` sigue `Pending`",
+    rompe: "nada visible hoy — y ese es el punto: el pendiente pasa a ser decorativo",
+    cambios: [
+      [
+        `export const textFloorAdapter = (\n  minPrintableProportion: number,\n)`,
+        `export const textFloorAdapter = (\n  _minPrintableProportion: number,\n)`,
+      ],
+      [
+        `      printableProportionOf(probe.magicBytes) >= minPrintableProportion`,
+        `      printableProportionOf(probe.magicBytes) >= 0.8`,
+      ],
+    ],
+    espera: /I16 · la decisión la toma el umbral/,
+    nota:
+      "ES EL NÚMERO INVENTADO ENTRANDO POR LA VENTANA, escrito como lo escribiría alguien de buena fe: " +
+      "0.8 SUENA medido. `PARAMETERS.intake.minPrintableProportion` es `Pending<number>` con su plan de " +
+      "medición escrito («curva ROC sobre un corpus etiquetado binario/texto») y con la asimetría " +
+      "declarada, y ningún caso del corpus distingue 0.8 de un umbral bien elegido — por eso lo que el " +
+      "guardián verifica no es el VALOR sino que el parámetro GOBIERNE: con el literal puesto, los dos " +
+      "pisos del invariante se comportan igual y la frontera deja de moverse. La fila necesita DOS " +
+      "cambios porque quitar el uso del parámetro sin renombrarlo muere en TS6133 y acreditaría al " +
+      "linter",
+  },
+
   // ── El borde R1 y el confinamiento de la dependencia ───────────────────────
   {
     id: "S54",
@@ -475,9 +603,14 @@ const MUTANTES = [
     id: "S55",
     garantía: "no hay `delegar()`: `adapters` no puede alcanzar la orquestación",
     rompe: "el grafo de paquetes: la delegación deja de ser emergente y pasa a ser una llamada",
+    // EL ANCLA CRECIÓ EN EL PASO 4, y el motivo va escrito: `src/floor.ts` abre con el
+    // MISMO prefijo de import, así que `import {⏎ Evidence, PARAMETERS, asAdapterId,`
+    // pasó a encontrar DOS archivos y `ubicar()` rechazó la fila. Es el arnés
+    // funcionando: un ancla ambigua muta el archivo equivocado, y el `espera` de abajo
+    // nombra a `markdown.ts`. `asLocalId` es lo que distingue a los dos.
     cambios: [[
-      `import {\n  Evidence,\n  PARAMETERS,\n  asAdapterId,`,
-      `import { ingest } from "@savia-os/orchestration";\nexport const _delegar = ingest;\nimport {\n  Evidence,\n  PARAMETERS,\n  asAdapterId,`,
+      `import {\n  Evidence,\n  PARAMETERS,\n  asAdapterId,\n  asLocalId,`,
+      `import { ingest } from "@savia-os/orchestration";\nexport const _delegar = ingest;\nimport {\n  Evidence,\n  PARAMETERS,\n  asAdapterId,\n  asLocalId,`,
     ]],
     espera: /frontera cruzada · src\/markdown\.ts {2}↛ {2}@savia-os\/orchestration/,
     nota:
@@ -637,6 +770,21 @@ const MUTANTES = [
       "no se re-declare acá",
   },
   {
+    id: "SC18",
+    control: true,
+    garantía: "renombrar una variable local del piso no cambia nada",
+    cambios: [[`  const out: Block[] = [];`, `  const salida: Block[] = [];\n  const out = salida;`]],
+    nota:
+      "el par de S79: lo que esa fila fija es QUÉ texto sale de un bloque, no cómo se llama el " +
+      "acumulador que lo junta",
+  },
+  // Acá se propuso un control «cambiar el prefijo del ancla del piso no rompe nada», con
+  // el argumento de que lo que I17 fija es DÓNDE corta el piso y no cómo se llama el
+  // prefijo. Se corrió y salió ROJO: la tabla de I17 compara las anclas ENTERAS, así que
+  // el prefijo sí está pinchado. La hipótesis era falsa y el control se borra en vez de
+  // relajar el invariante para que el control sobreviva — que es la forma exacta de
+  // convertir un guardián en un espejo.
+  {
     id: "SC12",
     control: true,
     garantía: "editar la prosa de un docstring no rompe nada",
@@ -661,6 +809,12 @@ const MUTANTES = [
 const ARCHIVOS = [
   "src/registry.ts",
   "src/markdown.ts",
+  // Entra en el paso 4 con S74–S80. Los dos archivos nuevos del corpus NO entran: no
+  // aloja ninguna mutación un `.conf` cuyo contenido es irrelevante para las filas —lo
+  // que decide es su EXTENSIÓN, y eso lo verifica S74 renombrándolo en memoria— y el
+  // `.png` es binario, así que una mutación textual sobre él no es escribible. Que estén
+  // en disco lo exige `boundaries.mjs`, que es donde corresponde.
+  "src/floor.ts",
   "src/index.ts",
   "src/env.d.ts",
   "package.json",

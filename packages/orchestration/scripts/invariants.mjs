@@ -90,17 +90,25 @@ try {
   compilar(RAIZ, destino);
 
   const { contextOf, ingest } = await import(pathToFileURL(join(destino, "index.js")).href);
-  const { markdownAdapter, opaqueOf, registryOf } = await import(
-    pathToFileURL(join(nm, "adapters", "index.js")).href
-  );
+  const {
+    TEXT_FLOOR_ID,
+    coldProbeOf,
+    markdownAdapter,
+    opaqueOf,
+    printableProportionOf,
+    registryOf,
+    textFloorAdapter,
+  } = await import(pathToFileURL(join(nm, "adapters", "index.js")).href);
   const { Evidence, asAdapterId, asLocalId, cohesionOf } = await import(
     pathToFileURL(join(nm, "ir", "index.js")).href
   );
 
   const sha256 = (preimagen) => createHash("sha256").update(preimagen, "utf8").digest("hex");
-  const bytes = new Uint8Array(
-    readFileSync(join(realpathSync(DEP("adapters")), "corpus", "manual.md")),
-  );
+  const corpus = (archivo) =>
+    new Uint8Array(readFileSync(join(realpathSync(DEP("adapters")), "corpus", archivo)));
+  const bytes = corpus("manual.md");
+  const conf = corpus("servidor.conf");
+  const png = corpus("sello.png");
 
   const REGISTRO = registryOf([opaqueOf(markdownAdapter)]);
   const OPCIONES = {
@@ -152,6 +160,7 @@ try {
         })),
         registros: corrida.records,
         sumidero: corrida.sink,
+        enEspera: corrida.onHold,
       },
       null,
       2,
@@ -428,12 +437,134 @@ try {
     }
   }
 
+  // ── EL PISO DE TEXTO, DE PUNTA A PUNTA ────────────────────────────────────
+  // El umbral sale de MEDIR el corpus y no de elegir un número:
+  // `PARAMETERS.intake.minPrintableProportion` es `Pending<number>` y sigue estándolo.
+  // Es la misma disciplina que `targetSizeChars`, y por la misma razón.
+  const UMBRAL = printableProportionOf(coldProbeOf(conf, null).magicBytes);
+  const CON_PISO = registryOf([opaqueOf(markdownAdapter), opaqueOf(textFloorAdapter(UMBRAL))]);
+
+  // ── I10 · LA DEGRADACIÓN ES REAL Y ES VISIBLE ─────────────────────────────
+  // Las DOS mitades, y las dos hacen falta. Que el archivo entre —«nunca se pierde un
+  // archivo»— y que DIGA que entró degradado. Un documento degradado que se recupera
+  // exactamente igual que uno completo es el defecto: quien consume la memoria no puede
+  // saber que lo que está leyendo perdió su estructura.
+  {
+    const r = await ingest(conf, { ...OPCIONES, name: "servidor.conf", registry: CON_PISO });
+    if (r.adapter !== TEXT_FLOOR_ID || r.nodes.length === 0 || r.fragments.length === 0) {
+      fallar(
+        "I10 · un archivo que ningún adaptador reclama entra igual",
+        `adapter=${JSON.stringify(r.adapter)} nodos=${r.nodes.length} fragmentos=${r.fragments.length}`,
+        "hasta este paso el camino del piso estaba escrito en el contrato y NUNCA había corrido: el `.md` siempre ganaba su archivo, así que `Evidence.Floor`, el segundo nivel del `pool` y `achievedLevel:'plain_text'` eran código que ningún caso tocaba",
+      );
+    }
+    if (r.achievedLevel !== "plain_text" || r.onHold !== null) {
+      fallar(
+        "I10 · …y DICE que entró degradado",
+        `achievedLevel=${JSON.stringify(r.achievedLevel)} onHold=${r.onHold === null ? "null" : "presente"}`,
+        "es la mitad cara. `achievedLevel` es el campo que «vuelve visible la degradación» (§{Tramo 1 › El registro}) y se deriva de `evidence > Floor`: sin él, un `.conf` sin estructura y un `.md` con sus secciones se recuperan idénticos y nadie puede decir cuál perdió el árbol. Y `onHold` tiene que ser `null` porque este archivo SÍ se indexó",
+      );
+    }
+    // Y LAS DOS CORRIDAS SON DISTINGUIBLES. Sin esta comparación, «dice plain_text» lo
+    // cumpliría un pipeline que dijera `plain_text` para todo.
+    if (r.achievedLevel === corrida.achievedLevel) {
+      fallar(
+        "I10 · el degradado y el completo no se reportan igual",
+        `el .conf y el .md dieron los dos ${JSON.stringify(r.achievedLevel)}`,
+        "el campo existe para SEPARAR los dos casos. Un valor constante lo satisface y no informa nada: la métrica de degradación de §{Observabilidad} pasaría a ser una columna con un solo valor",
+      );
+    }
+    // El piso en el registro NO le roba el archivo al dedicado, y el golden lo prueba
+    // sin repetirse: la corrida del `.md` con el piso puesto tiene que ser IDÉNTICA.
+    const conPiso = await ingest(bytes, { ...OPCIONES, registry: CON_PISO });
+    if (!igual(conPiso, corrida)) {
+      fallar(
+        "I10 · agregar el piso al registro no mueve al `.md`",
+        "la misma corrida con el piso registrado dio otra salida",
+        "`Floor` no compite en el mismo `sort` que los dedicados (PROVISIONAL(#429)), y esta es la única fila que lo mide sobre el pipeline ENTERO en vez de sobre `select`: si el piso ganara, todo documento estructurado del corpus se indexaría como texto plano",
+      );
+    }
+  }
+
+  // ── I11 · GUARDAR ES INCONDICIONAL; INDEXAR NO ────────────────────────────
+  // El piso es de TEXTO y no es universal. Lo que no es texto y nadie sabe leer NO se
+  // indexa —indexar basura binaria es el falso positivo de costo IRREVERSIBLE— pero
+  // tampoco se pierde: queda `on_hold`, con lo necesario para reprocesarlo el día que
+  // llegue el adaptador. `on_hold` no es «rechazado», es «todavía no lo soportamos».
+  {
+    const antes = JSON.stringify(png);
+    const r = await ingest(png, { ...OPCIONES, name: "sello.png", registry: CON_PISO }).catch(
+      (e) => ({ tiró: String(e) }),
+    );
+    if (r.tiró !== undefined) {
+      fallar(
+        "I11 · lo que no se indexa tampoco lanza",
+        `lanzó ${r.tiró}`,
+        "un formato sin soporte es el caso NORMAL de una empresa, no una excepción. Convertirlo en throw obliga a capturar en cada llamador y borra la diferencia entre «en espera» y «roto»",
+      );
+    } else if (r.adapter !== null || r.nodes.length !== 0 || r.fragments.length !== 0) {
+      fallar(
+        "I11 · lo que no es texto y nadie sabe leer no se indexa",
+        `adapter=${JSON.stringify(r.adapter)} nodos=${r.nodes.length} fragmentos=${r.fragments.length}`,
+        "el plan le carga a este gate la consecuencia máxima: «erosiona la confianza en la memoria, que es el producto entero» (§{Qué se acepta}). Basura binaria indexada es costo irreversible; texto en espera es recuperable, y por eso el umbral se calibra hacia este lado",
+      );
+    } else {
+      const códigos = r.sink.notices.map((n) => n.code);
+      if (!códigos.includes("intake.on_hold")) {
+        fallar(
+          "I11 · el rechazo a indexar se AVISA",
+          `los avisos fueron ${JSON.stringify(códigos)}`,
+          "sin el aviso, un documento que nadie sabe leer sale EXACTAMENTE igual que uno que alguien leyó y del que no sacó nada, y «ninguna información se descarta en silencio» lo cumple por no haber nada escrito. Rechazar es información útil —«todavía no soportamos esto»—; rechazar callado es daño mudo",
+        );
+      }
+      if (r.onHold === null || r.onHold.extension !== "png" || r.onHold.size !== png.length) {
+        fallar(
+          "I11 · lo que queda en espera lleva con qué reintentarlo",
+          `onHold=${JSON.stringify(r.onHold === null ? null : { extension: r.onHold.extension, size: r.onHold.size })}`,
+          "«se reprocesa el día que llegue el adaptador» solo es una promesa cumplible si queda escrito QUÉ estaba esperando: el barrido del plan corre «solo su `evidencia()` contra las sondas guardadas — se recorre una tabla chica, NO SE LEEN ARCHIVOS» (§{Lo que queda}). Sin la sonda fría, ese día es un barrido del corpus entero",
+        );
+      }
+    }
+    if (JSON.stringify(png) !== antes) {
+      fallar(
+        "I11 · los bytes se conservan",
+        "la corrida modificó el arreglo de entrada",
+        "guardar es INCONDICIONAL y no está sujeto al umbral: lo único que el umbral decide es la indexación. `sourceOfBytes` entrega el MISMO arreglo en `bytes()` —no una copia— así que un adaptador puede escribir sobre él, y el día que eso pase el original que la cita verbatim promete servir ya no es el original",
+      );
+    }
+    // Y `on_hold` ES RECUPERABLE: los mismos bytes, con un adaptador que los reclama, se
+    // leen. Es lo que separa «en espera» de «rechazado», y no es ejercitable sin un
+    // adaptador binario — que no existe hasta el paso 6. Va con uno SINTÉTICO, dicho y
+    // no tapado.
+    const imagenSintética = {
+      id: asAdapterId("imagen-sintetica"),
+      level: "declarative",
+      version: "1",
+      evidence: (p) =>
+        Promise.resolve(p.extension === "png" ? Evidence.Signature : Evidence.None),
+      recognize: () => Promise.resolve([]),
+    };
+    const reintento = await ingest(png, {
+      ...OPCIONES,
+      name: "sello.png",
+      registry: registryOf([...CON_PISO, imagenSintética]),
+    });
+    if (reintento.adapter !== "imagen-sintetica" || reintento.onHold !== null) {
+      fallar(
+        "I11 · `on_hold` es «todavía no», no «nunca»",
+        `con el adaptador registrado dio adapter=${JSON.stringify(reintento.adapter)} onHold=${reintento.onHold === null ? "null" : "presente"}`,
+        "es lo que vuelve honesto el «aceptamos todo»: no se le guarda al usuario algo que nadie va a mirar nunca. Si registrar el adaptador no cambiara el destino de esos bytes, `on_hold` sería un cementerio con otro nombre",
+      );
+    }
+  }
+
   if (fallas > 0) process.exit(1);
 
   console.log(
     `invariantes ok (I1 golden bytes→árbol · I2 determinismo · I3 frontmatter hermano · ` +
       `I4 satélite y su imagen · I5 sin adaptador no se pierde · I6 emisión fallida reportada · ` +
-      `I7 delegación de profundidad cero · I8 el tamaño objetivo decide · I9 la autoría fuera de la huella)\n` +
+      `I7 delegación de profundidad cero · I8 el tamaño objetivo decide · I9 la autoría fuera de la huella · ` +
+      `I10 degradación real y visible · I11 guardar incondicional, indexar no)\n` +
       `           ${corrida.nodes.length} nodos · ${corrida.fragments.length} fragmentos · ` +
       `${corrida.records.length} registros · ${corrida.sink.notices.length} avisos`,
   );

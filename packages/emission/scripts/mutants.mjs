@@ -833,6 +833,44 @@ const MUTANTES = [
       "verdad impone R1 es el grafo de PAQUETES (§{Paquetes}), y este es el único chequeo que lo mira",
   },
 
+  // ── Paso 4 · R2, la regla que este paquete era el más propenso a romper ────
+  {
+    id: "M57",
+    garantía: "R2 — aguas abajo se LEE `role`, nunca se RAMIFICA sobre él",
+    cambios: [[
+      `    const cohesion = cohesionOf(n.role, n.body.shape);`,
+      `    const cohesion = n.role === "page_footer" ? "solo" : cohesionOf(n.role, n.body.shape);`,
+    ]],
+    espera: /R2 · src\/grouping\.ts nombra un literal de `role`/,
+    nota:
+      "LA MUTACIÓN ES LA PLAUSIBLE Y NO LA ABSURDA, y por eso duele: `PROVISIONAL(C1/#58)` de `ir` " +
+      "documenta que bajo el codominio nuevo un `page_footer` pasó de «no se mezcla» a «se agrupa " +
+      "libremente», y que «un pie repetido en 200 páginas entra en el texto de decenas de fragmentos, " +
+      "contaminando vectores y hashes». O sea: el propio contrato deja escrito el argumento para " +
+      "escribir esta línea acá, y la respuesta correcta es cambiar la TABLA en `ir`, no ramificar en el " +
+      "tramo 5. Hasta el paso 4 este `switch` compilaba: R2 solo la imponía `orchestration`, y " +
+      "`grouping.ts` es el consumidor de `cohesionOf` — o sea el candidato más real de todo el repo, " +
+      "porque consultar la tabla es un renglón más largo que ramificar. NO ROMPÍA NADA MÁS: " +
+      "`page_footer` no aparece en ningún caso sintético, así que ni el golden ni los diecinueve " +
+      "invariantes se mueven. El vocabulario del guardián se DERIVA de `ROLES` en `ir`",
+  },
+  {
+    id: "M58",
+    garantía: "la exención del fixture es de NOMBRAR un rol, nunca de ramificar sobre él",
+    cambios: [[
+      `  node(t, "heading", prose(t), { linkage: "level", level }, delegation);`,
+      `  node(t, t === "heading" ? "subheading" : "heading", prose(t), { linkage: "level", level }, delegation);`,
+    ]],
+    espera: /R2 · src\/synthetic\.ts nombra un literal de `role`/,
+    nota:
+      "ES LA FILA QUE PAGA LA EXENCIÓN. `synthetic.ts` CONSTRUYE nodos, así que tiene que poder " +
+      "escribir `\"heading\"`; si no lo eximiera, R2 sería inaplicable en este paquete y la regla se " +
+      "quedaría sin dueño otra vez. Pero una exención que nadie prueba es un agujero con nombre: acá se " +
+      "verifica que sea NARROW —adentro del fixture sigue prohibida la forma que sí es ramificar— y que " +
+      "el mensaje nombre al archivo exento y no a otro. Sin esta fila, ensanchar la exención a todos los " +
+      "archivos apagaría M57 y nada cambiaría de color",
+  },
+
   // ── Controles ──────────────────────────────────────────────────────────────
   {
     id: "MC1",
@@ -964,6 +1002,20 @@ const MUTANTES = [
       "`|| true` mantiene la llamada en uso porque sin ella el import muere en TS6133 y el control " +
       "quedaría rojo por el linter. El día que exista una cohesión que la rechace de verdad —o que un " +
       "`lead` pueda dejar fragmento abierto— esta fila se pone roja y deja de ser un control",
+  },
+  {
+    id: "MC13",
+    control: true,
+    garantía: "un comentario que NOMBRA un rol no es ramificar sobre `role`",
+    cambios: [[
+      `    const cohesion = cohesionOf(n.role, n.body.shape);`,
+      `    // control MC13: nombrar "page_footer" en prosa no es ramificar sobre él\n    const cohesion = cohesionOf(n.role, n.body.shape);`,
+    ]],
+    nota:
+      "el par de M57, y no es adorno: el guardián de R2 barre el archivo SIN comentarios justamente " +
+      "para que un docstring que EXPLICA la regla no la viole. Sin este control, R2 sería " +
+      "indistinguible de un `grep` sobre el archivo crudo — que se pondría rojo sobre su propia " +
+      "documentación, que es la forma más rápida de que alguien lo apague",
   },
   {
     id: "MC6",

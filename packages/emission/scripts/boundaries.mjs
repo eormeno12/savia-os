@@ -37,6 +37,23 @@
  *      REGLA, (2) nombra la RELACIÓN.
  *   3. `dependencies` de `package.json` es exactamente `{@savia-os/ir}`. Sin esto,
  *      (1) se puede satisfacer agregando la dependencia y el import el mismo día.
+ *   4. **R2 — aguas abajo se LEE `role`, nunca se RAMIFICA sobre él.** El plan la lista
+ *      como «lint sobre el núcleo, detectable estáticamente» y hasta el paso 4 solo la
+ *      imponía `orchestration`: un `switch (node.role)` en `src/grouping.ts` COMPILABA,
+ *      y `grouping.ts` es el candidato más real de todo el repo a escribirlo, porque es
+ *      el consumidor de `cohesionOf` y consultar la tabla es un renglón más largo que
+ *      ramificar. El vocabulario NO se escribe acá: se DERIVA de `ROLES` en `ir`, o
+ *      sería una segunda lista que queda corta justo con el rol que alguien acaba de
+ *      agregar — que es el caso en el que R2 más importa.
+ *
+ *      LA EXENCIÓN DEL FIXTURE, y por qué no es un agujero. `src/synthetic.ts`
+ *      CONSTRUYE nodos y por eso nombra roles; no los consume. Construir no es
+ *      ramificar, y los sintéticos viven en `src/` y no en el guardián por una razón de
+ *      tipos que su propio docstring explica (`Node` lleva `NODE_BRAND` y solo `asNode`
+ *      la pone). La exención es de UN archivo, nombrado, y no es total: adentro del
+ *      fixture sigue prohibida la forma que SÍ es ramificar (`=== "x"`, `case "x"`).
+ *      Y tiene su propia red — si el archivo se renombrara, la exención dejaría de
+ *      cubrir a nadie y este guardián lo dice en vez de quedarse callado.
  *
  *   · RED A — los extremos EXISTEN EN DISCO. Si `src/grouping.ts` se renombrara, un
  *     script que solo busca imports prohibidos no encontraría ninguno y pasaría en
@@ -48,7 +65,7 @@
  *     cuatro archivos importen `@savia-os/ir` por su nombre.
  */
 
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -57,6 +74,9 @@ const SRC = join(RAIZ, "src");
 
 /** El único paquete que este puede alcanzar. */
 const PERMITIDO = "@savia-os/ir";
+
+/** El único archivo que puede NOMBRAR un rol, porque construye nodos en vez de leerlos. */
+const FIXTURE = "synthetic.ts";
 
 /**
  * Las relaciones prohibidas, nombradas. No son la garantía —lo es la lista blanca de
@@ -111,9 +131,67 @@ if (faltantes.length > 0) {
 const importsDe = (texto) =>
   [...texto.matchAll(/(?:from|import)\s*\(?\s*["']([^"']+)["']/g)].map((m) => m[1]);
 
+/**
+ * EL VOCABULARIO DE R2, DERIVADO Y NO ESCRITO. Se lee `ROLES` de `ir` a través de la
+ * dependencia que este paquete ya declara. Una lista a mano acá sería una SEGUNDA fuente
+ * de verdad, y quedaría corta exactamente con el rol que alguien acaba de agregar.
+ */
+const rolesDeIr = () => {
+  const archivo = join(RAIZ, "node_modules", "@savia-os", "ir", "src", "classification.ts");
+  if (!existsSync(archivo)) return null;
+  const m = /export const ROLES = \[([\s\S]*?)\] as const;/.exec(readFileSync(archivo, "utf8"));
+  if (m === null) return null;
+  const roles = [...m[1].matchAll(/"([a-z_]+)"/g)].map((x) => x[1]);
+  return roles.length === 0 ? null : roles;
+};
+
+const ROLES = rolesDeIr();
+if (ROLES === null) {
+  fallar(
+    "R2 · no se pudo derivar el vocabulario de `ROLES` desde `ir`",
+    "no está `node_modules/@savia-os/ir/src/classification.ts`, o cambió la forma de la declaración",
+    "sin el vocabulario, el barrido de R2 no encuentra nada y este guardián da VERDE por no haber mirado — que es el modo de falla que las dos redes de arriba existen para impedir",
+  );
+}
+
+/** Sin comentarios: un docstring que EXPLICA R2 no está ramificando sobre `role`. */
+const sinComentarios = (t) =>
+  t.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+// RED del fixture: si `synthetic.ts` se renombrara, la exención de abajo dejaría de
+// cubrir a nadie y el barrido pasaría a exigirle al archivo nuevo algo que ningún
+// constructor de nodos puede cumplir — o, peor, la exención quedaría apuntando al vacío
+// y nadie se enteraría de que el guardián dejó de tener una excepción que justificar.
+if (!archivos.includes(FIXTURE)) {
+  fallar(
+    `R2 · el fixture exento \`src/${FIXTURE}\` no está en disco`,
+    `los archivos de src son: ${archivos.join(", ")}`,
+    "la exención existe porque los sintéticos CONSTRUYEN nodos y por eso nombran roles. Una exención que no cubre ningún archivo es una excepción sin dueño: el día que alguien la lea no va a poder decidir si sigue haciendo falta",
+  );
+}
+
 let conIr = 0;
 for (const archivo of archivos) {
   const especificadores = importsDe(readFileSync(join(SRC, archivo), "utf8"));
+
+  // ── R2 · no se ramifica sobre `role` ───────────────────────────────────────
+  if (ROLES !== null) {
+    const código = sinComentarios(readFileSync(join(SRC, archivo), "utf8"));
+    // El fixture puede NOMBRAR un rol —lo escribe adentro de un nodo— pero no
+    // RAMIFICAR sobre él. Los demás no pueden ni nombrarlo: no tienen por qué.
+    const prohibido =
+      archivo === FIXTURE
+        ? (r) => new RegExp(`(?:===|!==|case)\\s*["']${r}["']|["']${r}["']\\s*(?:===|!==)`).test(código)
+        : (r) => new RegExp(`["']${r}["']`).test(código);
+    const ramifica = ROLES.filter(prohibido);
+    if (ramifica.length > 0) {
+      fallar(
+        `R2 · src/${archivo} nombra un literal de \`role\``,
+        `menciona: ${ramifica.join(", ")}`,
+        "«aguas abajo se LEE `role`, nunca se RAMIFICA sobre él» es lo único que impide que la semántica del formato se re-derive en cada tramo. `cohesionOf`, `isLead`, `roleFromBody` e `isRowNode` viven en `ir` justamente para que ningún consumidor tenga que escribir el nombre de un rol; el día que uno lo escriba, agregar el rol dieciséis pasa a ser una búsqueda por todo el repo — y este paquete es el candidato más real, porque consultar `cohesionOf` es un renglón más largo que ramificar",
+      );
+    }
+  }
 
   // ── RED B · el regex sigue reconociendo imports ────────────────────────────
   if (especificadores.length === 0) {
@@ -174,5 +252,5 @@ if (errores > 0) {
 }
 console.log(
   `fronteras ok (${archivos.length} archivos de src, ${FRONTERAS.length} fronteras nombradas, ` +
-    `1 paquete permitido: ${PERMITIDO})`,
+    `1 paquete permitido: ${PERMITIDO}, R2 sobre ${ROLES.length} roles derivados de \`ir\`)`,
 );

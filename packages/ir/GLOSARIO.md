@@ -696,6 +696,40 @@ cambia es el nombre del **artefacto de código**, que es lo que este documento g
 
 ---
 
+## 15 · Paso 4 — el piso de texto, y los cuatro que ninguna regla determinaba
+
+**Agregado el 2026-08-16**, antes de escribir una línea de `packages/adapters/src/floor.ts`,
+por la regla del cierre. El paso 4 escribe **el piso de texto**, agrega **un guardián** a
+`ir` y **un campo** a la salida de la orquestación.
+
+> **Primero, lo que las reglas SÍ determinaban.** `Piso → Floor` es R1 llana (el
+> cognado no existe y `floor` es el término de dominio que el propio plan usa en
+> §{El piso}); `Cohesión → Cohesion` ya está en §3. El guardián nuevo se llama
+> **`cohesion.mjs`** y **no va como fila**: §6 lo determina entero —«un guardián NUEVO
+> nace en inglés» y se llama como lo que verifica, igual que `numbers.mjs` y
+> `geometry.mjs`—. `Proporción → Proportion` e `Imprimible → Printable` son R1.
+> **Ninguno de estos va en la tabla.**
+
+| # | Símbolo | **Queda** | Por qué no la que salía sola |
+|---|---|---|---|
+| **P9** | el adaptador que responde cuando **nadie** reclamó | **`textFloorAdapter`**, en **`src/floor.ts`**, con id **`"text-floor"`** | R2 pone el modificador adelante (`text` + `floor`), y `markdownAdapter` fija el sufijo. Lo que había que decidir es **cuál es la raíz**: el plan lo llama «el piso **de texto**», así que la raíz es `floor` y `text` la califica — al revés (`floorText`) diría «el texto del piso», que no es una cosa. `fallbackAdapter` se descarta porque **`fallback` promete universalidad** y este adaptador **puede abstenerse**: es de TEXTO, y lo que no lo es queda `on_hold`. `plainTextAdapter` se descarta porque nombra un FORMATO, y `.txt` no es lo que este adaptador reclama: reclama por contenido, y el caso por el que existe es el `.conf`. El **archivo** se llama `floor.ts` y no `text-floor.ts` por E1 —se llama como lo que contiene— y porque el par con `markdown.ts` se lee solo: uno conoce un formato, el otro ninguno |
+| **P10** | la medición del gate de imprimibles | **`printableProportionOf`** | R11 exacta (`De → Of`) sobre el nombre que **`params.ts` ya usa**: `minPrintableProportion`. No es una elección — es la única forma de que el parámetro y su medidor no tengan dos vocabularios. `isText` se descarta y es la tentación real: colapsa la MEDICIÓN con la DECISIÓN, y son dos cosas distintas —la medición es del contenido, la decisión es del umbral, que es `Pending`—. Con `isText` el umbral no tendría dónde entrar y el número se escribiría adentro de la función |
+| **P11** | lo que la corrida deja para reintentar | **`Run.onHold`**, de tipo **`ColdProbe \| null`** | Se llama como **el estado** que registra, que ya es una decisión tomada (`on_hold`, §8/G5, en `DOCUMENT_STATES`), en `camelCase` por R10. `pending` se descarta porque **`Pending<T>` ya está tomado** en `params.ts` y significa otra cosa (un parámetro sin medir); `deferred` está tomado por `Body.asset.deferred`; `rejected` es exactamente lo contrario de lo que el campo significa —`on_hold` es «todavía no lo soportamos», no «no lo queremos»—. Y el TIPO no es nuevo: son «los cinco datos escalares que se persisten en `documento_en_espera`» (§{Lo que queda}), o sea `ColdProbe`. Inventar un tipo paralelo con los mismos cinco campos sería la re-declaración que el `README.md` de `ir` prohíbe |
+| **P12** | la cara de señales de un adaptador que no lee ningún formato | **`FloorSignals = Record<string, never>`** | El tipo sale de P3 (`<Formato>Signals`) y lo que había que decidir es **el cuerpo**. `{}` es la escritura obvia y es **falsa**: en TypeScript `{}` admite cualquier objeto, así que el tipo no diría «no hay señales» sino «no me importa». `Record<string, never>` no admite ninguna propiedad, que es lo que se quiere afirmar. `void` y `null` no son asignables a `Unit<S>['signals']` sin ensanchar el contrato |
+
+### El precio de P9, dicho de frente
+
+El plan escribe **«piso de texto `.txt`»** en su orden de construcción, y este paso
+**no crea ningún adaptador de `.txt`**: el corpus lleva un `.conf` y **deliberadamente
+no lleva un `.txt`**. Es una divergencia con el plan y no con una regla, y va anotada
+para que quien lea el orden de construcción no concluya que el paso quedó a medias. Lo
+que el plan nombra con `.txt` es **el caso más fácil de imaginar**, no el conjunto que
+el adaptador cubre; el conjunto lo fija `minPrintableProportion`, que mide **contenido**
+y del que la extensión no participa. Con un `.txt` en el corpus, una implementación que
+decidiera por extensión pasaría en verde — el atajo lo invita el fixture, no el plan.
+
+---
+
 ## La regla que gobierna a este documento
 
 **Si un término no está acá y ninguna regla de §2 lo determina, no se inventa: se

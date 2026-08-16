@@ -84,9 +84,13 @@ const MUTANTES = [
     id: "S66",
     garantía: "`null` de `select` es un resultado LEGÍTIMO, no un error disfrazado",
     rompe: "la disponibilidad: un archivo que nadie sabe leer rompe el pipeline en vez de quedar en espera",
+    // EL ANCLA SE REANCLÓ EN EL PASO 4 y el motivo va escrito: la rama ganó el aviso de
+    // `intake.on_hold` y el campo `onHold`, así que el bloque entero dejó de existir tal
+    // como estaba y `ubicar()` rechazó la fila. Ahora muta SOLO el `return`, que es lo que
+    // esta garantía toca: el aviso lo acredita S82 y la sonda fría S81, por separado.
     cambios: [[
-      `  if (selection === null) {\n    return { ...EMPTY, sink, achievedLevel: "plain_text", adapter: null };\n  }`,
-      `  if (selection === null) {\n    throw new Error("ORCHESTRATION-ERR: no adapter claimed these bytes");\n  }`,
+      `    return { ...EMPTY, sink, achievedLevel: "plain_text", adapter: null, onHold: cold };\n  }`,
+      `    throw new Error("ORCHESTRATION-ERR: no adapter claimed these bytes");\n  }`,
     ]],
     espera: /I5 · sin adaptador, la ingesta no lanza/,
     nota:
@@ -148,6 +152,76 @@ const MUTANTES = [
       "existe. Las dos direcciones hacen falta o el invariante lo satisface borrar el campo. El " +
       "reemplazo usa el mismo actor que la corrida del golden a propósito: así el golden NO se mueve y " +
       "la fila la acredita el invariante que le corresponde y no un snapshot que cambió de color",
+  },
+
+  // ── Paso 4 · el piso de texto, de punta a punta ────────────────────────────
+  {
+    id: "S81",
+    garantía: "lo que queda en espera lleva CON QUÉ reintentarlo",
+    rompe: "el reprocesamiento: el día que llegue el adaptador hay que barrer el corpus entero",
+    cambios: [[
+      `    return { ...EMPTY, sink, achievedLevel: "plain_text", adapter: null, onHold: cold };`,
+      `    return { ...EMPTY, sink, achievedLevel: "plain_text", adapter: null, onHold: null };`,
+    ]],
+    espera: /I11 · lo que queda en espera lleva con qué reintentarlo/,
+    nota:
+      "`on_hold` NO es «rechazado»: es «todavía no lo soportamos», y esa promesa solo es cumplible si " +
+      "queda escrito QUÉ estaba esperando. El plan describe el barrido como «se corre solo su " +
+      "`evidencia()` contra las sondas guardadas — se recorre una tabla chica, NO SE LEEN ARCHIVOS» " +
+      "(§{Lo que queda}), y sin la sonda fría esa afirmación de costo es falsa. La mutación no rompe " +
+      "NADA MÁS: la corrida sale igual de vacía, el aviso sigue estando y el golden no se mueve, " +
+      "porque el `.md` nunca queda en espera",
+  },
+  {
+    id: "S82",
+    garantía: "el rechazo a indexar se AVISA",
+    rompe: "el diagnóstico: un formato sin soporte sale idéntico a un documento del que no se sacó nada",
+    cambios: [[
+      `    ctx.diagnostics.notice(\n      "intake.on_hold",`,
+      `    void ((code: string, location: null, detail: string) => [code, location, detail])(\n      "intake.on_hold",`,
+    ]],
+    espera: /I11 · el rechazo a indexar se AVISA/,
+    nota:
+      "hasta el paso 4 esta rama devolvía la corrida vacía SIN UN SOLO AVISO, así que «ninguna " +
+      "información se descarta en silencio» la cumplía por no haber nada escrito. Rechazar es " +
+      "información útil —«todavía no soportamos esto», que además es lo que arma el roadmap de qué " +
+      "formatos pedir— y rechazar callado es daño mudo. El reemplazo CONSUME los tres argumentos a " +
+      "propósito: borrar la llamada dejaría `cold` sin usar en esa rama y el mutante moriría en el " +
+      "compilador",
+  },
+  {
+    id: "S83",
+    garantía: "el nivel alcanzado del piso llega HASTA LA SALIDA",
+    rompe: "la degradación deja de ser visible: el `.conf` se recupera igual que el `.md`",
+    cambios: [[
+      `    achievedLevel: selection.achievedLevel,\n    adapter: selection.adapter.id,\n    onHold: null,`,
+      `    achievedLevel: "structured",\n    adapter: selection.adapter.id,\n    onHold: null,`,
+    ]],
+    espera: /I10 · …y DICE que entró degradado/,
+    nota:
+      "NO ES S30 DE `adapters` OTRA VEZ: aquella fija que `select` DERIVE el nivel de `evidence > " +
+      "Floor`, y esta que la orquestación lo PROPAGUE. Son dos sitios y el segundo no lo cubría nadie. " +
+      "El reemplazo es `\"structured\"` a propósito, que es el valor que el `.md` ya tiene: el golden NO " +
+      "se mueve y la fila la acredita el invariante que le corresponde, no un snapshot que cambió de " +
+      "color. Un archivo degradado que se recupera exactamente igual que uno completo es el defecto: " +
+      "quien consume la memoria no puede saber que lo que lee perdió su estructura",
+  },
+  {
+    id: "S84",
+    garantía: "«en espera» y «leído» no se confunden",
+    rompe: "el barrido futuro: documentos ya indexados vuelven a la cola que ningún adaptador va a arreglar",
+    cambios: [[
+      `    achievedLevel: selection.achievedLevel,\n    adapter: selection.adapter.id,\n    onHold: null,\n  };\n};`,
+      `    achievedLevel: selection.achievedLevel,\n    adapter: selection.adapter.id,\n    onHold: cold,\n  };\n};`,
+    ]],
+    espera: /I1 · golden bytes→árbol/,
+    nota:
+      "el par de S81, y va al revés: aquella BORRA la sonda de un documento en espera, esta se la pone " +
+      "a uno que se indexó perfecto. Son dos estados con destinos distintos —uno se reintenta cuando " +
+      "llega un adaptador nuevo, el otro no— y confundirlos hace crecer la cola con documentos que ya " +
+      "están en el índice. Es la única fila del bloque que muta el golden, y por eso es la única que lo " +
+      "espera: el campo `enEspera` está en el snapshot justamente para que borrarlo o llenarlo de más " +
+      "sea un acto visible",
   },
 
   // ── R2, el borde de dependencias y la composición ──────────────────────────
@@ -323,6 +397,20 @@ const MUTANTES = [
     garantía: "reordenar dos exports del barril no rompe nada",
     cambios: [[`  type IngestOptions,\n  type Run,`, `  type Run,\n  type IngestOptions,`]],
     nota: "el barril es una lista, no un contrato de orden",
+  },
+  {
+    id: "SC20",
+    control: true,
+    garantía: "cambiar el TEXTO del aviso de `on_hold` no rompe nada, pero su CÓDIGO sí",
+    cambios: [[
+      `      \`no adapter claimed these bytes: extension \${JSON.stringify(cold.extension)}, \` +`,
+      `      \`nobody claimed these bytes: extension \${JSON.stringify(cold.extension)}, \` +`,
+    ]],
+    nota:
+      "el par de S82, y separa las dos mitades que un aviso tiene. Lo que el invariante fija es el " +
+      "CÓDIGO —`intake.on_hold`, que es lo que una consulta agrupa— y no la prosa del detalle, que es " +
+      "para un humano. Sin este control, S82 sería indistinguible de un chequeo que congela el mensaje, " +
+      "y congelar el mensaje es la forma más rápida de que nadie lo mejore",
   },
   {
     id: "SC17",

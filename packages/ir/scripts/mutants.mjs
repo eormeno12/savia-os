@@ -539,6 +539,31 @@ const MUTANTES = [
     nota: "equivalente de I11b de `packages/emission`. No es una excepción a M51: es la otra mitad. `mutants.mjs` muta los archivos del árbol EN EL LUGAR y `turbo` agenda `lint` y `build` del mismo paquete en paralelo, así que el segundo captura como «original» un archivo que el primero ya mutó. No es hipotético y le pasó a ESTE paquete: dejó ocho archivos de `packages/ir/src` con mutaciones pegadas. `emission` tenía el chequeo desde su bloque 5 y `ir`, que fue el que se lo comió, no",
   },
 
+  // ── Paso 4 · la tabla de cohesión MANDA sobre la red de formas ─────────────
+  {
+    id: "M56",
+    garantía: "donde `COHESION_BY_ROLE` tiene entrada, `cohesionOf` la devuelve",
+    cambios: [[
+      `  COHESION_BY_ROLE[role] ?? (SOLO_SHAPES.has(shape) ? "solo" : "normal");`,
+      `  SOLO_SHAPES.has(shape) ? "solo" : COHESION_BY_ROLE[role] ?? "normal";`,
+    ]],
+    espera: /la tabla manda y la función no la obedece/,
+    nota:
+      "TODO EL PESO ESTÁ EN EL `??`, y esta es la única fila del paquete que lo toca. La mutación no " +
+      "es absurda: las dos mitades siguen ahí y la expresión se lee igual de bien al derecho que al " +
+      "revés. `COHESION_PROOFS` en `invariants.ts` SIGUE VERDE —asevera la TABLA contra `\"solo\"` " +
+      "exacto, y la tabla no cambió: cambió quién la consulta— y `tsc` tampoco dice nada, porque el " +
+      "tipo de salida es el mismo. Lo que se apaga son las cuatro entradas que NO son `solo`: un " +
+      "`heading` con forma `verbatim` deja de ser `lead` y un `caption` sobre un `asset` deja de ser " +
+      "`satellite`, o sea que un epígrafe deja de pegarse a su imagen y las dos se indexan como " +
+      "fragmentos que nadie recupera. CORRECCIÓN A LA CONSIGNA: el ejemplo que se propuso para esta " +
+      "fila era «un `code` con forma `text_span` pasa de `solo` a `normal`», y es FALSO — con el `??` " +
+      "invertido ese par sigue dando `solo`, porque `text_span` no está en `SOLO_SHAPES` y la rama " +
+      "`else` consulta la tabla igual. Las víctimas reales son los cuatro roles cuya entrada no es " +
+      "`solo` (`heading`, `subheading`, `caption`, `footnote`) sobre las DOS formas que sí están en " +
+      "`SOLO_SHAPES`: 8 de los 90 pares. Verificado corriendo la mutación",
+  },
+
   // ── Paso 3a · las dos salidas del tramo 5 (PROVISIONAL(#75)) ───────────────
   //
   // Las tres acreditan el mismo hallazgo por sus tres mitades: `Fragment` y
@@ -652,6 +677,13 @@ const MUTANTES = [
     cambios: [[`  readonly signals: S;`, `  readonly trace?: string;\n  readonly signals: S;`]],
     nota: "el par de M40, sobre la MISMA ancla y con una sola palabra de diferencia: `id` es rojo, cualquier otro campo es verde. `_UnitHasNoId` asevera `'id' extends keyof Unit`, no «Unit está cerrada» — sin este control, la fila de arriba sería indistinguible de una que congela el tipo entero",
   },
+  {
+    id: "MC9",
+    control: true,
+    garantía: "reordenar dos entradas de `COHESION_BY_ROLE` no rompe nada",
+    cambios: [[`  heading: "lead",\n  subheading: "lead",`, `  subheading: "lead",\n  heading: "lead",`]],
+    nota: "el par de M56: lo que `scripts/cohesion.mjs` fija es el MAPEO —qué devuelve la función donde la tabla tiene entrada— y no el orden en que las entradas están escritas. Sin el control, la propiedad nueva sería indistinguible de una que congela el literal, y congelar el literal es lo que `COHESION_PROOFS` ya hace para los tres atómicos",
+  },
 ];
 
 // Dónde vive cada mutación se deduce de su primer `buscar`, así que no hay que
@@ -700,7 +732,7 @@ const guardianes = () => {
     const salida = execSync(
       `./node_modules/.bin/tsc --noEmit && node scripts/boundaries.mjs && ` +
         `node scripts/projection.mjs && node scripts/geometry.mjs && ` +
-        `node scripts/citations.mjs && node scripts/numbers.mjs`,
+        `node scripts/cohesion.mjs && node scripts/citations.mjs && node scripts/numbers.mjs`,
       { cwd: RAIZ, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
     );
     return { verde: true, salida };

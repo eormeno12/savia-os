@@ -13,8 +13,11 @@ savia-os/
 │   ├── api/               (vacío — el B2B nuevo va acá; scaffold pendiente)
 │   └── app/               (vacío — el B2B nuevo va acá; scaffold pendiente)
 ├── packages/
-│   ├── ir/               @savia-os/ir             el contrato del pipeline de ingesta · 0 deps
-│   ├── emission/         @savia-os/emission       tramo 4: ruta + emisor
+│   ├── ir/               @savia-os/ir             el contrato del pipeline · 0 deps de runtime
+│   ├── adapters/         @savia-os/adapters       tramos 2 y 3: sonda · registro · selector ·
+│   │                                              cascada · el `.md` · el piso de texto
+│   ├── emission/         @savia-os/emission       tramos 4 y 5: ruta + emisor + agrupación
+│   ├── orchestration/    @savia-os/orchestration  `ingest(bytes) → Run` — la espina dorsal
 │   ├── ui/               @savia-os/ui             sistema de diseño (Atomic Design) sobre Chakra v3
 │   ├── design-tokens/    @savia-os/design-tokens  foundations: tokens Chakra (createSystem)
 │   └── tsconfig/         @savia-os/tsconfig       tsconfigs compartidos
@@ -62,6 +65,43 @@ pnpm build              # build de todos los workspaces
 - Imports entre workspaces: `workspace:*` en `package.json`.
 - Configs TypeScript compartidas: extender desde `@savia-os/tsconfig/nextjs` o `@savia-os/tsconfig/base`.
 - Turbo cachea `.next/**` y `dist/**`. No modificar `turbo.json` salvo que cambie el pipeline.
+
+## El pipeline de ingesta (`packages/ir` · `adapters` · `emission` · `orchestration`)
+
+Cuatro paquetes, escritos en ese orden. `ir` es el **contrato** y se congela primero;
+los otros tres lo implementan. La autoridad de nombres es
+[`packages/ir/GLOSARIO.md`](packages/ir/GLOSARIO.md): **un término que ninguna regla del
+§2 determine se agrega ahí ANTES de escribirlo en código.**
+
+| Paquete | Qué contiene | Deps de runtime |
+|---|---|---|
+| `@savia-os/ir` | las seis formas, `Role`, `Hint`, `Cohesion`, la proyección canónica, los invariantes de tipo | **ninguna** |
+| `@savia-os/adapters` | tramos 2 y 3: sonda, registro, selector, cascada, `opaqueOf`, el adaptador `.md` y el piso de texto | `ir` + **`yaml`** |
+| `@savia-os/emission` | tramos 4 y 5: ruta, emisor y agrupación | `ir` |
+| `@savia-os/orchestration` | `ingest(bytes) → Run` — el único que compone los otros tres | `ir`, `adapters`, `emission` |
+
+**Las reglas del grafo, y las impone un guardián en cada paquete (`scripts/boundaries.mjs`),
+no la disciplina:**
+
+- **`adapters` y `emission` NUNCA se ven entre sí.** `ir` es el único paquete que los dos
+  alcanzan. Lo que vuelve no vacía esa frase es que `orchestration` los componga.
+- **`adapters` es el único paquete del pipeline con dependencias de runtime**, y la única
+  que hay —`yaml`— está **confinada a `src/markdown.ts`**. Los otros tres están en cero:
+  `sha256` y `targetSizeChars` entran por parámetro exactamente para eso, y ni un
+  `import "node:…"` ni un global de node (`Buffer`, `process`) pasan el guardián.
+- **R2 — aguas abajo se LEE `role`, nunca se RAMIFICA sobre él.** Solo `ir` conmuta sobre
+  `Role`; el resto consulta `cohesionOf`, `isLead`, `roleFromBody`, `isRowNode`.
+- **Ningún número inventado.** Si un número decide comportamiento vive en
+  `PARAMETERS` (`ir/src/params.ts`) con unidad, qué decide y cómo se mediría; los que el
+  plan declara medibles y nadie midió son `Pending<T>` en `null` y **quien los necesite
+  los provee por parámetro**.
+
+**Cómo se verifica.** `pnpm turbo lint --filter=@savia-os/ir …` corre, por paquete, la
+cadena de guardianes de su `package.json`: fronteras → `tsc` → invariantes/goldens →
+citas → **corredor de mutación**. El corredor **acredita cada garantía rompiéndola** y
+falla si alguna deja de romperse; los `control` son mutaciones que tienen que quedar
+**verdes**. `build` nunca encadena el corredor —muta `src/` en el lugar— y `lint` se
+ordena por el grafo (`dependsOn: ["^build", "^lint"]`).
 
 ## Sistema de diseño (Atomic Design)
 

@@ -87,13 +87,25 @@ const FRONTERAS = [
   },
 ];
 
-/** Lo que las fronteras y el golden protegen. Si no están, el script mentiría. */
+/**
+ * Lo que las fronteras y el golden protegen. Si no están, el script mentiría.
+ *
+ * Los dos archivos del paso 4 entran por una razón MÁS FUERTE que la del `.md`. El
+ * `.conf` es el único caso de texto del corpus y lleva a propósito una extensión que
+ * ningún adaptador reclama: si desapareciera, el piso no tendría un solo archivo que
+ * lo obligue a decidir por CONTENIDO, y una implementación que decidiera por extensión
+ * pasaría en verde. El `.png` es el único caso de la rama que NO se indexa: sin él,
+ * «el piso no acepta todo» es una frase sin observador y `on_hold` es código muerto.
+ */
 const PROTEGIDOS = [
   "src/registry.ts",
   "src/markdown.ts",
+  "src/floor.ts",
   "src/env.d.ts",
   "corpus/manual.md",
   "corpus/manual.golden.json",
+  "corpus/servidor.conf",
+  "corpus/sello.png",
 ];
 
 /** Globales de node. No son imports, así que ningún regex de imports los ve. */

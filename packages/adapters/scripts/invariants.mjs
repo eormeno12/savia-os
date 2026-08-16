@@ -97,21 +97,40 @@ try {
 
   const {
     MARKDOWN_ID,
+    TEXT_FLOOR_ID,
     blocksOf,
     cascade,
     coldProbeOf,
     markdownAdapter,
     opaqueOf,
+    printableProportionOf,
     probeOf,
     registryOf,
     select,
     sourceOfBytes,
+    textFloorAdapter,
   } = await import(pathToFileURL(join(destino, "index.js")).href);
   const { Evidence, asAdapterId, certaintyOfLevel, isLegalPair, ROLES } = await import(
     pathToFileURL(join(destinoIr, "index.js")).href
   );
 
   const bytes = new Uint8Array(readFileSync(join(RAIZ, "corpus", "manual.md")));
+  const conf = new Uint8Array(readFileSync(join(RAIZ, "corpus", "servidor.conf")));
+  const png = new Uint8Array(readFileSync(join(RAIZ, "corpus", "sello.png")));
+
+  /**
+   * LOS DOS UMBRALES SALEN DE MEDIR EL CORPUS, NO DE ELEGIR UN NÚMERO.
+   * `PARAMETERS.intake.minPrintableProportion` es `Pending<number>` y sigue estándolo:
+   * el plan lo declara medible («curva ROC sobre un corpus etiquetado binario/texto») y
+   * no lo midió. Lo que este guardián verifica NO es que el umbral valga 0.8 —eso sería
+   * el número inventado— sino que **el parámetro gobierna la decisión**: con el umbral
+   * en la proporción del archivo de texto, el binario cae; con el umbral en la
+   * proporción del binario, el binario entra. Si el parámetro dejara de decidir, las
+   * dos mitades no podrían dar resultados distintos.
+   */
+  const ventanaDe = (b) => coldProbeOf(b, null).magicBytes;
+  const P_TEXTO = printableProportionOf(ventanaDe(conf));
+  const P_BINARIO = printableProportionOf(ventanaDe(png));
 
   /**
    * El contexto MÍNIMO que un adaptador necesita, escrito acá y no importado: el que el
@@ -367,13 +386,12 @@ try {
 
   // ── I8 · EL SELECTOR ──────────────────────────────────────────────────────
   {
-    const piso = {
-      id: asAdapterId("floor-text"),
-      level: "physical",
-      version: "1",
-      evidence: () => Promise.resolve(Evidence.Floor),
-      recognize: () => Promise.resolve([]),
-    };
+    // EL PISO DE VERDAD, y no un sosías. Hasta el paso 4 acá había un doble de cinco
+    // líneas que devolvía `Floor` a secas: el gate de CI verificaba el selector contra
+    // un adaptador que el registro nunca guardaría, que es exactamente el defecto que
+    // PROVISIONAL(C9) de `ir` nombra para `recognize`. Con el piso escrito, el doble se
+    // borra — una pieza menos, y la que queda es la que corre en producción.
+    const piso = opaqueOf(textFloorAdapter(P_TEXTO));
     // Un evidenciador ROTO. `Promise.all` propaga el rechazo: sin captura, un bug en un
     // adaptador que ni siquiera reclamaba el archivo decide su destino (PROVISIONAL(#9)).
     const roto = {
@@ -441,7 +459,7 @@ try {
     }
 
     const sinExtensión = await select(registro, sonda("manual"));
-    if (sinExtensión?.adapter.id !== "floor-text" || sinExtensión.achievedLevel !== "plain_text") {
+    if (sinExtensión?.adapter.id !== TEXT_FLOOR_ID || sinExtensión.achievedLevel !== "plain_text") {
       fallar(
         "I8 · sin adaptador dedicado se cae al piso, y se DECLARA",
         `ganó ${JSON.stringify(sinExtensión?.adapter.id ?? null)} con nivel ${JSON.stringify(sinExtensión?.achievedLevel ?? null)}`,
@@ -617,6 +635,217 @@ try {
     }
   }
 
+  // ── I15 · EL PISO DECIDE POR CONTENIDO, NUNCA POR EL NOMBRE ───────────────
+  // Es el mismo principio con el que este proyecto identifica un documento —por
+  // contenido, nunca por nombre— y acá vale por la misma razón: la extensión MIENTE EN
+  // LAS DOS DIRECCIONES. Un `.dat` puede ser texto puro y un `.txt` puede ser basura
+  // binaria. Por eso el corpus lleva un `.conf` y NO lleva un `.txt`: con un `.txt`
+  // adentro, un piso que decidiera por extensión pasaría en verde.
+  {
+    // RED: si los dos archivos dejaran de ser separables, TODO lo de abajo es
+    // vacuamente cierto y las filas que lo acreditan pasan en verde.
+    if (!(P_BINARIO < P_TEXTO)) {
+      fallar(
+        "I15 · el corpus separa texto de binario",
+        `el .conf mide ${P_TEXTO} y el .png mide ${P_BINARIO}`,
+        "sin dos archivos que CUALQUIER umbral razonable separe, no hay nada que un umbral pueda decidir: los tres invariantes de abajo se cumplirían con un detector que responde siempre lo mismo",
+      );
+    }
+    // RED: si un adaptador dedicado reclamara el `.conf`, el piso nunca contestaría y
+    // el caso no probaría nada.
+    const sondaDe = (b, nombre) =>
+      probeOf(coldProbeOf(b, nombre), { kind: "channel", channel: "frontend" }, sourceOfBytes(b));
+    const reclamado = await markdownAdapter.evidence(sondaDe(conf, "servidor.conf"));
+    if (reclamado !== Evidence.None) {
+      fallar(
+        "I15 · ningún adaptador dedicado reclama el `.conf`",
+        `el \`.md\` respondió ${reclamado}`,
+        "el archivo de texto del corpus existe para que el piso conteste DE VERDAD. Si un dedicado lo gana, la rama del piso no se recorre y las filas que la acreditan son verdes por no haberla tocado",
+      );
+    }
+
+    // LO QUE NO ES UTF-8 VÁLIDO NO PUEDE MEDIR COMO TEXTO. Es la mitad `U+FFFD` de
+    // `UNPRINTABLE`, y va con una ventana propia y no con el `.png` a propósito: sobre el
+    // corpus la mitad se puede quitar y el binario BAJA de 1.00 igual —medido: 0.44 con
+    // la regla, 0.81 sin ella— así que un caso apoyado en el `.png` pasaría en verde con
+    // el detector roto. Cuatro bytes que ningún decodificador puede leer son la forma
+    // mínima e inequívoca: sin la regla miden 1.00, o sea «texto puro».
+    const basura = printableProportionOf(new Uint8Array([255, 255, 255, 255]));
+    const limpio = printableProportionOf(new TextEncoder().encode("hola\nmundo\n"));
+    if (basura !== 0 || limpio !== 1) {
+      fallar(
+        "I15 · lo que no es UTF-8 válido no mide como texto",
+        `cuatro bytes ilegibles midieron ${basura} (tenían que medir 0) y un ASCII limpio midió ${limpio} (tenía que medir 1)`,
+        "`U+FFFD` es lo que `TextDecoder` pone donde los bytes no eran UTF-8, o sea la huella EXACTA de un binario leído como texto — y su categoría Unicode es `So`, así que `\\p{C}` NO lo atrapa. Sin esa mitad, un archivo de bytes arbitrarios mide 1.00 y el piso lo indexa entero. La segunda mitad es el par: un detector que devolviera 0 siempre también cumpliría la primera",
+      );
+    }
+
+    const piso = textFloorAdapter(P_TEXTO);
+    // EL NOMBRE NO MUEVE LA RESPUESTA — los mismos bytes con tres nombres. Es la mitad
+    // que se rompe con una sola línea (`probe.extension === "txt"`) y que ningún otro
+    // chequeo del paquete puede ver.
+    for (const nombre of ["servidor.conf", "servidor.dat", "servidor", null]) {
+      const e = await piso.evidence(sondaDe(conf, nombre));
+      if (e === Evidence.Floor) continue;
+      fallar(
+        "I15 · el piso reclama por contenido, no por extensión",
+        `con el nombre ${JSON.stringify(nombre)} respondió ${e} y tenía que responder ${Evidence.Floor}`,
+        "el caso que el piso existe para atrapar no es el `.txt` —que nadie escribe en una empresa— sino el `.conf`, el `.ini` y el `.log` sin extensión conocida. Un piso que mire la extensión es un adaptador de `.txt` disfrazado, y deja afuera exactamente los archivos por los que existe",
+      );
+    }
+    // Y AL REVÉS: un binario con extensión de texto sigue siendo binario.
+    const disfrazado = await piso.evidence(sondaDe(png, "sello.conf"));
+    if (disfrazado !== Evidence.None) {
+      fallar(
+        "I15 · un binario con nombre de texto sigue sin ser texto",
+        `respondió ${disfrazado} y tenía que responder ${Evidence.None}`,
+        "es la otra dirección de la mentira de la extensión, y la cara cara: aceptar por el nombre indexa basura binaria, que el plan declara COSTO IRREVERSIBLE («erosiona la confianza en la memoria, que es el producto entero», §{Qué se acepta})",
+      );
+    }
+    // `Floor` EXACTO y ni un peldaño más: subirlo le ganaría archivos a adaptadores
+    // dedicados que sí saben leerlos.
+    const sobreElMd = await piso.evidence(sondaDe(bytes, "manual.md"));
+    if (sobreElMd !== Evidence.Floor) {
+      fallar(
+        "I15 · el piso nunca declara más que `Floor`",
+        `sobre el \`.md\` respondió ${sobreElMd}`,
+        "`Floor` es el escalón que la escala le RESERVA (§{Evidencia}). Con un peldaño más el piso entra al `pool` de arriba y le gana el archivo a quien sí sabe leerlo — y el `.md` se indexaría como texto plano",
+      );
+    }
+  }
+
+  // ── I16 · LAS TRES RAMAS, Y EL UMBRAL ES QUIEN DECIDE ─────────────────────
+  // «Nunca se pierde un archivo» significa que los BYTES se guardan siempre, no que
+  // siempre salga un fragmento. El árbol es de tres ramas y no de dos.
+  {
+    const sondaDe = (b, nombre) =>
+      probeOf(coldProbeOf(b, nombre), { kind: "channel", channel: "frontend" }, sourceOfBytes(b));
+    const piso = opaqueOf(textFloorAdapter(P_TEXTO));
+    const md = opaqueOf(markdownAdapter);
+
+    // A · es texto por contenido → el piso lo reclama y la degradación se DECLARA.
+    const a = await select(registryOf([md, piso]), sondaDe(conf, "servidor.conf"));
+    if (a?.adapter.id !== TEXT_FLOOR_ID || a.achievedLevel !== "plain_text") {
+      fallar(
+        "I16 · A · un archivo de texto que nadie reclama entra por el piso",
+        `ganó ${JSON.stringify(a?.adapter.id ?? null)} con nivel ${JSON.stringify(a?.achievedLevel ?? null)}`,
+        "es la mitad que el plan promete y que hasta este paso NADIE ejercitaba: el `.md` siempre ganaba su archivo, así que la rama del piso estaba escrita en el contrato y nunca había corrido",
+      );
+    }
+
+    // C · no es texto y no hay dedicado → NADIE reclama. `null` no es un error: es
+    // `on_hold`, y los bytes se guardan igual.
+    const c = await select(registryOf([md, piso]), sondaDe(png, "sello.png"));
+    if (c !== null) {
+      fallar(
+        "I16 · C · lo que no es texto y nadie sabe leer no se indexa",
+        `ganó ${JSON.stringify(c?.adapter.id ?? null)}`,
+        "el piso es de TEXTO y no es universal. Indexar basura binaria es el falso positivo que el umbral existe para minimizar, y su costo es IRREVERSIBLE; `on_hold` es el falso negativo, y es recuperable: el día que llegue el adaptador, se reprocesa",
+      );
+    }
+
+    // B · no es texto y SÍ hay dedicado → gana el dedicado y el piso no participa. No
+    // hay ningún adaptador binario hasta el paso 6, así que la rama va con uno
+    // SINTÉTICO y eso está dicho, no tapado: lo que se verifica es que la rama sea
+    // EXPRESABLE hoy —que el `None` del piso no envenene la selección— para que el paso
+    // 6 agregue una entrada al registro en vez de reabrir el selector.
+    const imagenSintética = {
+      id: asAdapterId("imagen-sintetica"),
+      level: "declarative",
+      version: "1",
+      evidence: (p) =>
+        Promise.resolve(p.extension === "png" ? Evidence.Signature : Evidence.None),
+      recognize: () => Promise.resolve([]),
+    };
+    const b = await select(registryOf([md, piso, imagenSintética]), sondaDe(png, "sello.png"));
+    if (b?.adapter.id !== "imagen-sintetica" || b.achievedLevel !== "structured") {
+      fallar(
+        "I16 · B · un binario CON adaptador lo procesa el adaptador",
+        `ganó ${JSON.stringify(b?.adapter.id ?? null)} con nivel ${JSON.stringify(b?.achievedLevel ?? null)}`,
+        "«binario» y «no soportado» no son lo mismo, y colapsarlos obligaría al paso 6 a reabrir el selector en vez de agregar una entrada al registro. La rama del medio no la recorre nada todavía y por eso se verifica con un sintético declarado: lo que se está midiendo es que el `None` del piso no impida que otro gane",
+      );
+    }
+
+    // Y EL UMBRAL ES QUIEN DECIDE, no una regla escondida. Con el umbral en la
+    // proporción del binario, el binario entra. No fija ningún valor —el parámetro
+    // sigue `Pending`— fija que el parámetro GOBIERNA.
+    const pisoLaxo = opaqueOf(textFloorAdapter(P_BINARIO));
+    const conUmbralBajo = await select(registryOf([md, pisoLaxo]), sondaDe(png, "sello.png"));
+    if (conUmbralBajo?.adapter.id !== TEXT_FLOOR_ID) {
+      fallar(
+        "I16 · la decisión la toma el umbral",
+        `con el umbral en ${P_BINARIO} el .png dio ${JSON.stringify(conUmbralBajo?.adapter.id ?? null)}`,
+        "`minPrintableProportion` es `Pending<number>` y este guardián NO fija su valor —eso sería el número inventado que el plan declara peor que uno pendiente—: fija que la frontera entre indexar y `on_hold` se MUEVE con el parámetro. Si no se moviera, el gate estaría escrito en otro lado y el pendiente sería decorativo",
+      );
+    }
+  }
+
+  // ── I17 · EL PISO PRODUCE NODOS, Y TODOS SON DEL PISO FÍSICO ──────────────
+  // La otra mitad de la rama A: no alcanza con que el piso RECLAME el archivo, tiene que
+  // producir algo recuperable. Y todo lo que produce lo resuelve el piso físico, porque
+  // `detect` se abstiene siempre.
+  {
+    const corridaPiso = contextoDe();
+    const delPiso = await opaqueOf(textFloorAdapter(P_TEXTO)).recognize(
+      sourceOfBytes(conf),
+      corridaPiso.ctx,
+    );
+
+    // El corte es la LÍNEA EN BLANCO, y el salto de línea de adentro SE CONSERVA. La
+    // cadena va exacta y entera: pin de las dos mitades a la vez, y las dos se rompen
+    // por separado —partir por línea da tres nodos donde hay uno, y reflowear con
+    // espacios borra los saltos—. Es más corta que un golden y no se puede regenerar
+    // con una tecla.
+    const anclas = delPiso.map((n) => n.location.anchor);
+    const BLOQUES = ["line#0", "line#4", "line#8"];
+    if (!igual(anclas, BLOQUES)) {
+      fallar(
+        "I17 · el piso corta por línea en blanco",
+        `las anclas fueron ${JSON.stringify(anclas)} y tenían que ser ${JSON.stringify(BLOQUES)}`,
+        "la línea en blanco es la ÚNICA estructura que un archivo de texto tiene. Cortar por línea multiplica los nodos y los fragmentos por cinco; no cortar deja el archivo entero en un solo vector",
+      );
+    }
+    const segundo = delPiso[1]?.body;
+    const ESPERADO = "[worker]\nconcurrencia = 4\nreintentos = 3";
+    if (segundo?.text !== ESPERADO) {
+      fallar(
+        "I17 · el salto de línea de adentro de un bloque se conserva",
+        `el segundo bloque es ${JSON.stringify(segundo?.text ?? null)} y tenía que ser ${JSON.stringify(ESPERADO)}`,
+        "el piso NO sabe si el salto lo puso el autor o el ancho de una terminal, y adivinarlo sería leer un formato que no existe. Reflowear con espacios convierte tres líneas de configuración en una oración y las vuelve irreconocibles en el resultado de una búsqueda",
+      );
+    }
+
+    const impropios = delPiso.filter(
+      (n) =>
+        n.attribution !== null ||
+        n.level !== "physical" ||
+        n.hint !== null ||
+        n.confidence !== null ||
+        n.role !== "paragraph" ||
+        n.body.shape !== "text_span",
+    );
+    if (delPiso.length === 0 || impropios.length > 0) {
+      fallar(
+        "I17 · todo nodo del piso lo resolvió el piso físico",
+        `${delPiso.length} nodos, ${impropios.length} impropios: ${JSON.stringify(impropios.map((n) => [n.role, n.level, n.attribution]))}`,
+        "`detect` se abstiene SIEMPRE, sin cascada: un archivo de texto plano no DECLARA nada. Una cascada acá inventaría títulos a partir de líneas cortas y los estamparía con `attribution`, y la métrica que §{Observabilidad} llama «la importante» diría que un clasificador resolvió lo que nadie miró",
+      );
+    }
+
+    const otra = contextoDe();
+    const segundas = await opaqueOf(textFloorAdapter(P_TEXTO)).recognize(
+      sourceOfBytes(conf),
+      otra.ctx,
+    );
+    if (!igual(segundas, delPiso)) {
+      fallar(
+        "I17 · el piso es determinístico",
+        "dos corridas sobre los mismos bytes dieron salidas distintas",
+        "es la misma precondición del caché de reconocimiento que I2 fija para el `.md`, y no la hereda: son dos adaptadores y el caché se indexa por `(hashBytes, adaptador, versión)`",
+      );
+    }
+  }
+
   if (fallas > 0) process.exit(1);
 
   const roles = [...new Set(crudos.map((n) => n.role))].sort();
@@ -624,8 +853,11 @@ try {
     `invariantes ok (I1 golden bytes→nodos · I2 determinismo · I3 pareja obligatoria · ` +
       `I4 cero fugas · I5 piso físico · I6 nada en silencio · I7 caption por dos eslabones · ` +
       `I8 selector · I9 cascada reordenada · I10 range medio abierto · I11 frontmatter hermano · ` +
-      `I12 sin roles de página · I13 YAML 1.2 core · I14 contenedores)\n` +
-      `           ${crudos.length} nodos · ${roles.length} de ${ROLES.length} roles alcanzados: ${roles.join(" ")}`,
+      `I12 sin roles de página · I13 YAML 1.2 core · I14 contenedores · I15 el piso por contenido · ` +
+      `I16 las tres ramas · I17 el piso produce y se abstiene)\n` +
+      `           ${crudos.length} nodos · ${roles.length} de ${ROLES.length} roles alcanzados: ${roles.join(" ")}\n` +
+      `           piso: .conf ${P_TEXTO.toFixed(4)} imprimible → indexa · ` +
+      `.png ${P_BINARIO.toFixed(4)} → on_hold`,
   );
 } finally {
   rmSync(salida, { recursive: true, force: true });

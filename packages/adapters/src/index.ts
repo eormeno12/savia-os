@@ -17,9 +17,15 @@
  * no puede depender de una librería de formato, o cada adaptador nuevo la arrastraría
  * a la selección de los doce.
  *
+ * DESDE EL PASO 4 HAY DOS ADAPTADORES, Y SON LAS DOS PUNTAS DE LA MISMA RECTA:
+ * `markdown.ts` conoce un formato y `floor.ts` no conoce ninguno. El piso es un
+ * adaptador del registro y no una propiedad del selector —el razonamiento está en su
+ * docstring, con los cuatro argumentos— y decide POR CONTENIDO y nunca por extensión,
+ * que es el mismo principio con el que se identifica un documento.
+ *
  * LO QUE NO ESTÁ ACÁ, Y NO POR OLVIDO:
  *
- *   · los otros once adaptadores — el `.txt` es el paso 4 y el `chat` el 5
+ *   · los otros diez adaptadores — el `chat` es el paso 5
  *   · `delegar()`. No existe y no puede existir: sería la lectura literal de «la
  *     recursión ocurre sola» desde adentro del adaptador y rompería el grafo — este
  *     paquete pasaría a depender de la orquestación. El adaptador emite `asset` y nada
@@ -54,3 +60,10 @@ export {
   inlineOf,
   markdownAdapter,
 } from "./markdown.js";
+
+export {
+  TEXT_FLOOR_ID,
+  type FloorSignals,
+  printableProportionOf,
+  textFloorAdapter,
+} from "./floor.js";
