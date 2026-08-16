@@ -1,0 +1,33 @@
+{
+  "name": "@savia-os/orchestration",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "La orquestación mínima del paso 3: `ingest(bytes) -> Run`. Es el único paquete que ve a los otros tres, y por eso es el único que puede sostener la espina dorsal entera — tramos 2, 3, 4 y 5 — sin HTTP, sin base y sin cola.",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "corpus"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "boundaries": "node scripts/boundaries.mjs",
+    "invariants": "node scripts/invariants.mjs",
+    "citations": "node scripts/citations.mjs",
+    "mutants": "node scripts/mutants.mjs",
+    "lint": "node scripts/boundaries.mjs && tsc --noEmit && node scripts/invariants.mjs && node scripts/citations.mjs && node scripts/mutants.mjs",
+    "build": "node scripts/boundaries.mjs && tsc --noEmit && node scripts/invariants.mjs && node scripts/citations.mjs"
+  },
+  "dependencies": {
+    "@savia-os/adapters": "workspace:*",
+    "@savia-os/emission": "workspace:*",
+    "@savia-os/ir": "workspace:*"
+  },
+  "devDependencies": {
+    "@savia-os/tsconfig": "workspace:*",
+    "typescript": "^5.9.3"
+  }
+}

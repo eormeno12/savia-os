@@ -1,0 +1,567 @@
+{
+  "nodos": [
+    {
+      "anchor": "frontmatter",
+      "coordinate": {
+        "space": "source"
+      },
+      "adapter": "markdown",
+      "role": "fields",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "hint": {
+        "linkage": "none"
+      },
+      "delegation": [],
+      "body": {
+        "shape": "fields",
+        "pairs": [
+          {
+            "label": "titulo",
+            "value": "Manual de proveedores"
+          },
+          {
+            "label": "version",
+            "value": "3"
+          },
+          {
+            "label": "vigencia",
+            "value": "2026-08-16"
+          },
+          {
+            "label": "archivado",
+            "value": "no"
+          }
+        ]
+      }
+    },
+    {
+      "anchor": "Manual de proveedores",
+      "coordinate": {
+        "space": "source"
+      },
+      "adapter": "markdown",
+      "role": "heading",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "hint": {
+        "linkage": "level",
+        "level": 1
+      },
+      "delegation": [],
+      "body": {
+        "shape": "text_span",
+        "text": "Manual de proveedores",
+        "marks": []
+      }
+    },
+    {
+      "anchor": "p#9",
+      "coordinate": {
+        "space": "source"
+      },
+      "adapter": "markdown",
+      "role": "paragraph",
+      "level": "physical",
+      "attribution": null,
+      "confidence": null,
+      "hint": null,
+      "delegation": [],
+      "body": {
+        "shape": "text_span",
+        "text": "Este manual describe el circuito completo de alta, con su checklist y el procedimiento oficial.",
+        "marks": [
+          {
+            "kind": "bold",
+            "start": 21,
+            "end": 41
+          },
+          {
+            "kind": "code",
+            "start": 58,
+            "end": 67
+          },
+          {
+            "kind": "link",
+            "start": 73,
+            "end": 94,
+            "href": "https://savia.uno/alta"
+          }
+        ]
+      }
+    },
+    {
+      "anchor": "Alta de un proveedor",
+      "coordinate": {
+        "space": "source"
+      },
+      "adapter": "markdown",
+      "role": "subheading",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "hint": {
+        "linkage": "level",
+        "level": 2
+      },
+      "delegation": [],
+      "body": {
+        "shape": "text_span",
+        "text": "Alta de un proveedor",
+        "marks": []
+      }
+    },
+    {
+      "anchor": "p#14",
+      "coordinate": {
+        "space": "source"
+      },
+      "adapter": "markdown",
+      "role": "paragraph",
+      "level": "physical",
+      "attribution": null,
+      "confidence": null,
+      "hint": null,
+      "delegation": [],
+      "body": {
+        "shape": "text_span",
+        "text": "Los pasos son estos:",
+        "marks": []
+      }
+    },
+    {
+      "anchor": "list#16",
+      "coordinate": {
+        "space": "source"
+      },
+      "adapter": "markdown",
+      "role": "ordered_list",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "hint": {
+        "linkage": "parent",
+        "id": "list#16",
+        "parent": null
+      },
+      "delegation": [],
+      "body": {
+        "shape": "container",
+        "ordered": true,
+        "schema": null
+      }
+    },
+    {
+      "anchor": "item#16",
+      "coordinate": {
+        "space": "source"
+      },
+      "adapter": "markdown",
+      "role": "paragraph",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "hint": {
+        "linkage": "parent",
+        "id": "item#16",
+        "parent": "list#16"
+      },
+      "delegation": [],
+      "body": {
+        "shape": "text_span",
+        "text": "Pedir la documentación",
+        "marks": []
+      }
+    },
+    {
+      "anchor": "item#17",
+      "coordinate": {
+        "space": "source"
+      },
+      "adapter": "markdown",
+      "role": "paragraph",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "hint": {
+        "linkage": "parent",
+        "id": "item#17",
+        "parent": "list#16"
+      },
+      "delegation": [],
+      "body": {
+        "shape": "text_span",
+        "text": "Verificar el CUIT",
+        "marks": []
+      }
+    },
+    {
+      "anchor": "list#18",
+      "coordinate": {
+        "space": "source"
+      },
+      "adapter": "markdown",
+      "role": "list",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "hint": {
+        "linkage": "parent",
+        "id": "list#18",
+        "parent": "item#17"
+      },
+      "delegation": [],
+      "body": {
+        "shape": "container",
+        "ordered": false,
+        "schema": null
+      }
+    },
+    {
+      "anchor": "item#18",
+      "coordinate": {
+        "space": "source"
+      },
+      "adapter": "markdown",
+      "role": "paragraph",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "hint": {
+        "linkage": "parent",
+        "id": "item#18",
+        "parent": "list#18"
+      },
+      "delegation": [],
+      "body": {
+        "shape": "text_span",
+        "text": "Contra el padrón",
+        "marks": []
+      }
+    },
+    {
+      "anchor": "item#19",
+      "coordinate": {
+        "space": "source"
+      },
+      "adapter": "markdown",
+      "role": "paragraph",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "hint": {
+        "linkage": "parent",
+        "id": "item#19",
+        "parent": "list#18"
+      },
+      "delegation": [],
+      "body": {
+        "shape": "text_span",
+        "text": "Contra la factura",
+        "marks": []
+      }
+    },
+    {
+      "anchor": "item#20",
+      "coordinate": {
+        "space": "source"
+      },
+      "adapter": "markdown",
+      "role": "paragraph",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "hint": {
+        "linkage": "parent",
+        "id": "item#20",
+        "parent": "list#16"
+      },
+      "delegation": [],
+      "body": {
+        "shape": "text_span",
+        "text": "Cargar el legajo",
+        "marks": []
+      }
+    },
+    {
+      "anchor": "quote#22",
+      "coordinate": {
+        "space": "source"
+      },
+      "adapter": "markdown",
+      "role": "quote",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "hint": null,
+      "delegation": [],
+      "body": {
+        "shape": "text_span",
+        "text": "Un proveedor sin CUIT verificado no se da de alta.",
+        "marks": []
+      }
+    },
+    {
+      "anchor": "fence#24",
+      "coordinate": {
+        "space": "source"
+      },
+      "adapter": "markdown",
+      "role": "code",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "hint": null,
+      "delegation": [],
+      "body": {
+        "shape": "verbatim",
+        "text": "select razon_social from proveedor where verificado = false;",
+        "language": "sql"
+      }
+    },
+    {
+      "anchor": "img#28",
+      "coordinate": {
+        "space": "source"
+      },
+      "adapter": "markdown",
+      "role": "image",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "hint": null,
+      "delegation": [],
+      "body": {
+        "shape": "asset",
+        "ref": {
+          "object": "https://savia.uno/circuito.png",
+          "window": {
+            "scope": "whole"
+          }
+        },
+        "mime": "application/octet-stream",
+        "deferred": []
+      }
+    },
+    {
+      "anchor": "caption#28",
+      "coordinate": {
+        "space": "source"
+      },
+      "adapter": "markdown",
+      "role": "caption",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "hint": null,
+      "delegation": [],
+      "body": {
+        "shape": "text_span",
+        "text": "Circuito de alta, versión 3",
+        "marks": []
+      }
+    },
+    {
+      "anchor": "img#30",
+      "coordinate": {
+        "space": "source"
+      },
+      "adapter": "markdown",
+      "role": "image",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "hint": null,
+      "delegation": [],
+      "body": {
+        "shape": "asset",
+        "ref": {
+          "object": "https://savia.uno/legajo.png",
+          "window": {
+            "scope": "whole"
+          }
+        },
+        "mime": "application/octet-stream",
+        "deferred": []
+      }
+    },
+    {
+      "anchor": "p#32",
+      "coordinate": {
+        "space": "source"
+      },
+      "adapter": "markdown",
+      "role": "caption",
+      "level": "positional",
+      "attribution": "byNearbyItalic",
+      "confidence": null,
+      "hint": null,
+      "delegation": [],
+      "body": {
+        "shape": "text_span",
+        "text": "El legajo cerrado, con sus cuatro adjuntos.",
+        "marks": [
+          {
+            "kind": "italic",
+            "start": 0,
+            "end": 43
+          }
+        ]
+      }
+    },
+    {
+      "anchor": "img#34",
+      "coordinate": {
+        "space": "source"
+      },
+      "adapter": "markdown",
+      "role": "image",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "hint": null,
+      "delegation": [],
+      "body": {
+        "shape": "asset",
+        "ref": {
+          "object": "https://savia.uno/sello.png",
+          "window": {
+            "scope": "whole"
+          }
+        },
+        "mime": "application/octet-stream",
+        "deferred": []
+      }
+    },
+    {
+      "anchor": "p#36",
+      "coordinate": {
+        "space": "source"
+      },
+      "adapter": "markdown",
+      "role": "paragraph",
+      "level": "physical",
+      "attribution": null,
+      "confidence": null,
+      "hint": null,
+      "delegation": [],
+      "body": {
+        "shape": "text_span",
+        "text": "El sello se aplica en Legales y no forma parte del legajo.",
+        "marks": []
+      }
+    },
+    {
+      "anchor": "table#38",
+      "coordinate": {
+        "space": "source"
+      },
+      "adapter": "markdown",
+      "role": "table",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "hint": null,
+      "delegation": [],
+      "body": {
+        "shape": "grid",
+        "headers": [
+          "Etapa",
+          "Responsable"
+        ],
+        "rows": [
+          [
+            {
+              "text": "Alta",
+              "type": null
+            },
+            {
+              "text": "Compras",
+              "type": null
+            }
+          ],
+          [
+            {
+              "text": "Verificación",
+              "type": null
+            },
+            {
+              "text": "Legales",
+              "type": null
+            }
+          ]
+        ],
+        "grain": "whole"
+      }
+    },
+    {
+      "anchor": "Cierre",
+      "coordinate": {
+        "space": "source"
+      },
+      "adapter": "markdown",
+      "role": "subheading",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "hint": {
+        "linkage": "level",
+        "level": 2
+      },
+      "delegation": [],
+      "body": {
+        "shape": "text_span",
+        "text": "Cierre",
+        "marks": []
+      }
+    },
+    {
+      "anchor": "p#47",
+      "coordinate": {
+        "space": "source"
+      },
+      "adapter": "markdown",
+      "role": "paragraph",
+      "level": "physical",
+      "attribution": null,
+      "confidence": null,
+      "hint": null,
+      "delegation": [],
+      "body": {
+        "shape": "text_span",
+        "text": "Perfecto.",
+        "marks": []
+      }
+    },
+    {
+      "anchor": "Anexo",
+      "coordinate": {
+        "space": "source"
+      },
+      "adapter": "markdown",
+      "role": "subheading",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "hint": {
+        "linkage": "level",
+        "level": 2
+      },
+      "delegation": [],
+      "body": {
+        "shape": "text_span",
+        "text": "Anexo",
+        "marks": []
+      }
+    }
+  ],
+  "avisos": [
+    {
+      "code": "md.thematic_break",
+      "location": null,
+      "detail": "línea 44"
+    }
+  ]
+}

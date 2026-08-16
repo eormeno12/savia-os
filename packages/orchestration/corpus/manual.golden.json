@@ -1,0 +1,528 @@
+{
+  "adapter": "markdown",
+  "achievedLevel": "structured",
+  "árbol": [
+    {
+      "anchor": "frontmatter",
+      "role": "fields",
+      "shape": "fields",
+      "cohesion": "normal",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "parent": null,
+      "breadcrumbs": [],
+      "hash": "fad57aa1b2013346729413ddbbe4d4007f9f30adcc235f4956fb0c69d8cf5172"
+    },
+    {
+      "anchor": "Manual de proveedores",
+      "role": "heading",
+      "shape": "text_span",
+      "cohesion": "lead",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "parent": null,
+      "breadcrumbs": [],
+      "hash": "9071a789a07b112cb2be9bfd08a6219e437f6eff32fed1b0ac8e5532d0e46420"
+    },
+    {
+      "anchor": "p#9",
+      "role": "paragraph",
+      "shape": "text_span",
+      "cohesion": "normal",
+      "level": "physical",
+      "attribution": null,
+      "confidence": null,
+      "parent": "Manual de proveedores",
+      "breadcrumbs": [
+        "Manual de proveedores"
+      ],
+      "hash": "bc58e223b0215b52ae0e14b5d846f20ce1d315a201b11e7edc5632a9631c2ce1"
+    },
+    {
+      "anchor": "Alta de un proveedor",
+      "role": "subheading",
+      "shape": "text_span",
+      "cohesion": "lead",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "parent": "Manual de proveedores",
+      "breadcrumbs": [
+        "Manual de proveedores"
+      ],
+      "hash": "f50a6991ade13bc7b1ce5a7c88dc36d92b78ff607fab3ca83e79685ebafa39ae"
+    },
+    {
+      "anchor": "p#14",
+      "role": "paragraph",
+      "shape": "text_span",
+      "cohesion": "normal",
+      "level": "physical",
+      "attribution": null,
+      "confidence": null,
+      "parent": "Alta de un proveedor",
+      "breadcrumbs": [
+        "Manual de proveedores",
+        "Alta de un proveedor"
+      ],
+      "hash": "1d1be9e633d3c2a7ff8a580acd4bc02bd48c383bcfb107205919132764f04dbe"
+    },
+    {
+      "anchor": "list#16",
+      "role": "ordered_list",
+      "shape": "container",
+      "cohesion": "normal",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "parent": "Alta de un proveedor",
+      "breadcrumbs": [
+        "Manual de proveedores",
+        "Alta de un proveedor"
+      ],
+      "hash": "3e5a9c57bbf2ad33e480c86b004d1c37051604113be6611e876cd79a30215d3e"
+    },
+    {
+      "anchor": "item#16",
+      "role": "paragraph",
+      "shape": "text_span",
+      "cohesion": "normal",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "parent": "list#16",
+      "breadcrumbs": [
+        "Manual de proveedores",
+        "Alta de un proveedor"
+      ],
+      "hash": "b1887a6f9bc4300f3558877ab61c770e9c04d70098ef986d7c24a17b20694b1b"
+    },
+    {
+      "anchor": "item#17",
+      "role": "paragraph",
+      "shape": "text_span",
+      "cohesion": "normal",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "parent": "list#16",
+      "breadcrumbs": [
+        "Manual de proveedores",
+        "Alta de un proveedor"
+      ],
+      "hash": "21e259d314f69d8fb0f49d61b496144fff2499188062f19ffe11799bcf068365"
+    },
+    {
+      "anchor": "list#18",
+      "role": "list",
+      "shape": "container",
+      "cohesion": "normal",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "parent": "item#17",
+      "breadcrumbs": [
+        "Manual de proveedores",
+        "Alta de un proveedor"
+      ],
+      "hash": "1465ebb3ee33f257eb219de79ab8fb9ff58b6974dfaeb0e17705158a03231375"
+    },
+    {
+      "anchor": "item#18",
+      "role": "paragraph",
+      "shape": "text_span",
+      "cohesion": "normal",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "parent": "list#18",
+      "breadcrumbs": [
+        "Manual de proveedores",
+        "Alta de un proveedor"
+      ],
+      "hash": "745a2c1eb6ae1b6d737c92e773c88297b833decdf2be6d7ff5ceaee74fb9aafe"
+    },
+    {
+      "anchor": "item#19",
+      "role": "paragraph",
+      "shape": "text_span",
+      "cohesion": "normal",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "parent": "list#18",
+      "breadcrumbs": [
+        "Manual de proveedores",
+        "Alta de un proveedor"
+      ],
+      "hash": "70c98f07c115035bdbca4fb544a9a468e50ae33627351e17938948a8d353a2c0"
+    },
+    {
+      "anchor": "item#20",
+      "role": "paragraph",
+      "shape": "text_span",
+      "cohesion": "normal",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "parent": "list#16",
+      "breadcrumbs": [
+        "Manual de proveedores",
+        "Alta de un proveedor"
+      ],
+      "hash": "5a6227ad2b9dfe078e2ea67e8a8194f5af43a4ee4e1a4c9d9132c245ec0dd18c"
+    },
+    {
+      "anchor": "quote#22",
+      "role": "quote",
+      "shape": "text_span",
+      "cohesion": "normal",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "parent": "Alta de un proveedor",
+      "breadcrumbs": [
+        "Manual de proveedores",
+        "Alta de un proveedor"
+      ],
+      "hash": "6f885942d710d37f97ff971773f34aa3bc290b1d4b77eb8a7d226ae338bf3eaf"
+    },
+    {
+      "anchor": "fence#24",
+      "role": "code",
+      "shape": "verbatim",
+      "cohesion": "solo",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "parent": "Alta de un proveedor",
+      "breadcrumbs": [
+        "Manual de proveedores",
+        "Alta de un proveedor"
+      ],
+      "hash": "8788708cea0b3542eceb4e802a14346a8167279455e25f2f77882012efe2186b"
+    },
+    {
+      "anchor": "img#28",
+      "role": "image",
+      "shape": "asset",
+      "cohesion": "solo",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "parent": "Alta de un proveedor",
+      "breadcrumbs": [
+        "Manual de proveedores",
+        "Alta de un proveedor"
+      ],
+      "hash": "5d6864b4a0a827c358a90d2fcaec6b0c9df8fdd5f69a0127ebb7de875c03e881"
+    },
+    {
+      "anchor": "caption#28",
+      "role": "caption",
+      "shape": "text_span",
+      "cohesion": "satellite",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "parent": "Alta de un proveedor",
+      "breadcrumbs": [
+        "Manual de proveedores",
+        "Alta de un proveedor"
+      ],
+      "hash": "63b446199a852fd61ffdd1d4efb9ef7912b3daf3d3d8b5559b4f32d75e61cedb"
+    },
+    {
+      "anchor": "img#30",
+      "role": "image",
+      "shape": "asset",
+      "cohesion": "solo",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "parent": "Alta de un proveedor",
+      "breadcrumbs": [
+        "Manual de proveedores",
+        "Alta de un proveedor"
+      ],
+      "hash": "d2475f062a6b40303fdfd21b2b7e5226d255ed3548e33120188f304df3a5291b"
+    },
+    {
+      "anchor": "p#32",
+      "role": "caption",
+      "shape": "text_span",
+      "cohesion": "satellite",
+      "level": "positional",
+      "attribution": "byNearbyItalic",
+      "confidence": null,
+      "parent": "Alta de un proveedor",
+      "breadcrumbs": [
+        "Manual de proveedores",
+        "Alta de un proveedor"
+      ],
+      "hash": "3d6bb2b125d8a8d54af49ce877607a355d6ffdc47b3c8bcfde7bae8e502c69ee"
+    },
+    {
+      "anchor": "img#34",
+      "role": "image",
+      "shape": "asset",
+      "cohesion": "solo",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "parent": "Alta de un proveedor",
+      "breadcrumbs": [
+        "Manual de proveedores",
+        "Alta de un proveedor"
+      ],
+      "hash": "f05c7441b8f41e3bd359177d0057adbed9a55adbff82c57115a1fbd0a863030d"
+    },
+    {
+      "anchor": "p#36",
+      "role": "paragraph",
+      "shape": "text_span",
+      "cohesion": "normal",
+      "level": "physical",
+      "attribution": null,
+      "confidence": null,
+      "parent": "Alta de un proveedor",
+      "breadcrumbs": [
+        "Manual de proveedores",
+        "Alta de un proveedor"
+      ],
+      "hash": "e2b6942ca017c2b901f9b87fd118ed3d24a5fea924b37b0a0d391d039ed0cc0b"
+    },
+    {
+      "anchor": "table#38",
+      "role": "table",
+      "shape": "grid",
+      "cohesion": "normal",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "parent": "Alta de un proveedor",
+      "breadcrumbs": [
+        "Manual de proveedores",
+        "Alta de un proveedor"
+      ],
+      "hash": "44a3605381a58327e2ec36e0c97a39cc115dd9b771ac000ae88938afb490c5a0"
+    },
+    {
+      "anchor": "Cierre",
+      "role": "subheading",
+      "shape": "text_span",
+      "cohesion": "lead",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "parent": "Manual de proveedores",
+      "breadcrumbs": [
+        "Manual de proveedores"
+      ],
+      "hash": "09787c9e5a736c3b452a808570198bb0d52e466fa21a2e17bc5f5f01e0a31d8d"
+    },
+    {
+      "anchor": "p#47",
+      "role": "paragraph",
+      "shape": "text_span",
+      "cohesion": "normal",
+      "level": "physical",
+      "attribution": null,
+      "confidence": null,
+      "parent": "Cierre",
+      "breadcrumbs": [
+        "Manual de proveedores",
+        "Cierre"
+      ],
+      "hash": "bd42964d7a614be9854b4542e3aaf8c3e5ddfb3939aa9b0b8d4219b6d9f9b71b"
+    },
+    {
+      "anchor": "Anexo",
+      "role": "subheading",
+      "shape": "text_span",
+      "cohesion": "lead",
+      "level": "declarative",
+      "attribution": "byMarkdownBlock",
+      "confidence": null,
+      "parent": "Manual de proveedores",
+      "breadcrumbs": [
+        "Manual de proveedores"
+      ],
+      "hash": "82d9a20738efc1b04f968e40006bdffa45e0405827b507a7549eee37ad830cfd"
+    }
+  ],
+  "fragmentos": [
+    {
+      "text": "titulo\tManual de proveedores\nversion\t3\nvigencia\t2026-08-16\narchivado\tno",
+      "nodes": [
+        "frontmatter"
+      ],
+      "breadcrumbs": [],
+      "minLevel": "declarative",
+      "confidence": null
+    },
+    {
+      "text": "Este manual describe el circuito completo de alta, con su checklist y el procedimiento oficial.",
+      "nodes": [
+        "p#9"
+      ],
+      "breadcrumbs": [
+        "Manual de proveedores"
+      ],
+      "minLevel": "physical",
+      "confidence": null
+    },
+    {
+      "text": "Los pasos son estos:\nPedir la documentación\nVerificar el CUIT",
+      "nodes": [
+        "p#14",
+        "list#16",
+        "item#16",
+        "item#17",
+        "list#18"
+      ],
+      "breadcrumbs": [
+        "Manual de proveedores",
+        "Alta de un proveedor"
+      ],
+      "minLevel": "physical",
+      "confidence": null
+    },
+    {
+      "text": "Contra el padrón\nContra la factura\nCargar el legajo",
+      "nodes": [
+        "item#18",
+        "item#19",
+        "item#20"
+      ],
+      "breadcrumbs": [
+        "Manual de proveedores",
+        "Alta de un proveedor"
+      ],
+      "minLevel": "declarative",
+      "confidence": null
+    },
+    {
+      "text": "Un proveedor sin CUIT verificado no se da de alta.",
+      "nodes": [
+        "quote#22"
+      ],
+      "breadcrumbs": [
+        "Manual de proveedores",
+        "Alta de un proveedor"
+      ],
+      "minLevel": "declarative",
+      "confidence": null
+    },
+    {
+      "text": "select razon_social from proveedor where verificado = false;",
+      "nodes": [
+        "fence#24"
+      ],
+      "breadcrumbs": [
+        "Manual de proveedores",
+        "Alta de un proveedor"
+      ],
+      "minLevel": "declarative",
+      "confidence": null
+    },
+    {
+      "text": "Circuito de alta, versión 3",
+      "nodes": [
+        "img#28",
+        "caption#28"
+      ],
+      "breadcrumbs": [
+        "Manual de proveedores",
+        "Alta de un proveedor"
+      ],
+      "minLevel": "declarative",
+      "confidence": null
+    },
+    {
+      "text": "El legajo cerrado, con sus cuatro adjuntos.",
+      "nodes": [
+        "img#30",
+        "p#32"
+      ],
+      "breadcrumbs": [
+        "Manual de proveedores",
+        "Alta de un proveedor"
+      ],
+      "minLevel": "positional",
+      "confidence": null
+    },
+    {
+      "text": "",
+      "nodes": [
+        "img#34"
+      ],
+      "breadcrumbs": [
+        "Manual de proveedores",
+        "Alta de un proveedor"
+      ],
+      "minLevel": "declarative",
+      "confidence": null
+    },
+    {
+      "text": "El sello se aplica en Legales y no forma parte del legajo.",
+      "nodes": [
+        "p#36"
+      ],
+      "breadcrumbs": [
+        "Manual de proveedores",
+        "Alta de un proveedor"
+      ],
+      "minLevel": "physical",
+      "confidence": null
+    },
+    {
+      "text": "Etapa\tResponsable\nAlta\tCompras\nVerificación\tLegales",
+      "nodes": [
+        "table#38"
+      ],
+      "breadcrumbs": [
+        "Manual de proveedores",
+        "Alta de un proveedor"
+      ],
+      "minLevel": "declarative",
+      "confidence": null
+    },
+    {
+      "text": "Perfecto.",
+      "nodes": [
+        "p#47"
+      ],
+      "breadcrumbs": [
+        "Manual de proveedores",
+        "Cierre"
+      ],
+      "minLevel": "physical",
+      "confidence": null
+    },
+    {
+      "text": "Anexo",
+      "nodes": [
+        "Anexo"
+      ],
+      "breadcrumbs": [
+        "Manual de proveedores"
+      ],
+      "minLevel": "declarative",
+      "confidence": null
+    }
+  ],
+  "registros": [],
+  "sumidero": {
+    "notices": [
+      {
+        "code": "md.thematic_break",
+        "location": null,
+        "detail": "línea 44"
+      }
+    ],
+    "degradations": []
+  }
+}

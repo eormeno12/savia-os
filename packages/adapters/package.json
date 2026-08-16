@@ -1,0 +1,32 @@
+{
+  "name": "@savia-os/adapters",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Tramos 2 y 3: sonda, registro, selector, cascada, la fábrica del adaptador opaco y el adaptador `.md`. Es el ÚNICO paquete del pipeline con dependencias de runtime, y `yaml` está confinada al adaptador que la usa.",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "corpus"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "boundaries": "node scripts/boundaries.mjs",
+    "invariants": "node scripts/invariants.mjs",
+    "citations": "node scripts/citations.mjs",
+    "mutants": "node scripts/mutants.mjs",
+    "lint": "node scripts/boundaries.mjs && tsc --noEmit && node scripts/invariants.mjs && node scripts/citations.mjs && node scripts/mutants.mjs",
+    "build": "node scripts/boundaries.mjs && tsc --noEmit && node scripts/invariants.mjs && node scripts/citations.mjs"
+  },
+  "dependencies": {
+    "@savia-os/ir": "workspace:*",
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@savia-os/tsconfig": "workspace:*",
+    "typescript": "^5.9.3"
+  }
+}

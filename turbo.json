@@ -20,7 +20,7 @@
       "persistent": true
     },
     "lint": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build", "^lint"]
     },
     "typecheck": {
       "dependsOn": ["^build"]

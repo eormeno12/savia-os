@@ -640,6 +640,62 @@ y no en una nota del paquete.
 
 ---
 
+## 14 · Paso 3b — dos paquetes nuevos, y las dos reglas que faltaban
+
+**Agregado el 2026-08-16**, antes de escribir una línea de `packages/adapters` y
+`packages/orchestration`, por la regla del cierre. El paso 3b crea **dos paquetes**, y
+el documento tenía dos huecos que hasta hoy nadie había pisado: **no había regla para
+nombrar un paquete nuevo** (§10 solo renombró uno) y **no había política para los
+vocabularios de señales**, que van a ser doce escritos por gente distinta.
+
+> **Primero, lo que las reglas SÍ determinaban**, para que se vea que se consultaron.
+> `Sonda → Probe`, `Evidencia → Evidence`, `Adaptador → Adapter`, `Unidad → Unit`,
+> `Contexto → Context` y `Fuente → Source` ya están en §3, y los cinco tipos ya viven
+> en `adapter.ts`. `seleccionar → select`, `Selección → Selection`, `descomponer →
+> decompose`, `detectar → detect` y `enCascada → cascade` son R1 llana (y `CascadeLink`
+> ya está en §4). `sondaDe → probeOf`, `sondaFríaDe → coldProbeOf`, `extensiónDe →
+> extensionOf`, `registroDe → registryOf`, `fuenteDeBytes → sourceOfBytes`,
+> `bloquesDe → blocksOf` e `inlineDe → inlineOf` son R11 exacta. `Marca → Mark` y
+> `Marca.destino → href` están en §4; `epigrafe → caption` en §5. **Ninguno de estos va
+> en este documento.**
+
+| # | Símbolo | **Queda** | Por qué no la que salía sola |
+|---|---|---|---|
+| **P1** | cómo nace un **paquete** nuevo | **inglés, y se llama como lo que contiene** — el directorio es el nombre sin el scope | §6 tiene la regla para un guardián nuevo («nace en inglés») y §9 (E1) para un módulo de `src/` («el archivo se llama como lo que contiene»); para un **paquete** solo existía el rename de §10, que dijo «los nombres de paquete van en inglés» y nada más. Un rename no es una regla: no dice qué hacer la primera vez. La regla se compone de las dos que ya existen y no inventa un criterio tercero — y **P2 es su primer caso difícil**, que es la prueba de que hacía falta escribirla y no dejarla implícita |
+| **P2** | el paquete de la orquestación | **`@savia-os/orchestration`** (`packages/orchestration/`) | **`Ingestion` está tomado dos veces y ninguna es esta.** Es raíz de §3 (`Ingesta → Ingestion`) y es un **tipo exportado** —`outputs.ts`, «lo que es del documento y NO de la IR»: `document`, `organization`, `owner`, `channel`, `state`—. Un paquete `@savia-os/ingestion` que exporta `ingest()` conviviría con un tipo homónimo que nombra el **envoltorio del documento**, y un `import { Ingestion } from "@savia-os/ir"` adentro de `@savia-os/ingestion` es exactamente la homonimia que este documento existe para evitar (el mismo criterio que forzó `Registro → DataRecord` en §4 y `Contenedor → Ancestor` en §10, B3). Por P1 el paquete se llama como **lo que contiene**, y lo que contiene lo nombra el propio plan: «`ingesta/` — **orquestación de los tramos**» (§{Paquetes}). `pipeline` se descarta por vago —todo el repo es el pipeline— y `spine` porque «la espina dorsal» es una metáfora del plan, no un término del dominio. **El archivo sigue siendo `src/ingest.ts` y la función `ingest`**, por E1: el archivo se llama como lo que contiene, y contiene `ingest` |
+| **P3** | los valores de `MdSignals['block']` y **la política para los doce** | **la convención del archivo que los produce**, minúscula llana, y **el formato NO se repite adentro de los valores** | Son **datos** y §5 no los cubre: §5 es snake **porque** sus valores van a filas de Postgres y al payload de Qdrant, y estos **mueren en la unidad** (`Unit.signals`, PROVISIONAL(C25)) — no salen del adaptador. Les corresponde el precedente **G9** («la convención del archivo que los produce»), o sea minúscula llana como `from`/`stack`/`reference` (§12, F1) y no snake. Lo que **faltaba** es la política, y es esta: **cada adaptador es dueño de su vocabulario y ninguno se coordina con los otros once.** Esa independencia es la contracara exacta de que `role` sea cerrado — `role` es cerrado porque **cruza** el borde y va al índice; las señales son abiertas porque **no lo cruzan**, y pedirles coordinación sería pagar el costo de un vocabulario cerrado sin comprar ninguna de sus garantías. El tipo se llama **`<Formato>Signals`** (R2: raíz + modificador adelante) — `MdSignals`, `DocxSignals`, `XlsxSignals` — y por eso los valores **no** repiten el formato: `heading`, no `mdHeading`; el tipo ya lo dice |
+| **P4** | el registro de adaptadores | **`Registry`** | §3 traduce `Registro → DataRecord` y la fila parece colisionar: **no colisiona, y conviene decir por qué.** El español `registro` es dos palabras distintas —el *asiento* de una planilla y el *padrón* de algo— y el inglés las separa solo: `Record` y `Registry`. Es el quinto caso de §4 («lo que la traducción arregla gratis»), y es el primero que aparece **después** de que una de las dos mitades ya se hubiera renombrado, así que sin esta fila la lectura natural es que `Registry` contradice a `DataRecord` |
+| **P5** | lo que **acumula** `Diagnostics` | **`Sink`** | §8 (D1/D2) nombró `Diagnostics` y `Notice` y dejó sin nombre **lo que las junta**, que es de lo que dependen el estado `partial`, la métrica de degradación y el invariante «nada se descarta en silencio». Los dos métodos de `Diagnostics` devuelven `void`: **lo único que los vuelve verificables es que el destino esté tipado**. `Report` promete un renderizado y `DiagnosticsLog` un flujo ordenado de append; el tipo es dos arreglos y no es ninguna de las dos. `sumidero → sink` es R1, es el término de dominio para el destino de un canal de diagnóstico, y **el par se lee entero**: `Diagnostics` es el lado que escribe, `Sink` el que acumula |
+| **P6** | la fábrica del adaptador opaco | **`opaqueOf`** | R11 admite `Of` y `From`, y `roleFromBody` parece el precedente. **No lo es:** `From` es para derivaciones que **cruzan de concepto** —un rol no es un cuerpo—, y acá lo que sale **es** un adaptador, el mismo, con `S` y `E` borrados. `Of` es el conector que dice «el opaco DE este adaptador». `sealAdapter` se descarta porque **`seal` ya está tomado** —`sealOf` en `grouping.ts` sella un fragmento— y un segundo `seal` importaría a mano la homonimia que §4 celebró que el inglés deshiciera. `erase` nombra la operación sobre los **parámetros de tipo**, que es justo lo que a quien la llama no le importa: le importa que lo que sale sea un `OpaqueAdapter`, que es el tipo que `ir` ya declara |
+| **P7** | lo que devuelve un eslabón resuelto de la cascada | **`Resolution`** | `Classification & {level, attribution, confidence}` — lo que la cascada sabe y `Adapter.detect` tira (H3). `Resolved` es un **participio**, y los tipos de este repo son sustantivos: `Routing`, `Emission`, `Grouping`, `Classification`. `CascadeResult` nombra al **productor** en vez de a la cosa, que es el defecto que §4 le señaló a `Evidenciador → EvidenceFn`. `Resolución → Resolution` es R1 llana sobre el sustantivo correcto |
+| **P8** | lo que devuelve `ingest` | **`Run`** | R1 sobre `Corrida`. `IngestResult` agrega una palabra para no agregar significado (el precedente de §4 con `ClassificationResult`, descartado ahí por lo mismo), y `Ingestion` es P2 otra vez. Gana `Run` porque nombra **una corrida** y no un valor de retorno cualquiera: lo que el objeto lleva —el árbol, las dos salidas, el sumidero, el adaptador que ganó y el nivel alcanzado— es el registro de **qué pasó esta vez**, y es lo que el golden congela |
+
+### Lo que este bloque BORRA, y por qué es una decisión y no una omisión
+
+`MarkdownOptions` **no existe**. El prototipo del paso 3 llevaba las dos decisiones
+abiertas —`frontmatterAsFields` y `captionByPosition`— como parámetros de la fábrica,
+y eso era correcto **mientras estaban abiertas**: era lo único que hacía las dos ramas
+ejecutables y por lo tanto medibles. Las dos se decidieron, así que el parámetro se
+borra. **Una opción que sobrevive a su decisión es una configuración, y una
+configuración es una decisión que nadie tomó.**
+
+`OpaqueEntry` **tampoco existe**, y era una re-declaración: el prototipo lo escribió
+como un registro con los cinco miembros de `OpaqueAdapter`, que `ir` ya exporta y que
+`Selection.adapter` ya usa. `README.md` de `ir` lo prohíbe con todas las letras —«si
+un tipo de acá hace falta en otro lado, se importa»— y la copia además habría dejado
+`Selection.adapter` y `Registry[number]` como dos tipos estructuralmente iguales que
+pueden divergir en silencio.
+
+### El precio de P2, dicho de frente
+
+El plan escribe `ingesta/` en su diagrama de paquetes (§{Paquetes}) y este documento
+lo renombra. **Es una divergencia con el plan, no con una regla**, y va anotada acá
+para que quien lea el diagrama no concluya que el paquete falta. Lo que el plan nombra
+es el **tramo** —la ingesta—, y el tramo sigue llamándose así en toda la prosa; lo que
+cambia es el nombre del **artefacto de código**, que es lo que este documento gobierna.
+
+---
+
 ## La regla que gobierna a este documento
 
 **Si un término no está acá y ninguna regla de §2 lo determina, no se inventa: se
