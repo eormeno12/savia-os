@@ -45,12 +45,14 @@ export {
   type Resolution,
   cascade,
   coldProbeOf,
+  coldProbeOfAsset,
   extensionOf,
   opaqueOf,
   probeOf,
   recognizeMessage,
   registryOf,
   select,
+  sourceOfAsset,
   sourceOfBytes,
 } from "./registry.js";
 
@@ -69,6 +71,12 @@ export {
   inlineOf,
   markdownAdapter,
 } from "./markdown.js";
+
+export {
+  IMAGE_ID,
+  type ImageSignals,
+  imageAdapter,
+} from "./image.js";
 
 export {
   TEXT_FLOOR_ID,

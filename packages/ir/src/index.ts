@@ -131,9 +131,8 @@ export {
   type Grain,
   type Window,
   type ObjectRef,
-  type Enrichment,
-  type EnrichmentKind,
   windowCovers,
+  windowKey,
   isRowNode,
 } from "./shapes.js";
 
@@ -229,6 +228,10 @@ export {
 export {
   EVIDENCE_SCALE,
   type EvidenceName,
+  CAPABILITIES,
+  type Capability,
+  type Region,
+  type PerceiveFn,
   Evidence,
   type Origin,
   type ColdProbe,
@@ -269,5 +272,6 @@ export {
   type RECURSION_PROOFS,
   type EVIDENCE_PROOFS,
   type CHANNEL_PROOFS,
+  type CHANNEL_CAPABILITY_PROOFS,
   isNode,
 } from "./invariants.js";

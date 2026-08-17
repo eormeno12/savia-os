@@ -20,7 +20,7 @@ import { PARAMETERS } from "./params.js";
 import type { AdapterId, MatterHash } from "./identity.js";
 import type { Classification, RecognitionLevel } from "./classification.js";
 import type { Body, ObjectRef } from "./shapes.js";
-import type { LocalLocation, Location } from "./location.js";
+import type { Box, LocalLocation, Location } from "./location.js";
 import type { AchievedLevel, Channel, RawNode } from "./outputs.js";
 
 // ─────────────────────────────── Evidence ────────────────────────────────────
@@ -387,6 +387,56 @@ export interface CancellationSignal {
  * se ven entre sí» (§{Paquetes}) y que deja el punto fijo, la guarda de ciclo y el
  * descuento en un solo lugar.
  */
+/**
+ * Lo que un adaptador puede NECESITAR del núcleo y que el núcleo puede no tener.
+ *
+ * UN NOMBRE DE CAPACIDAD ES UN NOMBRE DE CAMPO DE `Context`, y eso no es una
+ * coincidencia cómoda: es lo que vuelve genérico el chequeo del núcleo
+ * (`ctx[c] === null`) sin una tabla que alguien mantenga al día. Cuando aparezca la
+ * segunda capacidad no hay que tocar el mecanismo, solo agregar la fila.
+ *
+ * Hoy hay UNA. Un conjunto cerrado de un elemento parece de más hasta que se ve qué
+ * compra: `Adapter.requires` deja de ser `string[]` —donde un typo es un adaptador
+ * que nunca corre y nadie se entera— y pasa a ser una lista que el compilador cierra.
+ */
+export const CAPABILITIES = ["perceive"] as const;
+export type Capability = (typeof CAPABILITIES)[number];
+
+/**
+ * Lo que un modelo perceptual devuelve sobre una imagen: dónde, qué texto, y cuánta
+ * confianza.
+ *
+ * DEVUELVE PERCEPCIÓN, NUNCA ROLES, y esa línea es la que sostiene R2. Si el modelo
+ * dijera «esto es un título», el conjunto cerrado de `Role` quedaría decidido por lo
+ * que responda un servicio externo, y solo `ir` puede conmutar sobre `Role`. Quién
+ * decide que la región de arriba y en letra grande es un `heading` es la CASCADA del
+ * adaptador, exactamente igual que `porProminencia` en un `.docx`.
+ *
+ * `text: null` = región PICTÓRICA, sin texto que leer. Es el caso que hace disparar
+ * el punto fijo sin ninguna regla sobre imágenes: la foto de un gato devuelve una
+ * sola región pictórica que cubre todo, o sea lo mismo que entró (§{Dónde frena}).
+ *
+ * `confidence` es el único productor que va a tener `RawNode.confidence`, que hoy es
+ * `null` en el 100% del corpus. Es la promesa con la que §{La escalera} se distingue
+ * —«la diferencia entre un pipeline que adivina y uno que declara cuánto está
+ * adivinando»— y hasta el paso 6 no tenía implementación.
+ */
+export type Region = {
+  readonly box: Box;
+  readonly text: string | null;
+  readonly confidence: number;
+};
+
+/**
+ * §{La delegación es emergente}. La firma que el host implementa y `ir` no.
+ *
+ * NO RECIBE EL MIME, y no por olvido: `decompose` recibe una `Source` y un `Context`,
+ * nunca la sonda, así que un adaptador NO TIENE de dónde sacarlo. Pedirlo obligaría a
+ * meter la sonda adentro del contexto para un solo dato que el modelo puede sacar de
+ * los bytes. Un parámetro que quien llama no puede llenar es un parámetro mentiroso.
+ */
+export type PerceiveFn = (source: Source) => Promise<readonly Region[]>;
+
 export interface Context {
   readonly diagnostics: Diagnostics;
   readonly limits: Budget;
@@ -422,6 +472,31 @@ export interface Context {
    * es lo que hace cumplir la precondición de terminación (§{Dónde frena}).
    */
   materialize(bytes: Uint8Array, mime: string): Promise<ObjectRef>;
+  /**
+   * EL MODELO PERCEPTUAL, y `null` significa «este contexto no puede».
+   *
+   * `null` NO ES UN ERROR NI UNA DEGRADACIÓN: es la forma que toma el corte entre el
+   * hilo que atiende al usuario y el que hace el trabajo pesado. Correr un modelo
+   * sale del proceso, cuesta plata y tarda segundos; el contexto del request no lo
+   * trae y el del worker sí. Con eso, «lo pesado no bloquea» deja de ser una regla
+   * que alguien respeta y pasa a ser algo que el hilo rápido NO PUEDE HACER.
+   *
+   * Y NO LO CONSULTA EL ADAPTADOR PARA AUTOLIMITARSE. Quien lo mira es el NÚCLEO,
+   * comparando contra `Adapter.requires` ANTES de invocar: un adaptador que necesita
+   * lo que no hay ni se llama, y su asset queda anotado. Dejar que el adaptador
+   * respondiera «no pude» sería confiar en que doce autores distingan bien entre «no
+   * pude» y «no había nada» — y esas dos cosas tienen destinos opuestos: una se
+   * reintenta y la otra ya terminó (PROVISIONAL(H1), la misma razón por la que este
+   * contexto es un capability object).
+   *
+   * VA POR `invoke` CUANDO SE USA, no suelta: `invoke` es «el único punto donde se
+   * consulta el caché», y la clave sale sin hashear nada porque el almacenamiento es
+   * direccionado por contenido — `${id}:${version}:${ref.object}:${ref.window}`. Con
+   * eso los 200 encabezados que repiten el mismo logo son UNA invocación y 199
+   * aciertos, y una versión nueva del modelo invalida sola (PROVISIONAL(#25/C20):
+   * `version` cubre el adaptador entero).
+   */
+  perceive: PerceiveFn | null;
 }
 
 // ─────────────────────────────── Unit ────────────────────────────────────────
@@ -568,6 +643,30 @@ export type AuthoredRawNode = RawNode & {
  * de memoria del sistema.
  */
 export interface Source {
+  /**
+   * QUÉ ES ESTO QUE ESTOY LEYENDO — el objeto y la parte.
+   *
+   * Hasta el paso 6 una `Source` era solo un lector de bytes, y alcanzaba porque
+   * ningún adaptador había necesitado NOMBRAR aquello que leía. El `imagen` sí:
+   *
+   *   · para emitir una región pictórica tiene que construir un `ObjectRef`, y el
+   *     objeto no salía de ningún lado;
+   *   · para que el modelo perceptual pueda renderizar la región, el host necesita
+   *     saber cuál es — una `Source` de un rectángulo no tiene bytes que entregar;
+   *   · y el PUNTO FIJO es literalmente «lo que devolviste tiene la misma ref que lo
+   *     que te di», así que sin ref no hay punto fijo que escribir.
+   *
+   * ES EL MISMO TIPO QUE DECLARA `Body.asset`, y esa correspondencia no es casual:
+   * un asset dice `{ref, mime}` y la `Source` del delegado se construye EXACTAMENTE
+   * de ahí. Lo que el padre declara es lo que el hijo recibe, sin traducción.
+   */
+  readonly ref: ObjectRef;
+  /**
+   * Normalizado, igual que `Body.asset.mime`. Para el delegado sale de lo que
+   * DECLARÓ EL PADRE, que es el único que puede saberlo: un rectángulo de una página
+   * renderizada no tiene bytes propios de los que olerlo.
+   */
+  readonly mime: string;
   readonly size: number;
   bytes(): Promise<Uint8Array>;
   /**
@@ -662,6 +761,26 @@ export interface Adapter<S, E> {
   /** El escalón de la escalera en el que trabaja. Alimenta `certaintyOfLevel`. */
   readonly level: RecognitionLevel;
   readonly version: string;
+  /**
+   * QUÉ NECESITA DEL NÚCLEO PARA PODER CORRER. Vacío = alcanza con bytes y parseo,
+   * que es el caso de once de los doce.
+   *
+   * ES UNA DECLARACIÓN ESTÁTICA, y ahí está todo el valor. El núcleo la compara con
+   * lo que el contexto trae y decide ANTES de invocar; el adaptador nunca opina sobre
+   * si pudo o no. Eso separa dos estados que desde afuera son idénticos —un `asset`
+   * sin hijos— y que tienen destinos OPUESTOS:
+   *
+   *   no se intentó  ·  faltaba la capacidad     →  se anota y se reintenta
+   *   se intentó     ·  devolvió lo mismo        →  punto fijo, terminó para siempre
+   *
+   * Sin esta distinción, la foto de un gato —que descompone en una sola región
+   * pictórica, o sea en sí misma— se vuelve a encolar en cada pasada, para siempre.
+   *
+   * NO ES UN `boolean` «soy lento». Un flag no dice QUÉ falta, así que el núcleo no
+   * puede saber si el contexto que tiene alcanza; y cuando aparezca la segunda
+   * capacidad habría dos flags que pueden mentir por separado.
+   */
+  readonly requires: readonly Capability[];
   decompose(input: E, ctx: Context): Promise<readonly Unit<S>[]>;
   detect(units: readonly Unit<S>[]): (u: Unit<S>) => Classification | null;
 }
@@ -737,6 +856,12 @@ export interface OpaqueAdapter {
   readonly id: AdapterId;
   readonly level: RecognitionLevel;
   readonly version: string;
+  /**
+   * SOBREVIVE AL BORRADO, y tiene que hacerlo: es lo único que el núcleo consulta
+   * para decidir si puede invocar a este adaptador, y a un `OpaqueAdapter` se llega
+   * SOLO desde `select`, que es justo donde vive la decisión de delegar.
+   */
+  readonly requires: readonly Capability[];
   evidence(probe: Probe): Promise<Evidence>;
   /**
    * `Source`, Y ESTO CIERRA P14. Solo `S` se borra; `E` no, porque ya no varía.

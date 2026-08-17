@@ -89,7 +89,7 @@
  * evitado con sus mensajes con default. Ahora cada una dice lo suyo.
  */
 
-import { SHAPES, type Shape } from "./shapes.js";
+import { SHAPES, type Body, type Shape } from "./shapes.js";
 import type {
   CERTAINTY_RANK,
   COHESION_BY_ROLE,
@@ -132,7 +132,9 @@ import {
 } from "./outputs.js";
 import {
   EVIDENCE_SCALE,
+  type Adapter,
   type AuthoredUnit,
+  type Capability,
   type ChannelAdapter,
   type Context,
   type FileAdapter,
@@ -912,6 +914,72 @@ export type CHANNEL_PROOFS = readonly [
   _AuthoredUnitRequiresAuthorship,
   _RegistryInputIsNotUnknown,
   _RegistryInputIsSource,
+];
+
+// ════ Invariante 13 · el núcleo decide si un adaptador puede correr ══════════
+// Nace en el paso 6. Las cuatro sostienen un solo mecanismo, y el mecanismo existe
+// para separar dos estados que desde afuera son IDÉNTICOS —un `asset` sin hijos— y
+// que tienen destinos opuestos:
+//
+//     no se intentó · faltaba la capacidad   →  se anota y se reintenta
+//     se intentó    · devolvió lo mismo      →  punto fijo, terminó para siempre
+//
+// Sin la separación, la foto de un gato —que descompone en una sola región
+// pictórica, o sea en sí misma— vuelve a la cola en cada pasada, para siempre.
+
+// (a) LA PIEDRA ANGULAR: un nombre de capacidad ES un nombre de campo de `Context`.
+// Es lo que vuelve genérico el chequeo del núcleo —`ctx[c] === null`— sin una tabla
+// de correspondencia que alguien mantenga al día. Si los dos vocabularios se
+// separan, el núcleo pasa a preguntar por un campo que no existe: `undefined !==
+// null`, así que la capacidad se da por PRESENTE y el adaptador se invoca en un
+// contexto que no puede satisfacerlo. Falla hacia el lado peligroso, y en silencio.
+type _CapabilityIsAContextField = True<
+  FitsIn<
+    Capability,
+    keyof Context,
+    "a Capability stopped naming a Context field — the core now probes a key that does not exist, reads undefined instead of null, and invokes adapters in contexts that cannot serve them"
+  >
+>;
+
+// (b) `requires` es del conjunto CERRADO, no `string[]`. Con strings sueltos un typo
+// —`"percieve"`— es un adaptador que no corre nunca y nadie se entera: el núcleo
+// busca un campo inexistente y cae en la misma rama de (a).
+type _RequiresIsClosed = True<
+  FitsIn<
+    Adapter<unknown, unknown>["requires"],
+    readonly Capability[],
+    "Adapter.requires widened past the closed set — a typo in a capability name is now an adapter that silently never runs"
+  >
+>;
+
+// (c) `Context.perceive` ADMITE `null`, y eso es la mitad del corte entre el hilo
+// rápido y el worker. Si dejara de admitirlo, el contexto del request no sería
+// construible sin un modelo, y «lo pesado no bloquea» volvería a ser una regla que
+// alguien respeta en vez de algo que ese contexto NO PUEDE hacer.
+type _PerceiveCanBeAbsent = True<
+  FitsIn<
+    null,
+    Context["perceive"],
+    "Context.perceive stopped admitting null — a context without a perceptual model is no longer expressible, so the request thread has to carry one and heavy work is back on it"
+  >
+>;
+
+// (d) La lápida se sostiene: el `asset` no vuelve a llevar trabajo pendiente. Ver el
+// razonamiento en `shapes.ts` — el cuerpo se regenera entero en cada re-ingesta y
+// está fuera de la huella, así que no puede registrar nada durable.
+type _AssetCarriesNoPendingWork = True<
+  WithoutKey<
+    Extract<Body, { readonly shape: "asset" }>,
+    "deferred",
+    "the asset body carries deferred work again — it is regenerated whole on every re-ingest and excluded from the fingerprint, so it cannot durably record anything; pending belongs to Run, not to the content"
+  >
+>;
+
+export type CHANNEL_CAPABILITY_PROOFS = readonly [
+  _CapabilityIsAContextField,
+  _RequiresIsClosed,
+  _PerceiveCanBeAbsent,
+  _AssetCarriesNoPendingWork,
 ];
 
 // ─────────────────────────────── Invariantes de runtime ──────────────────────

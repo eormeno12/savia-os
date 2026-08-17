@@ -341,8 +341,7 @@
             "scope": "whole"
           }
         },
-        "mime": "application/octet-stream",
-        "deferred": []
+        "mime": "application/octet-stream"
       }
     },
     {
@@ -383,8 +382,7 @@
             "scope": "whole"
           }
         },
-        "mime": "application/octet-stream",
-        "deferred": []
+        "mime": "application/octet-stream"
       }
     },
     {
@@ -431,8 +429,7 @@
             "scope": "whole"
           }
         },
-        "mime": "application/octet-stream",
-        "deferred": []
+        "mime": "application/octet-stream"
       }
     },
     {

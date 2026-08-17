@@ -93,6 +93,7 @@ try {
   const {
     TEXT_FLOOR_ID,
     chatAdapter,
+    imageAdapter,
     coldProbeOf,
     markdownAdapter,
     opaqueOf,
@@ -100,7 +101,7 @@ try {
     registryOf,
     textFloorAdapter,
   } = await import(pathToFileURL(join(nm, "adapters", "index.js")).href);
-  const { Evidence, asAdapterId, asLocalId, cohesionOf } = await import(
+  const { Evidence, asAdapterId, asLocalId, asObjectKey, cohesionOf } = await import(
     pathToFileURL(join(nm, "ir", "index.js")).href
   );
 
@@ -127,6 +128,11 @@ try {
   const SUBIDA = (b, extra = {}) => ({
     kind: "bytes",
     bytes: b,
+    // Desde el paso 6 la entrada trae su propia dirección: el request guarda ANTES de
+    // encolar, así que la clave existe para cuando esto corre. Sin ella un adaptador
+    // no puede emitir un `asset`, y sin `asset` no hay delegación.
+    object: asObjectKey(`obj-${b.length}`),
+    mime: "application/octet-stream",
     name: "manual.md",
     channel: "frontend",
     when: "2026-08-16T00:00:00.000Z",
@@ -717,6 +723,223 @@ try {
     }
   }
 
+  // ── I14 · UNA IMAGEN ES UN DOCUMENTO COMO CUALQUIER OTRO ──────────────────
+  // El invariante por el que existe el paso 6. `adapters` ya fija la mitad local —que
+  // el adaptador `imagen` mapee regiones a las seis formas y toque fondo cuando no hay
+  // nada más—; esto fija la que solo se puede medir acá, porque necesita el emisor:
+  // que el subárbol se INJERTE en la lista plana y HEREDE el contexto del contenedor.
+  //
+  // «Un asset delega si algún adaptador reclama sus bytes»
+  // (§{La delegación es emergente}), y eso es `select()` aplicado a la parte. Si
+  // hiciera falta una rama aguas abajo para un nodo que vino de una imagen, la
+  // cintura tendría un agujero.
+  {
+    // El contenedor sintético: un título y una pieza incrustada. Es el paso 2 otra vez
+    // —el emisor se construyó con nodos escritos a mano antes de que existiera un
+    // adaptador— y por la misma razón: lo que se mide es el MECANISMO, no un decoder.
+    const CONTENEDOR = asAdapterId("contenedor-sintetico");
+    const contenedor = {
+      id: CONTENEDOR,
+      level: "declarative",
+      version: "1",
+      requires: [],
+      evidence: (p) => Promise.resolve(p.extension === "caja" ? Evidence.Signature : Evidence.None),
+      recognize: (source) =>
+        Promise.resolve([
+          {
+            role: "heading",
+            body: { shape: "text_span", text: "Informe anual", marks: [] },
+            location: { anchor: "h1", coordinate: { space: "source" }, adapter: CONTENEDOR, within: [] },
+            hint: { linkage: "level", level: 1 },
+            delegation: [],
+            attribution: "sintetico",
+            level: "declarative",
+            confidence: null,
+          },
+          {
+            role: "image",
+            body: {
+              shape: "asset",
+              // Un RANGO del mismo objeto: es el caso del miembro de un `.zip` o del
+              // adjunto de un `.eml`. La ventana nombra la parte sin escribir un byte.
+              ref: { object: source.ref.object, window: { scope: "range", start: 0, end: 8 } },
+              mime: "image/png",
+            },
+            location: { anchor: "img1", coordinate: { space: "source" }, adapter: CONTENEDOR, within: [] },
+            hint: null,
+            delegation: [],
+            attribution: null,
+            level: "physical",
+            confidence: null,
+          },
+        ]),
+    };
+
+    const REGIONES = [
+      { box: { frame: "img", x: 0, y: 0, width: 1000, height: 120 }, text: "Ventas por región", confidence: 0.93 },
+      { box: { frame: "img", x: 0, y: 140, width: 1000, height: 400 }, text: "Creció un 12%.", confidence: 0.81 },
+    ];
+    const REG = registryOf([contenedor, opaqueOf(imageAdapter)]);
+    const CAJA = SUBIDA(new TextEncoder().encode("cajacaja"), { name: "todo.caja" });
+
+    // ── (a) CON la capacidad: el subárbol se injerta ──────────────────────────
+    const conModelo = await ingest(CAJA, {
+      ...OPCIONES,
+      registry: REG,
+      perceive: () => Promise.resolve(REGIONES),
+    });
+    const anclas = conModelo.nodes.map((n) => n.location.anchor);
+    if (!igual(anclas, ["h1", "img1", "r#0", "r#1"])) {
+      fallar(
+        "I14 · el subárbol se injerta donde estaba la pieza",
+        JSON.stringify(anclas),
+        "«el resultado se injerta donde estaba la pieza, de modo que el contenido incrustado hereda el contexto jerárquico de su contenedor» (§{La delegación es emergente}). Si los nodos de la imagen salieran al final o en otra lista, el emisor no podría reencuadrar y las migas del subárbol serían las de la raíz",
+      );
+    }
+
+    const delImagen = conModelo.nodes.filter((n) => n.location.anchor.startsWith("r#"));
+    if (!delImagen.every((n) => n.delegation.length === 1)) {
+      fallar(
+        "I14 · los nodos delegados llevan su cadena",
+        JSON.stringify(delImagen.map((n) => n.delegation)),
+        "es una CADENA y no un id suelto porque el emisor tiene que distinguir bajar un nivel de bajar tres (PROVISIONAL(C21) de `ir`). Sin ella, la cita encadenada del ejemplo canónico —contrato.pdf → pg3 → esta celda— no se puede armar",
+      );
+    }
+
+    // (b) LAS MIGAS CRUZAN LA FRONTERA. Es la mitad que solo el emisor puede dar, y la
+    // razón por la que este invariante vive acá y no en `adapters`.
+    const migas = delImagen.map((n) => n.breadcrumbs.map((b) => b.text));
+    if (!migas.every((m) => m.includes("Informe anual"))) {
+      fallar(
+        "I14 · el contenido incrustado hereda el contexto de su contenedor",
+        JSON.stringify(migas),
+        "es la frase literal de §{La delegación es emergente}. Un párrafo que estaba adentro de una imagen que estaba bajo un título tiene que recuperarse SABIENDO bajo qué título estaba, o la memoria devuelve texto sin contexto — que es exactamente lo que las migas existen para impedir",
+      );
+    }
+
+    // (c) `mixed` ESTRENA PRODUCTOR: parte estructurado, parte delegado.
+    if (conModelo.achievedLevel !== "mixed" || conModelo.deferred.length !== 0) {
+      fallar(
+        "I14 · un documento con delegación sale `mixed`",
+        `nivel=${JSON.stringify(conModelo.achievedLevel)} diferidos=${conModelo.deferred.length}`,
+        "`mixed` es el ejemplo estrella del plan —198 páginas estructuradas + 2 delegadas— y hasta este paso NO LO PRODUCÍA NADIE. Sale de que hubo delegación y no de que haya corrido un modelo: un `.docx` con un `.xlsx` adentro también es mixto",
+      );
+    }
+
+    // ── (d) SIN la capacidad: no se invoca, se anota ──────────────────────────
+    const sinModelo = await ingest(CAJA, { ...OPCIONES, registry: REG }).catch((e) => ({
+      tiró: String(e),
+    }));
+    if (sinModelo.tiró !== undefined) {
+      fallar(
+        "I14 · sin la capacidad, el adaptador NI SE INVOCA",
+        `la corrida lanzó: ${sinModelo.tiró}`,
+        "el núcleo tiene que comparar `Adapter.requires` contra lo que el contexto trae ANTES de llamar. Si lo invoca igual, el adaptador se encuentra sin su capacidad y falla ruidoso — que es lo correcto de su lado y un desastre del otro: la ingesta entera se cae por una pieza que solo tenía que quedar anotada. Es la razón por la que la decisión vive en el núcleo y no en el adaptador",
+      );
+    }
+    const códigos = sinModelo.sink?.notices.map((n) => n.code) ?? [];
+    if (sinModelo.deferred?.length !== 1 || !códigos.includes("delegation.deferred")) {
+      fallar(
+        "I14 · sin la capacidad, el asset queda anotado",
+        `diferidos=${sinModelo.deferred?.length} avisos=${JSON.stringify(códigos)}`,
+        "el núcleo compara `Adapter.requires` contra lo que el contexto trae y decide ANTES de invocar. Sin la anotación, «no se intentó» y «se intentó y tocó fondo» son el mismo `asset` sin hijos: o el trabajo se pierde, o la foto de un gato se re-encola para siempre",
+      );
+    }
+    if (sinModelo.nodes?.length !== 2) {
+      fallar(
+        "I14 · lo que sí se pudo leer entra igual",
+        `salieron ${sinModelo.nodes?.length} nodos`,
+        "el documento se indexa con lo que tiene y dice qué le falta. Esperar a la capacidad para entregar algo sería poner el trabajo pesado en el camino del usuario, que es justo lo que el corte del contexto existe para evitar",
+      );
+    }
+
+    // (e) LA MISMA ENTRADA, LOS DOS CONTEXTOS, LOS MISMOS IDS donde el contenido no
+    // cambió. Es la precondición de la delegación tardía: «todo lo que ya estaba →
+    // hash idéntico → MISMO id» (§{La delegación tardía}). Sin esto, procesar la
+    // imagen después movería la identidad de lo que nadie tocó.
+    const huellasComunes = (r) =>
+      (r.nodes ?? []).filter((n) => !n.location.anchor.startsWith("r#")).map((n) => n.hash);
+    if (!igual(huellasComunes(sinModelo), huellasComunes(conModelo))) {
+      fallar(
+        "I14 · procesar la imagen después no mueve lo que ya estaba",
+        `sin=${JSON.stringify(huellasComunes(sinModelo))}\n        con=${JSON.stringify(huellasComunes(conModelo))}`,
+        "es lo que vuelve barata la delegación tardía: el documento se indexa incompleto y lo que llega después son ALTAS, no un re-etiquetado. Si las huellas se movieran, cada enriquecimiento despegaría toda la curación del documento — el invariante que §{Orden} llama «el más caro de recuperar si se rompe tarde»",
+      );
+    }
+  }
+
+  // ── I15 · LA RECURSIÓN FRENA, Y NO POR UN CONTADOR ────────────────────────
+  // Las dos guardas de §{Dónde frena}, y ninguna es presupuestaria: el presupuesto es
+  // la tercera y es el paso 10.
+  {
+    const IMG = asAdapterId("img-sintetica");
+    // Se devuelve A SÍ MISMO: la ventana que sale cubre la que entró. Es la foto de un
+    // gato — el modelo miró y no había nada más que sacar.
+    const espejo = {
+      id: IMG,
+      level: "perceptual",
+      version: "1",
+      requires: [],
+      evidence: (p) => Promise.resolve(p.declaredMime === "image/png" ? Evidence.Structure : Evidence.None),
+      recognize: (source) =>
+        Promise.resolve([
+          {
+            role: "image",
+            body: { shape: "asset", ref: { object: source.ref.object, window: { scope: "whole" } }, mime: "image/png" },
+            location: { anchor: "self", coordinate: { space: "source" }, adapter: IMG, within: [] },
+            hint: null,
+            delegation: [],
+            attribution: null,
+            level: "physical",
+            confidence: null,
+          },
+        ]),
+    };
+    const CONT = asAdapterId("cont-espejo");
+    const contenedor = {
+      id: CONT,
+      level: "declarative",
+      version: "1",
+      requires: [],
+      evidence: (p) => Promise.resolve(p.extension === "espejo" ? Evidence.Signature : Evidence.None),
+      recognize: (source) =>
+        Promise.resolve([
+          {
+            role: "image",
+            body: { shape: "asset", ref: { object: source.ref.object, window: { scope: "range", start: 0, end: 4 } }, mime: "image/png" },
+            location: { anchor: "a", coordinate: { space: "source" }, adapter: CONT, within: [] },
+            hint: null,
+            delegation: [],
+            attribution: null,
+            level: "physical",
+            confidence: null,
+          },
+        ]),
+    };
+
+    const r = await ingest(
+      SUBIDA(new TextEncoder().encode("abcdefgh"), { name: "x.espejo" }),
+      { ...OPCIONES, registry: registryOf([contenedor, espejo]) },
+    ).catch((e) => ({ tiró: String(e) }));
+
+    if (r.tiró !== undefined) {
+      fallar(
+        "I15 · el punto fijo frena la recursión",
+        `la corrida no terminó: ${r.tiró}`,
+        "«si descomponer un asset devuelve un solo bloque cuyo contenido es el mismo que entró, se tocó fondo» (§{Dónde frena}). Sin el punto fijo esto no es un bug de calidad: es una recursión que no termina, y sin presupuesto —que es el paso 10— nada más la para",
+      );
+    } else {
+      const códigos = r.sink.notices.map((n) => n.code);
+      if (!códigos.includes("delegation.bottomed") || r.deferred.length !== 0) {
+        fallar(
+          "I15 · tocar fondo NO es quedar pendiente",
+          `avisos=${JSON.stringify(códigos)} diferidos=${r.deferred.length}`,
+          "es la otra mitad de la distinción: el modelo SÍ corrió y devolvió lo mismo, así que no hay nada que reintentar. Si esto entrara en `deferred`, la foto de un gato volvería a la cola en cada pasada, para siempre",
+        );
+      }
+    }
+  }
+
   if (fallas > 0) process.exit(1);
 
   console.log(
@@ -724,7 +947,8 @@ try {
       `I4 satélite y su imagen · I5 sin adaptador no se pierde · I6 emisión fallida reportada · ` +
       `I7 delegación de profundidad cero · I8 el tamaño objetivo decide · I9 la autoría fuera de la huella · ` +
       `I10 degradación real y visible · I11 guardar incondicional, indexar no · ` +
-      `I12 la cintura no tiene forma de documento · I13 leído y vacío avisa)\n` +
+      `I12 la cintura no tiene forma de documento · I13 leído y vacío avisa · ` +
+      `I14 una imagen es un documento · I15 la recursión frena)\n` +
       `           ${corrida.nodes.length} nodos · ${corrida.fragments.length} fragmentos · ` +
       `${corrida.records.length} registros · ${corrida.sink.notices.length} avisos`,
   );

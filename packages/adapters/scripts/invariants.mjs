@@ -101,6 +101,7 @@ try {
     blocksOf,
     cascade,
     chatAdapter,
+    imageAdapter,
     coldProbeOf,
     markdownAdapter,
     opaqueOf,
@@ -108,11 +109,12 @@ try {
     probeOf,
     recognizeMessage,
     registryOf,
+    sourceOfAsset,
     select,
     sourceOfBytes,
     textFloorAdapter,
   } = await import(pathToFileURL(join(destino, "index.js")).href);
-  const { Evidence, asAdapterId, certaintyOfLevel, isLegalPair, ROLES } = await import(
+  const { Evidence, asAdapterId, asObjectKey, certaintyOfLevel, isLegalPair, ROLES } = await import(
     pathToFileURL(join(destinoIr, "index.js")).href
   );
 
@@ -165,13 +167,26 @@ try {
         spend: () => true,
         invoke: (_k, work) => work(),
         materialize: () => Promise.reject(new Error("no")),
+        // `null` = este contexto NO PUEDE percibir, que es el estado del hilo del
+        // request. Un contexto de banco que lo trajera por defecto escondería
+        // justamente el corte que el paso 6 introduce.
+        perceive: null,
       },
     };
   };
 
+  /**
+   * Desde el paso 6 una `Source` lleva su propia identidad —`ref` y `mime`—, porque
+   * un adaptador tiene que poder NOMBRAR lo que está leyendo para emitir un `asset`.
+   * El banco le da una clave sintética y estable: no hay host que las acuñe acá, y
+   * una clave que cambiara por corrida rompería el determinismo de I2.
+   */
+  const fuenteDe = (b, mime = "application/octet-stream") =>
+    sourceOfBytes(b, asObjectKey(`obj-${b.length}`), mime);
+
   const opaco = opaqueOf(markdownAdapter);
   const corrida = contextoDe();
-  const crudos = await opaco.recognize(sourceOfBytes(bytes), corrida.ctx);
+  const crudos = await opaco.recognize(fuenteDe(bytes), corrida.ctx);
 
   // ── I1 · GOLDEN: BYTES → NODOS CRUDOS ─────────────────────────────────────
   // Es el único invariante que compara contra algo EXTERNO al código. Los demás
@@ -224,7 +239,7 @@ try {
   // ── I2 · DETERMINISMO: DOS CORRIDAS BYTE-IDÉNTICAS ────────────────────────
   {
     const otra = contextoDe();
-    const segundos = await opaco.recognize(sourceOfBytes(bytes), otra.ctx);
+    const segundos = await opaco.recognize(fuenteDe(bytes), otra.ctx);
     if (!igual(segundos, crudos) || !igual(otra.notices, corrida.notices)) {
       fallar(
         "I2 · determinismo",
@@ -418,7 +433,7 @@ try {
       probeOf(
         coldProbeOf(bytes, nombre),
         { kind: "channel", channel: "frontend" },
-        sourceOfBytes(bytes),
+        fuenteDe(bytes),
       );
 
     const conMd = await select(registro, sonda("manual.md")).catch(() => "TIRÓ");
@@ -514,7 +529,7 @@ try {
   // ── I10 · `range` ES `[start, end)`, EN BYTES ─────────────────────────────
   {
     const diez = new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
-    const s = sourceOfBytes(diez);
+    const s = fuenteDe(diez);
     const trozos = [await s.range(0, 4), await s.range(4, 8), await s.range(8, 10)];
     const total = trozos.reduce((t, x) => t + x.length, 0);
     if (total !== diez.length || trozos[0].length !== 4) {
@@ -656,7 +671,7 @@ try {
     // RED: si un adaptador dedicado reclamara el `.conf`, el piso nunca contestaría y
     // el caso no probaría nada.
     const sondaDe = (b, nombre) =>
-      probeOf(coldProbeOf(b, nombre), { kind: "channel", channel: "frontend" }, sourceOfBytes(b));
+      probeOf(coldProbeOf(b, nombre), { kind: "channel", channel: "frontend" }, fuenteDe(b));
     const reclamado = await markdownAdapter.evidence(sondaDe(conf, "servidor.conf"));
     if (reclamado !== Evidence.None) {
       fallar(
@@ -721,7 +736,7 @@ try {
   // siempre salga un fragmento. El árbol es de tres ramas y no de dos.
   {
     const sondaDe = (b, nombre) =>
-      probeOf(coldProbeOf(b, nombre), { kind: "channel", channel: "frontend" }, sourceOfBytes(b));
+      probeOf(coldProbeOf(b, nombre), { kind: "channel", channel: "frontend" }, fuenteDe(b));
     const piso = opaqueOf(textFloorAdapter(P_TEXTO));
     const md = opaqueOf(markdownAdapter);
 
@@ -789,7 +804,7 @@ try {
   {
     const corridaPiso = contextoDe();
     const delPiso = await opaqueOf(textFloorAdapter(P_TEXTO)).recognize(
-      sourceOfBytes(conf),
+      fuenteDe(conf),
       corridaPiso.ctx,
     );
 
@@ -836,7 +851,7 @@ try {
 
     const otra = contextoDe();
     const segundas = await opaqueOf(textFloorAdapter(P_TEXTO)).recognize(
-      sourceOfBytes(conf),
+      fuenteDe(conf),
       otra.ctx,
     );
     if (!igual(segundas, delPiso)) {
@@ -945,6 +960,162 @@ try {
     }
   }
 
+  // ── I19 · UNA IMAGEN ES UN DOCUMENTO COMO CUALQUIER OTRO ──────────────────
+  // La mitad LOCAL de la afirmación del paso 6. La otra —que el subárbol se injerte
+  // heredando las migas del contenedor— vive en `orchestration`, porque necesita el
+  // emisor y el emisor no se ve desde acá.
+  {
+    // El modelo, sintético y fijo. No es un atajo: es lo mismo que hizo el paso 2 al
+    // construir el emisor entero con nodos escritos a mano ANTES de que existiera un
+    // adaptador. Lo que se prueba acá es el mapeo región→unidad y la cascada, no la
+    // calidad de un OCR.
+    const REGIONES = [
+      { box: { frame: "img", x: 0, y: 0, width: 1000, height: 120 }, text: "Informe trimestral", confidence: 0.94 },
+      { box: { frame: "img", x: 0, y: 140, width: 1000, height: 300 }, text: "Las ventas subieron.", confidence: 0.88 },
+      { box: { frame: "img", x: 0, y: 460, width: 480, height: 400 }, text: null, confidence: 0.71 },
+    ];
+    const conModelo = (regiones) => {
+      const c = contextoDe();
+      return { ...c, ctx: { ...c.ctx, perceive: () => Promise.resolve(regiones) } };
+    };
+
+    // (a) DECLARA LO QUE NECESITA, y `opaqueOf` lo propaga. Es lo único que este
+    // adaptador tiene y los otros tres no, y de eso depende que el núcleo pueda
+    // decidir por él.
+    if (!igual(imageAdapter.requires, ["perceive"]) || !igual(opaqueOf(imageAdapter).requires, ["perceive"])) {
+      fallar(
+        "I19 · el adaptador imagen declara su capacidad y el registro la conserva",
+        `adaptador=${JSON.stringify(imageAdapter.requires)} opaco=${JSON.stringify(opaqueOf(imageAdapter).requires)}`,
+        "sin la declaración, el núcleo no puede distinguir «no lo intenté» de «lo intenté y tocó fondo» — y esas dos cosas son un `asset` sin hijos las dos, con destinos opuestos. Si `opaqueOf` la borrara, la declaración existiría y no llegaría a quien decide",
+      );
+    }
+
+    // (b) LAS TRES ALTURAS DE LA ESCALA, y el orden es «contenido sobre extensión».
+    // La fila del medio es la decisión del paso 6: un delegado sin bytes propios gana
+    // por el mime que declaró el padre, y `Structure` es el peldaño que significa «el
+    // formato lo declaró» sin estirar `Signature`, que es «firma EN EL CONTENIDO».
+    const sondaDe = (magic, mime, ext) => ({ magicBytes: new Uint8Array(magic), declaredMime: mime, extension: ext });
+    const PNG = [0x89, 0x50, 0x4e, 0x47];
+    const casos = [
+      ["firma en el contenido", sondaDe(PNG, null, null), Evidence.Signature],
+      ["mime declarado por el padre", sondaDe([1, 2, 3], "image/png", null), Evidence.Structure],
+      ["solo la extensión", sondaDe([1, 2, 3], null, "jpg"), Evidence.Extension],
+      ["nada", sondaDe([1, 2, 3], "text/plain", "txt"), Evidence.None],
+    ];
+    for (const [qué, sonda, esperado] of casos) {
+      const dio = await imageAdapter.evidence(sonda);
+      if (dio !== esperado) {
+        fallar(
+          `I19 · evidencia: ${qué}`,
+          `dio ${dio}, se esperaba ${esperado}`,
+          "«contenido sobre extensión» (§{Tramo 2 › Decisiones}), y el peldaño del medio es lo que vuelve seleccionable a un delegado que NO TIENE BYTES PROPIOS: un rectángulo de una página renderizada no tiene firma que oler, y fabricarle una devolvería los del original — el bug H9 exacto",
+        );
+      }
+    }
+
+    // (c) LA FUENTE DE UN DELEGADO. Un rango SÍ tiene bytes; un rectángulo NO, y
+    // devolver vacío es lo correcto y no una carencia: renderizarlo sería
+    // materializar, y si cada nivel generara bytes el hash cambiaría siempre y el
+    // punto fijo no dispararía jamás (§{Dónde frena}).
+    const origen = fuenteDe(new Uint8Array([10, 11, 12, 13, 14, 15]), "application/zip");
+    const porRango = sourceOfAsset(origen, {
+      shape: "asset",
+      ref: { object: origen.ref.object, window: { scope: "range", start: 2, end: 5 } },
+      mime: "image/png",
+    });
+    const porRegion = sourceOfAsset(origen, {
+      shape: "asset",
+      ref: { object: origen.ref.object, window: { scope: "region", box: { frame: "p3", x: 0, y: 0, width: 1000, height: 500 } } },
+      mime: "image/png",
+    });
+    if (!igual([...(await porRango.bytes())], [12, 13, 14]) || porRango.size !== 3) {
+      fallar(
+        "I19 · un delegado por rango lee los bytes de su ventana",
+        `bytes=${JSON.stringify([...(await porRango.bytes())])} size=${porRango.size}`,
+        "`[start, end)` MEDIA ABIERTA, la misma convención que `Source.range` fija con número. Leerla cerrada pierde un byte de cada tramo, sin excepción y sin aviso: el delegado entra al pipeline con agujeros",
+      );
+    }
+    if ((await porRegion.bytes()).length !== 0 || porRegion.size !== 0) {
+      fallar(
+        "I19 · un delegado por región NO tiene bytes propios",
+        `bytes=${(await porRegion.bytes()).length} size=${porRegion.size}`,
+        "devolver los del original es el bug H9: los primeros 4 KB de la página 3 serían los del PDF entero, `esImagen` daría `None` y ganaría otra vez el adaptador de PDF. El ejemplo canónico del plan —contrato.pdf → pg3 → adaptador `imagen`— no funcionaría",
+      );
+    }
+    if (porRango.ref.object !== origen.ref.object || porRegion.ref.object !== origen.ref.object) {
+      fallar(
+        "I19 · la clave del delegado es la del objeto que lo contiene",
+        "un delegado cambió de objeto",
+        "es lo que hace que la guarda de ciclo y el caché vean la misma materia, y lo que permite que el punto fijo compare (objeto, ventana) contra lo que entró",
+      );
+    }
+
+    // (d) REGIÓN → UNIDAD. Texto va a `text_span`; sin texto va a `asset`. Y ninguna
+    // de las dos decide un rol: eso es de la cascada.
+    const c = conModelo(REGIONES);
+    const unidades = await imageAdapter.decompose(fuenteDe(png, "image/png"), c.ctx);
+    const formas = unidades.map((u) => u.body.shape);
+    if (!igual(formas, ["text_span", "text_span", "asset"])) {
+      fallar(
+        "I19 · las regiones se mapean a las formas de la cintura",
+        JSON.stringify(formas),
+        "una imagen entra por la misma puerta que un `.docx`: las mismas seis formas, el mismo `recognizerOf`, el mismo emisor. Si acá hiciera falta una forma nueva, la cintura tendría un agujero con nombre de imagen",
+      );
+    }
+    if (!unidades.every((u) => typeof u.signals.confidence === "number" && u.location.coordinate.space === "visual")) {
+      fallar(
+        "I19 · cada unidad trae confianza y su caja",
+        JSON.stringify(unidades.map((u) => [u.signals.confidence, u.location.coordinate.space])),
+        "`RawNode.confidence` es `null` en el 100% del corpus hasta este paso, y es la promesa con la que §{La escalera} se distingue: «la diferencia entre un pipeline que adivina y uno que declara cuánto está adivinando». La coordenada `visual` es lo que permite citar «acá, en esta parte de la imagen»",
+      );
+    }
+
+    // (e) LA CASCADA: la región más alta, si es única a esa altura, es el título. Es
+    // `porProminencia` un escalón más abajo en la escalera — geometría en vez de
+    // estilos— y por ser perceptual viaja `inferred` con su confianza.
+    const clasificar = imageAdapter.detect(unidades);
+    const roles = unidades.map((u) => clasificar(u)?.role ?? null);
+    if (!igual(roles, ["heading", null, null])) {
+      fallar(
+        "I19 · la región más alta y única es el título",
+        JSON.stringify(roles),
+        "es lo único que este adaptador infiere, y lo infiere de un HECHO de la imagen —la posición—, no de una adivinanza. Las otras dos se abstienen a propósito: donde nadie resuelve responde el piso físico, y eso es lo que la métrica de §{Observabilidad} lee como «acá no hubo clasificador»",
+      );
+    }
+
+    // (f) EL CASO DEGENERADO — la foto de un gato. Una sola región pictórica que
+    // cubre el marco entero sale como un `asset` con `window: 'whole'`, o sea
+    // EXACTAMENTE lo que entró. El punto fijo lo detecta comparando refs, sin que el
+    // adaptador tenga una rama que diga «esto es una foto y no se descompone»: se
+    // descubre haciéndolo, no declarándolo (§{Dónde frena}).
+    const gato = conModelo([
+      { box: { frame: "img", x: 0, y: 0, width: 1000, height: 1000 }, text: null, confidence: 0.4 },
+    ]);
+    const fondo = await imageAdapter.decompose(fuenteDe(png, "image/png"), gato.ctx);
+    if (fondo.length !== 1 || fondo[0].body.shape !== "asset" || fondo[0].body.ref.window.scope !== "whole") {
+      fallar(
+        "I19 · una imagen que no se descompone se devuelve a sí misma",
+        JSON.stringify(fondo.map((u) => [u.body.shape, u.body.ref?.window?.scope])),
+        "es la fila «foto de un gato» de §{La delegación es emergente}, y es lo que hace que el punto fijo dispare sin una regla sobre imágenes. Si saliera con `scope:'region'` cubriendo todo, `windowCovers` no lo reconocería como lo mismo que entró y la recursión seguiría sobre recortes idénticos hasta agotarse",
+      );
+    }
+
+    // (g) SIN LA CAPACIDAD, TIRA. Es inalcanzable si el núcleo cumple, y por eso
+    // tiene que ser ruidoso: devolver `[]` sería indistinguible de una imagen vacía y
+    // el asset se daría por TERMINADO — el documento diría que no había nada que leer.
+    const sinModelo = contextoDe();
+    const tiró = await imageAdapter
+      .decompose(fuenteDe(png, "image/png"), sinModelo.ctx)
+      .then(() => null, (e) => String(e));
+    if (tiró === null || !/perceive/.test(tiró)) {
+      fallar(
+        "I19 · invocado sin la capacidad, falla ruidoso",
+        tiró === null ? "no tiró" : tiró,
+        "llegar acá significa que alguien invocó sin mirar `requires`, o sea que el contrato que separa «no lo intenté» de «tocó fondo» está roto. Un fallo ruidoso es recuperable; el silencio de un `[]` no: el asset se da por terminado y nadie vuelve a mirarlo",
+      );
+    }
+  }
+
   if (fallas > 0) process.exit(1);
 
   const roles = [...new Set(crudos.map((n) => n.role))].sort();
@@ -954,7 +1125,7 @@ try {
       `I8 selector · I9 cascada reordenada · I10 range medio abierto · I11 frontmatter hermano · ` +
       `I12 sin roles de página · I13 YAML 1.2 core · I14 contenedores · I15 el piso por contenido · ` +
       `I16 las tres ramas · I17 el piso produce y se abstiene · ` +
-      `I18 el chat entra por la misma puerta)\n` +
+      `I18 el chat entra por la misma puerta · I19 una imagen es un documento)\n` +
       `           ${crudos.length} nodos · ${roles.length} de ${ROLES.length} roles alcanzados: ${roles.join(" ")}\n` +
       `           piso: .conf ${P_TEXTO.toFixed(4)} imprimible → indexa · ` +
       `.png ${P_BINARIO.toFixed(4)} → on_hold`,

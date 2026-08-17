@@ -719,6 +719,46 @@ const MUTANTES = [
     nota: "es lo que vuelve NO REDUNDANTE la segunda mitad de la aserción, y la razón por la que las dos se assertean por separado en vez de con `&`. `Uint8Array` no es `unknown`, así que `_RegistryInputIsNotUnknown` queda VERDE y solo se cae `_RegistryInputIsSource`: sin esta fila, M60 dejaría la mitad positiva sin acreditar y nadie notaría que el contrato pasó a exigir el archivo entero en memoria — que es justo lo que `Source` existe para no exigir (PROVISIONAL(C9/#8))",
   },
 
+  // ── Paso 6 · el núcleo decide si un adaptador puede correr (invariante 13) ──
+  // Las cuatro sostienen un solo mecanismo: separar «no se intentó» de «se intentó y
+  // tocó fondo», dos estados que desde afuera son un `asset` sin hijos y que tienen
+  // destinos opuestos. Sin la separación, la foto de un gato vuelve a la cola para
+  // siempre.
+  {
+    id: "M62",
+    garantía: "un nombre de capacidad sigue nombrando un campo de `Context`",
+    cambios: [[`export const CAPABILITIES = ["perceive"] as const;`, `export const CAPABILITIES = ["percieve"] as const;`]],
+    espera: /a Capability stopped naming a Context field/,
+    nota: "un TYPO, que es la mutación que de verdad ocurre. Y el modo de falla es el peligroso: el núcleo pregunta por `ctx['percieve']`, lee `undefined`, y `undefined !== null` da VERDADERO — o sea que la capacidad se declara PRESENTE y el adaptador se invoca en un contexto que no puede satisfacerlo. Falla hacia el lado inseguro y sin un aviso. Es la razón entera por la que los dos vocabularios se atan en el tipo en vez de en una tabla",
+  },
+  {
+    id: "M63",
+    garantía: "`requires` es el conjunto cerrado y no `string[]`",
+    cambios: [[
+      `  readonly requires: readonly Capability[];\n  decompose`,
+      `  readonly requires: readonly string[];\n  decompose`,
+    ]],
+    espera: /Adapter.requires widened past the closed set/,
+    nota: "el ancla lleva la línea siguiente porque `requires` aparece DOS veces —`Adapter` y `OpaqueAdapter`— y `ubicar()` rechazaría la fila por ambigua. Ensanchado a `string`, un typo deja de ser un error de tipo y pasa a ser un adaptador que no corre nunca: exactamente M62 pero sin testigo",
+  },
+  {
+    id: "M64",
+    garantía: "`Context.perceive` admite `null` — un contexto sin modelo es construible",
+    cambios: [[`  perceive: PerceiveFn | null;`, `  perceive: PerceiveFn;`]],
+    espera: /Context.perceive stopped admitting null/,
+    nota: "es la mitad del corte entre el hilo del request y el worker. Sin `null`, el contexto rápido no se puede construir sin un modelo, y «lo pesado no bloquea» vuelve a ser una regla que alguien respeta en vez de algo que ese contexto NO PUEDE hacer. La ausencia de la capacidad no es una degradación: es la forma que toma el corte",
+  },
+  {
+    id: "M65",
+    garantía: "el `asset` no vuelve a llevar trabajo pendiente",
+    cambios: [[
+      `      readonly mime: string;\n      // DOS CAMPOS`,
+      `      readonly mime: string;\n      readonly deferred: readonly string[];\n      // DOS CAMPOS`,
+    ]],
+    espera: /the asset body carries deferred work again/,
+    nota: "restituye el campo que el paso 6 borró, y la lápida de `shapes.ts` dice por qué no puede volver: el cuerpo se regenera ENTERO desde los bytes en cada re-ingesta (R3) y está excluido de la huella —tiene que estarlo, o resolver un enriquecimiento movería el id—. Un campo que no toca la identidad y se reescribe de cero cada vez no registra nada: es una nota de planificación guardada adentro del contenido. El censo lo confirmó antes de borrarlo: 3 escrituras, todas vacías, 0 lecturas",
+  },
+
   // ── Controles ──────────────────────────────────────────────────────────────
   {
     id: "DC1",
@@ -826,6 +866,16 @@ const MUTANTES = [
       `export interface ChannelAdapter<S, E> extends Adapter<S, E> {\n  readonly channel?: string;`,
     ]],
     nota: "el par de M57, sobre la MISMA ancla: `evidence` es rojo, cualquier otro miembro es verde. `_ChannelIsNotSelectable` asevera la AUSENCIA de un miembro, no que la interfaz esté congelada — y esa diferencia es la que deja crecer el adaptador de canal sin tocar el invariante. Sin este control, la fila de arriba sería indistinguible de una que prohíbe extender el tipo",
+  },
+  {
+    id: "MC11",
+    control: true,
+    garantía: "agregarle al `asset` un campo que NO es trabajo pendiente no rompe nada",
+    cambios: [[
+      `      readonly mime: string;\n      // DOS CAMPOS`,
+      `      readonly mime: string;\n      readonly trace?: string;\n      // DOS CAMPOS`,
+    ]],
+    nota: "el par de M65, sobre la MISMA ancla: `deferred` es rojo, cualquier otro campo es verde. `_AssetCarriesNoPendingWork` asevera la ausencia de UNA clave, no que la variante esté congelada — es la misma pareja que M40/MC8 sobre `Unit` y M57/MC10 sobre `ChannelAdapter`",
   },
 ];
 

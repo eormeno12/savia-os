@@ -38,37 +38,50 @@
 import { group, emit } from "@savia-os/emission";
 import {
   coldProbeOf,
+  coldProbeOfAsset,
   probeOf,
   recognizeMessage,
   select,
+  sourceOfAsset,
   sourceOfBytes,
   type Registry,
 } from "@savia-os/adapters";
 import {
   PARAMETERS,
   asActorId,
+  asDelegationId,
   asInstant,
+  asMatterHash,
   asNode,
+  windowCovers,
+  windowKey,
   type AchievedLevel,
   type AdapterId,
+  type BodyOf,
   type Budget,
   type CancellationSignal,
   type Channel,
   type ChannelAdapter,
   type ColdProbe,
   type Context,
+  type DelegationId,
   type Degradation,
   type HashFn,
   type LocalDataRecord,
   type LocalFragment,
+  type MatterHash,
   type Node,
   type Notice,
+  type ObjectKey,
   type ObjectRef,
+  type PerceiveFn,
+  type RawNode,
+  type Source,
   type RoutedNode,
   type SpendKind,
 } from "@savia-os/ir";
 
-const { zero: ZERO } = PARAMETERS.arithmetic;
+const { zero: ZERO, one: ONE } = PARAMETERS.arithmetic;
 
 // ─────────────────────────────── El sumidero ─────────────────────────────────
 
@@ -129,6 +142,29 @@ export type Run = {
    * `null`, y eso es un hueco declarado y no una garantía.
    */
   readonly onHold: ColdProbe | null;
+  /**
+   * LOS ASSETS QUE ESTA CORRIDA NO PUDO DESCOMPONER porque le faltaba una capacidad.
+   * Vacío = no quedó nada pendiente, y el documento está entero.
+   *
+   * NO ES `onHold` CON OTRO NOMBRE, y confundirlos sería caro. `onHold` es un
+   * DOCUMENTO que nadie supo leer y se reintenta cuando llega un adaptador nuevo;
+   * esto son PARTES de un documento que sí se leyó, y se reintentan cuando corre un
+   * contexto con más capacidades. Distinto disparador, distinto destino.
+   *
+   * Y NO SE CONFUNDE CON «TOCÓ FONDO». Un asset que el modelo miró y devolvió igual
+   * —la foto de un gato— NO entra acá: terminó. Los dos se ven idénticos desde
+   * afuera —un `asset` sin hijos— y sin esta lista el segundo se re-encolaría para
+   * siempre. Que la distinción exista es el motivo entero de `Adapter.requires`.
+   *
+   * ES `ObjectRef` Y NO UN TIPO NUEVO: son exactamente (qué objeto, qué parte), que
+   * es todo lo que hace falta para rehacer el trabajo. Inventar un tipo paralelo con
+   * los mismos dos campos sería la re-declaración que el README de `ir` prohíbe.
+   *
+   * PENDING(host): quién lo empareja con su documento. `ingest` no conoce su propio
+   * `DocumentId` —vive en el tramo 1, aguas arriba— así que el job lo arma quien
+   * persiste. Es el mismo hueco que `onHold` ya declara, con el mismo dueño.
+   */
+  readonly deferred: readonly ObjectRef[];
 };
 
 /**
@@ -173,6 +209,19 @@ export type Intake<S, E> =
   | {
       readonly kind: "bytes";
       readonly bytes: Uint8Array;
+      /**
+       * SU DIRECCIÓN, y la trae quien la guardó. El almacenamiento es direccionado
+       * por contenido y el request guarda ANTES de encolar, así que para cuando esto
+       * corre la clave ya existe. Sin ella un adaptador no puede emitir un `asset`
+       * —`ObjectRef` es (objeto, ventana)— y sin `asset` no hay delegación.
+       *
+       * Cierra además la mitad que `Run.onHold` declaraba pendiente desde el paso 4:
+       * «falta el `ObjectKey` de los bytes guardados — sale del tramo 1, y
+       * `ingest(bytes)` recibe un `Uint8Array` sin nombre de objeto».
+       */
+      readonly object: ObjectKey;
+      /** Declarado por quien subió. Alimenta `ColdProbe.declaredMime` y `Source.mime`. */
+      readonly mime: string;
       readonly name: string | null;
       readonly channel: Channel;
       /**
@@ -210,6 +259,16 @@ export type IngestOptions = {
    */
   readonly targetSizeChars: number;
   readonly budget?: Budget;
+  /**
+   * LA CAPACIDAD PERCEPTUAL, y `undefined` significa que este contexto no la tiene.
+   *
+   * Es lo único que distingue la corrida del request de la del worker, y por eso vive
+   * en las OPCIONES y no en el `Intake`: no es un hecho de lo que llegó, es un hecho
+   * de quién está corriendo. La misma entrada por los dos contextos da un documento
+   * completo o uno con partes anotadas, sin que el llamador tenga que pedir nada
+   * distinto.
+   */
+  readonly perceive?: PerceiveFn | null;
 };
 
 /** Sin topes. `maxMs` en `null` es lo que `ir` EXIGE para el test de determinismo. */
@@ -235,7 +294,17 @@ const NEVER_ABORTED: CancellationSignal = { aborted: false };
  * recorre las unidades, detecta los assets y llama a `select` es la ORQUESTACIÓN — o
  * sea este archivo, en el paso 6.
  */
-export const contextOf = (limits: Budget): { ctx: Context; sink: Sink } => {
+export const contextOf = (
+  limits: Budget,
+  /**
+   * `null` = este contexto NO PUEDE percibir, y es el valor por defecto A PROPÓSITO.
+   * El hilo que atiende el request se construye así, el worker con el modelo puesto,
+   * y esa diferencia ES el corte entre lo liviano y lo pesado. Que el default sea la
+   * ausencia importa: un contexto que lo trajera sin pedirlo pondría el trabajo caro
+   * en el camino del usuario sin que nadie lo decidiera.
+   */
+  perceive: PerceiveFn | null = null,
+): { ctx: Context; sink: Sink } => {
   const notices: Notice[] = [];
   const degradations: Degradation[] = [];
   const spent = new Map<SpendKind, number>();
@@ -277,8 +346,175 @@ export const contextOf = (limits: Budget): { ctx: Context; sink: Sink } => {
     // precondición de terminación» (§{Dónde frena}) — acá no se puede llamar.
     materialize: (_bytes: Uint8Array, _mime: string): Promise<ObjectRef> =>
       Promise.reject(new Error("ORCHESTRATION-ERR: step 3 does not materialize bytes")),
+    perceive,
   };
   return { ctx, sink: { notices, degradations } };
+};
+
+// ─────────────────────────────── La delegación ───────────────────────────────
+
+/**
+ * «Un asset delega si algún adaptador reclama sus bytes»
+ * (§{La delegación es emergente}) — y eso es LITERALMENTE `select()`, el tramo 2,
+ * aplicado a la parte.
+ *
+ * TODO EL PASO 6 ES ESTA SECCIÓN, y es corta por diseño: no hay maquinaria nueva de
+ * recursión. La reforma que la hizo emergente borró `role:'delegado'` y el
+ * clasificador de contenedores por declarar algo que el sistema puede deducir, y el
+ * registro tampoco necesita una fila para «contenedores»: un `.zip` es un adaptador
+ * que emite un asset por miembro, y la recursión ocurre sola.
+ *
+ * VIVE ACÁ Y NO EN UN ADAPTADOR, y esa frontera es la que sostiene el grafo de
+ * paquetes: `ctx` no tiene `delegar()` porque eso obligaría a `adapters` a depender
+ * de `select`, que vive con el registro (PROVISIONAL(H1) de `ir`). El adaptador emite
+ * `asset` y nada más; quien recorre las unidades, les construye sonda y llama a
+ * `select` es la orquestación.
+ */
+
+/** Lo que produce expandir una lista: los nodos, lo que quedó pendiente, y si hubo delegación. */
+type Expansion = {
+  readonly nodes: readonly RawNode[];
+  readonly deferred: readonly ObjectRef[];
+  readonly delegated: boolean;
+};
+
+const NOTHING: Expansion = { nodes: [], deferred: [], delegated: false };
+
+/**
+ * La MATERIA de un asset — el par (objeto, ventana) — que es lo que la guarda de
+ * ciclo compara y lo que nombra un marco de delegación.
+ *
+ * SIN HASHEAR, y no es una omisión: `ObjectKey` ya *es* el hash del contenido, así
+ * que componerlo con la ventana identifica la materia sin colisiones y sin pedirle
+ * una función de hash a nadie. El nombre del tipo dice «hash» porque describe lo que
+ * garantiza —dos materias distintas nunca coinciden— y no cómo se calcula.
+ */
+const matterOf = (ref: ObjectRef): MatterHash =>
+  asMatterHash(`${ref.object}#${windowKey(ref.window)}`);
+
+/**
+ * PUNTO FIJO — «si descomponer un asset devuelve un solo bloque cuyo contenido es el
+ * mismo que entró, se tocó fondo» (§{Dónde frena}).
+ *
+ * NO ES UNA REGLA SOBRE IMÁGENES. Vale para cualquier cosa que no se abra más, y por
+ * eso también cubre el `.zip` que se contiene a sí mismo. Es la definición más
+ * honesta de «no se puede descomponer más» que existe: se descubre HACIÉNDOLO, no
+ * declarándolo.
+ *
+ * Y descansa por completo en la precondición de terminación: la región referencia el
+ * original en vez de materializar un recorte, así que la ventana que vuelve es
+ * comparable con la que fue. Si cada nivel generara bytes nuevos, la ref sería otra
+ * siempre y esta función devolvería `false` para siempre.
+ */
+const isFixedPoint = (raw: readonly RawNode[], ref: ObjectRef): boolean => {
+  const [only] = raw;
+  return (
+    raw.length === ONE &&
+    only !== undefined &&
+    only.body.shape === "asset" &&
+    only.body.ref.object === ref.object &&
+    windowCovers(only.body.ref.window, ref.window)
+  );
+};
+
+const expand = async (
+  nodes: readonly RawNode[],
+  origin: Source,
+  chain: readonly DelegationId[],
+  ctx: Context,
+  registry: Registry,
+): Promise<Expansion> => {
+  const out: RawNode[] = [];
+  const deferred: ObjectRef[] = [];
+  let delegated = false;
+
+  for (const node of nodes) {
+    // La cadena se estampa ACÁ y nunca en el adaptador: «el adaptador delegado no
+    // sabe que fue delegado» (PROVISIONAL(#C21) de `ir`). Y es una CADENA y no un id
+    // suelto porque el emisor necesita distinguir bajar un nivel de bajar tres — sin
+    // eso, la cita encadenada del ejemplo canónico no se puede armar.
+    out.push(chain.length === ZERO ? node : { ...node, delegation: chain });
+    if (node.body.shape !== "asset") continue;
+
+    const sub = await delegateOne(node, node.body, origin, chain, ctx, registry);
+    out.push(...sub.nodes);
+    deferred.push(...sub.deferred);
+    delegated = delegated || sub.delegated;
+  }
+  return { nodes: out, deferred, delegated };
+};
+
+const delegateOne = async (
+  node: RawNode,
+  asset: BodyOf<"asset">,
+  origin: Source,
+  chain: readonly DelegationId[],
+  ctx: Context,
+  registry: Registry,
+): Promise<Expansion> => {
+  const matter = matterOf(asset.ref);
+
+  // ── GUARDA DE CICLO ────────────────────────────────────────────────────────
+  // Protege del archivo armado a propósito —A contiene B contiene A— donde el punto
+  // fijo NO alcanza, porque cada paso sí devuelve algo distinto (§{Dónde frena}).
+  if (ctx.ancestors.includes(matter)) {
+    ctx.diagnostics.notice(
+      "delegation.cycle",
+      node.location,
+      `matter ${matter} is already an ancestor: the container contains itself`,
+    );
+    return NOTHING;
+  }
+
+  const source = sourceOfAsset(origin, asset);
+  const probe = probeOf(
+    await coldProbeOfAsset(source),
+    // El origen `delegated` estrena productor: existe desde el paso 1 y nadie lo
+    // había construido. `by` es quien EMITIÓ el asset, que es el dato que hace
+    // legible una cascada de delegaciones en la observabilidad.
+    { kind: "delegated", by: node.location.adapter },
+    source,
+  );
+  const selection = await select(registry, probe);
+
+  // Nadie lo reclama: el asset se queda como está, sin hijos y sin pendiente. No es
+  // una falla — es un binario que todavía no sabemos abrir, y ya está guardado.
+  if (selection === null) return NOTHING;
+
+  // ── ¿PUEDE ESTE CONTEXTO INVOCARLO? ────────────────────────────────────────
+  // La decisión la toma el NÚCLEO comparando la declaración estática del adaptador
+  // contra lo que este contexto trae, y la toma ANTES de llamarlo. Que el adaptador
+  // no opine es lo que vuelve confiable la distinción entre «no se intentó» y «se
+  // intentó y tocó fondo»: los dos dejan un `asset` sin hijos, y solo el primero
+  // vuelve a la cola.
+  const missing = selection.adapter.requires.filter((c) => ctx[c] === null);
+  if (missing.length > ZERO) {
+    ctx.diagnostics.notice(
+      "delegation.deferred",
+      node.location,
+      `adapter ${selection.adapter.id} requires ${JSON.stringify(missing)}, which this context does not provide`,
+    );
+    return { nodes: [], deferred: [asset.ref], delegated: false };
+  }
+
+  const inner: Context = {
+    ...ctx,
+    ancestors: [...ctx.ancestors, matter],
+    depth: ctx.depth + ONE,
+  };
+  const raw = await selection.adapter.recognize(source, inner);
+
+  if (isFixedPoint(raw, asset.ref)) {
+    ctx.diagnostics.notice(
+      "delegation.bottomed",
+      node.location,
+      `${selection.adapter.id} returned the same matter it was given: nothing further to decompose`,
+    );
+    return NOTHING;
+  }
+
+  const below = await expand(raw, source, [...chain, asDelegationId(matter)], inner, registry);
+  return { ...below, delegated: true };
 };
 
 // ─────────────────────────────── La espina dorsal ────────────────────────────
@@ -298,6 +534,7 @@ type Recognized =
       readonly nodes: readonly Node[];
       readonly achievedLevel: AchievedLevel;
       readonly adapter: AdapterId;
+      readonly deferred: readonly ObjectRef[];
     }
   | { readonly onHold: ColdProbe };
 
@@ -341,7 +578,7 @@ const recognizedOfBytes = async (
   registry: Registry,
   ctx: Context,
 ): Promise<Recognized> => {
-  const source = sourceOfBytes(intake.bytes);
+  const source = sourceOfBytes(intake.bytes, intake.object, intake.mime);
   const cold = coldProbeOf(intake.bytes, intake.name);
   const probe = probeOf(cold, { kind: "channel", channel: intake.channel }, source);
   const selection = await select(registry, probe);
@@ -368,9 +605,17 @@ const recognizedOfBytes = async (
   }
 
   const raw = await selection.adapter.recognize(source, ctx);
+
+  // EL BUCLE. Todo asset que salga de acá vuelve a entrar por la misma puerta, y lo
+  // que traiga se injerta en esta misma lista plana — «el contenido incrustado hereda
+  // el contexto jerárquico de su contenedor» (§{La delegación es emergente}). El
+  // emisor no necesita saber nada de esto: compara cadenas de delegación y reencuadra
+  // solo, y eso está construido desde el paso 2.
+  const grown = await expand(raw, source, [], ctx, registry);
+
   return {
     onHold: null,
-    nodes: raw.map((n) =>
+    nodes: grown.nodes.map((n) =>
       asNode({
         ...n,
         authorship: {
@@ -380,8 +625,13 @@ const recognizedOfBytes = async (
         },
       }),
     ),
-    achievedLevel: selection.achievedLevel,
+    // `mixed` ESTRENA PRODUCTOR, y es el ejemplo estrella del plan: «198 páginas
+    // estructuradas + 2 delegadas» (PROVISIONAL(#2) de `ir`). Sale de que HUBO
+    // delegación, no de que haya corrido un modelo: un `.docx` con un `.xlsx` adentro
+    // también es mixto, y no hay modelo en el camino.
+    achievedLevel: grown.delegated ? "mixed" : selection.achievedLevel,
     adapter: selection.adapter.id,
+    deferred: grown.deferred,
   };
 };
 
@@ -424,6 +674,9 @@ const recognizedOfMessage = async <S, E>(
     ),
     achievedLevel: "structured",
     adapter: intake.adapter.id,
+    // Un mensaje curado no trae piezas incrustadas con bytes: lo que llega es una
+    // afirmación, no un contenedor (§{Chat}). Vacío por construcción, no por olvido.
+    deferred: [],
   };
 };
 
@@ -431,7 +684,7 @@ export const ingest = async <S, E>(
   intake: Intake<S, E>,
   options: IngestOptions,
 ): Promise<Run> => {
-  const { ctx, sink } = contextOf(options.budget ?? NO_BUDGET);
+  const { ctx, sink } = contextOf(options.budget ?? NO_BUDGET, options.perceive ?? null);
 
   // LA ÚNICA RAMA DE TODO EL ARCHIVO, y está acá arriba a propósito. De la línea
   // siguiente en adelante no hay una sola pregunta sobre de dónde vino esto: emisión,
@@ -449,10 +702,11 @@ export const ingest = async <S, E>(
       achievedLevel: "plain_text",
       adapter: null,
       onHold: recognized.onHold,
+      deferred: [],
     };
   }
 
-  const { nodes, achievedLevel, adapter } = recognized;
+  const { nodes, achievedLevel, adapter, deferred } = recognized;
 
   // ALGUIEN SUPO LEERLO Y NO SALIÓ NADA, y eso tampoco se va en silencio.
   //
@@ -489,6 +743,7 @@ export const ingest = async <S, E>(
       sink,
       achievedLevel,
       adapter,
+      deferred,
       // NO va a `on_hold`: alguien SÍ supo leer esto y lo que falló fue la emisión. Son
       // dos estados con destinos distintos —uno se reintenta cuando llega un adaptador
       // nuevo, el otro no— y confundirlos pondría a re-barrer un documento que ningún
@@ -506,5 +761,6 @@ export const ingest = async <S, E>(
     achievedLevel,
     adapter,
     onHold: null,
+    deferred,
   };
 };

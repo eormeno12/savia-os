@@ -162,39 +162,35 @@ export type ObjectRef = {
   readonly window: Window;
 };
 
-/**
- * Trabajo diferido sobre un asset. Declara QUÉ FALTA, nunca un resultado.
- *
- * PROVISIONAL(#54): enum cerrado de clases de trabajo, sin campo de resultado — El
- * campo `deferred: Enrichment[]` (§{Tramo 3 › Qué sale}) no tiene productor,
- * consumidor ni tramo en todo el documento, y es cómo una imagen se vuelve texto
- * consultable («un bloque: asset con descripción pendiente»,
- * §{La delegación es emergente}). El conflicto de fondo es de ubicación: si el
- * RESULTADO va en el `Body`, R3 lo borra en cada re-ingesta («se regenera entero
- * desde los bytes», §{R3}); si va en anotaciones, entonces no está en el cuerpo,
- * que es donde el tipo lo pone. Sin resultado, no hay conflicto: cuando el
- * enriquecimiento llega, la descripción se emite como nodo hijo mediante
- * RE-EMISIÓN, que es el mecanismo que §{La delegación tardía} ya diseñó y el banco
- * ya midió («delegación tardía injerta un subárbol → 0 ids movidos», §{Tercera}) —
- * Si se decide al revés (con resultado), o se pierde en cada re-ingesta o el
- * `Body` deja de ser desechable y se rompe R3, que el plan considera de las tres
- * fundamentales.
- *
- * SOSPECHA A RESOLVER CON EL DUEÑO DEL TRAMO 3: la reforma de la delegación unificó
- * «descripción de imágenes» y «reconocimiento de escaneados» en un solo mecanismo
- * (§{La delegación es emergente}) y eliminó `role:'delegado'` y el clasificador
- * `miembros` por redundantes con ella (§{Lo que se borró}). `deferred` sobrevivió
- * sin que nadie revisara si le pasa lo mismo: un asset delegado YA es una unidad de
- * trabajo independiente que se agenda sola (§{La delegación es emergente}), así que
- * «pendiente» podría ser un estado de la cola y no un campo del cuerpo. Si es así,
- * este campo sobra.
- */
-export type EnrichmentKind = "description" | "ocr" | "transcription";
-
-export type Enrichment = {
-  readonly kind: EnrichmentKind;
-};
-
+// ─── LÁPIDA · `Enrichment` y `EnrichmentKind`, borrados en el paso 6 ─────────
+// Eran `{kind: 'description'|'ocr'|'transcription'}` y el campo `asset.deferred`.
+//
+// La sospecha estaba escrita acá desde el paso 1 y el paso 6 la confirmó: «la
+// reforma de la delegación unificó “descripción de imágenes” y “reconocimiento de
+// escaneados” en un solo mecanismo y eliminó `role:'delegado'` y el clasificador
+// `miembros` por redundantes con ella. `deferred` sobrevivió sin que nadie revisara
+// si le pasa lo mismo: un asset delegado YA es una unidad de trabajo independiente
+// que se agenda sola, así que “pendiente” podría ser un estado de la cola y no un
+// campo del cuerpo. Si es así, este campo sobra».
+//
+// Sobraba, y el censo lo dijo sin ambigüedad: TRES escrituras —`markdown.ts` y dos
+// en `synthetic.ts`—, las tres el arreglo vacío, y CERO lecturas en toda la vida del
+// proyecto. Nunca llevó un valor. Es el mismo cuadro que `ownAuthorship` en el paso
+// 5, con el diagnóstico opuesto: aquel campo hacía falta y se caía en silencio; este
+// no hacía falta.
+//
+// LAS TRES RAZONES, por si alguien lo quiere de vuelta:
+//   1. DERIVABLE. `kind` sale del `mime` (`audio/*` → transcripción, `image/*` →
+//      descripción) y de si el punto fijo disparó. Las dos cosas las sabe la
+//      orquestación en el instante de delegar.
+//   2. NO PODÍA REGISTRAR NADA. Estaba excluido de la huella —tenía que estarlo, o
+//      resolver un enriquecimiento movería el id (§{La delegación tardía})— Y el
+//      cuerpo se regenera entero desde los bytes en cada re-ingesta (R3). Un campo
+//      que no toca la identidad y se reescribe de cero cada vez no es un registro:
+//      es una nota para un planificador, guardada adentro del contenido.
+//   3. EL LUGAR ERA EL EQUIVOCADO, no la información. «Pendiente» es un hecho de
+//      ESTA corrida, no del contenido, y vive en `Run.deferred` (`orchestration`).
+//
 // ─────────────────────────────── Cuerpo ──────────────────────────────────────
 
 /**
@@ -237,12 +233,10 @@ export type Body =
        * mime movería el id) sin poder discriminante real.
        */
       readonly mime: string;
-      /**
-       * NO entra en la huella. Está PROHIBIDO por §{La delegación tardía}: «el
-       * asset que ganó hijos → su contenido no cambió → MISMO id». Si entrara, cada
-       * enriquecimiento resuelto movería el id.
-       */
-      readonly deferred: readonly Enrichment[];
+      // DOS CAMPOS Y NADA MÁS, desde el paso 6. Acá vivía `deferred: Enrichment[]`,
+      // y con él se fue la última tentación de escribir estado de cola adentro del
+      // contenido — ver la lápida arriba. Lo que queda es exactamente lo que el
+      // delegado necesita para ser sondeado: QUÉ objeto, QUÉ parte, y QUÉ es.
     }
   | {
       readonly shape: "grid";
@@ -323,6 +317,25 @@ export type BodyOf<F extends Shape> = Extract<Body, { shape: F }>;
  * RESIDUO SIN RESOLVER: la canonicalización de `Window` (redondeo de cajas)
  * tiene que ser exacta o dos corridas dan `MatterHash` distintos.
  */
+/**
+ * La ventana como texto, para nombrar una materia sin hashearla.
+ *
+ * Vive acá y no en sus dos consumidores —la clave de caché del adaptador `imagen` y
+ * la materia de la guarda de ciclo— porque dos codificaciones que tienen que
+ * coincidir y viven en paquetes distintos derivan en silencio, y el día que difieran
+ * el caché sirve el árbol de otra región. Es la misma razón por la que `ir` existe.
+ *
+ * NO HACE FALTA HASHEAR: `ObjectKey` ya *es* el hash del contenido, así que
+ * `(objeto, ventana)` compuesto identifica la materia sin colisiones y sin pedirle
+ * una función de hash a un paquete que tiene cero dependencias.
+ */
+export const windowKey = (w: Window): string =>
+  w.scope === "whole"
+    ? "whole"
+    : w.scope === "range"
+      ? `range:${w.start}:${w.end}`
+      : `region:${w.box.frame}:${w.box.x}:${w.box.y}:${w.box.width}:${w.box.height}`;
+
 export const windowCovers = (exterior: Window, interior: Window): boolean => {
   if (exterior.scope === "whole") return true;
   if (interior.scope === "whole") return false;

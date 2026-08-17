@@ -31,6 +31,7 @@
 
 import {
   Evidence,
+  MAGIC_BYTES,
   PARAMETERS,
   rank,
   roleFromBody,
@@ -50,10 +51,15 @@ import {
   type RecognitionLevel,
   type Selection,
   type Source,
+  type BodyOf,
+  type ObjectKey,
   type Unit,
 } from "@savia-os/ir";
 
 const { zero: ZERO, one: ONE } = PARAMETERS.arithmetic;
+
+/** Sin bytes propios. No es «vacío por error»: es «esta región no ES bytes». */
+const EMPTY_BYTES = new Uint8Array(ZERO);
 
 // ─────────────────────────────── Source ──────────────────────────────────────
 
@@ -63,7 +69,13 @@ const { zero: ZERO, one: ONE } = PARAMETERS.arithmetic;
  * aviso, y el documento entra al pipeline con agujeros. `ir` lo escribe con número —
  * un archivo de 10 bytes recorrido de a 4 devuelve 7, perdiendo el 3, el 7 y el 9.
  */
-export const sourceOfBytes = (bytes: Uint8Array): Source => ({
+export const sourceOfBytes = (
+  bytes: Uint8Array,
+  object: ObjectKey,
+  mime: string,
+): Source => ({
+  ref: { object, window: { scope: "whole" } },
+  mime,
   size: bytes.length,
   bytes: () => Promise.resolve(bytes),
   range: (start, end) => Promise.resolve(bytes.slice(start, end)),
@@ -71,6 +83,77 @@ export const sourceOfBytes = (bytes: Uint8Array): Source => ({
     yield bytes;
   },
 });
+
+/**
+ * La `Source` de UNA PARTE de otra, sin escribir un byte.
+ *
+ * ES LA PIEZA QUE VUELVE COMPATIBLES LAS DOS MITADES DE §{Dónde frena}. La
+ * precondición de terminación exige «referenciar el original, nunca materializar un
+ * recorte» —si cada nivel generara bytes nuevos el hash cambiaría siempre y el punto
+ * fijo no dispararía jamás—, y a la vez el delegado tiene que ser SONDEABLE. Con
+ * `Window` de por medio las dos conviven, que es exactamente lo que `PROVISIONAL(C4)`
+ * decidió: «referenciar» se lee como NO ESCRIBIR BYTES NUEVOS, no como no poder
+ * nombrar una subregión.
+ *
+ * `range` es el caso con bytes propios —un miembro de `.zip`, un adjunto de `.eml`—:
+ * se leen del original con un `range()` y la sonda sale honesta, con firma y todo.
+ *
+ * `region` y `whole` NO TIENEN BYTES PROPIOS. Un rectángulo de una página renderizada
+ * no existe en ningún lado hasta que alguien la renderiza, y renderizar es
+ * materializar. Devuelve VACÍO a propósito: la evidencia de esos delegados no puede
+ * venir del contenido, y viene del mime que declaró el padre (`Evidence.Structure`).
+ * Fingir bytes acá sería devolverle al selector los del original —los del PDF entero—
+ * y el ejemplo canónico del plan (contrato.pdf → pg3 → adaptador `imagen`) elegiría
+ * otra vez el adaptador de PDF, que es el bug H9 exacto.
+ *
+ * LA CLAVE NO CAMBIA. Sigue siendo la del objeto que la contiene, y tiene que serlo:
+ * es lo que hace que la guarda de ciclo y el caché vean la misma materia, y lo que
+ * permite que el punto fijo compare `(objeto, ventana)` contra lo que entró.
+ */
+export const sourceOfAsset = (origin: Source, asset: BodyOf<"asset">): Source => {
+  const { ref, mime } = asset;
+  const shared = { ref, mime } as const;
+  if (ref.window.scope !== "range") {
+    // SIN BYTES PROPIOS, y devolverlo vacío es lo correcto, no una carencia. Un
+    // rectángulo de una página renderizada no existe hasta que alguien la renderiza,
+    // y renderizar es materializar — lo que §{Dónde frena} prohíbe, porque si cada
+    // nivel generara bytes el hash cambiaría siempre y el punto fijo no dispararía
+    // jamás.
+    //
+    // FINGIR BYTES ACÁ ES EL BUG H9 EXACTO: devolver los del original le daría al
+    // selector los primeros 4 KB del PDF entero, `esImagen` daría `None`, ganaría
+    // otra vez el adaptador de PDF y el ejemplo canónico del plan —contrato.pdf →
+    // pg3 → adaptador `imagen`— no funcionaría. Por eso la evidencia de estos
+    // delegados no puede venir del contenido y viene del mime que declaró el padre.
+    //
+    // Los PÍXELES son otra cosa y no salen de acá: el modelo los pide por `ref`, que
+    // es lo que `Source` lleva desde el paso 6. Renderizar para un modelo no escribe
+    // un objeto nuevo, así que no toca la precondición.
+    return {
+      ...shared,
+      size: ZERO,
+      bytes: () => Promise.resolve(EMPTY_BYTES),
+      range: () => Promise.resolve(EMPTY_BYTES),
+      stream: async function* () {
+        yield EMPTY_BYTES;
+      },
+    };
+  }
+  const { start, end } = ref.window;
+  const size = Math.max(ZERO, end - start);
+  return {
+    ...shared,
+    size,
+    bytes: () => origin.range(start, end),
+    // `[start, end)` MEDIA ABIERTA, la misma convención que `Source.range` de `ir`
+    // fija con número: leerla cerrada pierde un byte de cada tramo, en silencio.
+    range: (a, b) =>
+      origin.range(start + Math.max(ZERO, a), start + Math.min(size, Math.max(ZERO, b))),
+    stream: async function* () {
+      yield await origin.range(start, end);
+    },
+  };
+};
 
 // ─────────────────────────────── Sonda ───────────────────────────────────────
 
@@ -130,6 +213,35 @@ export const probeOf = (cold: ColdProbe, origin: Origin, source: Source): Probe 
     },
   };
 };
+
+/**
+ * La sonda fría de un ASSET DELEGADO (PROVISIONAL(H9) de `ir`).
+ *
+ * Los cinco campos, y tres de ellos dicen «no aplica» con todas las letras:
+ *
+ *   · `extension`     `null`. Un rectángulo de la página 3 no tiene nombre de archivo.
+ *   · `declaredMime`  LO QUE DECLARÓ EL PADRE, y es la única evidencia que un delegado
+ *                     sin bytes propios puede ofrecer. El adaptador que abrió el PDF
+ *                     es el único que sabe que esa página es un ráster.
+ *   · `size`          el de la ventana.
+ *   · `magicBytes`    los de la ventana SI la ventana es bytes; vacíos si es un
+ *                     rectángulo. Ver `sourceOfAsset`: fingirlos devolvería los del
+ *                     original y el ejemplo canónico elegiría otra vez al padre.
+ *   · `detectedFormat` `null`, igual que en la sonda de un archivo (auditoría #32).
+ *
+ * ES LA MITAD DE LA ORQUESTACIÓN Y NO DEL PADRE, aunque el dato salga del padre. El
+ * adaptador declara —`asset.mime`, `asset.ref.window`— y quien hace I/O sobre el
+ * original es quien recorre las unidades. Si la armara el padre, `adapters` pasaría a
+ * leer objetos y a depender de `select`, y eso es exactamente lo que
+ * `PROVISIONAL(H1)` prohíbe al negarle un `delegar()` al contexto.
+ */
+export const coldProbeOfAsset = async (source: Source): Promise<ColdProbe> => ({
+  extension: null,
+  declaredMime: source.mime,
+  size: source.size,
+  magicBytes: source.size === ZERO ? EMPTY_BYTES : await source.range(ZERO, MAGIC_BYTES),
+  detectedFormat: null,
+});
 
 // ─────────────────────────────── Registro ────────────────────────────────────
 
@@ -335,6 +447,9 @@ export const opaqueOf = <S,>(a: FileAdapter<S>): OpaqueAdapter => ({
   id: a.id,
   level: a.level,
   version: a.version,
+  // Sobrevive al borrado de `S`: es lo único que el núcleo consulta para saber si
+  // puede invocar a este adaptador, y solo se llega acá desde `select`.
+  requires: a.requires,
   evidence: (probe) => a.evidence(probe),
   recognize: async (input: Source, ctx: Context): Promise<readonly RawNode[]> => {
     const units = await a.decompose(input, ctx);

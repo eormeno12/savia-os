@@ -209,8 +209,8 @@ const MUTANTES = [
     garantía: "el nivel alcanzado del piso llega HASTA LA SALIDA",
     rompe: "la degradación deja de ser visible: el `.conf` se recupera igual que el `.md`",
     cambios: [[
-      `    achievedLevel: selection.achievedLevel,\n    adapter: selection.adapter.id,`,
-      `    achievedLevel: "structured",\n    adapter: selection.adapter.id,`,
+      `    achievedLevel: grown.delegated ? "mixed" : selection.achievedLevel,`,
+      `    achievedLevel: "structured",`,
     ]],
     espera: /I10 · …y DICE que entró degradado/,
     nota:
@@ -277,8 +277,8 @@ const MUTANTES = [
     garantía: "…y tampoco un GLOBAL de node",
     rompe: "la lista blanca de imports, que sigue diciendo la verdad mientras el paquete ya usa node",
     cambios: [[
-      `  const source = sourceOfBytes(intake.bytes);`,
-      `  const source = sourceOfBytes(Buffer.from(intake.bytes));`,
+      `  const source = sourceOfBytes(intake.bytes, intake.object, intake.mime);`,
+      `  const source = sourceOfBytes(Buffer.from(intake.bytes), intake.object, intake.mime);`,
     ]],
     espera: /usa el global de node `Buffer`/,
     nota:
@@ -439,6 +439,66 @@ const MUTANTES = [
       "`===`, que es la que un typo produce de verdad y deja la condición muerta sin tocar el aviso: " +
       "borrar el bloque entero dejaría `ZERO` huérfano y mataría la corrida con TS6133, acreditando al " +
       "linter (la lección de M12c)",
+  },
+
+  // ── Paso 6 · la delegación (I14, I15) ───────────────────────────────────────
+  {
+    id: "S89",
+    garantía: "el punto fijo reconoce que le devolvieron lo mismo que dio",
+    rompe: "la terminación: la recursión sigue sobre recortes idénticos",
+    cambios: [[
+      `    windowCovers(only.body.ref.window, ref.window)`,
+      `    !windowCovers(only.body.ref.window, ref.window)`,
+    ]],
+    espera: /I15 · tocar fondo NO es quedar pendiente/,
+    nota:
+      "se INVIERTE en vez de constantear a `false`, y eso es deliberado: con `false` el import de " +
+      "`windowCovers` queda huérfano y `tsc` mata la corrida ANTES del guardián, o sea acreditando al " +
+      "compilador (la lección de M12c). Se midió: la primera versión de esta fila murió así. Invertido, " +
+      "la recursión baja un nivel más y la ataja la guarda de CICLO — el aviso pasa de `bottomed` a " +
+      "`cycle`, y ahí se ve que las dos guardas cubren cosas distintas y ninguna sobra",
+  },
+  {
+    id: "S90",
+    garantía: "el subárbol se injerta DONDE ESTABA la pieza, no al final",
+    rompe: "las migas del contenido incrustado, que pasan a ser las de la raíz",
+    cambios: [[`    out.push(...sub.nodes);`, `    out.unshift(...sub.nodes);`]],
+    espera: /I14 · el subárbol se injerta donde estaba la pieza/,
+    nota:
+      "«el resultado se injerta donde estaba la pieza, de modo que el contenido incrustado hereda el " +
+      "contexto jerárquico de su contenedor» (§{La delegación es emergente}). El emisor decide BAJÓ y " +
+      "SUBIÓ comparando la cadena del nodo anterior con la actual, así que mover los nodos rompe el " +
+      "reencuadre y con él las migas — y esa es la mitad que solo se puede medir en este paquete",
+  },
+  {
+    id: "S91",
+    garantía: "el núcleo chequea `requires` ANTES de invocar",
+    rompe: "la ingesta entera, por una pieza que solo tenía que quedar anotada",
+    cambios: [[
+      `  const missing = selection.adapter.requires.filter((c) => ctx[c] === null);`,
+      `  const missing = selection.adapter.requires.filter(() => false);`,
+    ]],
+    espera: /I14 · sin la capacidad, el adaptador NI SE INVOCA/,
+    nota:
+      "es la fila que justifica que la decisión viva en el NÚCLEO y no en el adaptador. Sin el chequeo, " +
+      "el `imagen` se invoca en un contexto sin modelo y falla ruidoso —que es lo correcto de su lado— " +
+      "y la corrida entera se cae. El adaptador no puede hacerlo mejor: si respondiera «no pude» en vez " +
+      "de tirar, «no lo intenté» y «lo intenté y tocó fondo» volverían a ser indistinguibles",
+  },
+  {
+    id: "S92",
+    garantía: "los nodos delegados llevan su cadena",
+    rompe: "el reencuadre del emisor, que deja de saber que bajó un nivel",
+    cambios: [[
+      `    out.push(chain.length === ZERO ? node : { ...node, delegation: chain });`,
+      `    out.push(node);`,
+    ]],
+    espera: /I14 · los nodos delegados llevan su cadena/,
+    nota:
+      "la cadena la estampa el ORQUESTADOR y nunca el adaptador —«el adaptador delegado no sabe que fue " +
+      "delegado» (PROVISIONAL(C21) de `ir`)— y es una CADENA y no un id suelto porque el emisor tiene " +
+      "que distinguir bajar un nivel de bajar tres. Sin ella la cita encadenada del ejemplo canónico " +
+      "—contrato.pdf → pg3 → esta celda— no se puede armar",
   },
 
   // ── El diario de deshacer del propio arnés ─────────────────────────────────

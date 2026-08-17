@@ -119,6 +119,8 @@ export const chatAdapter: ChannelAdapter<ChatSignals, Message> = {
   id: CHAT_ID,
   level: "physical",
   version: "1",
+  // Bytes y parseo: no necesita nada del núcleo, así que corre en cualquier contexto.
+  requires: [],
   decompose: (input: Message, _ctx: Context) =>
     Promise.resolve(
       input.paragraphs.map(

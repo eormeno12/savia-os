@@ -402,7 +402,6 @@ export const blocksOf = (
           shape: "asset",
           ref: { object: asObjectKey(image[TWO] ?? ""), window: { scope: "whole" } },
           mime: "application/octet-stream",
-          deferred: [],
         },
         anchor: `img#${i}`,
       });
@@ -663,6 +662,8 @@ export const markdownAdapter: FileAdapter<MdSignals> = {
   id: MARKDOWN_ID,
   level: "declarative",
   version: "1",
+  // Bytes y parseo: no necesita nada del núcleo, así que corre en cualquier contexto.
+  requires: [],
   /**
    * `evidence()` responde por la FORMA, nunca por el valor del contenido
    * (§{Tramo 2 › Decisiones tomadas}). Markdown no tiene firma de bytes: lo más alto

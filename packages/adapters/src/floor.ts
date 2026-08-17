@@ -207,6 +207,8 @@ export const textFloorAdapter = (
   id: TEXT_FLOOR_ID,
   level: "physical",
   version: "1",
+  // Bytes y parseo: no necesita nada del núcleo, así que corre en cualquier contexto.
+  requires: [],
   evidence: (probe) =>
     Promise.resolve(
       printableProportionOf(probe.magicBytes) >= minPrintableProportion

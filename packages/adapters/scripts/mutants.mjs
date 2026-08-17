@@ -602,7 +602,7 @@ const MUTANTES = [
     garantía: "R1 — `adapters` no puede alcanzar `emission`, y el error NOMBRA la frontera",
     rompe: "el borde R1, desde el lado que hasta este paso no existía",
     cambios: [[
-      `import { cascade } from "./registry.js";`,
+      `import { cascade } from "./registry.js";\n\nconst { zero: ZERO, one: ONE, notFound: NOT_FOUND }`,
       `import { group } from "@savia-os/emission";\nexport const _cruza = group;\nimport { cascade } from "./registry.js";`,
     ]],
     espera: /frontera cruzada · src\/markdown\.ts {2}↛ {2}@savia-os\/emission/,
@@ -638,7 +638,7 @@ const MUTANTES = [
     garantía: "`yaml` está confinada al adaptador que la usa",
     rompe: "el borde de dependencias: el tramo 2 pasa a depender de una librería de formato",
     cambios: [[
-      `import {\n  Evidence,\n  PARAMETERS,\n  rank,`,
+      `import {\n  Evidence,\n  MAGIC_BYTES,\n  PARAMETERS,\n  rank,`,
       `import { parse } from "yaml";\nexport const _yaml = parse;\nimport {\n  Evidence,\n  PARAMETERS,\n  rank,`,
     ]],
     espera: /confinamiento roto · src\/registry\.ts importa `yaml`/,
@@ -733,7 +733,7 @@ const MUTANTES = [
 
   // ── Paso 5 · el chat entra por la misma puerta (I18) ────────────────────────
   {
-    id: "S45",
+    id: "S81",
     garantía: "el chat produce `text_span` y no envuelve el mensaje en otra forma",
     rompe: "la igualdad de huellas entre canales, que es la cintura MEDIDA",
     cambios: [[
@@ -749,7 +749,7 @@ const MUTANTES = [
       "el dedupe de blobs y la reconciliación del paso 11. Es la mitad local de I12 de `orchestration`",
   },
   {
-    id: "S46",
+    id: "S82",
     garantía: "el chat SE ABSTIENE: quien clasifica un mensaje es el piso físico",
     rompe: "el rol, el nivel y la atribución de todo mensaje",
     cambios: [[
@@ -765,7 +765,7 @@ const MUTANTES = [
       "en una etiqueta: reparte todos los mensajes siguientes en otro fragmento",
   },
   {
-    id: "S47",
+    id: "S83",
     garantía: "la autoría del mensaje llega a cada nodo",
     rompe: "«esto lo dijo el CFO en marzo», que es la mitad del valor de la memoria",
     cambios: [[`          ownAuthorship: input.author,`, `          ownAuthorship: { actor: "", when: "", source: "" },`]],
@@ -779,7 +779,7 @@ const MUTANTES = [
   },
 
   {
-    id: "S48",
+    id: "S84",
     garantía: "el corpus del chat es versionado y su salida está congelada",
     rompe: "el golden del mensaje — a propósito: cambiar el corpus es cambiar la prueba",
     cambios: [[`{ "kind": "bold", "start": 32, "end": 48 }`, `{ "kind": "italic", "start": 32, "end": 48 }`]],
@@ -792,7 +792,7 @@ const MUTANTES = [
       "nada, solo traduce",
   },
   {
-    id: "S49",
+    id: "S85",
     garantía: "el golden del chat no se puede editar para que el código pase",
     rompe: "la única comparación del chat contra algo externo al código",
     cambios: [[`      "anchor": "msg#1",`, `      "anchor": "msg#uno",`]],
@@ -803,6 +803,64 @@ const MUTANTES = [
       "tres y ser la equivocada; el golden es lo único que la ata a algo escrito afuera. Se regenera con " +
       "`ADAPTERS_REGEN=1` y ningún script del `package.json` lo pasa: regenerar es un comando que " +
       "alguien escribe a mano y que aparece en el diff",
+  },
+
+  // ── Paso 6 · una imagen es un documento como cualquier otro (I19) ───────────
+  {
+    id: "S86",
+    garantía: "el mime declarado por el padre gana como `Structure`, no como `Signature`",
+    rompe: "el vocabulario de la escala, que pasa a llamar «firma en el contenido» a un testimonio",
+    cambios: [[
+      `  if (probe.declaredMime !== null && probe.declaredMime.startsWith(IMAGE_PREFIX)) {\n    return Evidence.Structure;`,
+      `  if (probe.declaredMime !== null && probe.declaredMime.startsWith(IMAGE_PREFIX)) {\n    return Evidence.Signature;`,
+    ]],
+    espera: /I19 · evidencia: mime declarado por el padre/,
+    nota:
+      "`Signature` está definida como «firma inequívoca EN EL CONTENIDO» (§{Evidencia}) y un mime " +
+      "declarado no es contenido: es el testimonio de quien abrió el archivo. `adapter.ts` dejó escrito " +
+      "que el día que un adaptador quisiera ganar por origen había que tomar esta decisión ANTES; el " +
+      "paso 6 es ese día. Y no es cosmético: con `Signature` un delegado sin bytes le gana a un " +
+      "adaptador que sí olió una firma real",
+  },
+  {
+    id: "S87",
+    garantía: "una región que cubre el marco entero se emite como `whole`",
+    rompe: "el punto fijo, que deja de reconocer que le devolvieron lo mismo que dio",
+    cambios: [[
+      `    ? { scope: "whole" }\n    : { scope: "region", box };`,
+      `    ? { scope: "region", box }\n    : { scope: "region", box };`,
+    ]],
+    espera: /I19 · una imagen que no se descompone se devuelve a sí misma/,
+    nota:
+      "es la fila «foto de un gato» de §{La delegación es emergente}. `windowCovers` da `false` cuando " +
+      "el exterior es `region` y el interior `whole`, así que con esta mutación el punto fijo NO dispara " +
+      "y la recursión sigue sobre recortes idénticos hasta agotarse. La caja en milésimas es lo que " +
+      "vuelve decidible «cubre todo» sin conocer un solo píxel: `unitsPerFrame` ya estaba en PARAMETERS",
+  },
+  {
+    id: "S88",
+    garantía: "invocado sin su capacidad, el adaptador falla RUIDOSO",
+    rompe: "la distinción entre «no lo intenté» y «lo intenté y tocó fondo»",
+    cambios: [[`      throw new Error(\n        "ADAPTERS-ERR: the image adapter was invoked`, `      return [];\n      throw new Error(\n        "ADAPTERS-ERR: the image adapter was invoked`]],
+    espera: /I19 · invocado sin la capacidad, falla ruidoso/,
+    nota:
+      "el silencio es el defecto caro: `[]` es indistinguible de una imagen de la que no había nada que " +
+      "leer, así que el asset se da por TERMINADO y nadie vuelve a mirarlo — el documento sale diciendo " +
+      "que ahí no había contenido. Un fallo ruidoso significa que el núcleo invocó sin mirar `requires`, " +
+      "y eso es recuperable. La mutación AGREGA un return en vez de borrar el throw: borrarlo dejaría el " +
+      "`if` con cuerpo vacío y el linter mataría la corrida antes del guardián (la lección de M12c)",
+  },
+  {
+    id: "S89",
+    garantía: "el adaptador imagen declara que necesita `perceive`",
+    rompe: "el corte entre el hilo del request y el worker",
+    cambios: [[`  requires: ["perceive"],\n  evidence: (probe) => Promise.resolve(evidenceOf(probe)),`, `  requires: [],\n  evidence: (probe) => Promise.resolve(evidenceOf(probe)),`]],
+    espera: /I19 · el adaptador imagen declara su capacidad/,
+    nota:
+      "es la ÚNICA línea que este adaptador tiene y los otros tres no, y sin ella el núcleo lo invoca en " +
+      "el contexto del request —donde `perceive` es `null`— y se cae por S52. Peor si S52 no existiera: " +
+      "el asset se daría por terminado. Con `requires` vacío, «lo pesado no bloquea» vuelve a ser una " +
+      "regla que alguien respeta en vez de algo que ese contexto no puede hacer",
   },
 
   // ── El diario de deshacer del propio arnés ─────────────────────────────────
@@ -971,6 +1029,9 @@ const ARCHIVOS = [
   // Entra en el paso 5 con S45-S47. Es el adaptador que prueba que la cintura no tiene
   // forma de documento, así que sus mutaciones son de COMPORTAMIENTO y no de tipo.
   "src/chat.ts",
+  // Entra en el paso 6 con S50-S53. Es el adaptador que prueba que una imagen es un
+  // documento como cualquier otro, así que sus mutaciones son de COMPORTAMIENTO.
+  "src/image.ts",
   "src/index.ts",
   "src/env.d.ts",
   "package.json",
