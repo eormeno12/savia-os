@@ -730,6 +730,67 @@ decidiera por extensión pasaría en verde — el atajo lo invita el fixture, no
 
 ---
 
+## 16 · Paso 11 — el reconciliador, y los diez que ninguna regla determinaba
+
+**Agregado el 2026-08-17**, antes de escribir una línea de
+`packages/emission/src/reconcile.ts`, por la regla del cierre. El paso 11 escribe **el
+reconciliador de tres pases**, agrega **un tipo** y **tres campos** al contrato de `ir`,
+y **corrige un docstring de `params.ts` que afirma algo imposible**.
+
+> **Primero, lo que las reglas SÍ determinaban**, para que se vea que se consultaron.
+> `reconciliar → reconcile` es R1 llana, y **`Reconciliador → Reconciler` NO se escribe
+> como símbolo**: precedente triple de §4 (`Evidenciador → EvidenceFn`), F2
+> (`grouper.ts` descartado) y P7 (`CascadeResult` nombra al productor en vez de a la
+> cosa) — no se nombra al agente cuando lo que hay es una función libre. `Reconciliación
+> → Reconciliation` es R1+R2 y la mitad ya está escrita (`ReconciliationMetrics`).
+> `residuo → residue`, `altas → additions` y `bajas → removals` ya están **congeladas en
+> el contrato** (`ReconciliationMetrics.byResidue`, `EmissionOutput.removals`):
+> proponerles otro nombre sería un cambio de contrato, no una elección. `umbral de
+> similitud → similarityThreshold`, `tope de comparaciones → maxComparisons` y
+> `multiplicidad máxima → maxMultiplicityForAnchoring` ya viven en `PARAMETERS.identity`,
+> y los dos primeros **entran por parámetro** porque son `Pending<number>` en `null`.
+> `similitud entre proyecciones → similarityOfProjections` ya existe. El archivo se llama
+> **`reconcile.ts`** por §6 + E1. **Ninguno de estos va en la tabla.**
+
+| # | Símbolo | **Queda** | Por qué no la que salía sola |
+|---|---|---|---|
+| **P13** | el **hueco** entre dos anclas | **`Gap`** (local, no exportado) | `Hole` en inglés nombra una AUSENCIA, y este objeto es **donde vive todo lo que no ancló** — es lo más lleno del reconciliador, y decirle «agujero» invita a leer el pase 2 como limpieza en vez de como el pase que resuelve «lo que se editó en su lugar». La palabra del plan, **«tramo», está tomada**: así nombra el plan sus siete etapas, y los docstrings citan `§{Tramo 4 › …}`. Y las cuatro alternativas obvias tienen dueño en `ir`: `Window` (§3, con `Window['scope']` en §5), `Slice` (§3), `Range` (§4 lo partió en `rank`/`range`, y `SourceRange` es el rango de bytes de la grilla) y `Span`, que queda a un guion bajo de `text_span`, valor de `SHAPES` |
+| **P14** | el **ancla** y quién ancla | **`Anchor`** · **`anchorsOf`** | §4 **ya reservó `anclaje → anchoring` explícitamente para LA MÉTRICA** («es la métrica —fracción de nodos que ancló—, no el acto»), así que el acto quedó libre y las dos palabras no se pisan. `Anchor` es `{ node: number; known: number }` — **las DOS posiciones**, porque el problema que el plan no resuelve vive exactamente en que las dos pueden no crecer juntas. Nada de `old`/`new`: `new` es palabra del lenguaje, y el par no diría de qué espacio es cada lado |
+| **P15** | el ancla que **además parte las listas** | **`Fence`** en la prosa · **`fencesOf(anchors): readonly Anchor[]`** en el código | **El nombre más importante del paso.** Nace porque el plan escribió como una sola cosa **dos usos distintos de la misma ancla** — conservar identidad (todas) y partir en tramos (solo las monótonas) —, y la frase que resuelve el hueco es literalmente **«un ancla que no es cerco conserva su id»**. Sin dos palabras esa frase no es escribible y la tentación de descartar el ancla junto con el cerco no tiene dónde hacerse visible. `monotoneAnchorsOf` nombra **el cómo** (la monotonía) en vez de **el rol** (partir las listas), que es el error exacto que §4 evitó al reservar `anchoring`. `Boundary` ya es de `boundaries.mjs` y de las fronteras entre paquetes. **NO nace un tipo `Fence`**: un cerco ES un `Anchor` seleccionado, y la firma lo dice mejor que un alias |
+| **P16** | el **emparejamiento** viejo ↔ nuevo | **`Match`**, con campos **`local` · `id` · `by`** | **`Pair` está tomado tres veces en `ir`**: `shapes.ts:126` exporta `type Pair = { label, value }` (el par de la forma `fields`), el barril lo reexporta, y la palabra ya trabaja en `isLegalPair` y `ROLE_SHAPE_PAIRS` para la pareja `role⇒shape`. Es `Registro → DataRecord` (§4) y `Contenedor → Ancestor` (B3) calcado: **cuando R1 no elige, elige la colisión**. `Mapping` nombra el CONTENEDOR y el que tiene que llevar el criterio es el ELEMENTO; `Link` ya lo descartó §4 a secas. Los campos son `local` e `id` porque son **las dos palabras que el contrato ya usa para esos dos lados** (`RoutedNode.local`, `EmittedNode.id`) |
+| **P17** | **con qué criterio** se emparejó | **`MatchBasis`** · **`MATCH_BASES = ["hash","similarity","residue"] as const`** | **`attribution` está tomado Y EN EL MISMO OBJETO**: `RawNode.attribution` es «qué eslabón de la cascada resolvió este nodo» y `EmittedNode` lo hereda vía `Node`; dos campos que dicen «qué paso decidió esto» con el mismo nombre en el mismo tipo es la homonimia que este documento existe para evitar. `origin` está tomado (`Origin['kind']`, D6), `source` lleva ⚠ DOBLE en §3 y §5, y `provenance` es un módulo con criterio de membresía que esto no cumple (dice cómo se CONCLUYÓ la identidad, no cómo LLEGÓ el contenido). `kind` es el caso F1 otra vez: las tres variantes no se distinguen por qué CLASE son sino por con qué CRITERIO se hicieron, y para eso hay regla — **R7, `por → by`**. Los tres valores son **los tres campos de `ReconciliationMetrics` sin el prefijo**, y no los tres títulos del plan: el pase 2 empareja POR SIMILITUD, el hueco es DÓNDE y no CÓMO, y un `"gap"` contradiría el campo agregado que vive tres líneas más arriba. **Tampoco se numeran**: el ordinal miente el día que se reordene un pase |
+| **P18** | **el pase** | **NINGÚN NOMBRE EN INGLÉS** — fila de ausencia | «Pase» se queda en los docstrings, que son español por §1. En DATOS los tres se nombran por su criterio (P17); en CÓDIGO son `anchorsOf` y **dos llamadas a la misma función**. R1 daría `pass` y **se dispara su salvedad**: en cualquier base de código «pass» es pasar un parámetro o que un chequeo pase, y nombrar así el objeto central del único tramo cuyo guardián imprime verde y rojo es comprar la confusión. Pero antes de elegir entre `Pass`, `Phase` y `Round` hay que preguntar **si el nombre hace falta, y no hace**: un tipo para «el pase» solo serviría para poner el ordinal en algún lado, y **el ordinal es justo lo que el contrato ya decidió no guardar**. Se lista para que la ausencia no se lea como olvido (precedente B7 con `Scope`, y §14 «Lo que este bloque BORRA») |
+| **P19** | lo que entra al reconciliador: **la memoria de la versión anterior** | **`KnownVersion`** = `Nominal<readonly KnownNode[], "KnownVersion">` · **`knownVersionOf`** | El nombre que sale solo es el del plan —«el índice de reconciliación» → `ReconciliationIndex`— y es el que más caro sale, por dos razones. **(1) Sería una RE-DECLARACIÓN**: tendría exactamente los miembros de dos tipos que `ir` ya exporta, y el `README.md` de `ir` lo prohíbe con todas las letras; es el caso `OpaqueEntry` de §14, borrado por eso mismo. **(2) «índice» es la palabra del PRODUCTO** para el índice buscable —`DOCUMENT_STATES` tiene `indexing`/`indexed`—, así que el nombre pondría la memoria privada del reconciliador y el destino de la ingesta bajo la misma palabra. `PreviousVersion` **está tomado con otro significado**: `ReconciliationMetrics.previousVersion` es la versión del ADAPTADOR (H16). La marca nominal existe para que **«lista desordenada» sea IRREPRESENTABLE** y no una precondición en un comentario: un arreglo mal ordenado no explota — produce cercos cortos, huecos mal armados y un desempate «menor `order` viejo» que es falso, y el resultado sigue siendo un `EmissionOutput` perfectamente formado |
+| **P20** | **acuñar** un `ElementId` | **`MintFn = () => ElementId`**, en `identity.ts` | El verbo ya está fijado por el contrato (`MINTING_PROOFS`, `invariants.ts:258`); lo que esta fila registra es **el TIPO**, por R2 sobre el precedente doble `HashFn` (`projection.ts:416`) y `EvidenceFn` (§4). Existe porque **acuñar es IMPURO** —H13(a): ULID/UUIDv7 = reloj + azar— y `boundaries.mjs` de `emission` rechaza cualquier import que no sea `@savia-os/ir`, **incluidos los `node:*`**. Es la misma jugada que hizo `sha256` entrar por parámetro, y por la misma razón: sin ella el determinismo no es verificable |
+| **P21** | los **tres campos nuevos** de `ReconciliationMetrics` | **`comparisons`** · **`uncompared`** · **`ambiguous`** | Los dos primeros son R1 llana y entran por completitud. **`ambiguous` sí necesita fila**: nombra un ESTADO del nodo —«su hash no es único de su lado, así que no puede ni intentar anclar»— y no un conteo obvio. `collisions` sugiere que el hash falló, **y no falló**: el contenido es idéntico. `nonUnique` describe el hash, no el nodo. `unanchorable` promete de más — un nodo ambiguo **se empareja perfectamente bien** por los pases 2 y 3 |
+| **P22** | el caso del banco | **`ReconciliationCase`** | Sigue a `Case` y `GroupingCase` de `synthetic.ts` por R1 + §9. La fila existe para dejar escrito **por qué el golden va TIPADO en `src/` y no en un archivo de snapshot**: un snapshot se regenera con una tecla, y ese es exactamente el modo de falla que M18 existe para impedir |
+
+### El precio de P19, dicho de frente
+
+El plan le dedica una sección entera a **«3 · El índice de reconciliación»** y describe
+sus dos tablas (`nodo_conocido`, `version_nodo`). Este documento **no le da ese nombre a
+ningún símbolo**, y hay que decir por qué para que quien lea el plan no concluya que la
+pieza falta: lo que el plan nombra es **el artefacto de persistencia del tramo 7**, que
+sigue llamándose así en toda la prosa y que este paso **no construye**. Lo que nace acá
+es **la vista en memoria de una versión ya elegida**, que es un recorte de aquel — sin
+`document`, sin `organization` y sin `version`, porque para cuando llega ya se eligió
+contra qué reconciliar. Nombrarlos igual haría creer que `reconcile` toca Postgres.
+
+### Lo que este bloque CORRIGE, y por qué no es una errata
+
+El docstring de `PARAMETERS.identity.maxComparisons` afirma que al superar el tope «se
+emite el evento de anclaje bajo — nunca se trunca en silencio». **La segunda mitad es el
+requisito y la primera es imposible**: agotar el presupuesto no mueve `byHash` ni
+`oldNodes`, así que **no mueve `anchoring`**, así que el evento no se dispara. Las dos
+condiciones coinciden en el caso que las motivó —renombrar una columna deja cero anclas
+*y* revienta el presupuesto— y por eso la contradicción pasó desapercibida; pero un
+documento sano con **un solo hueco enorme** trunca con `anchoring` alto y **en silencio**,
+que es exactamente lo que la frase prometía impedir. Se corrige el docstring, no el
+comportamiento —bajar `anchoring` sería mentir sobre una métrica que mide otra cosa— y
+`uncompared` (P21) es el canal que vuelve verdadera la promesa.
+
+---
+
 ## La regla que gobierna a este documento
 
 **Si un término no está acá y ninguna regla de §2 lo determina, no se inventa: se

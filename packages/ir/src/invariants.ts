@@ -107,6 +107,7 @@ import type {
   EmbeddingKey,
   LocalId,
   MatterHash,
+  MintFn,
   NodeFingerprint,
   Nominal,
   ObjectKey,
@@ -128,6 +129,7 @@ import {
   type Node,
   type NodeInVersion,
   type RawNode,
+  type ReconciliationMetrics,
   type StableDataRecord,
 } from "./outputs.js";
 import {
@@ -980,6 +982,101 @@ export type CHANNEL_CAPABILITY_PROOFS = readonly [
   _RequiresIsClosed,
   _PerceiveCanBeAbsent,
   _AssetCarriesNoPendingWork,
+];
+
+// ═══ Invariante 14 · los tres canales del reconciliador siguen siendo obligatorios ═
+// Los tres campos que el paso 11 agregó a `ReconciliationMetrics` NO son marcas
+// nominales como los del invariante 8: son `number` pelado. Así que la mutación que
+// los mata no es cambiarles la marca —no tienen— sino **volverlos opcionales**, y esa
+// es la edición de UN CARÁCTER que alguien hace de buena fe para «no romper a los que
+// ya construyen el objeto».
+//
+// Por qué eso es catastrófico y no cosmético: los tres existen porque una promesa del
+// plan es falsa sin ellos. Con `comparisons?`, un reconciliador que no lo reporta
+// compila, y `PARAMETERS.identity.maxComparisons` —que el plan declara MEDIBLE— se
+// queda para siempre sin instrumento, o sea que el tope se elige a ojo. Con
+// `uncompared?`, agotar el presupuesto vuelve a ser invisible y «nunca se trunca en
+// silencio» deja de ser verdad. Con `ambiguous?`, el peor modo de falla del tramo
+// —la huella deja de cubrir una forma, todo hashea igual, la identidad colapsa— pierde
+// su única señal en la primera ingesta.
+//
+// LA ASERCIÓN DE IDA ES LA QUE TRABAJA, y conviene decir por qué alcanza: un campo
+// opcional hace que `ReconciliationMetrics["comparisons"]` sea `number | undefined`,
+// que NO cabe en `number`. La misma aserción agarra además el ensanchamiento a
+// `string`. La de vuelta agarra el colapso a `never`, que es asignable a todo y
+// pasaría la primera en verde — mismo par y misma razón que el invariante 8. Y como
+// allá, LAS TRES DE ATRÁS NO TIENEN MUTANTE: cada una dice lo suyo para que si alguna
+// dispara no mande a leer lo que no es, pero colapsar un campo a `never` no es una
+// edición que alguien haga de buena fe, que es el filtro con el que este corredor
+// decide qué fila merece existir.
+//
+// `MintFn` va en esta banda y no en la del invariante 8 porque no es un campo sino una
+// FIRMA, y se assertea sobre `ReturnType<MintFn>` por el precedente de `fingerprintOf`:
+// sobre la firma real, no sobre una copia que pueda discrepar. Si devolviera `string`,
+// cualquier función que produzca texto entra como acuñador y el reconciliador reparte
+// ids sin marca — que es exactamente el agujero que `asElementId` existe para tapar.
+
+type _ComparisonsIsRequiredCount = True<
+  FitsIn<
+    ReconciliationMetrics["comparisons"],
+    number,
+    "ReconciliationMetrics.comparisons became optional or stopped being a count — the only channel that could ever measure maxComparisons reports nothing, and the plan declares that parameter measurable"
+  >
+>;
+type _ComparisonsInhabited = True<
+  FitsIn<
+    number,
+    ReconciliationMetrics["comparisons"],
+    "ReconciliationMetrics.comparisons collapsed to never — the field still typechecks everywhere and counts nothing"
+  >
+>;
+
+type _UncomparedIsRequiredCount = True<
+  FitsIn<
+    ReconciliationMetrics["uncompared"],
+    number,
+    "ReconciliationMetrics.uncompared became optional or stopped being a count — exhausting the comparison budget is invisible again and «never truncates silently» goes back to being false"
+  >
+>;
+type _UncomparedInhabited = True<
+  FitsIn<
+    number,
+    ReconciliationMetrics["uncompared"],
+    "ReconciliationMetrics.uncompared collapsed to never — the field still typechecks everywhere and counts nothing"
+  >
+>;
+
+type _AmbiguousIsRequiredCount = True<
+  FitsIn<
+    ReconciliationMetrics["ambiguous"],
+    number,
+    "ReconciliationMetrics.ambiguous became optional or stopped being a count — a fingerprint that stopped covering a shape collapses identity with no signal on the first ingestion"
+  >
+>;
+type _AmbiguousInhabited = True<
+  FitsIn<
+    number,
+    ReconciliationMetrics["ambiguous"],
+    "ReconciliationMetrics.ambiguous collapsed to never — the field still typechecks everywhere and counts nothing"
+  >
+>;
+
+type _MintProducesElementIds = True<
+  FitsIn<
+    ReturnType<MintFn>,
+    ElementId,
+    "MintFn stopped returning an ElementId — any text-producing function is accepted as a minter and the reconciler hands out unbranded ids"
+  >
+>;
+
+export type RECONCILIATION_PROOFS = readonly [
+  _ComparisonsIsRequiredCount,
+  _ComparisonsInhabited,
+  _UncomparedIsRequiredCount,
+  _UncomparedInhabited,
+  _AmbiguousIsRequiredCount,
+  _AmbiguousInhabited,
+  _MintProducesElementIds,
 ];
 
 // ─────────────────────────────── Invariantes de runtime ──────────────────────

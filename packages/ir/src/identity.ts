@@ -124,6 +124,35 @@ export type Nominal<Base, Label extends string> = [Base] extends [Branded]
 export type ElementId = Nominal<string, "ElementId">;
 
 /**
+ * Acuña un `ElementId` nuevo (paso 11).
+ *
+ * POR QUÉ ES UN PARÁMETRO Y NO UNA FUNCIÓN DE ESTE PAQUETE. Acuñar es IMPURO por
+ * definición: H13(a) arriba dice ULID o UUIDv7, o sea RELOJ + AZAR. `ir` no depende
+ * de nada y `emission` tampoco —su `boundaries.mjs` rechaza todo import que no sea
+ * `@savia-os/ir`, incluidos los `node:*` y los globales de node—, así que el
+ * acuñador entra por parámetro igual que `sha256: HashFn` entra a `emit`. No es una
+ * concesión a las fronteras: es lo que vuelve VERIFICABLE el determinismo del
+ * reconciliador, porque un banco que provee un acuñador contable puede afirmar
+ * «se acuñaron exactamente N ids» y comparar dos corridas.
+ *
+ * EL CONTRATO QUE ESTE TIPO NO PUEDE EXPRESAR, dicho de frente: cada llamada tiene
+ * que devolver un identificador que NUNCA se devolvió antes — ni en esta corrida ni
+ * en ninguna otra, ni en este proceso ni en otro. `() => ElementId` no lo dice y
+ * ningún tipo de TypeScript puede. Lo que sí se puede es no confiar: el
+ * reconciliador DETECTA la colisión dentro de su propia corrida y falla con
+ * `duplicate-element-id` en vez de emparejar dos nodos al mismo id; una colisión
+ * contra una corrida anterior la agarra la clave primaria del tramo 7. Con 128 bits
+ * de azar ninguna de las dos debería ocurrir nunca, y esa es exactamente la razón
+ * por la que un acuñador roto pasaría desapercibido sin la detección.
+ *
+ * NO SE LLAMA `IdFn`. `mint` ya es el verbo del contrato —`MINTING_PROOFS` en
+ * `invariants.ts`, y el mensaje «minted and adapter-local ids no longer separate»—,
+ * y el sufijo `*Fn` sigue el precedente doble de `HashFn` (`projection.ts`) y
+ * `EvidenceFn`. Ver GLOSARIO.md, P20.
+ */
+export type MintFn = () => ElementId;
+
+/**
  * Identificador provisional, válido SOLO dentro de una corrida del emisor.
  *
  * PROVISIONAL(#66): restauro `LocalKey` del diseño predecesor (05-capa1 L417-419:

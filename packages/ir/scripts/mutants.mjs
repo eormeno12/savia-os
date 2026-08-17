@@ -759,7 +759,55 @@ const MUTANTES = [
     nota: "restituye el campo que el paso 6 borró, y la lápida de `shapes.ts` dice por qué no puede volver: el cuerpo se regenera ENTERO desde los bytes en cada re-ingesta (R3) y está excluido de la huella —tiene que estarlo, o resolver un enriquecimiento movería el id—. Un campo que no toca la identidad y se reescribe de cero cada vez no registra nada: es una nota de planificación guardada adentro del contenido. El censo lo confirmó antes de borrarlo: 3 escrituras, todas vacías, 0 lecturas",
   },
 
+  // ── Bloque 6 · paso 11 · los tres canales del reconciliador y el acuñador ───
+  // Los tres campos NO son marcas nominales como M32–M35: son `number` pelado, así
+  // que la edición que los mata es otra — volverlos OPCIONALES. Es un carácter, la
+  // hace alguien de buena fe para «no romper a los que ya construyen el objeto», y
+  // deja los tres canales existiendo y reportando nada. Sin el invariante 14 las tres
+  // compilan.
+  {
+    id: "M66",
+    garantía: "`comparisons` es obligatorio — es el único instrumento de `maxComparisons`",
+    cambios: [[`  readonly comparisons: number;`, `  readonly comparisons?: number;`]],
+    espera: /comparisons became optional or stopped being a count/,
+    nota: "el plan declara `maxComparisons` MEDIBLE («se mide: curva tiempo vs tamaño de hueco») y no le deja instrumento; este campo es el instrumento. Opcional, un reconciliador que no lo reporta compila y el tope se elige a ojo, que es lo que «ningún número inventado» prohíbe. Sin el testigo: NO ROMPÍA",
+  },
+  {
+    id: "M67",
+    garantía: "`uncompared` es obligatorio — sin él «nunca se trunca en silencio» es falso",
+    cambios: [[`  readonly uncompared: number;`, `  readonly uncompared?: number;`]],
+    espera: /uncompared became optional or stopped being a count/,
+    nota: "agotar el presupuesto NO mueve `byHash` ni `oldNodes`, así que no mueve `anchoring` y el evento de anclaje bajo no se dispara — la promesa del docstring de `maxComparisons` era imposible y el paso 11 la corrigió apoyándola en este campo. Opcional, la corrección se deshace sin tocar la prosa que la anuncia. Sin el testigo: NO ROMPÍA",
+  },
+  {
+    id: "M68",
+    garantía: "`ambiguous` es obligatorio — es la única alarma del colapso de identidad",
+    cambios: [[`  readonly ambiguous: number;`, `  readonly ambiguous?: number;`]],
+    espera: /ambiguous became optional or stopped being a count/,
+    nota: "es la única señal que suena en la PRIMERA ingesta, cuando todavía no hay versión anterior contra la cual el anclaje pueda caer. El plan cuenta que el modo de falla ya ocurrió —la huella no cubría `grid`, las 500 filas de una planilla hashearon idénticas y una inserción movió 500 identificadores—, y ese día ninguna métrica de reconciliación existía para avisarlo. Sin el testigo: NO ROMPÍA",
+  },
+  {
+    id: "M69",
+    garantía: "`MintFn` devuelve un `ElementId`, no texto cualquiera",
+    cambios: [[
+      `export type MintFn = () => ElementId;`,
+      `export type MintFn = () => string;`,
+    ]],
+    espera: /MintFn stopped returning an ElementId/,
+    nota: "es el par de D24 sobre `fingerprintOf`, del otro lado del contrato: allá el productor de huellas tenía que APLICAR la marca, acá el productor de identidades tiene que DEVOLVERLA. Con `string` cualquier función que produzca texto entra como acuñador y el reconciliador reparte ids sin marca, que es el agujero que `asElementId` existe para tapar. No acredita por casualidad: `ElementId` aparece 12 veces en `invariants.ts`, así que la mutación no deja ningún import huérfano y `TS6133`/`TS6196` no pueden matarla. Sin el testigo: NO ROMPÍA",
+  },
+
   // ── Controles ──────────────────────────────────────────────────────────────
+  {
+    id: "MC12",
+    control: true,
+    garantía: "agregarle a ReconciliationMetrics un campo que NO es uno de los tres canales no rompe nada",
+    cambios: [[
+      `  readonly ambiguous: number;`,
+      `  readonly ambiguous: number;\n  /** control MC12 */\n  readonly spare?: number;`,
+    ]],
+    nota: "el par de M66–M68, y el contraste es exactamente el punto: volver opcional a `comparisons`, `uncompared` o `ambiguous` es ROJO, y agregar un cuarto campo opcional es VERDE. Sin este control las tres filas serían indistinguibles de un invariante que congela la FORMA del objeto, y congelar la forma prohibiría el próximo campo que la degradación honesta necesite. Va opcional y no obligatorio a propósito: uno obligatorio se pondría rojo el día que `reconcile` construya el objeto, y un control que caduca solo es peor que ninguno — es el modo de falla que MC4 documenta haber tenido",
+  },
   {
     id: "DC1",
     control: true,

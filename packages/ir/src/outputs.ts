@@ -274,6 +274,46 @@ export type ReconciliationMetrics = {
    */
   readonly previousAdapter: string | null;
   readonly previousVersion: string | null;
+  /**
+   * PROVISIONAL(#88): campo NUEVO — Llamadas a `similarityOfProjections` que hizo
+   * esta corrida, sumando los pases 2 y 3. Es el ÚNICO canal por el que
+   * `PARAMETERS.identity.maxComparisons` se puede medir alguna vez: su docstring
+   * dice «se mide: curva tiempo vs tamaño de hueco sobre el corpus», y sin este
+   * número no hay de dónde sacar la curva. El plan declara el parámetro medible y
+   * no le deja instrumento — Si se decide al revés, el tope se elige a ojo, que es
+   * exactamente lo que «ningún número inventado» prohíbe.
+   */
+  readonly comparisons: number;
+  /**
+   * PROVISIONAL(#89): campo NUEVO — Nodos VIEJOS que se fueron a `removals` sin que
+   * el presupuesto de `maxComparisons` les diera su comparación. Sin él, agotar el
+   * tope es INVISIBLE: `byHash` no se mueve, así que `anchoring` tampoco, así que el
+   * evento de anclaje bajo no se dispara y la promesa «nunca se trunca en silencio»
+   * es literalmente falsa. Las dos condiciones coinciden en el caso que las motivó
+   * —renombrar una columna deja cero anclas Y revienta el presupuesto—, y por eso la
+   * contradicción no se veía; pero un documento con anclaje alto y UN SOLO HUECO
+   * ENORME trunca en silencio. Ver la corrección del docstring de `maxComparisons`
+   * en `params.ts`, y GLOSARIO.md, P21 — Si se decide al revés, el truncado deja de
+   * ser distinguible de «no había nada que emparejar».
+   */
+  readonly uncompared: number;
+  /**
+   * PROVISIONAL(#90): campo NUEVO — Nodos NUEVOS cuyo hash no es único de su lado, o
+   * sea que no pueden ni intentar anclar (`maxMultiplicityForAnchoring`). Es la única
+   * señal del peor modo de falla del tramo —«la huella no cubre una forma, todos
+   * hashean igual, el pase 1 no ancla NINGUNO y la identidad colapsa en silencio»,
+   * §{Tramo 4 › Qué sale}— que suena en la PRIMERA ingesta, antes de que exista
+   * versión anterior contra la que comparar. El plan cuenta que ya pasó: las 500
+   * filas de una planilla hashearon idénticas y una inserción movió 500
+   * identificadores.
+   *
+   * OJO AL LEERLO: tiene un piso NO NULO conocido y no se lee contra cero. Los
+   * `container` desnudos —misma forma, mismo `ordered`, sin esquema— hashean igual
+   * POR CONSTRUCCIÓN, así que un documento sano con dos listas simples ya reporta
+   * ambigüedad. Se lee contra la línea de base del propio documento: lo que importa
+   * es que SALTE, no que sea cero.
+   */
+  readonly ambiguous: number;
 };
 
 /**

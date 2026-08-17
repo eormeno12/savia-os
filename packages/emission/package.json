@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Tramos 4 y 5: ruta (de dónde cuelga cada nodo), emisor (un solo recorrido con una pila) y agrupación (un recorrido, dos salidas). El reconciliador es el paso 11 y NO vive todavía acá.",
+  "description": "Tramos 4 y 5: ruta (de dónde cuelga cada nodo), emisor (un solo recorrido con una pila), reconciliador (tres pases: anclas, huecos y residuo) y agrupación (un recorrido, dos salidas). El acuñado de ElementId entra por parámetro: es impuro y este paquete no importa nada.",
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts"

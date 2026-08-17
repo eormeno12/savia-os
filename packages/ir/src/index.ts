@@ -68,6 +68,8 @@ export {
   type Nominal,
   type ElementId,
   type LocalId,
+  /** El acuñador del paso 11. Entra por parámetro: acuñar es impuro (P20). */
+  type MintFn,
   type AdapterId,
   type ActorId,
   type OrganizationId,

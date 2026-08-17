@@ -61,7 +61,7 @@
  *   · RED B — un CONTEO LAXO de imports por archivo. Si el regex dejara de reconocer
  *     la forma de un import, este script encontraría cero prohibidos y daría verde
  *     por no ver nada. Se exige que cada archivo de `src/` tenga al menos un import
- *     —los cinco lo tienen, y el barril tiene cuatro relativos— y que al menos
+ *     —los seis lo tienen, y el barril tiene cinco relativos— y que al menos
  *     cuatro archivos importen `@savia-os/ir` por su nombre.
  */
 
@@ -100,7 +100,7 @@ const FRONTERAS = [
 ];
 
 /** Los archivos que las fronteras protegen. Si no están, el script mentiría. */
-const PROTEGIDOS = ["grouping.ts", "emitter.ts", "route.ts"];
+const PROTEGIDOS = ["grouping.ts", "emitter.ts", "route.ts", "reconcile.ts"];
 
 let errores = 0;
 const fallar = (qué, detalle, porqué) => {

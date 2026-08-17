@@ -226,8 +226,23 @@ export const PARAMETERS = {
      * la necesidad y no la lleva ni a decisión ni a punto abierto.
      * Se mide: curva tiempo vs tamaño de hueco sobre el corpus; el tope es donde
      * el pase deja de caber en el presupuesto de la corrida.
-     * Al superarlo el hueco se resuelve como altas + bajas y se emite el evento
-     * de anclaje bajo — nunca se trunca en silencio.
+     * Al superarlo el hueco se resuelve como altas + bajas y los nodos viejos que
+     * se quedaron sin comparación se cuentan en `ReconciliationMetrics.uncompared`
+     * — nunca se trunca en silencio.
+     *
+     * CORREGIDO EN EL PASO 11, y la versión anterior de estas líneas era imposible.
+     * Decían que al superar el tope «se emite el evento de anclaje bajo». No puede
+     * pasar: agotar el presupuesto NO mueve `byHash` ni `oldNodes`, así que no mueve
+     * `anchoring`, así que la comparación contra `anchoringThreshold` da lo mismo
+     * que habría dado sin truncar. Las dos condiciones coinciden en el caso que las
+     * motivó —renombrar una columna deja cero anclas Y revienta el presupuesto—, y
+     * por eso la contradicción pasó desapercibida; pero un documento con anclaje
+     * alto y UN SOLO HUECO ENORME truncaba con la alerta muda, que es exactamente lo
+     * que la frase prometía impedir. Se corrigió el DOCSTRING y no el
+     * comportamiento: hacer que agotar el tope baje `anchoring` sería mentir sobre
+     * una métrica que mide otra cosa —cuánta curación del cliente sobrevivió—. La
+     * condición del evento pasa a ser `anchoring < anchoringThreshold ||
+     * uncompared > 0`, y la emite `orchestration`, no el reconciliador, que es puro.
      */
     maxComparisons: null as Pending<number>,
 

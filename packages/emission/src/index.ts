@@ -1,5 +1,5 @@
 /**
- * `@savia-os/emission` — tramos 4 y 5: RUTA, EMISOR y AGRUPACIÓN.
+ * `@savia-os/emission` — tramos 4 y 5: RUTA, EMISOR, RECONCILIADOR y AGRUPACIÓN.
  *
  * Depende de `@savia-os/ir` y de nada más. `emission` y `adaptadores` NUNCA se ven
  * entre sí (§{Paquetes}): `ir` es el único paquete que los dos alcanzan. Este
@@ -15,17 +15,29 @@
  * verifica `scripts/boundaries.mjs`, que nombra la frontera en vez de dejarla en
  * manos del resolvedor de módulos.
  *
- * LO QUE NO ESTÁ ACÁ, Y NO POR OLVIDO:
+ * EL PASO 11 AGREGÓ EL RECONCILIADOR, que es la pieza 5 del tramo 4 y el último paso
+ * del orden de construcción por ser el más caro de equivocar. Vive acá y no en un
+ * paquete propio porque el plan lo lista junto con los otros dos («emision/ ruta ·
+ * emisor · reconciliador», §{Paquetes}): partirlo en dos habría partido el tramo.
  *
- *   · el índice de reconciliación (tramo 4, pieza 3)
- *   · el acuñado de `ElementId`  (tramo 4, pieza 4)
- *   · el reconciliador de tres pases (tramo 4, pieza 5) — es el PASO 11 del orden
- *     de construcción, el último por ser el más caro de equivocar
+ * Por eso la salida de `emit` sigue siendo `RoutedNode` y no `EmittedNode`: el `id`
+ * sale de `reconcile`, que corre después. Ver PROVISIONAL(#66) y PROVISIONAL(#75) en
+ * `ir/src/outputs.ts`.
  *
- * Por eso la salida de `emit` es `RoutedNode` y no `EmittedNode`, y la de `group` es
- * `LocalFragment`/`LocalDataRecord` y no `StableFragment`/`StableDataRecord`: el `id`
- * sale de la reconciliación, que corre después. Ver PROVISIONAL(#66) y
- * PROVISIONAL(#75) en `ir/src/outputs.ts`.
+ * LO QUE SIGUE SIN ESTAR ACÁ, Y NO POR OLVIDO:
+ *
+ *   · el índice de reconciliación (tramo 4, pieza 3) — las dos tablas que el plan
+ *     describe son del tramo 7. Lo que sí vive acá es `KnownVersion`, que es la vista
+ *     EN MEMORIA de una versión ya elegida, sin documento ni organización ni versión
+ *     de bytes: para cuando llega, elegir contra qué reconciliar ya pasó
+ *   · el acuñado de `ElementId` (tramo 4, pieza 4) — es reloj + azar, o sea impuro, y
+ *     entra por parámetro como `MintFn` para que `reconcile` sea pura y este paquete
+ *     no importe un solo `node:*`
+ *   · la elección de CONTRA QUÉ versión reconciliar (`hash → documento`, con su filtro
+ *     por organización) — vive un nivel más arriba, y filtrarla acá sería una máscara
+ *     sobre el bug en vez de la garantía
+ *   · el evento de degradación por anclaje bajo — `reconcile` es pura y devuelve las
+ *     métricas; comparar contra `anchoringThreshold` y emitir es de `orchestration`
  *
  * El paquete está ENTERO EN INGLÉS desde el bloque 5 de la reescritura, con
  * `packages/ir/GLOSARIO.md` como autoridad de nombres — los tres términos que
@@ -55,6 +67,27 @@ export {
 export { type EmissionFailure, type Emission, emit } from "./emitter.js";
 
 export { type Grouping, group } from "./grouping.js";
+
+export {
+  type KnownVersion,
+  type Anchor,
+  type Match,
+  type MatchBasis,
+  type ReconciliationFailure,
+  type Reconciliation,
+  type ReconcileOptions,
+  MATCH_BASES,
+  knownVersionOf,
+  // `anchorsOf` y `fencesOf` se exportan aunque `reconcile` sea el único llamador de
+  // producto, y es superficie que se paga a sabiendas: el banco solo puede importar
+  // del barril compilado, así que sin ellas la decisión que el plan NO TOMA —cuál
+  // ancla parte las listas— quedaría acreditada solo a través de la salida final. Con
+  // las dos afuera, el guardián COMPONE las implementaciones reales en vez de
+  // reimplementar el pase 1, que sería acreditarse a sí mismo.
+  anchorsOf,
+  fencesOf,
+  reconcile,
+} from "./reconcile.js";
 
 export {
   type Case,

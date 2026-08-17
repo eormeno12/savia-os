@@ -101,8 +101,12 @@ try {
     registryOf,
     textFloorAdapter,
   } = await import(pathToFileURL(join(nm, "adapters", "index.js")).href);
-  const { Evidence, asAdapterId, asLocalId, asObjectKey, cohesionOf } = await import(
-    pathToFileURL(join(nm, "ir", "index.js")).href
+  const { Evidence, asAdapterId, asElementId, asLocalId, asObjectKey, cohesionOf, project } =
+    await import(pathToFileURL(join(nm, "ir", "index.js")).href);
+  // El reconciliador (paso 11). Se importa acá y no en `emission` porque el golden de
+  // identidades necesita nodos REALES, y `emission` no puede ver `adapters`.
+  const { anchorsOf, fencesOf, knownVersionOf, reconcile } = await import(
+    pathToFileURL(join(nm, "emission", "index.js")).href
   );
 
   const sha256 = (preimagen) => createHash("sha256").update(preimagen, "utf8").digest("hex");
@@ -940,6 +944,139 @@ try {
     }
   }
 
+  // ── I16 · GOLDEN DE IDENTIDADES: NINGUNA ANOTACIÓN SE DESPEGA ─────────────
+  // EL INVARIANTE DEL PASO 11, y §{Orden} lo llama «el más caro de recuperar si se
+  // rompe tarde». Dos versiones REALES del mismo documento, con sus huellas calculadas
+  // por el mismo `fingerprintOf` que corre en producción.
+  //
+  // POR QUÉ ACÁ Y NO EN `emission`, que es donde vive `reconcile`: los nodos los
+  // produce el adaptador y `emission` NO PUEDE VER `adapters` (R1). Este es el único
+  // paquete que alcanza a los dos — la misma razón que puso el golden de I1 acá.
+  //
+  // EL GOLDEN NO ES EL ÁRBOL: ES LA ASIGNACIÓN DE IDENTIDADES, y lleva DOS columnas.
+  // Qué id de v1 quedó en qué nodo de v2, **y qué pase lo ancló**. Sin la segunda, un
+  // reconciliador que acierta por casualidad se ve igual que uno que funciona: mover
+  // un emparejamiento del pase 1 al 3 significa que la identidad ya no se conserva por
+  // contenido sino por parecido, y con una sola columna eso pasa en verde.
+  //
+  // LOS IDS SE VUELVEN LEGIBLES A PROPÓSITO. Un `ElementId` real es ULID o UUIDv7 —
+  // reloj + azar—, así que ningún golden puede congelarlo. El banco deriva los de v1
+  // de su ancla (`v1#…`) y acuña con un contador, que es exactamente para lo que
+  // `MintFn` entra por parámetro: sin esa costura este invariante no sería escribible.
+  //
+  // NO LLEVA NINGUNA CLAVE `role`, y es deliberado: la fila S60 muta `"role":` adentro
+  // de `manual.golden.json`, y si el texto existiera en dos archivos esa mutación
+  // pasaría a tocar los dos y la fila diría otra cosa de la que dice.
+  {
+    const v2 = await ingest(SUBIDA(corpus("manual.v2.md"), { name: "manual.v2.md" }), OPCIONES);
+    if (!v2.ok && v2.nodes === undefined) {
+      fallar("I16 · la v2 del corpus no se pudo ingerir", "sin nodos no hay nada que reconciliar", "");
+    }
+
+    // La memoria de la versión anterior, construida desde la corrida de v1: tiene
+    // `hash`, `role` y `body`, y la proyección sale de `ir`. Es el mismo material que
+    // el tramo 7 va a persistir en el índice.
+    const previous = knownVersionOf(
+      corrida.nodes.map((n, order) => ({
+        id: asElementId(`v1#${n.location.anchor}`),
+        hash: n.hash,
+        role: n.role,
+        shape: n.body.shape,
+        projection: project(n.body),
+        order,
+      })),
+    );
+
+    let acuñados = 0;
+    const r = reconcile(v2.nodes, previous, {
+      mint: () => asElementId(`nuevo#${(acuñados += 1)}`),
+      // LOS DOS SON PARÁMETROS DEL BANCO, no del producto — igual que `targetSizeChars`
+      // arriba. `PARAMETERS.identity.similarityThreshold` y `.maxComparisons` siguen en
+      // `null` con su plan de medición escrito. El umbral se elige holgado a propósito:
+      // los pares correctos del corpus dan 0.60 y 0.79, y los distractores 0.00, así
+      // que CUALQUIER valor entre ambos da el mismo golden. Que el resultado no dependa
+      // del número es lo que permite que el número siga sin medirse.
+      similarityThreshold: 0.5,
+      maxComparisons: 10000,
+      previousAdapter: corrida.adapter,
+      previousVersion: "v1",
+    });
+
+    if (!r.ok) {
+      fallar(
+        "I16 · la reconciliación falló",
+        JSON.stringify(r.failure),
+        "las tres fallas son violaciones de CONTRATO, no condiciones de datos: sobre dos versiones de un `.md` sano ninguna puede ocurrir",
+      );
+    } else {
+      const porLocal = new Map(r.matches.map((m) => [m.local, m.by]));
+      const anclas = anchorsOf(v2.nodes, previous, () => {});
+      // EL REMAPEO VA EN EL GOLDEN, y no es relleno. `parentId` y las migas se remapean
+      // desde la MISMA tabla que el `id`, así que sin ellos una mutación que remape las
+      // migas por su TEXTO en vez de por su referencia —que es el punto entero de C15,
+      // porque el texto de un título es mutable por diseño— pasaría en verde: los ids
+      // saldrían perfectos y el árbol quedaría cosido al nodo equivocado.
+      const actual = JSON.stringify(
+        {
+          nodos: r.output.nodes.map((n, i) => ({
+            anchorV2: v2.nodes[i].location.anchor,
+            id: n.id,
+            by: porLocal.get(v2.nodes[i].local) ?? null,
+            parentId: n.parentId,
+            migas: n.breadcrumbs.map((b) => b.ref),
+          })),
+          bajas: r.output.removals,
+          cercos: { de: anclas.length, parten: fencesOf(anclas).length },
+          metricas: r.output.metrics,
+        },
+        null,
+        2,
+      );
+      const identityPath = join(RAIZ, "corpus", "manual.identity.golden.json");
+      if (process.env.ORCHESTRATION_REGEN === "1") {
+        writeFileSync(identityPath, `${actual}\n`, "utf8");
+        console.log("golden de identidades REGENERADO — revisá el diff antes de commitear");
+      } else {
+        const esperado = readFileSync(identityPath, "utf8").trimEnd();
+        if (actual !== esperado) {
+          const a = actual.split("\n");
+          const b = esperado.split("\n");
+          const i = a.findIndex((l, k) => l !== b[k]);
+          fallar(
+            "I16 · golden de identidades",
+            `primera diferencia en la línea ${i + 1}\n        esperado: ${b[i]}\n        obtenido: ${a[i]}`,
+            "un identificador que se mueve NO FALLA: despega en silencio la curación del cliente colgada de él. Este golden es lo único que convierte ese movimiento en un rojo",
+          );
+        }
+      }
+
+      // ACÁ HUBO UNA GUARDA DE FUGAS Y SE BORRÓ, que es una decisión y no un olvido.
+      // Verificaba que ningún nodo emitido arrastrara su `local`/`localParent` —valen
+      // SOLO dentro de una corrida del emisor, y persistidos dejan dos identidades por
+      // nodo—. Al escribirle el mutante que la acreditara, las dos ediciones que
+      // producen la fuga resultaron RECHAZADAS POR EL COMPILADOR: agregar la clave a
+      // mano da `TS2353` («'local' does not exist in type 'EmittedNode'», porque un
+      // literal SÍ tiene chequeo de propiedades de más) y cambiar `...rest` por
+      // `...node` deja `rest` sin usar y da `TS6133`. La violación ya es
+      // irrepresentable un peldaño más arriba, así que la guarda era una aserción que
+      // ningún cambio plausible podía disparar — y una garantía que no se puede
+      // acreditar rompiéndola es indistinguible de una que no funciona.
+      //
+      // LAS DOS SUMAS, y no son un test del golden: valen para cualquier entrada.
+      // Salen de que todo se derive de `matches`, así que solo pueden fallar si
+      // alguien reintroduce contadores paralelos.
+      const m = r.output.metrics;
+      const emparejados = m.byHash + m.bySimilarity + m.byResidue;
+      if (emparejados + m.additions !== m.newNodes || emparejados + m.removals !== m.oldNodes) {
+        fallar(
+          "I16 · las métricas no cierran",
+          `${emparejados}+${m.additions}≠${m.newNodes} o ${emparejados}+${m.removals}≠${m.oldNodes}`,
+          "«ninguna información se descarta en silencio» aplicado a la identidad: si las cuentas no cierran hay nodos que no son ni emparejados, ni altas, ni bajas — o sea que desaparecieron sin que nada lo diga",
+        );
+      }
+    }
+  }
+
   if (fallas > 0) process.exit(1);
 
   console.log(
@@ -948,7 +1085,8 @@ try {
       `I7 delegación de profundidad cero · I8 el tamaño objetivo decide · I9 la autoría fuera de la huella · ` +
       `I10 degradación real y visible · I11 guardar incondicional, indexar no · ` +
       `I12 la cintura no tiene forma de documento · I13 leído y vacío avisa · ` +
-      `I14 una imagen es un documento · I15 la recursión frena)\n` +
+      `I14 una imagen es un documento · I15 la recursión frena · ` +
+      `I16 golden de identidades, ninguna anotación se despega)\n` +
       `           ${corrida.nodes.length} nodos · ${corrida.fragments.length} fragmentos · ` +
       `${corrida.records.length} registros · ${corrida.sink.notices.length} avisos`,
   );

@@ -141,7 +141,17 @@ const fallar = (qué, detalle, porqué) => {
 
 // ── RED A · los extremos existen ─────────────────────────────────────────────
 {
-  const protegidos = ["src/ingest.ts", "corpus/manual.golden.json"];
+  // `manual.identity.golden.json` entra por la misma razón que el otro: un guardián que
+  // compara contra un archivo que no existe encuentra cero diferencias y pasa en VERDE.
+  // Y su par de entrada también, porque el golden de identidades se calcula sobre DOS
+  // versiones: sin `manual.v2.md` en el corpus prestado, I16 no tiene contra qué
+  // reconciliar y la única red del invariante más caro del pipeline desaparece sin ruido.
+  const protegidos = [
+    "src/ingest.ts",
+    "corpus/manual.golden.json",
+    "corpus/manual.identity.golden.json",
+    "../adapters/corpus/manual.v2.md",
+  ];
   const faltantes = protegidos.filter((f) => !existsSync(join(RAIZ, f)));
   if (faltantes.length > 0) {
     fallar(

@@ -550,7 +550,83 @@ const MUTANTES = [
       "dos siguen. El error caro es ese, no el de negarse a arrancar",
   },
 
+  // ── El reconciliador (paso 11) · las fallas que NO SE VEN ──────────────────
+  // Las cuatro mutan `../emission/src/reconcile.ts` y las mata I16, que es el único
+  // invariante del repo que corre el reconciliador sobre nodos reales. Las cuatro
+  // COMPILAN y devuelven un `EmissionOutput` perfectamente formado: sin el golden de
+  // identidades, ninguna se ve.
+  {
+    id: "S93",
+    garantía: "los cercos son la subsecuencia creciente más larga, no todas las anclas",
+    rompe: "el golden de identidades",
+    cambios: [[
+      `    if (tail !== undefined && tail.anchor.known < target) lo = mid + ONE;`,
+      `    if (tail !== undefined && tail.anchor.known > target) lo = mid + ONE;`,
+    ]],
+    espera: /I16 · golden de identidades/,
+    nota:
+      "es LA decisión que el plan no toma, y la mutación es la comparación dada vuelta — un carácter, y " +
+      "el error más común al escribir una búsqueda binaria. Con el predicado invertido la subsecuencia " +
+      "deja de ser la más larga, las divisorias del lado viejo dejan de ser monótonas —el corpus lo " +
+      "provoca: la cita se mudó del orden 12 al 3— y el cursor de `splitAround` avanza buscando un borde " +
+      "que ya pasó: los huecos de los dos lados dejan de salir del mismo par de anclas. Nada explota; " +
+      "empareja distinto. LA PRIMERA VERSIÓN DE ESTA FILA reemplazaba la llamada entera por " +
+      "`tails.length` y moría por `TS6133` —`lowerBound` quedaba sin usar—, o sea acreditando al " +
+      "compilador en vez del contrato: el corredor la rechazó. Sin el golden: NO ROMPÍA",
+  },
+  {
+    id: "S94",
+    garantía: "`anchoring` se mide sobre el lado VIEJO (ANCHORING_DENOMINATOR)",
+    rompe: "el golden de identidades",
+    cambios: [[
+      `    anchoring: m === ZERO ? ONE : byHash / m,`,
+      `    anchoring: m === ZERO ? ONE : byHash / n,`,
+    ]],
+    espera: /I16 · golden de identidades/,
+    nota:
+      "PROVISIONAL(#62) eligió el conteo viejo porque la métrica vigila CUÁNTA CURACIÓN SOBREVIVIÓ, y esa " +
+      "es una proporción del pasado. Con el denominador nuevo, borrar 400 de 500 nodos MEJORA el número " +
+      "—quedan menos por preservar— y la única alerta del peor modo de falla se apaga justo cuando más " +
+      "hace falta. Los dos valores están en [0,1] y los dos parecen razonables: sin el golden: NO ROMPÍA",
+  },
+  {
+    id: "S95",
+    garantía: "los pases 2 y 3 solo comparan mismo `role` Y misma `shape`",
+    rompe: "el golden de identidades",
+    cambios: [
+      [
+        `        bucket(encodeParts(fresh.it.role, fresh.it.body.shape)).fresh.push(fresh);`,
+        `        bucket(encodeParts(fresh.it.body.shape)).fresh.push(fresh);`,
+      ],
+      [
+        `        bucket(encodeParts(old.it.role, old.it.shape)).old.push(old);`,
+        `        bucket(encodeParts(old.it.shape)).old.push(old);`,
+      ],
+    ],
+    espera: /I16 · golden de identidades/,
+    nota:
+      "la guarda del plan («con mismo tipo y misma forma») está escrita como DOMINIO y no como condición: " +
+      "un par de roles distintos no se rechaza, no se enumera. Quitar `role` de la clave no produce un " +
+      "emparejamiento visiblemente absurdo sobre este corpus —los distractores dan 0.00— pero SÍ agranda " +
+      "el dominio, y eso se ve en `comparisons`, que el golden congela: 6 pasa a 9. Es el único canal por " +
+      "el que la guarda es observable sin un caso adversarial, y es exactamente para lo que ese campo entró",
+  },
+
   // ── Controles ──────────────────────────────────────────────────────────────
+  {
+    id: "SC21",
+    control: true,
+    garantía: "editar la prosa de un docstring del reconciliador no rompe nada",
+    cambios: [[
+      `ES UNA FUNCIÓN PURA.`,
+      `ES UNA FUNCIÓN PURA (control SC21).`,
+    ]],
+    nota:
+      "el par de S93–S96: sin él, las cuatro filas serían indistinguibles de un golden que congela el " +
+      "ARCHIVO en vez de su comportamiento. El reconciliador es el archivo más comentado del paquete " +
+      "—la mitad de sus líneas son razonamiento— y congelarlo sería la forma más rápida de que nadie " +
+      "lo pueda mejorar",
+  },
   {
     id: "DC1",
     control: true,
@@ -637,8 +713,16 @@ const ARCHIVOS = [
   "src/index.ts",
   "package.json",
   "corpus/manual.golden.json",
+  "corpus/manual.identity.golden.json",
   "scripts/boundaries.mjs",
   "scripts/invariants.mjs",
+  // El `src/` de OTRO paquete, y va con la misma razón que `turbo.json` de abajo: el
+  // reconciliador vive en `emission`, pero lo único que puede acreditar su
+  // COMPORTAMIENTO es I16, que necesita nodos reales y por eso vive acá — `emission` no
+  // puede ver `adapters` (R1). El único que puede acreditar una garantía es el que la
+  // sufre. El arnés lo restaura como a cualquier otro, y el orden `^lint` del grafo
+  // garantiza que la cadena de `emission` ya terminó cuando esto lo muta (S73).
+  "../emission/src/reconcile.ts",
   // El único archivo de la RAÍZ que un corredor de mutación toca en todo el repo, y va
   // con su razón: el orden entre `lint` y `lint` es un hecho del monorepo, no del
   // paquete, y el único que lo puede acreditar es el que lo sufre (S73). El arnés lo
