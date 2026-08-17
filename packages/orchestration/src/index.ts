@@ -19,7 +19,9 @@
  */
 
 export {
+  type Intake,
   type IngestOptions,
+  type RECOGNIZED_PROOFS,
   type Run,
   type Sink,
   contextOf,

@@ -48,10 +48,19 @@ export {
   extensionOf,
   opaqueOf,
   probeOf,
+  recognizeMessage,
   registryOf,
   select,
   sourceOfBytes,
 } from "./registry.js";
+
+export {
+  CHAT_ID,
+  type ChatSignals,
+  type Message,
+  type Paragraph,
+  chatAdapter,
+} from "./chat.js";
 
 export {
   MARKDOWN_ID,

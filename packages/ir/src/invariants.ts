@@ -130,7 +130,16 @@ import {
   type RawNode,
   type StableDataRecord,
 } from "./outputs.js";
-import { EVIDENCE_SCALE, type Context, type Unit } from "./adapter.js";
+import {
+  EVIDENCE_SCALE,
+  type AuthoredUnit,
+  type ChannelAdapter,
+  type Context,
+  type FileAdapter,
+  type OpaqueAdapter,
+  type Source,
+  type Unit,
+} from "./adapter.js";
 
 // ─────────────────────────────── Maquinaria ──────────────────────────────────
 
@@ -291,7 +300,7 @@ type Inhabited<
  * cuenta las dos cosas por separado, para que «ninguna usa el default» tampoco quede
  * sostenido por esta frase.
  *
- * CENSO(numbers.mjs): 12 llamadas a NotAssignableTo, 12 con mensaje propio
+ * CENSO(numbers.mjs): 14 llamadas a NotAssignableTo, 14 con mensaje propio
  *
  * Son `_S1`–`_S8`, `_GuardFires`, `_IllegalPairStaysIllegal`, `_FrameRequired` y
  * `_FingerprintIsBranded`. Los invariantes 10 y 11 usan `FitsIn` y no este operador.
@@ -814,6 +823,96 @@ type _EvidenceScaleOrder = True<
 >;
 
 export type EVIDENCE_PROOFS = readonly [_EvidenceScaleOrder];
+
+// ════ Invariante 12 · el adaptador de canal no puede entrar al concurso ══════
+// Nace en el paso 5, y las cuatro pruebas de acá son las cuatro frases que hasta
+// ayer eran prosa en `adapter.ts`.
+//
+// La frase que gobierna todo el paso es «la cintura no tiene forma de documento»
+// (§{Orden}), y el chat es su caso testigo: no tiene extensión, ni bytes que
+// sondear, ni un documento del que heredar la autoría. Hasta el paso 4 eso se
+// resolvía haciendo que el chat fabricara una sonda con cinco campos vacíos y
+// ganara el concurso por origen. Fabricar la sonda TIPA IGUAL DE BIEN que traerla
+// de un archivo, así que esa era una garantía de peldaño 5: un booleano en runtime
+// que nadie lee.
+//
+// Las cuatro se assertean POR SEPARADO y ninguna se intersecta: `true & {error}`
+// sigue siendo asignable a `true`, que es la regla del encabezado de este archivo.
+
+/** Error si `K` es OPCIONAL en `T`. `Required` es lo único que lo distingue. */
+type RequiredKey<T, K extends keyof T, Message extends string> = Pick<T, K> extends Required<
+  Pick<T, K>
+>
+  ? true
+  : { "IR-ERR": [Message, K, T] };
+
+// (a) Un adaptador de canal NO es un adaptador de archivo — le falta `evidence`, y
+// `opaqueOf` (la única puerta al registro) pide un `FileAdapter`.
+//
+// LAS DOS INSTANCIAS COMPARTEN `S` Y `E` A PROPÓSITO. Con `ChannelAdapter<Sig,
+// string>` la prueba también se pondría verde, pero por el desfase de la ENTRADA —
+// acreditando que `string` no es `Source`, que no es lo que esta línea afirma. Con
+// `Source` en los dos lados, la ÚNICA diferencia que queda es `evidence`, y si
+// alguien se la agrega a `ChannelAdapter` esta prueba se cae. El retorno más
+// angosto de `decompose` (`AuthoredUnit` en vez de `Unit`) no interfiere: los
+// retornos son covariantes, así que no bloquea la asignación por su cuenta.
+type _ChannelIsNotSelectable = True<
+  NotAssignableTo<
+    ChannelAdapter<Record<string, never>, Source>,
+    FileAdapter<Record<string, never>>,
+    "a ChannelAdapter became assignable to FileAdapter — it can now enter the registry and compete for bytes it was never meant to read"
+  >
+>;
+
+// (b) La unidad de un adaptador de ARCHIVO no puede llevar autoría. `RawNode` es lo
+// que se cachea por `hashBytes` cruzando organizaciones (§{Caché}), así que una
+// autoría escrita acá o se propaga al tenant equivocado o —lo que de hecho pasaba—
+// se cae en `opaqueOf` sin un aviso.
+type _UnitHasNoAuthorship = True<
+  WithoutKey<
+    Unit<unknown>,
+    "ownAuthorship",
+    "Unit carries authorship again — a file adapter can now write into the tree that is cached across organizations, and opaqueOf drops it silently"
+  >
+>;
+
+// (c) La del adaptador de CANAL sí, y OBLIGATORIA. Con `?` el adaptador compila sin
+// ella y la corrida atribuye cada mensaje a quien lo mandó por MCP en vez de a quien
+// lo dijo — que es la mitad del valor de la memoria (§{Tramo 3 › Qué sale}).
+type _AuthoredUnitRequiresAuthorship = True<
+  RequiredKey<
+    AuthoredUnit<unknown>,
+    "ownAuthorship",
+    "AuthoredUnit.ownAuthorship became optional — a channel adapter can now forget it, and every message gets attributed to whoever invoked the MCP tool"
+  >
+>;
+
+// (d) P14, en sus dos mitades. La entrada del registro NO es `unknown` —esa es la
+// que se rompió y hay que verla romperse— y ADEMÁS es `Source`. Separadas porque la
+// primera sola se quedaría verde si alguien la cambiara a `Uint8Array`, y la segunda
+// sola es vacua si `Source` colapsara.
+type _RegistryInputIsNotUnknown = True<
+  NotAssignableTo<
+    unknown,
+    Parameters<OpaqueAdapter["recognize"]>[0],
+    "OpaqueAdapter.recognize takes unknown again — recognize(42, ctx) compiles, and P14 is back open at every call site"
+  >
+>;
+type _RegistryInputIsSource = True<
+  FitsIn<
+    Parameters<OpaqueAdapter["recognize"]>[0],
+    Source,
+    "OpaqueAdapter.recognize stopped taking a Source — the registry is heterogeneous again and the type no longer says what an adapter reads"
+  >
+>;
+
+export type CHANNEL_PROOFS = readonly [
+  _ChannelIsNotSelectable,
+  _UnitHasNoAuthorship,
+  _AuthoredUnitRequiresAuthorship,
+  _RegistryInputIsNotUnknown,
+  _RegistryInputIsSource,
+];
 
 // ─────────────────────────────── Invariantes de runtime ──────────────────────
 

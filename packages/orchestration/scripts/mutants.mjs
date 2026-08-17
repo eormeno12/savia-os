@@ -104,7 +104,7 @@ const MUTANTES = [
     // como estaba y `ubicar()` rechazó la fila. Ahora muta SOLO el `return`, que es lo que
     // esta garantía toca: el aviso lo acredita S82 y la sonda fría S81, por separado.
     cambios: [[
-      `    return { ...EMPTY, sink, achievedLevel: "plain_text", adapter: null, onHold: cold };\n  }`,
+      `    return { onHold: cold };\n  }`,
       `    throw new Error("ORCHESTRATION-ERR: no adapter claimed these bytes");\n  }`,
     ]],
     espera: /I5 · sin adaptador, la ingesta no lanza/,
@@ -160,7 +160,7 @@ const MUTANTES = [
     id: "S70",
     garantía: "la autoría que se estampa es la que pidió el llamador",
     rompe: "la atribución: todo documento aparece subido por la misma persona",
-    cambios: [[`        actor: asActorId(options.actor),`, `        actor: asActorId("usuario-sintetico"),`]],
+    cambios: [[`          actor: asActorId(intake.actor),`, `          actor: asActorId("usuario-sintetico"),`]],
     espera: /I9 · …y la autoría sí viaja con el nodo/,
     nota:
       "es la mitad que impide que «la autoría no entra en la huella» lo cumpla una autoría que no " +
@@ -175,8 +175,8 @@ const MUTANTES = [
     garantía: "lo que queda en espera lleva CON QUÉ reintentarlo",
     rompe: "el reprocesamiento: el día que llegue el adaptador hay que barrer el corpus entero",
     cambios: [[
-      `    return { ...EMPTY, sink, achievedLevel: "plain_text", adapter: null, onHold: cold };`,
-      `    return { ...EMPTY, sink, achievedLevel: "plain_text", adapter: null, onHold: null };`,
+      `      onHold: recognized.onHold,`,
+      `      onHold: null,`,
     ]],
     espera: /I11 · lo que queda en espera lleva con qué reintentarlo/,
     nota:
@@ -209,8 +209,8 @@ const MUTANTES = [
     garantía: "el nivel alcanzado del piso llega HASTA LA SALIDA",
     rompe: "la degradación deja de ser visible: el `.conf` se recupera igual que el `.md`",
     cambios: [[
-      `    achievedLevel: selection.achievedLevel,\n    adapter: selection.adapter.id,\n    onHold: null,`,
-      `    achievedLevel: "structured",\n    adapter: selection.adapter.id,\n    onHold: null,`,
+      `    achievedLevel: selection.achievedLevel,\n    adapter: selection.adapter.id,`,
+      `    achievedLevel: "structured",\n    adapter: selection.adapter.id,`,
     ]],
     espera: /I10 · …y DICE que entró degradado/,
     nota:
@@ -225,18 +225,18 @@ const MUTANTES = [
     id: "S84",
     garantía: "«en espera» y «leído» no se confunden",
     rompe: "el barrido futuro: documentos ya indexados vuelven a la cola que ningún adaptador va a arreglar",
-    cambios: [[
-      `    achievedLevel: selection.achievedLevel,\n    adapter: selection.adapter.id,\n    onHold: null,\n  };\n};`,
-      `    achievedLevel: selection.achievedLevel,\n    adapter: selection.adapter.id,\n    onHold: cold,\n  };\n};`,
-    ]],
-    espera: /I1 · golden bytes→árbol/,
+    cambios: [[`      readonly onHold: null;`, `      readonly onHold: ColdProbe | null;`]],
+    espera: /the read variant of Recognized can carry a cold probe again/,
     nota:
       "el par de S81, y va al revés: aquella BORRA la sonda de un documento en espera, esta se la pone " +
       "a uno que se indexó perfecto. Son dos estados con destinos distintos —uno se reintenta cuando " +
       "llega un adaptador nuevo, el otro no— y confundirlos hace crecer la cola con documentos que ya " +
-      "están en el índice. Es la única fila del bloque que muta el golden, y por eso es la única que lo " +
-      "espera: el campo `enEspera` está en el snapshot justamente para que borrarlo o llenarlo de más " +
-      "sea un acto visible",
+      "están en el índice. LA GARANTÍA SUBIÓ DE PELDAÑO EN EL PASO 5 y la fila cambió con ella: hasta " +
+      "acá mutaba la SALIDA y la esperaba el golden, y con `Recognized` partida en dos variantes esa " +
+      "mutación dejó de compilar —se midió: `TS1117` por el campo duplicado y tres `TS2339` porque " +
+      "ensanchar `onHold` rompe el discriminante—. Un mutante que muere en el compilador acredita al " +
+      "compilador y no al contrato (la lección de M12c), así que ahora muta el TIPO y la espera " +
+      "`RECOGNIZED_PROOFS`. Hacer inexpresable lo que antes se detectaba es el objetivo, no un efecto",
   },
 
   // ── R2, el borde de dependencias y la composición ──────────────────────────
@@ -277,8 +277,8 @@ const MUTANTES = [
     garantía: "…y tampoco un GLOBAL de node",
     rompe: "la lista blanca de imports, que sigue diciendo la verdad mientras el paquete ya usa node",
     cambios: [[
-      `  const source = sourceOfBytes(bytes);`,
-      `  const source = sourceOfBytes(Buffer.from(bytes));`,
+      `  const source = sourceOfBytes(intake.bytes);`,
+      `  const source = sourceOfBytes(Buffer.from(intake.bytes));`,
     ]],
     espera: /usa el global de node `Buffer`/,
     nota:
@@ -375,6 +375,70 @@ const MUTANTES = [
       "mutua no lo cubre: protege dos corridas sobre el MISMO árbol y acá son dos distintos. La fila " +
       "muta un archivo de la RAÍZ y no del paquete, y eso es deliberado — el hecho es del repo y el " +
       "único que puede acreditarlo es el que lo sufre",
+  },
+
+  // ── Paso 5 · la cintura no tiene forma de documento (I12) ───────────────────
+  // Las tres mutan el camino del MENSAJE, y las tres son la misma equivocación: tratarlo
+  // como si fuera el camino de los bytes. Es el error que la puerta única vuelve fácil, y
+  // por eso el paso trajo I12 en el mismo commit que la puerta.
+  {
+    id: "S85",
+    garantía: "la autoría de un mensaje sale del mensaje, no de quien invocó",
+    rompe: "«esto lo dijo el CFO en marzo», que es la mitad del valor de la memoria",
+    cambios: [[
+      `          actor: asActorId(ownAuthorship.actor),`,
+      `          actor: asActorId("mcp-agent"),`,
+    ]],
+    espera: /I12 · la autoría de un mensaje es la del mensaje/,
+    nota:
+      "es la copia del camino de archivo, que es la mutación PLAUSIBLE: ahí la autoría es del " +
+      "documento y vale para las mil unidades, y el reflejo es estamparla igual acá. Un mensaje no " +
+      "tiene documento del que heredarla, así que lo que queda estampado es el agente que la mandó " +
+      "por MCP. El defecto no rompe nada visible —la corrida sale completa, con sus fragmentos y sus " +
+      "huellas— y solo se nota preguntándole a la memoria quién dijo qué",
+  },
+  {
+    id: "S86",
+    garantía: "un mensaje lo lee un adaptador dedicado, no el piso",
+    rompe: "la métrica de degradación, que pasa a contar como degradado lo que no lo está",
+    cambios: [[`    achievedLevel: "structured",`, `    achievedLevel: "plain_text",`]],
+    espera: /I12 · un mensaje recorre la espina entera/,
+    nota:
+      "el otro reflejo del camino de archivo: el chat se ABSTIENE de clasificar, así que se parece a " +
+      "un documento que cayó al piso. No es lo mismo — al piso se cae cuando nadie supo leer los " +
+      "bytes, y acá el adaptador es dedicado y lo trajo quien invocó. Con `plain_text` la métrica de " +
+      "§{Observabilidad} reporta degradado todo lo que entra por MCP, que es el canal del que el " +
+      "producto más espera",
+  },
+  {
+    id: "S87",
+    garantía: "la atribución cruda del mensaje sobrevive hasta el nodo",
+    rompe: "la citación de un chat, que se queda sin a dónde apuntar",
+    cambios: [[`          source: ownAuthorship.source,`, `          source: "upload",`]],
+    espera: /I12 · la atribución cruda del mensaje sobrevive/,
+    nota:
+      "`'upload'` es la constante LITERAL del camino de archivo doce líneas más arriba, así que esta " +
+      "es la mutación de copiar y pegar. `Authorship.source` es «la atribución cruda tal como venía» " +
+      "y para un mensaje es lo único que permite volver al hilo original. Es la fila que distingue " +
+      "«la autoría llegó» de «la autoría llegó ENTERA»: S85 sigue verde con esta mutación puesta, " +
+      "porque el actor y el instante están bien y lo que se perdió es de dónde salió",
+  },
+
+  {
+    id: "S88",
+    garantía: "una corrida que alguien SÍ leyó y de la que no salió nada tampoco se va en silencio",
+    rompe: "el invariante «ninguna información se descarta en silencio», que pasa a cumplirse por no haber nada escrito",
+    cambios: [[`  if (nodes.length === ZERO) {`, `  if (nodes.length < ZERO) {`]],
+    espera: /I13 · una corrida leída y vacía avisa/,
+    nota:
+      "el hueco lo DESTAPÓ el paso 5 y no lo introdujo: estaba desde el paso 3, en el otro extremo del " +
+      "camino que el paso 4 arregló. Allá nadie sabía leer los bytes y quedaba `on_hold`; acá un " +
+      "adaptador dedicado los leyó y devolvió cero unidades, y la corrida salía idéntica a un documento " +
+      "vacío de verdad. Con un `.docx` casi nunca pasa; con una herramienta MCP mandar una afirmación " +
+      "vacía no cuesta nada, así que el canal nuevo lo volvió alcanzable. La mutación es `<` en vez de " +
+      "`===`, que es la que un typo produce de verdad y deja la condición muerta sin tocar el aviso: " +
+      "borrar el bloque entero dejaría `ZERO` huérfano y mataría la corrida con TS6133, acreditando al " +
+      "linter (la lección de M12c)",
   },
 
   // ── El diario de deshacer del propio arnés ─────────────────────────────────
@@ -474,7 +538,7 @@ const MUTANTES = [
     id: "SC16",
     control: true,
     garantía: "reordenar dos exports del barril no rompe nada",
-    cambios: [[`  type IngestOptions,\n  type Run,`, `  type Run,\n  type IngestOptions,`]],
+    cambios: [[`  type Intake,\n  type IngestOptions,`, `  type IngestOptions,\n  type Intake,`]],
     nota: "el barril es una lista, no un contrato de orden",
   },
   {

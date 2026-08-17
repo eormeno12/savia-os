@@ -243,9 +243,14 @@ export {
   type CancellationSignal,
   type Context,
   type Unit,
+  type AuthoredUnit,
+  type RawAuthorship,
+  type AuthoredRawNode,
   type Source,
   type CascadeLink,
   type Adapter,
+  type FileAdapter,
+  type ChannelAdapter,
   type OpaqueAdapter,
   MAGIC_BYTES,
 } from "./adapter.js";
@@ -263,5 +268,6 @@ export {
   type CERTAINTY_PROOFS,
   type RECURSION_PROOFS,
   type EVIDENCE_PROOFS,
+  type CHANNEL_PROOFS,
   isNode,
 } from "./invariants.js";

@@ -39,6 +39,7 @@ import { group, emit } from "@savia-os/emission";
 import {
   coldProbeOf,
   probeOf,
+  recognizeMessage,
   select,
   sourceOfBytes,
   type Registry,
@@ -52,6 +53,8 @@ import {
   type AdapterId,
   type Budget,
   type CancellationSignal,
+  type Channel,
+  type ChannelAdapter,
   type ColdProbe,
   type Context,
   type Degradation,
@@ -128,9 +131,75 @@ export type Run = {
   readonly onHold: ColdProbe | null;
 };
 
+/**
+ * LO QUE LLEGÓ. Una puerta, dos formas de entrar, y de la línea siguiente en adelante
+ * el pipeline no vuelve a preguntar cuál fue.
+ *
+ * ES LA DECISIÓN DEL PASO 5, y la que el plan predijo que dolería: hasta acá la
+ * espina dorsal era `ingest(bytes)`, o sea que la firma de la función TENÍA FORMA DE
+ * DOCUMENTO mientras el diseño afirmaba que la cintura no la tiene. Un mensaje de
+ * chat no tiene bytes, ni extensión, ni sonda; llega por una herramienta MCP.
+ *
+ * LAS TRES SALIDAS QUE SE DESCARTARON, porque la rama existe en las tres y lo único
+ * que cambia es dónde:
+ *
+ *   · Serializar el chat a bytes canónicos. El plan ya la rechaza (PROVISIONAL(C9)
+ *     de `ir`): hay que inventar ese formato, entra en `hashBytes`, en la clave del
+ *     caché y en el dedupe de blobs, y «las diez líneas de §{Chat} dejan de ser
+ *     diez».
+ *   · Fabricarle una sonda degenerada y hacerlo ganar el concurso por origen, que es
+ *     lo que §{Chat} escribe. Funciona, y esconde la rama adentro de un constructor
+ *     que inventa cinco datos falsos —`size` en bytes sobre un texto, `magicBytes`
+ *     vacíos—. Una sonda fabricada TIPA IGUAL DE BIEN que una traída de un archivo:
+ *     es una garantía de peldaño 5, un booleano en runtime que nadie lee.
+ *   · Dos entradas, `ingest(bytes)` e `ingestMessage(msg)`. Eso es literalmente «un
+ *     procesador de archivos con un chat pegado al costado», que es la frase que
+ *     §{Chat} usa para describir el fracaso.
+ *
+ * EL PAR (ADAPTADOR, ENTRADA) LO CHEQUEA EL COMPILADOR. La variante `message` lleva
+ * el adaptador YA TIPADO, así que `E` se infiere de él y la entrada se verifica
+ * contra ese mismo `E`. No hay borrado, no hay `unknown`, no hay búsqueda por id que
+ * pueda devolver el adaptador equivocado. En la variante `bytes` los dos parámetros
+ * quedan sin usar y TypeScript los infiere `unknown`, que es lo correcto: ahí quien
+ * elige el adaptador es el selector y no quien llama.
+ *
+ * `channel` SIGUE SIENDO LIBRE EN LA VARIANTE `bytes`, y eso es un rescate y no un
+ * descuido: `{kind:'bytes', channel:'chat'}` es un PDF que alguien soltó en la
+ * conversación, y es un archivo, y pasa por el selector como cualquier otro. El canal
+ * chat y el adaptador chat son dos cosas distintas; mientras el chat competía por la
+ * sonda se escribían igual y `Origin` documentaba la colisión como un costo asumido.
+ */
+export type Intake<S, E> =
+  | {
+      readonly kind: "bytes";
+      readonly bytes: Uint8Array;
+      readonly name: string | null;
+      readonly channel: Channel;
+      /**
+       * QUIÉN SUBIÓ Y CUÁNDO, y por eso viven acá y no en `IngestOptions`: son un
+       * hecho de ESTA entrada, no del entorno. La variante `message` no los lleva
+       * porque no los necesita — cada mensaje trae su autoría adentro, y tomarla de
+       * quien invocó la herramienta MCP sería atribuirle al agente lo que dijo una
+       * persona.
+       */
+      readonly actor: string;
+      /**
+       * EL INSTANTE, POR PARÁMETRO Y NO POR RELOJ. Es lo que hace posible el golden:
+       * un snapshot no puede contener la hora a la que se corrió. Y es la razón de
+       * que `RawNode` no lleve autoría y de que el envoltorio la estampe fuera del
+       * adaptador (PROVISIONAL(#22/C8) de `ir`). Vale igual para `ownAuthorship.when`
+       * de un mensaje, que tampoco lo pone un reloj: lo trae la afirmación.
+       */
+      readonly when: string;
+    }
+  | {
+      readonly kind: "message";
+      readonly adapter: ChannelAdapter<S, E>;
+      readonly input: E;
+    };
+
 export type IngestOptions = {
   readonly registry: Registry;
-  readonly name: string | null;
   readonly sha256: HashFn;
   /**
    * `PARAMETERS.grouping.targetSizeChars` es `Pending<number>` y hoy vale `null`, así
@@ -140,13 +209,6 @@ export type IngestOptions = {
    * este parámetro.
    */
   readonly targetSizeChars: number;
-  /**
-   * El instante de la autoría, POR PARÁMETRO. Es lo que hace posible el golden: un
-   * snapshot no puede contener un reloj. Y es la razón de que `RawNode` no lleve
-   * autoría y de que el envoltorio la estampe acá (PROVISIONAL(#22/C8) de `ir`).
-   */
-  readonly when: string;
-  readonly actor: string;
   readonly budget?: Budget;
 };
 
@@ -223,12 +285,66 @@ export const contextOf = (limits: Budget): { ctx: Context; sink: Sink } => {
 
 const EMPTY = { nodes: [], fragments: [], records: [] } as const;
 
-export const ingest = async (bytes: Uint8Array, options: IngestOptions): Promise<Run> => {
-  const source = sourceOfBytes(bytes);
-  const cold = coldProbeOf(bytes, options.name);
-  const probe = probeOf(cold, { kind: "channel", channel: "frontend" }, source);
-  const selection = await select(options.registry, probe);
-  const { ctx, sink } = contextOf(options.budget ?? NO_BUDGET);
+/**
+ * Lo que las DOS entradas producen, y a partir de acá no hay dos caminos.
+ *
+ * El `on_hold` no es una falla y no es un rechazo: es «todavía no lo soportamos». Y
+ * solo lo puede producir la variante `bytes` — un mensaje siempre tiene su adaptador,
+ * porque quien lo invocó lo trajo.
+ */
+type Recognized =
+  | {
+      readonly onHold: null;
+      readonly nodes: readonly Node[];
+      readonly achievedLevel: AchievedLevel;
+      readonly adapter: AdapterId;
+    }
+  | { readonly onHold: ColdProbe };
+
+/**
+ * «EN ESPERA» Y «LEÍDO» NO SE CONFUNDEN, y desde el paso 5 lo dice el TIPO.
+ *
+ * Hasta acá era una garantía de runtime: el campo `enEspera` estaba en el golden
+ * justamente para que llenarlo de más fuera un acto visible, y el mutante S84 lo
+ * acreditaba poniéndole una sonda fría a un documento que se había indexado perfecto.
+ * Con `Recognized` partida en dos variantes esa mutación DEJÓ DE SER ESCRIBIBLE —el
+ * compilador la rechaza por dos lados a la vez: la variante en espera no admite los
+ * otros campos, y ensanchar `onHold` rompe el discriminante que estrecha el resto—, así
+ * que la fila pasó a acreditar esta aserción en vez de un diff de snapshot.
+ *
+ * Son dos estados con destinos distintos: uno se reintenta el día que llega un adaptador
+ * nuevo, el otro no. Confundirlos hace crecer la cola de reprocesamiento con documentos
+ * que ya están en el índice y que ningún adaptador nuevo va a arreglar.
+ *
+ * El valor de fallo es un OBJETO y nunca `never`, por la misma razón que en `ir`: `never`
+ * es asignable a todo, así que una aserción que falla hacia `never` no puede fallar.
+ */
+type True<T extends true> = T;
+export type RECOGNIZED_PROOFS = True<
+  Extract<Recognized, { readonly adapter: AdapterId }>["onHold"] extends null
+    ? true
+    : {
+        "ORCHESTRATION-ERR": "the read variant of Recognized can carry a cold probe again — a document that WAS read can be queued for reprocessing, and the sweep grows with documents already in the index";
+      }
+>;
+
+/**
+ * TRAMO 2 + 3 POR EL LADO DE LOS BYTES: sonda, selector, y la autoría del documento.
+ *
+ * LA AUTORÍA SE ESTAMPA ACÁ Y NO EN EL ADAPTADOR. El caché de reconocimiento se
+ * indexa por `hashBytes` y cruza organizaciones POR DISEÑO (§{Caché}), y la autoría es
+ * por documento y por tenant: si viajara adentro del árbol cacheado, el primer subidor
+ * quedaría como autor del mismo archivo en otro tenant (PROVISIONAL(#22/C8)).
+ */
+const recognizedOfBytes = async (
+  intake: Extract<Intake<unknown, unknown>, { kind: "bytes" }>,
+  registry: Registry,
+  ctx: Context,
+): Promise<Recognized> => {
+  const source = sourceOfBytes(intake.bytes);
+  const cold = coldProbeOf(intake.bytes, intake.name);
+  const probe = probeOf(cold, { kind: "channel", channel: intake.channel }, source);
+  const selection = await select(registry, probe);
 
   // `null` es un resultado LEGÍTIMO y no un error disfrazado: ningún adaptador —ni el
   // piso de texto— puede leer estos bytes. El documento queda `on_hold`; no se pierde,
@@ -248,25 +364,116 @@ export const ingest = async (bytes: Uint8Array, options: IngestOptions): Promise
       `no adapter claimed these bytes: extension ${JSON.stringify(cold.extension)}, ` +
         `${cold.size} bytes, detected format ${JSON.stringify(cold.detectedFormat)}`,
     );
-    return { ...EMPTY, sink, achievedLevel: "plain_text", adapter: null, onHold: cold };
+    return { onHold: cold };
   }
 
   const raw = await selection.adapter.recognize(source, ctx);
+  return {
+    onHold: null,
+    nodes: raw.map((n) =>
+      asNode({
+        ...n,
+        authorship: {
+          actor: asActorId(intake.actor),
+          when: asInstant(intake.when),
+          source: "upload",
+        },
+      }),
+    ),
+    achievedLevel: selection.achievedLevel,
+    adapter: selection.adapter.id,
+  };
+};
 
-  // LA AUTORÍA SE ESTAMPA ACÁ Y NO EN EL ADAPTADOR. El caché de reconocimiento se
-  // indexa por `hashBytes` y cruza organizaciones POR DISEÑO (§{Caché}), y la autoría
-  // es por documento y por tenant: si viajara adentro del árbol cacheado, el primer
-  // subidor quedaría como autor del mismo archivo en otro tenant (PROVISIONAL(#22/C8)).
-  const nodes: readonly Node[] = raw.map((n) =>
-    asNode({
-      ...n,
-      authorship: {
-        actor: asActorId(options.actor),
-        when: asInstant(options.when),
-        source: "upload",
-      },
-    }),
-  );
+/**
+ * TRAMO 3 POR EL LADO DEL MENSAJE. No hay tramo 2, y esa ausencia es la decisión.
+ *
+ * NO ES UN ATAJO: es que no hay pregunta que hacer. El selector responde «¿quién sabe
+ * leer estos bytes?», que solo tiene sentido bajo incertidumbre de formato, y acá
+ * quien invoca trajo el adaptador. Hacerlo pasar igual obligaría a fabricarle una
+ * sonda con cinco campos que hablan de un archivo, y una sonda fabricada tipa igual de
+ * bien que una real.
+ *
+ * `achievedLevel: 'structured'` porque lo leyó un adaptador dedicado — la escala
+ * distingue eso de haber caído al piso de texto (§{Tramo 1 › El registro}), y un
+ * mensaje no cae al piso: nunca hubo bytes que nadie supiera leer.
+ *
+ * LA AUTORÍA VIENE DE CADA NODO Y NO DE QUIEN LLAMÓ, que es la otra mitad de la
+ * decisión. Es `AuthoredRawNode`: la trajo el adaptador pegada a la unidad, obligatoria
+ * por tipo, y acá solo se MARCA. Tomarla de quien invocó la herramienta MCP —que es lo
+ * que pasaría si el mensaje entrara por la puerta de los bytes— le atribuiría al agente
+ * lo que dijo una persona, y «esto lo dijo el CFO en marzo» es la mitad del valor de la
+ * memoria (§{Tramo 3 › Qué sale}).
+ */
+const recognizedOfMessage = async <S, E>(
+  intake: Extract<Intake<S, E>, { kind: "message" }>,
+  ctx: Context,
+): Promise<Recognized> => {
+  const raw = await recognizeMessage(intake.adapter, intake.input, ctx);
+  return {
+    onHold: null,
+    nodes: raw.map(({ ownAuthorship, ...n }) =>
+      asNode({
+        ...n,
+        authorship: {
+          actor: asActorId(ownAuthorship.actor),
+          when: asInstant(ownAuthorship.when),
+          source: ownAuthorship.source,
+        },
+      }),
+    ),
+    achievedLevel: "structured",
+    adapter: intake.adapter.id,
+  };
+};
+
+export const ingest = async <S, E>(
+  intake: Intake<S, E>,
+  options: IngestOptions,
+): Promise<Run> => {
+  const { ctx, sink } = contextOf(options.budget ?? NO_BUDGET);
+
+  // LA ÚNICA RAMA DE TODO EL ARCHIVO, y está acá arriba a propósito. De la línea
+  // siguiente en adelante no hay una sola pregunta sobre de dónde vino esto: emisión,
+  // agrupación, migas de pan y fragmentación son literalmente el mismo código para un
+  // `.docx` de doscientas páginas y para un mensaje de tres párrafos.
+  const recognized =
+    intake.kind === "message"
+      ? await recognizedOfMessage(intake, ctx)
+      : await recognizedOfBytes(intake, options.registry, ctx);
+
+  if (recognized.onHold !== null) {
+    return {
+      ...EMPTY,
+      sink,
+      achievedLevel: "plain_text",
+      adapter: null,
+      onHold: recognized.onHold,
+    };
+  }
+
+  const { nodes, achievedLevel, adapter } = recognized;
+
+  // ALGUIEN SUPO LEERLO Y NO SALIÓ NADA, y eso tampoco se va en silencio.
+  //
+  // Es el mismo defecto que el paso 4 le cerró a la rama de `on_hold`, en el otro
+  // extremo del camino: allá nadie sabía leer los bytes, acá un adaptador dedicado los
+  // leyó y devolvió cero unidades. Sin este aviso los dos casos salen EXACTAMENTE
+  // iguales que un documento vacío de verdad, y «ninguna información se descarta en
+  // silencio» (§{Invariantes}) lo cumple por no haber nada escrito — que es cumplirlo
+  // de la peor manera.
+  //
+  // LO ENCONTRÓ EL CHAT, y no es del chat. Un `.docx` del que el adaptador no saca nada
+  // hace lo mismo, pero casi nunca pasa; una herramienta MCP manda una afirmación vacía
+  // sin ningún esfuerzo, así que el canal nuevo volvió alcanzable un hueco que ya
+  // estaba. Va acá y no en la rama del mensaje, justamente porque no es de esa rama.
+  if (nodes.length === ZERO) {
+    ctx.diagnostics.notice(
+      "intake.empty",
+      null,
+      `adapter ${JSON.stringify(adapter)} claimed the input and produced no nodes`,
+    );
+  }
 
   const emission = emit(nodes, options.sha256);
   if (!emission.ok) {
@@ -280,12 +487,12 @@ export const ingest = async (bytes: Uint8Array, options: IngestOptions): Promise
     return {
       ...EMPTY,
       sink,
-      achievedLevel: selection.achievedLevel,
-      adapter: selection.adapter.id,
-      // NO va a `on_hold`: alguien SÍ supo leer estos bytes y lo que falló fue la
-      // emisión. Son dos estados con destinos distintos —uno se reintenta cuando llega
-      // un adaptador nuevo, el otro no— y confundirlos pondría a re-barrer un documento
-      // que ningún adaptador nuevo va a arreglar.
+      achievedLevel,
+      adapter,
+      // NO va a `on_hold`: alguien SÍ supo leer esto y lo que falló fue la emisión. Son
+      // dos estados con destinos distintos —uno se reintenta cuando llega un adaptador
+      // nuevo, el otro no— y confundirlos pondría a re-barrer un documento que ningún
+      // adaptador nuevo va a arreglar.
       onHold: null,
     };
   }
@@ -296,8 +503,8 @@ export const ingest = async (bytes: Uint8Array, options: IngestOptions): Promise
     fragments: grouped.fragments,
     records: grouped.records,
     sink,
-    achievedLevel: selection.achievedLevel,
-    adapter: selection.adapter.id,
+    achievedLevel,
+    adapter,
     onHold: null,
   };
 };

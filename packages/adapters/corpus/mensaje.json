@@ -1,0 +1,24 @@
+{
+  "author": {
+    "actor": "cfo@empresa",
+    "when": "2026-03-04T10:15:00.000Z",
+    "source": "hilo#814"
+  },
+  "paragraphs": [
+    {
+      "text": "La política de reembolsos cambia el primer lunes de cada trimestre.",
+      "marks": []
+    },
+    {
+      "text": "Los pedidos por encima de 5.000 los aprueba finanzas, no el equipo comercial.",
+      "marks": [
+        { "kind": "bold", "start": 32, "end": 48 },
+        { "kind": "link", "start": 50, "end": 58, "href": "https://intranet/finanzas" }
+      ]
+    },
+    {
+      "text": "Rige desde el cierre de este trimestre.",
+      "marks": []
+    }
+  ]
+}

@@ -5,9 +5,18 @@
  * (§{La única}) y la FÁBRICA DEL ADAPTADOR OPACO.
  *
  * Esa fábrica era una deuda nombrada del contrato: la corrección de
- * `OpaqueAdapter.recognize` en `ir/src/adapter.ts` dice, con todas las letras, «esa
- * fábrica NO EXISTE». Acá existe, y es lo único que puede confinar a UN sitio el
- * `unknown` que `recognize` recibe.
+ * `OpaqueAdapter.recognize` en `ir/src/adapter.ts` decía, con todas las letras, «esa
+ * fábrica NO EXISTE».
+ *
+ * Y LA SEGUNDA MITAD DE ESTE PÁRRAFO ERA FALSA hasta el paso 5. Decía que la fábrica
+ * es «lo único que puede confinar a UN sitio el `unknown` que `recognize` recibe», y
+ * `ir` ya tenía escrito por qué no: `unknown` en posición de PARÁMETRO no chequea
+ * nada, así que el agujero nunca estuvo acá sino en cada sitio de llamada. Lo cerró el
+ * paso 5, y no confinándolo: sacando al chat del registro. Ver `opaqueOf`.
+ *
+ * DESDE EL PASO 5 SON DOS COMPOSICIONES Y NO UNA, con el mismo cuerpo: `opaqueOf`
+ * para el que compite por bytes y `recognizeMessage` para el que nombra su canal. Que
+ * el cuerpo sea literalmente compartido (`recognizerOf`) es la prueba de §{Chat}.
  *
  * ESTE ARCHIVO NO IMPORTA `yaml`, Y ESO LO IMPONE EL GUARDIÁN. `adapters` es el único
  * paquete con dependencias de runtime, y la única que hay vive dentro del adaptador
@@ -27,10 +36,13 @@ import {
   roleFromBody,
   type AchievedLevel,
   type Adapter,
+  type AuthoredRawNode,
   type CascadeLink,
+  type ChannelAdapter,
   type Classification,
   type ColdProbe,
   type Context,
+  type FileAdapter,
   type OpaqueAdapter,
   type Origin,
   type Probe,
@@ -282,26 +294,81 @@ export const cascade =
  * ES LA ÚNICA FÁBRICA, y por eso el `as` de PENDING(H3) vive en un solo sitio. Sin
  * ella, `ir` documenta que el agujero está en CADA SITIO DE LLAMADA.
  */
-export const opaqueOf = <S, E>(a: Adapter<S, E>): OpaqueAdapter => ({
+const recognizerOf = <S, E>(
+  a: Adapter<S, E>,
+  units: readonly Unit<S>[],
+): ((u: Unit<S>) => RawNode) => {
+  const detect = a.detect(units);
+  return (u) => {
+    const r = detect(u) as Resolution | null;
+    return {
+      role: r === null ? roleFromBody(u.body) : r.role,
+      body: u.body,
+      location: { ...u.location, adapter: a.id, within: [] },
+      hint: r === null ? null : r.hint,
+      delegation: [],
+      attribution: r === null ? null : r.attribution,
+      level: r === null ? "physical" : r.level,
+      confidence: r === null ? null : r.confidence,
+    };
+  };
+};
+
+/**
+ * La composición para el adaptador que COMPITE POR BYTES, que es lo que entra al
+ * registro.
+ *
+ * `input` es una `Source` Y NO UN `unknown`, y eso cierra P14. El encabezado de este
+ * archivo decía que esta fábrica era «lo único que puede confinar a UN sitio el
+ * `unknown` que `recognize` recibe», y era falso por la razón que `ir` ya tenía
+ * escrita: `unknown` en posición de PARÁMETRO no chequea nada, así que el agujero no
+ * estaba acá sino en cada sitio de llamada. Lo que lo cerró no fue confinarlo: fue
+ * que el chat dejara de estar en el registro, con lo que ya no hay nada heterogéneo
+ * que borrar.
+ *
+ * PIDE UN `FileAdapter`, y ese es el único portón al registro. Un `ChannelAdapter` no
+ * tiene `evidence`, así que no es asignable y NO COMPILA acá — «un adaptador de canal
+ * no puede entrar al concurso» es un error de tipo y no una convención (invariante 12
+ * de `ir`, acreditado por M57 con MC10 de control).
+ */
+export const opaqueOf = <S,>(a: FileAdapter<S>): OpaqueAdapter => ({
   id: a.id,
   level: a.level,
   version: a.version,
   evidence: (probe) => a.evidence(probe),
-  recognize: async (input: unknown, ctx: Context): Promise<readonly RawNode[]> => {
-    const units = await a.decompose(input as E, ctx);
-    const detect = a.detect(units);
-    return units.map((u) => {
-      const r = detect(u) as Resolution | null;
-      return {
-        role: r === null ? roleFromBody(u.body) : r.role,
-        body: u.body,
-        location: { ...u.location, adapter: a.id, within: [] },
-        hint: r === null ? null : r.hint,
-        delegation: [],
-        attribution: r === null ? null : r.attribution,
-        level: r === null ? "physical" : r.level,
-        confidence: r === null ? null : r.confidence,
-      };
-    });
+  recognize: async (input: Source, ctx: Context): Promise<readonly RawNode[]> => {
+    const units = await a.decompose(input, ctx);
+    return units.map(recognizerOf(a, units));
   },
 });
+
+/**
+ * La composición para el adaptador que NOMBRA SU CANAL (§{Chat}).
+ *
+ * ES LA MISMA COMPOSICIÓN —`recognizerOf`, arriba, sin una rama de diferencia— y esa
+ * es la afirmación que el paso 5 existe para probar: «que el canal más distinto entre
+ * por la misma puerta es la evidencia más fuerte de que la descomposición es
+ * correcta» (§{Chat}). Un mensaje de chat recorre los mismos dos casilleros, la misma
+ * cascada, el mismo piso y las mismas seis formas que un `.docx`.
+ *
+ * LO ÚNICO QUE CAMBIA ES DE DÓNDE SALE LA AUTORÍA, y por eso no devuelve `RawNode`
+ * sino `AuthoredRawNode`. En un archivo la autoría es del documento y vale para las
+ * mil unidades; acá cada mensaje trae la suya y no hay documento del que heredarla.
+ * Viaja cruda —`ingest` la marca, igual que marca la del camino de archivo— porque
+ * acuñar no es trabajo de un adaptador.
+ *
+ * NO DEVUELVE UN ADAPTADOR OPACO, y no por asimetría: la opacidad existe para que el
+ * registro sea una colección homogénea de `S` distintos, y acá no hay colección. Quien
+ * llama trae el adaptador YA TIPADO, así que el par (adaptador, entrada) lo chequea el
+ * compilador en vez de perderse en un borrado.
+ */
+export const recognizeMessage = async <S, E>(
+  a: ChannelAdapter<S, E>,
+  input: E,
+  ctx: Context,
+): Promise<readonly AuthoredRawNode[]> => {
+  const units = await a.decompose(input, ctx);
+  const node = recognizerOf(a, units);
+  // Sin zip por índice: la autoría sale de LA MISMA unidad de la que sale el nodo.
+  return units.map((u) => ({ ...node(u), ownAuthorship: u.ownAuthorship }));
+};

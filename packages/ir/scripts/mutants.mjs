@@ -529,11 +529,11 @@ const MUTANTES = [
     id: "M50",
     garantía: "la cifra de llamadas a NotAssignableTo no se puede desincronizar del AST",
     cambios: [[
-      ` * CENSO(numbers.mjs): 12 llamadas a NotAssignableTo, 12 con mensaje propio`,
+      ` * CENSO(numbers.mjs): 14 llamadas a NotAssignableTo, 14 con mensaje propio`,
       ` * CENSO(numbers.mjs): 9 llamadas a NotAssignableTo, 9 con mensaje propio`,
     ]],
     espera: /the NotAssignableTo census published by invariants\.ts does not match/,
-    nota: "es la cifra VIEJA, literal: el docstring decía «las nueve» hasta el bloque 3b, se recontó a mano y eran diez, y la MISMA frase seguía diciendo «las nueve pasan el suyo» dos párrafos más arriba — o sea que la corrección a mano arregló una de las dos apariciones y dejó la otra mintiendo. Escribir cualquiera de las dos de nuevo tiene que ser imposible. Es M9c/M48 aplicado al tercer censo del paquete",
+    nota: "es la cifra VIEJA, literal: el docstring decía «las nueve» hasta el bloque 3b, se recontó a mano y eran diez, y la MISMA frase seguía diciendo «las nueve pasan el suyo» dos párrafos más arriba — o sea que la corrección a mano arregló una de las dos apariciones y dejó la otra mintiendo. Escribir cualquiera de las dos de nuevo tiene que ser imposible. Es M9c/M48 aplicado al tercer censo del paquete. El ancla se reancló en el paso 5 (12→14, por el invariante 12): sin reanclarla el corredor falla RUIDOSO —«el texto a mutar aparece en 0 archivos»—, que es como tiene que fallar un mutante podrido y es exactamente como falló",
   },
   {
     id: "M51",
@@ -668,6 +668,57 @@ const MUTANTES = [
       "dos siguen. El error caro es ese, no el de negarse a arrancar",
   },
 
+  // ── Paso 5 · el adaptador de canal no puede entrar al concurso (invariante 12) ─
+  // Las cinco acreditan el corte que el paso 5 le hizo al contrato: `Adapter` se
+  // partió en `FileAdapter` (compite por bytes) y `ChannelAdapter` (lo nombra quien
+  // lo invoca), y `Unit` en `Unit` / `AuthoredUnit`. Antes del corte las cinco
+  // garantías eran frases de docstring, y una de ellas —la autoría de la unidad— era
+  // una frase FALSA: el campo existía, era opcional, y no lo leía nadie.
+  {
+    id: "M57",
+    garantía: "un adaptador de canal no es asignable a uno de archivo (no puede entrar al registro)",
+    cambios: [[
+      `export interface ChannelAdapter<S, E> extends Adapter<S, E> {`,
+      `export interface ChannelAdapter<S, E> extends Adapter<S, E> {\n  evidence(probe: Probe): Promise<Evidence>;`,
+    ]],
+    espera: /a ChannelAdapter became assignable to FileAdapter/,
+    nota: "se le agrega `evidence`, que es EXACTAMENTE el miembro que lo separa. `Probe` y `Evidence` viven en este mismo archivo, así que no hay TS2304 que mate la corrida antes del testigo (la lección de M12c). La aserción compara las dos interfaces con el MISMO `S` y el MISMO `E`: con `ChannelAdapter<_, string>` también se pondría verde, pero acreditando que `string` no es `Source` en vez de lo que esta fila afirma. Sin el testigo: NO ROMPÍA",
+  },
+  {
+    id: "M58",
+    garantía: "la unidad de un adaptador de ARCHIVO no puede llevar autoría",
+    cambios: [[`  readonly signals: S;`, `  readonly ownAuthorship?: { readonly actor: string };\n  readonly signals: S;`]],
+    espera: /Unit carries authorship again/,
+    nota: "misma ancla que M40 y MC8, y con eso las tres se leen juntas: en `Unit`, `id` es rojo (M40), `trace?` es verde (MC8) y `ownAuthorship?` es rojo. Se muta al campo OPCIONAL porque es la forma exacta que el tipo tenía hasta este paso — y su modo de falla no era un error de tipo sino un silencio: `opaqueOf` mapea `Unit → RawNode` con ocho campos, este no era uno, y la autoría que un adaptador escribiera desaparecía sin un aviso. Sin el testigo: NO ROMPÍA, y de hecho NO ROMPIÓ durante cuatro pasos",
+  },
+  {
+    id: "M59",
+    garantía: "la autoría de un adaptador de CANAL es obligatoria",
+    cambios: [[
+      `export type AuthoredUnit<S> = Unit<S> & {\n  readonly ownAuthorship: RawAuthorship;`,
+      `export type AuthoredUnit<S> = Unit<S> & {\n  readonly ownAuthorship?: RawAuthorship;`,
+    ]],
+    espera: /AuthoredUnit.ownAuthorship became optional/,
+    nota: "un signo de interrogación, y es la diferencia entre «cada mensaje trae su autor» y «cada mensaje trae su autor si el autor del adaptador se acordó». Con `?` la corrida compila y atribuye los mensajes a quien invocó la herramienta MCP en vez de a quien los dijo, que es la mitad del valor de la memoria (§{Tramo 3 › Qué sale}). Es la única fila de las cinco que `WithoutKey` no puede escribir: opcional y ausente son la misma clave, y solo `Required` las separa. Sin el testigo: NO ROMPÍA",
+  },
+  {
+    id: "M60",
+    garantía: "la entrada del registro no vuelve a ser `unknown` (P14)",
+    cambios: [[
+      `  recognize(input: Source, ctx: Context): Promise<readonly RawNode[]>;`,
+      `  recognize(input: unknown, ctx: Context): Promise<readonly RawNode[]>;`,
+    ]],
+    espera: /recognize takes unknown again/,
+    nota: "restituye P14 tal como estuvo hasta el paso 5. `unknown` en posición de PARÁMETRO no chequea nada, y eso estaba MEDIDO contra el compilador y no supuesto: `recognize(42, ctx)`, `recognize(null, ctx)`, una función y el mensaje de chat pasado al adaptador de `.docx` compilaban las cuatro. El paso 5 no lo arregló, le sacó la premisa —la heterogeneidad del registro ERA el chat—. Dispara las DOS mitades del invariante a la vez, y por eso hace falta M61",
+  },
+  {
+    id: "M61",
+    garantía: "la entrada del registro sigue siendo una `Source`, y no solo «algo que no es unknown»",
+    cambios: [[`  recognize(input: Source, ctx: Context)`, `  recognize(input: Uint8Array, ctx: Context)`]],
+    espera: /recognize stopped taking a Source/,
+    nota: "es lo que vuelve NO REDUNDANTE la segunda mitad de la aserción, y la razón por la que las dos se assertean por separado en vez de con `&`. `Uint8Array` no es `unknown`, así que `_RegistryInputIsNotUnknown` queda VERDE y solo se cae `_RegistryInputIsSource`: sin esta fila, M60 dejaría la mitad positiva sin acreditar y nadie notaría que el contrato pasó a exigir el archivo entero en memoria — que es justo lo que `Source` existe para no exigir (PROVISIONAL(C9/#8))",
+  },
+
   // ── Controles ──────────────────────────────────────────────────────────────
   {
     id: "DC1",
@@ -765,6 +816,16 @@ const MUTANTES = [
     garantía: "reordenar dos entradas de `COHESION_BY_ROLE` no rompe nada",
     cambios: [[`  heading: "lead",\n  subheading: "lead",`, `  subheading: "lead",\n  heading: "lead",`]],
     nota: "el par de M56: lo que `scripts/cohesion.mjs` fija es el MAPEO —qué devuelve la función donde la tabla tiene entrada— y no el orden en que las entradas están escritas. Sin el control, la propiedad nueva sería indistinguible de una que congela el literal, y congelar el literal es lo que `COHESION_PROOFS` ya hace para los tres atómicos",
+  },
+  {
+    id: "MC10",
+    control: true,
+    garantía: "agregarle a ChannelAdapter un miembro que NO es `evidence` no rompe nada",
+    cambios: [[
+      `export interface ChannelAdapter<S, E> extends Adapter<S, E> {`,
+      `export interface ChannelAdapter<S, E> extends Adapter<S, E> {\n  readonly channel?: string;`,
+    ]],
+    nota: "el par de M57, sobre la MISMA ancla: `evidence` es rojo, cualquier otro miembro es verde. `_ChannelIsNotSelectable` asevera la AUSENCIA de un miembro, no que la interfaz esté congelada — y esa diferencia es la que deja crecer el adaptador de canal sin tocar el invariante. Sin este control, la fila de arriba sería indistinguible de una que prohíbe extender el tipo",
   },
 ];
 

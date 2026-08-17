@@ -117,16 +117,26 @@ export type Evidence = number;
  * PROVISIONAL(#445): unión DISCRIMINADA en vez de
  * `'chat' | ... | AdapterId` (§{La sonda}) —
  * Si `AdapterId` es un `string`, la unión entera COLAPSA a `string` y los cuatro
- * literales no aportan nada al chequeo de tipos. Peor: el adaptador de chat tiene
- * `id: 'chat'` (§{Chat}), así que `porOrigen('chat', Evidence.Signature)` (§{Chat}) no
- * distingue «vino del canal chat» de «lo delegó el adaptador chat» — Si se decide
- * al revés, la ambigüedad queda y `Channel` sigue con dos grafías.
+ * literales no aportan nada al chequeo de tipos — Si se decide al revés, `Channel`
+ * sigue con dos grafías.
  *
- * NOTA APARTE: `porOrigen` devolviendo `Evidence.Signature` es un abuso del
- * vocabulario, porque `Signature` está definida como «firma inequívoca EN EL CONTENIDO»
- * (§{Evidencia}) y el origen no es contenido. O se lee `Signature` como «evidencia
- * inequívoca», o el sexto valor de la escala es incoherente. Lo dejo escrito, no lo
- * resuelvo.
+ * LA SEGUNDA MITAD DE ESTE PÁRRAFO YA NO APLICA, y el paso 5 la borró en vez de
+ * mitigarla. Decía: «el adaptador de chat tiene `id: 'chat'` (§{Chat}), así que
+ * `porOrigen('chat', Evidence.Signature)` (§{Chat}) no distingue “vino del canal
+ * chat” de “lo delegó el adaptador chat”». Era cierto MIENTRAS el chat compitiera
+ * por la sonda. Ya no compite: lo nombra quien lo invoca (`ChannelAdapter`), nadie
+ * lee el origen para identificarlo, y `porOrigen` no llegó a existir.
+ *
+ * Y lo que queda es la distinción que la ambigüedad tapaba: `{kind:'bytes',
+ * channel:'chat'}` es LEGAL Y CORRECTO —un PDF que alguien suelta en el chat es un
+ * archivo, y pasa por el selector como cualquier otro—. El canal chat y el adaptador
+ * chat son dos cosas, y ahora se escriben distinto.
+ *
+ * NOTA APARTE, que sigue viva porque es sobre la escala y no sobre el chat: leer
+ * `Evidence.Signature` como evidencia de ORIGEN sería un abuso del vocabulario —
+ * `Signature` está definida como «firma inequívoca EN EL CONTENIDO» (§{Evidencia}) y
+ * el origen no es contenido. Hoy nadie lo hace. El día que un adaptador quiera ganar
+ * por origen, esa es la decisión que hay que tomar antes.
  */
 export type Origin =
   | { readonly kind: "channel"; readonly channel: Channel }
@@ -460,12 +470,26 @@ export interface Context {
  * sabe que fue delegado. Va en `RawNode.delegation` (`outputs.ts`), puesto por el
  * orquestador.
  *
- * PROVISIONAL(#22): NO lleva `Authorship`, con UNA excepción opcional — El chat la
- * necesita de verdad (cada mensaje tiene su autor, §{Chat}) y ningún otro
- * adaptador. Ponerla obligatoria mete un timestamp en la salida de `decompose` de
- * los otros once y rompe el determinismo byte-idéntico y el caché entre
- * organizaciones — Si se decide al revés (obligatoria), C8 y #22 quedan sin
- * arreglo.
+ * NO LLEVA `Authorship`, Y YA NO HAY EXCEPCIÓN. La versión anterior tenía
+ * `ownAuthorship?` opcional acá, con este razonamiento: «el chat la necesita de
+ * verdad (cada mensaje tiene su autor, §{Chat}) y ningún otro adaptador; ponerla
+ * obligatoria mete un timestamp en la salida de `decompose` de los otros once y
+ * rompe el determinismo byte-idéntico y el caché entre organizaciones». Las dos
+ * mitades eran ciertas y la conclusión —un campo opcional para todos— era la peor
+ * de las tres salidas: el campo NO LO LEÍA NADIE. `opaqueOf` mapea `Unit → RawNode`
+ * con ocho campos y este no era uno, así que un adaptador podía escribir la autoría
+ * de cada unidad y verla desaparecer SIN UN AVISO. Un `grep -rn ownAuthorship
+ * packages/` daba la declaración y dos menciones en prosa: cero lecturas.
+ *
+ * Y no se arreglaba agregándolo a `RawNode`, que es EXACTAMENTE lo que se cachea por
+ * `hashBytes` cruzando organizaciones (PROVISIONAL(#22/C8) en `outputs.ts`) — la
+ * razón por la que `Authorship` se sacó de ahí en primer lugar.
+ *
+ * Lo que lo resuelve es que la premisa no es universal: un MENSAJE NO TIENE BYTES,
+ * así que no entra al caché, y la razón que expulsa la autoría del árbol no aplica a
+ * su camino. La distinción es de TIPO y no de campo — `AuthoredUnit`, abajo—, con lo
+ * que los dos costos desaparecen a la vez: los once de archivo no pueden escribirla
+ * (el tipo no la tiene) y el de canal no puede olvidarla (es obligatoria).
  */
 export type Unit<S> = {
   /** Específico del formato — MUERE acá. */
@@ -473,8 +497,57 @@ export type Unit<S> = {
   /** Una de las seis formas — CRUZA el borde. */
   readonly body: Body;
   readonly location: LocalLocation;
-  /** Solo donde varía genuinamente dentro de un documento: chat, `.eml`, hilos. */
-  readonly ownAuthorship?: { readonly actor: string; readonly when: string };
+};
+
+/**
+ * La unidad de un adaptador de CANAL: la misma, más su propia autoría, OBLIGATORIA.
+ *
+ * Es la mitad de `ChannelAdapter` que `FileAdapter` no puede expresar. Un mensaje de
+ * chat tiene autor propio y el documento que lo contiene no existe: no hay «quién
+ * subió el archivo» del que heredarla (§{Chat}). Un `.docx` es al revés —la autoría
+ * es del documento y vale para las mil unidades—, y por eso `Unit` no la lleva.
+ *
+ * OBLIGATORIA Y NO OPCIONAL, y eso es lo único que la vuelve confiable: con `?` el
+ * adaptador de canal compila sin ella y la corrida entera atribuye los mensajes a
+ * quien los mandó por MCP en vez de a quien los dijo. «Esto lo dijo el CFO en marzo»
+ * es la mitad del valor de la memoria (§{Tramo 3 › Qué sale}), y un campo opcional lo
+ * deja a criterio de cada autor.
+ *
+ * STRINGS CRUDOS, no `ActorId`/`Instant`: el marcado lo pone la composición, igual
+ * que `ingest` hace `asActorId(options.actor)` en el camino de archivo. Un adaptador
+ * no acuña identidad (H13(a), `MINTING_PROOFS`).
+ */
+export type AuthoredUnit<S> = Unit<S> & {
+  readonly ownAuthorship: RawAuthorship;
+};
+
+/**
+ * Autoría SIN MARCAR, tal como la escribe un adaptador.
+ *
+ * Tiene nombre propio porque aparece en dos tipos —`AuthoredUnit`, que entra, y
+ * `AuthoredRawNode`, que sale— y sin él las dos declaraciones se copian y derivan.
+ * `Authorship` (`provenance.ts`) es la versión marcada, y el salto de una a la otra
+ * es de `orchestration`: es el mismo `asActorId(options.actor)` que el camino de
+ * archivo ya hacía, y la razón es la misma —acuñar no es trabajo del adaptador.
+ */
+export type RawAuthorship = {
+  readonly actor: string;
+  readonly when: string;
+  /** Atribución cruda, tal como venía. Alimenta `Authorship.source`. */
+  readonly source: string;
+};
+
+/**
+ * Lo que sale de componer un `ChannelAdapter`: un `RawNode` que trae su autoría
+ * pegada, todavía cruda.
+ *
+ * Es el reflejo exacto de `AuthoredUnit` del otro lado de la composición, y existe
+ * por la misma razón que `RawNode` no lleva `Authorship`: acá la autoría NO es
+ * contexto del documento —no hay documento— sino CONTENIDO del mensaje. Viaja
+ * pegada al nodo hasta que `ingest` la marca, y no un campo antes.
+ */
+export type AuthoredRawNode = RawNode & {
+  readonly ownAuthorship: RawAuthorship;
 };
 
 /**
@@ -584,24 +657,65 @@ export type CascadeLink<S> = {
  * `porProminencia`, que evolucionan por separado) se compone desde las versiones de
  * los eslabones más la propia.
  */
-export interface Adapter<S, E = Source> {
+export interface Adapter<S, E> {
   readonly id: AdapterId;
   /** El escalón de la escalera en el que trabaja. Alimenta `certaintyOfLevel`. */
   readonly level: RecognitionLevel;
   readonly version: string;
-  evidence(probe: Probe): Promise<Evidence>;
   decompose(input: E, ctx: Context): Promise<readonly Unit<S>[]>;
   detect(units: readonly Unit<S>[]): (u: Unit<S>) => Classification | null;
 }
 
 /**
- * El adaptador con `S` y `E` BORRADOS, que es lo que guarda el registro y lo que
- * devuelve `seleccionar`.
+ * El adaptador que COMPITE POR BYTES: los dos casilleros más `evidence`, y la
+ * entrada fijada en `Source`.
+ *
+ * `evidence` es lo que lo vuelve SELECCIONABLE, y por eso vive acá y no en
+ * `Adapter`. El selector no es un trámite por el que todo pasa: es la respuesta a
+ * «¿quién sabe leer estos bytes?», una pregunta que solo tiene sentido cuando hay
+ * incertidumbre sobre el formato. Once adaptadores la tienen. El chat no
+ * (§{Chat}): llega sabiendo cuál es su adaptador, porque lo invocó una herramienta
+ * MCP que ya lo sabía.
+ *
+ * Y la entrada fijada en `Source` es lo que vuelve HOMOGÉNEO al registro, que es de
+ * donde sale el cierre de P14 — ver `OpaqueAdapter.recognize`.
+ */
+export interface FileAdapter<S> extends Adapter<S, Source> {
+  evidence(probe: Probe): Promise<Evidence>;
+}
+
+/**
+ * El adaptador que NOMBRA UN CANAL: los dos casilleros, la entrada libre, y unidades
+ * con autoría propia.
+ *
+ * SE DEFINE POR LO QUE NO TIENE. Sin `evidence` no es asignable a `FileAdapter`, así
+ * que `opaqueOf` —la única puerta al registro— lo RECHAZA EN COMPILACIÓN. «Un
+ * adaptador de canal no puede entrar al concurso» deja de ser una frase de este
+ * comentario y pasa a ser un error de tipo.
+ *
+ * El recíproco NO se prohíbe, y es deliberado: un `FileAdapter` es un `Adapter<S,
+ * Source>` y se puede invocar directo, sin selección, cuando quien llama YA sabe el
+ * formato. Eso es un conector que conoce lo que descarga, no un agujero — lo único
+ * que se saltea es una pregunta cuya respuesta ya tenía.
+ *
+ * `decompose` DEVUELVE `AuthoredUnit<S>`, que es un retorno más angosto que el de
+ * `Adapter` y por lo tanto legal. Es la otra mitad de la distinción: sin bytes no hay
+ * caché, sin caché no hay razón para expulsar la autoría, y sin documento no hay de
+ * quién heredarla.
+ */
+export interface ChannelAdapter<S, E> extends Adapter<S, E> {
+  decompose(input: E, ctx: Context): Promise<readonly AuthoredUnit<S>[]>;
+}
+
+/**
+ * El adaptador con `S` BORRADO —y solo `S`—, que es lo que guarda el registro y lo
+ * que devuelve `select`.
  *
  * PROVISIONAL(§{El selector}): dos tipos, no uno — `Adapter` se declara genérico
  * en `S` (§{Dos casilleros}) y se usa SIN argumento en la firma del selector
- * (§{El selector}), y el registro es una colección heterogénea: el `S` de `.docx`
- * (con `styleId`) y el del chat (`{}`, §{Chat}) son distintos. Peor: `S` aparece a
+ * (§{El selector}), y el registro es una colección heterogénea EN `S`: el del
+ * `.docx` (con `styleId`) y el del `.md` (con el nivel del encabezado) son
+ * distintos. Peor: `S` aparece a
  * la vez en posición de retorno (`decompose`) y de parámetro (`detect`), así
  * que `Adapter<S>` es INVARIANTE en `S` y no existe supertipo común no trivial.
  * Con `Adapter<unknown>` el registro no compila; con `Adapter<any>` compila y
@@ -625,26 +739,30 @@ export interface OpaqueAdapter {
   readonly version: string;
   evidence(probe: Probe): Promise<Evidence>;
   /**
-   * PROVISIONAL(C9): `unknown` DELIBERADO, Y NO ESTÁ CONFINADO — Es el `E` borrado.
-   * El registro es heterogéneo por construcción (un `.docx` recibe una `Source`, el
-   * chat recibe un mensaje) y no hay tipo común.
+   * `Source`, Y ESTO CIERRA P14. Solo `S` se borra; `E` no, porque ya no varía.
    *
-   * CORRECCIÓN: la versión anterior decía «el cast queda confinado a UN solo punto
-   * del sistema: la fábrica que construye el adaptador opaco». Las dos mitades son
-   * falsas. Esa fábrica NO EXISTE. Y el agujero no estaría en ella aunque
-   * existiera: `unknown` en posición de PARÁMETRO no chequea nada. Verificado con
-   * el compilador — `recognize(42, ctx)`, `recognize(null, ctx)`, una función, o el
-   * mensaje de chat pasado al adaptador de `.docx`: las cuatro compilan sin un
-   * error. El agujero está en CADA SITIO DE LLAMADA.
+   * La versión anterior recibía `unknown`, declarado como hueco con este argumento:
+   * «el registro es heterogéneo por construcción (un `.docx` recibe una `Source`, el
+   * chat recibe un mensaje) y no hay tipo común», y con esta constatación —medida
+   * contra el compilador, no supuesta—: `recognize(42, ctx)`, `recognize(null,
+   * ctx)`, una función, o el mensaje de chat pasado al adaptador de `.docx`, LAS
+   * CUATRO COMPILABAN. `unknown` en posición de PARÁMETRO no chequea nada, así que
+   * el agujero no estaba confinado a ninguna fábrica: estaba en CADA SITIO DE
+   * LLAMADA.
    *
-   * POR QUÉ SIGUE ACÁ, y no es pereza. Ligar la entrada en `Selection` lo cierra y
-   * ROMPE EL GATE DE CI: «un adaptador que no pasa el property test no entra al
-   * registro», y a una `Selection` solo se llega desde `seleccionar`, que itera el
-   * registro. El test pasaría a ejercitar un sosías construido por el arnés en vez
-   * del artefacto que el registro guarda — y sobre ese gate descansa toda la
-   * validez del caché. Queda declarado como hueco (P14), no disfrazado de garantía.
+   * El paso 5 no lo arregló: le sacó la premisa. La heterogeneidad del registro ERA
+   * EL CHAT, y el chat ya no está en el registro —lo nombra su canal, no lo elige un
+   * concurso (`ChannelAdapter`)—. Los que quedan reciben todos una `Source`, así que
+   * hay tipo común y las cuatro llamadas de arriba son cuatro errores.
+   *
+   * Y NO ROMPE EL GATE DE CI, que era la razón por la que el hueco seguía abierto:
+   * ligar la entrada en `Selection` sí lo rompía —«un adaptador que no pasa el
+   * property test no entra al registro», y a una `Selection` solo se llega desde
+   * `select`, que itera el registro—, pero acá se liga en el ELEMENTO DEL REGISTRO,
+   * que es justo donde el gate vive. El test sigue ejercitando el artefacto que el
+   * registro guarda y no un sosías del arnés.
    */
-  recognize(input: unknown, ctx: Context): Promise<readonly RawNode[]>;
+  recognize(input: Source, ctx: Context): Promise<readonly RawNode[]>;
 }
 
 /** El tamaño de la ventana de la sonda, para quien la construya. */

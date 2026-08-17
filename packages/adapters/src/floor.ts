@@ -73,7 +73,7 @@ import {
   Evidence,
   PARAMETERS,
   asAdapterId,
-  type Adapter,
+  type FileAdapter,
   type Classification,
   type Context,
   type Source,
@@ -203,7 +203,7 @@ const blocksOfText = (text: string): readonly Block[] => {
  */
 export const textFloorAdapter = (
   minPrintableProportion: number,
-): Adapter<FloorSignals, Source> => ({
+): FileAdapter<FloorSignals> => ({
   id: TEXT_FLOOR_ID,
   level: "physical",
   version: "1",

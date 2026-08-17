@@ -92,6 +92,7 @@ try {
   const { contextOf, ingest } = await import(pathToFileURL(join(destino, "index.js")).href);
   const {
     TEXT_FLOOR_ID,
+    chatAdapter,
     coldProbeOf,
     markdownAdapter,
     opaqueOf,
@@ -113,18 +114,27 @@ try {
   const REGISTRO = registryOf([opaqueOf(markdownAdapter)]);
   const OPCIONES = {
     registry: REGISTRO,
-    name: "manual.md",
     sha256,
     // 60 y no otro número, y hay que decir qué es: es UN PARÁMETRO DEL BANCO, no del
     // producto. `PARAMETERS.grouping.targetSizeChars` sigue en `null` con su plan de
     // medición escrito, y 60 está elegido para que el corte por tamaño ocurra sobre un
     // corpus chico. Va dicho para que nadie lo lea como una medición.
     targetSizeChars: 60,
-    when: "2026-08-16T00:00:00.000Z",
-    actor: "usuario-sintetico",
   };
 
-  const corrida = await ingest(bytes, OPCIONES);
+  // La variante `bytes` de `Intake`, que desde el paso 5 lleva lo que era del entorno y
+  // resultó ser de ESTA entrada: el nombre, el canal, quién subió y cuándo.
+  const SUBIDA = (b, extra = {}) => ({
+    kind: "bytes",
+    bytes: b,
+    name: "manual.md",
+    channel: "frontend",
+    when: "2026-08-16T00:00:00.000Z",
+    actor: "usuario-sintetico",
+    ...extra,
+  });
+
+  const corrida = await ingest(SUBIDA(bytes), OPCIONES);
   const anclaDe = (local) =>
     local === null ? null : corrida.nodes.find((n) => n.local === local)?.location.anchor ?? "?";
 
@@ -185,7 +195,7 @@ try {
 
   // ── I2 · DETERMINISMO: DOS CORRIDAS BYTE-IDÉNTICAS ────────────────────────
   {
-    const otra = await ingest(bytes, OPCIONES);
+    const otra = await ingest(SUBIDA(bytes), OPCIONES);
     if (!igual(otra, corrida)) {
       fallar(
         "I2 · determinismo",
@@ -287,7 +297,7 @@ try {
       evidence: () => Promise.resolve(Evidence.None),
       recognize: () => Promise.resolve([]),
     };
-    const r = await ingest(bytes, { ...OPCIONES, registry: registryOf([mudo]) }).catch(
+    const r = await ingest(SUBIDA(bytes), { ...OPCIONES, registry: registryOf([mudo]) }).catch(
       (e) => ({ tiró: String(e) }),
     );
     if (r.tiró !== undefined) {
@@ -330,7 +340,7 @@ try {
           },
         ]),
     };
-    const r = await ingest(bytes, { ...OPCIONES, registry: registryOf([colgante]) }).catch(
+    const r = await ingest(SUBIDA(bytes), { ...OPCIONES, registry: registryOf([colgante]) }).catch(
       (e) => ({ tiró: String(e) }),
     );
     const códigos = r.sink?.notices.map((n) => n.code) ?? [];
@@ -398,7 +408,7 @@ try {
   // que no cambia nada no es un parámetro pendiente de medición, es código muerto — y
   // dejarlo escrito como pendiente sería inventar una medición que nadie va a hacer.
   {
-    const grande = await ingest(bytes, { ...OPCIONES, targetSizeChars: 100000 });
+    const grande = await ingest(SUBIDA(bytes), { ...OPCIONES, targetSizeChars: 100000 });
     if (grande.fragments.length >= corrida.fragments.length) {
       fallar(
         "I8 · el tamaño objetivo decide dónde corta",
@@ -413,11 +423,10 @@ try {
   // cruza organizaciones POR DISEÑO. Si la autoría moviera la huella, el mismo archivo
   // subido por dos personas sería dos contenidos distintos y el caché no serviría nunca.
   {
-    const otroAutor = await ingest(bytes, {
-      ...OPCIONES,
-      when: "2030-01-01T00:00:00.000Z",
-      actor: "otra-persona",
-    });
+    const otroAutor = await ingest(
+      SUBIDA(bytes, { when: "2030-01-01T00:00:00.000Z", actor: "otra-persona" }),
+      OPCIONES,
+    );
     const huellas = corrida.nodes.map((n) => n.hash);
     const otras = otroAutor.nodes.map((n) => n.hash);
     if (!igual(huellas, otras)) {
@@ -450,7 +459,7 @@ try {
   // exactamente igual que uno completo es el defecto: quien consume la memoria no puede
   // saber que lo que está leyendo perdió su estructura.
   {
-    const r = await ingest(conf, { ...OPCIONES, name: "servidor.conf", registry: CON_PISO });
+    const r = await ingest(SUBIDA(conf, { name: "servidor.conf" }), { ...OPCIONES, registry: CON_PISO });
     if (r.adapter !== TEXT_FLOOR_ID || r.nodes.length === 0 || r.fragments.length === 0) {
       fallar(
         "I10 · un archivo que ningún adaptador reclama entra igual",
@@ -476,7 +485,7 @@ try {
     }
     // El piso en el registro NO le roba el archivo al dedicado, y el golden lo prueba
     // sin repetirse: la corrida del `.md` con el piso puesto tiene que ser IDÉNTICA.
-    const conPiso = await ingest(bytes, { ...OPCIONES, registry: CON_PISO });
+    const conPiso = await ingest(SUBIDA(bytes), { ...OPCIONES, registry: CON_PISO });
     if (!igual(conPiso, corrida)) {
       fallar(
         "I10 · agregar el piso al registro no mueve al `.md`",
@@ -493,7 +502,7 @@ try {
   // llegue el adaptador. `on_hold` no es «rechazado», es «todavía no lo soportamos».
   {
     const antes = JSON.stringify(png);
-    const r = await ingest(png, { ...OPCIONES, name: "sello.png", registry: CON_PISO }).catch(
+    const r = await ingest(SUBIDA(png, { name: "sello.png" }), { ...OPCIONES, registry: CON_PISO }).catch(
       (e) => ({ tiró: String(e) }),
     );
     if (r.tiró !== undefined) {
@@ -544,9 +553,8 @@ try {
         Promise.resolve(p.extension === "png" ? Evidence.Signature : Evidence.None),
       recognize: () => Promise.resolve([]),
     };
-    const reintento = await ingest(png, {
+    const reintento = await ingest(SUBIDA(png, { name: "sello.png" }), {
       ...OPCIONES,
-      name: "sello.png",
       registry: registryOf([...CON_PISO, imagenSintética]),
     });
     if (reintento.adapter !== "imagen-sintetica" || reintento.onHold !== null) {
@@ -558,13 +566,165 @@ try {
     }
   }
 
+  // ── I12 · LA CINTURA NO TIENE FORMA DE DOCUMENTO ──────────────────────────
+  // Es el invariante por el que existe el paso 5, y el plan lo dice sin vueltas:
+  // «que el canal más distinto entre por la misma puerta es la evidencia más fuerte de
+  // que la descomposición es correcta» (§{Chat}). Hasta acá era una afirmación sobre
+  // el diseño; estas tres mitades la vuelven una medición.
+  //
+  // Un mensaje no tiene extensión, ni bytes que sondear, ni un documento del que
+  // heredar la autoría, y llega por una herramienta MCP en vez de por una subida. Si
+  // aguas abajo hiciera falta UNA excepción, la cintura tendría forma de documento.
+  {
+    const párrafos = [
+      "La política de reembolsos cambia el primer lunes de cada trimestre.",
+      "El CFO la aprueba antes de publicarla.",
+    ];
+    const AUTOR = {
+      actor: "cfo@empresa",
+      when: "2026-03-04T10:15:00.000Z",
+      source: "hilo#814",
+    };
+    const mensaje = await ingest(
+      {
+        kind: "message",
+        adapter: chatAdapter,
+        input: { author: AUTOR, paragraphs: párrafos.map((t) => ({ text: t, marks: [] })) },
+      },
+      OPCIONES,
+    );
+
+    // (a) El mensaje recorre TODO: emisión, migas, huellas, fragmentación. Si alguno de
+    // los tramos de abajo tuviera una precondición de documento, se caería acá.
+    if (
+      mensaje.adapter !== "chat" ||
+      mensaje.onHold !== null ||
+      mensaje.achievedLevel !== "structured" ||
+      mensaje.nodes.length !== párrafos.length ||
+      mensaje.fragments.length === 0
+    ) {
+      fallar(
+        "I12 · un mensaje recorre la espina entera",
+        `adapter=${JSON.stringify(mensaje.adapter)} nodos=${mensaje.nodes.length} fragmentos=${mensaje.fragments.length} nivel=${JSON.stringify(mensaje.achievedLevel)} onHold=${mensaje.onHold === null ? "null" : "presente"}`,
+        "el chat es el canal que más tensiona la abstracción y por eso el plan lo pone en el paso 5 y no en el 10: «descubrirlo roto en el paso 5 cuesta un día; en el 10, la arquitectura». Si un mensaje necesitara una rama propia en emisión o agrupación, la cintura tendría forma de documento",
+      );
+    }
+
+    // (b) LA AUTORÍA SALE DEL MENSAJE, no de quien invocó. Es la mitad que fallaría en
+    // silencio: `OPCIONES` ya no lleva `actor`, así que si la autoría se tomara del
+    // llamador sería `undefined` y no un valor equivocado — pero con la puerta de los
+    // bytes reutilizada sería el agente de MCP, y todo lo dicho en marzo por el CFO
+    // quedaría atribuido a quien lo mandó.
+    if (!mensaje.nodes.every((n) => n.authorship.actor === AUTOR.actor)) {
+      fallar(
+        "I12 · la autoría de un mensaje es la del mensaje",
+        `los actores fueron ${JSON.stringify([...new Set(mensaje.nodes.map((n) => n.authorship.actor))])}`,
+        "«esto lo dijo el CFO en marzo» es la mitad del valor de la memoria (§{Tramo 3 › Qué sale}). Un mensaje no tiene documento del que heredar la autoría, y tomarla de quien invocó la herramienta MCP le atribuye al agente lo que dijo una persona",
+      );
+    }
+    if (!mensaje.nodes.every((n) => n.authorship.source === AUTOR.source)) {
+      fallar(
+        "I12 · la atribución cruda del mensaje sobrevive",
+        `las fuentes fueron ${JSON.stringify([...new Set(mensaje.nodes.map((n) => n.authorship.source))])}`,
+        "`Authorship.source` es «la atribución cruda tal como venía», y para un mensaje es lo único que permite volver al hilo original. En el camino de archivo es la constante `'upload'`; si el mensaje también la trajera constante, la citación de un chat no tendría a dónde apuntar",
+      );
+    }
+
+    // (c) LA MEDICIÓN, y es la fila que de verdad vale: EL MISMO TEXTO POR LOS DOS
+    // CANALES DA LAS MISMAS HUELLAS. La huella se calcula sobre el CUERPO —ni la
+    // ubicación, ni la autoría, ni el adaptador entran en la preimagen—, así que dos
+    // `text_span` con el mismo texto son el mismo contenido para todo lo que viene
+    // después: caché, deduplicación, embeddings y reconciliación.
+    //
+    // Es «doce formatos convergen en seis formas» dejando de ser una frase sobre tipos
+    // y pasando a ser una igualdad entre dos hexadecimales.
+    const comoArchivo = await ingest(
+      SUBIDA(new TextEncoder().encode(`${párrafos.join("\n\n")}\n`), { name: "nota.md" }),
+      OPCIONES,
+    );
+    const huellasDelChat = mensaje.nodes.map((n) => n.hash);
+    const huellasDelMd = comoArchivo.nodes.map((n) => n.hash);
+    if (!igual(huellasDelChat, huellasDelMd)) {
+      fallar(
+        "I12 · el mismo texto por los dos canales tiene la misma huella",
+        `chat=${JSON.stringify(huellasDelChat)}\n        md  =${JSON.stringify(huellasDelMd)}`,
+        "es la cintura MEDIDA en vez de afirmada. Si un `.md` y un chat con el mismo texto dieran huellas distintas, el formato estaría filtrándose adentro de la identidad del contenido — y con él a la clave del caché, al dedupe de blobs y a la reconciliación del paso 11, que es exactamente lo que la representación intermedia existe para impedir",
+      );
+    }
+  }
+
+  // ── I13 · LEÍDO Y VACÍO TAMPOCO SE VA EN SILENCIO ─────────────────────────
+  // El otro extremo de I11. Allá NADIE supo leer los bytes y queda `on_hold`; acá un
+  // adaptador dedicado SÍ los leyó y devolvió cero unidades. Sin aviso, los dos casos
+  // salen idénticos a un documento vacío de verdad, y «ninguna información se descarta
+  // en silencio» (§{Invariantes}) se cumple por no haber nada escrito.
+  //
+  // LO DESTAPÓ EL CHAT Y NO ES DEL CHAT: un `.docx` del que el adaptador no saca nada
+  // hace lo mismo, pero casi nunca pasa. Una herramienta MCP manda una afirmación vacía
+  // sin ningún esfuerzo, así que el canal nuevo volvió alcanzable un hueco que estaba
+  // desde el paso 3. Por eso el aviso vive en `ingest` y no en la rama del mensaje, y
+  // por eso esta fila lo ejercita por las DOS puertas.
+  {
+    const vacío = await ingest(
+      {
+        kind: "message",
+        adapter: chatAdapter,
+        input: {
+          author: { actor: "a", when: "2026-01-01T00:00:00.000Z", source: "s" },
+          paragraphs: [],
+        },
+      },
+      OPCIONES,
+    );
+    if (!vacío.sink.notices.some((n) => n.code === "intake.empty")) {
+      fallar(
+        "I13 · una corrida leída y vacía avisa",
+        `los avisos fueron ${JSON.stringify(vacío.sink.notices.map((n) => n.code))}`,
+        "es el mismo defecto que el paso 4 le cerró a la rama de `on_hold`, en el otro extremo del camino. Una afirmación vacía mandada por MCP sale exactamente igual que una que el pipeline procesó bien y de la que no había nada que sacar: quien invocó la herramienta no tiene cómo saber que lo que mandó no entró",
+      );
+    }
+    if (vacío.onHold !== null) {
+      fallar(
+        "I13 · leído y vacío NO es «en espera»",
+        "una corrida vacía quedó marcada para reprocesar",
+        "`on_hold` significa «todavía no lo soportamos» y se REINTENTA cuando llega un adaptador nuevo. Un mensaje vacío no lo va a arreglar ningún adaptador: confundirlos hace crecer la cola con entradas que nunca van a producir nada",
+      );
+    }
+
+    // Y POR LA PUERTA DE LOS BYTES, que es de donde el hueco venía. Un adaptador que
+    // gana el archivo y no saca nada tiene que avisar igual.
+    const {
+      registry: _r,
+      ...sinRegistro
+    } = OPCIONES;
+    const mudoQueGana = {
+      id: asAdapterId("gana-y-no-produce"),
+      level: "declarative",
+      version: "1",
+      evidence: () => Promise.resolve(Evidence.Signature),
+      recognize: () => Promise.resolve([]),
+    };
+    const porBytes = await ingest(SUBIDA(bytes), {
+      ...sinRegistro,
+      registry: registryOf([mudoQueGana]),
+    });
+    if (!porBytes.sink.notices.some((n) => n.code === "intake.empty")) {
+      fallar(
+        "I13 · …y también por la puerta de los bytes",
+        `los avisos fueron ${JSON.stringify(porBytes.sink.notices.map((n) => n.code))}`,
+        "si el aviso viviera en la rama del mensaje, el hueco original —un adaptador dedicado que gana el archivo y devuelve cero unidades— seguiría abierto, y es el que estuvo abierto desde el paso 3. Las dos mitades hacen falta o la fila la satisface un aviso puesto en el lugar equivocado",
+      );
+    }
+  }
+
   if (fallas > 0) process.exit(1);
 
   console.log(
     `invariantes ok (I1 golden bytes→árbol · I2 determinismo · I3 frontmatter hermano · ` +
       `I4 satélite y su imagen · I5 sin adaptador no se pierde · I6 emisión fallida reportada · ` +
       `I7 delegación de profundidad cero · I8 el tamaño objetivo decide · I9 la autoría fuera de la huella · ` +
-      `I10 degradación real y visible · I11 guardar incondicional, indexar no)\n` +
+      `I10 degradación real y visible · I11 guardar incondicional, indexar no · ` +
+      `I12 la cintura no tiene forma de documento · I13 leído y vacío avisa)\n` +
       `           ${corrida.nodes.length} nodos · ${corrida.fragments.length} fragmentos · ` +
       `${corrida.records.length} registros · ${corrida.sink.notices.length} avisos`,
   );

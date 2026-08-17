@@ -35,7 +35,7 @@ import {
   asAdapterId,
   asLocalId,
   asObjectKey,
-  type Adapter,
+  type FileAdapter,
   type Body,
   type CascadeLink,
   type Cell,
@@ -659,7 +659,7 @@ const byNearbyItalic = <S extends MdSignals,>(): CascadeLink<S> => ({
 
 // ─────────────────────────────── El adaptador ────────────────────────────────
 
-export const markdownAdapter: Adapter<MdSignals, Source> = {
+export const markdownAdapter: FileAdapter<MdSignals> = {
   id: MARKDOWN_ID,
   level: "declarative",
   version: "1",

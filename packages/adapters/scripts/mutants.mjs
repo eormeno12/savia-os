@@ -419,7 +419,7 @@ const MUTANTES = [
     garantía: "el piso físico es de nivel `physical`",
     rompe: "la certeza que llega a la skill: lo que respondió la forma se declara leído del formato",
     cambios: [[
-      `        level: r === null ? "physical" : r.level,`,
+      `      level: r === null ? "physical" : r.level,`,
       `        level: r === null ? "declarative" : r.level,`,
     ]],
     espera: /I5 · el piso es de nivel `physical`/,
@@ -433,7 +433,7 @@ const MUTANTES = [
     garantía: "`attribution: null` significa «lo resolvió el piso», y nadie más lo escribe",
     rompe: "la observabilidad: el 100 % del documento aparece resuelto por un eslabón que no lo tocó",
     cambios: [[
-      `        attribution: r === null ? null : r.attribution,`,
+      `      attribution: r === null ? null : r.attribution,`,
       `        attribution: r === null ? "byMarkdownBlock" : r.attribution,`,
     ]],
     espera: /I5 · el piso físico responde/,
@@ -543,8 +543,8 @@ const MUTANTES = [
     garantía: "el piso se ABSTIENE siempre: no inventa estructura donde no hay formato",
     rompe: "la métrica de atribución — un clasificador aparece resolviendo lo que nadie miró",
     cambios: [[
-      `  detect: () => (): Classification | null => null,`,
-      `  detect: () => (): Classification | null => ({ role: "paragraph", hint: null }),`,
+      `  detect: () => (): Classification | null => null,\n});`,
+      `  detect: () => (): Classification | null => ({ role: "paragraph", hint: null }),\n});`,
     ]],
     espera: /I17 · todo nodo del piso lo resolvió el piso físico/,
     nota:
@@ -731,6 +731,80 @@ const MUTANTES = [
       "tocarlo tiene que ser un acto visible, con el golden regenerado en el mismo commit",
   },
 
+  // ── Paso 5 · el chat entra por la misma puerta (I18) ────────────────────────
+  {
+    id: "S45",
+    garantía: "el chat produce `text_span` y no envuelve el mensaje en otra forma",
+    rompe: "la igualdad de huellas entre canales, que es la cintura MEDIDA",
+    cambios: [[
+      `body: { shape: "text_span", text: p.text, marks: p.marks },`,
+      `body: { shape: "verbatim", text: p.text },`,
+    ]],
+    espera: /I18 · el chat produce un `text_span` por párrafo/,
+    nota:
+      "`verbatim` es la mutación PLAUSIBLE y no una inventada: un mensaje de chat se parece a texto " +
+      "preformateado, y la diferencia real —¿se puede reflowear, o los espacios son significativos?— " +
+      "es justo la que el fragmentador consulta. La huella se calcula sobre el CUERPO, así que con " +
+      "esta forma el mismo texto por dos canales pasa a ser dos contenidos distintos para el caché, " +
+      "el dedupe de blobs y la reconciliación del paso 11. Es la mitad local de I12 de `orchestration`",
+  },
+  {
+    id: "S46",
+    garantía: "el chat SE ABSTIENE: quien clasifica un mensaje es el piso físico",
+    rompe: "el rol, el nivel y la atribución de todo mensaje",
+    cambios: [[
+      `  detect: () => (): Classification | null => null,\n};`,
+      `  detect: () => (): Classification | null => ({ role: "heading", hint: { linkage: "none" } }),\n};`,
+    ]],
+    espera: /I18 · el chat se abstiene y responde el piso físico/,
+    nota:
+      "el plan lo anota en la misma línea del adaptador —«se abstiene: el piso responde 'parrafo'» " +
+      "(§{Chat})— y sin testigo esa línea es prosa. Una cascada acá inventaría títulos a partir de " +
+      "mensajes cortos y los estamparía como si la conversación los hubiera declarado; peor, un " +
+      "`heading` cambia la cohesión a `lead` y pasa a ABRIR fragmento, así que el defecto no se queda " +
+      "en una etiqueta: reparte todos los mensajes siguientes en otro fragmento",
+  },
+  {
+    id: "S47",
+    garantía: "la autoría del mensaje llega a cada nodo",
+    rompe: "«esto lo dijo el CFO en marzo», que es la mitad del valor de la memoria",
+    cambios: [[`          ownAuthorship: input.author,`, `          ownAuthorship: { actor: "", when: "", source: "" },`]],
+    espera: /I18 · cada nodo del mensaje trae su autoría/,
+    nota:
+      "es el modo de falla que este paso ENCONTRÓ y que estuvo cuatro pasos en silencio: `ownAuthorship` " +
+      "existía en `Unit` como campo opcional, no lo leía nadie, y `opaqueOf` mapeaba `Unit → RawNode` " +
+      "sin él. Un adaptador podía escribir la autoría de cada unidad y verla desaparecer sin un aviso. " +
+      "Se muta a strings vacíos y no se borra el campo: borrarlo daría un error de TIPO —`AuthoredUnit` " +
+      "lo exige— y acreditaría al compilador en vez del guardián, que es la lección de M12c",
+  },
+
+  {
+    id: "S48",
+    garantía: "el corpus del chat es versionado y su salida está congelada",
+    rompe: "el golden del mensaje — a propósito: cambiar el corpus es cambiar la prueba",
+    cambios: [[`{ "kind": "bold", "start": 32, "end": 48 }`, `{ "kind": "italic", "start": 32, "end": 48 }`]],
+    espera: /I18 · golden mensaje→nodos/,
+    nota:
+      "muta una MARCA y no el texto, y ahí está el punto: `marks` no se renderiza en `Fragment.text`, " +
+      "así que contra un golden de fragmentos esta edición pasaría en verde. El golden del chat trae el " +
+      "cuerpo ENTERO por la misma razón que el del `.md`, y esta fila es la que lo mide. Que el chat " +
+      "propague las marcas sin tocarlas es además media prueba de §{Chat}: el adaptador no interpreta " +
+      "nada, solo traduce",
+  },
+  {
+    id: "S49",
+    garantía: "el golden del chat no se puede editar para que el código pase",
+    rompe: "la única comparación del chat contra algo externo al código",
+    cambios: [[`      "anchor": "msg#1",`, `      "anchor": "msg#uno",`]],
+    espera: /I18 · golden mensaje→nodos/,
+    nota:
+      "el par de S48 y va al revés: aquella mueve la ENTRADA, esta la EXPECTATIVA. Las otras tres " +
+      "mitades de I18 verifican propiedades —forma, abstención, autoría— y una salida puede cumplir las " +
+      "tres y ser la equivocada; el golden es lo único que la ata a algo escrito afuera. Se regenera con " +
+      "`ADAPTERS_REGEN=1` y ningún script del `package.json` lo pasa: regenerar es un comando que " +
+      "alguien escribe a mano y que aparece en el diff",
+  },
+
   // ── El diario de deshacer del propio arnés ─────────────────────────────────
   // LAS TRES FILAS QUE NO VIENEN DEL PLAN, y las únicas que llevan EL MISMO ID EN LOS
   // CUATRO PAQUETES: acreditan la MISMA garantía sobre cuatro copias autónomas del mismo
@@ -894,10 +968,18 @@ const ARCHIVOS = [
   // `.png` es binario, así que una mutación textual sobre él no es escribible. Que estén
   // en disco lo exige `boundaries.mjs`, que es donde corresponde.
   "src/floor.ts",
+  // Entra en el paso 5 con S45-S47. Es el adaptador que prueba que la cintura no tiene
+  // forma de documento, así que sus mutaciones son de COMPORTAMIENTO y no de tipo.
+  "src/chat.ts",
   "src/index.ts",
   "src/env.d.ts",
   "package.json",
   "corpus/manual.md",
+  // El corpus del CHAT, desde el paso 5. Un mensaje no es un archivo, y por eso la
+  // fixture tiene que estar en disco igual que el `.md`: si viviera en el guardián,
+  // cambiar la entrada y cambiar la expectativa serían la misma edición.
+  "corpus/mensaje.json",
+  "corpus/mensaje.golden.json",
   "corpus/manual.golden.json",
   "scripts/boundaries.mjs",
   "scripts/invariants.mjs",

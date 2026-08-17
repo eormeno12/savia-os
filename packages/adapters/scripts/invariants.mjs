@@ -100,11 +100,13 @@ try {
     TEXT_FLOOR_ID,
     blocksOf,
     cascade,
+    chatAdapter,
     coldProbeOf,
     markdownAdapter,
     opaqueOf,
     printableProportionOf,
     probeOf,
+    recognizeMessage,
     registryOf,
     select,
     sourceOfBytes,
@@ -846,6 +848,103 @@ try {
     }
   }
 
+  // ── I18 · EL CHAT ENTRA POR LA MISMA PUERTA ───────────────────────────────
+  // La mitad LOCAL de la afirmación del paso 5. La otra mitad —que el mismo texto por
+  // los dos canales tenga la misma huella— vive en `orchestration/scripts/invariants.mjs`
+  // (I12) porque necesita el emisor, y el emisor no se ve desde acá.
+  //
+  // Esta fila fija lo que HACE CIERTA a aquella: que el chat produzca `text_span` con el
+  // texto y las marcas del párrafo, sin envolverlo en nada. La huella se calcula sobre el
+  // CUERPO, así que cualquier forma distinta —`verbatim`, un `container` de más— rompe la
+  // igualdad entre canales, y rompiéndola el formato se filtra adentro de la identidad
+  // del contenido: la clave del caché, el dedupe de blobs y la reconciliación del paso 11.
+  {
+    // EL MENSAJE ES CORPUS VERSIONADO, igual que el `.md` y el `.conf`. Un mensaje no es
+    // un archivo, y esa es exactamente la razón por la que la fixture tiene que estar en
+    // disco: si viviera en este script, cambiar la entrada y cambiar la expectativa serían
+    // la misma edición y el golden no compararía contra nada externo. Lleva marcas —una
+    // negrita y un enlace— porque `marks` no se renderiza en `Fragment.text`, así que una
+    // mutación sobre ellas pasaría en verde contra cualquier golden que no traiga el
+    // cuerpo entero. Es la misma lección que el encabezado de este archivo ya cobró.
+    const mensaje = JSON.parse(readFileSync(join(RAIZ, "corpus", "mensaje.json"), "utf8"));
+    const AUTOR = mensaje.author;
+    const párrafos = mensaje.paragraphs;
+    const corridaChat = contextoDe();
+    const delChat = await recognizeMessage(chatAdapter, mensaje, corridaChat.ctx);
+
+    // El GOLDEN del chat. Se regenera con `ADAPTERS_REGEN=1`, igual que el del `.md`, y
+    // ningún script del `package.json` lo pasa.
+    {
+      const goldenPath = join(RAIZ, "corpus", "mensaje.golden.json");
+      const actual = JSON.stringify(
+        {
+          nodos: delChat.map((n) => ({
+            anchor: n.location.anchor,
+            coordinate: n.location.coordinate,
+            adapter: n.location.adapter,
+            role: n.role,
+            level: n.level,
+            attribution: n.attribution,
+            confidence: n.confidence,
+            hint: n.hint,
+            delegation: n.delegation,
+            ownAuthorship: n.ownAuthorship,
+            body: n.body,
+          })),
+          avisos: corridaChat.notices,
+        },
+        null,
+        2,
+      );
+      if (process.env.ADAPTERS_REGEN === "1") {
+        writeFileSync(goldenPath, `${actual}\n`, "utf8");
+        console.log("golden del chat REGENERADO — revisá el diff antes de commitear");
+      } else {
+        const esperado = readFileSync(goldenPath, "utf8").trimEnd();
+        if (actual !== esperado) {
+          const a = actual.split("\n");
+          const b = esperado.split("\n");
+          const i = a.findIndex((l, k) => l !== b[k]);
+          fallar(
+            "I18 · golden mensaje→nodos",
+            `primera diferencia en la línea ${i + 1}\n        esperado: ${b[i]}\n        obtenido: ${a[i]}`,
+            "las otras tres mitades de I18 verifican PROPIEDADES —la forma, la abstención, la autoría— y una salida puede cumplir las tres y ser la equivocada. El golden es lo único que compara contra algo externo al código: sin él, una mutación que moviera una marca o un ancla pasaría en verde",
+          );
+        }
+      }
+    }
+
+    const formas = [...new Set(delChat.map((n) => n.body.shape))];
+    if (delChat.length !== párrafos.length || !igual(formas, ["text_span"])) {
+      fallar(
+        "I18 · el chat produce un `text_span` por párrafo y nada más",
+        `salieron ${delChat.length} nodos con formas ${JSON.stringify(formas)}`,
+        "es lo que vuelve cierta la igualdad de huellas entre canales (I12 de `orchestration`): la huella se calcula sobre el cuerpo, así que envolver el mensaje en otra forma haría que el mismo texto por dos canales fuera dos contenidos distintos para el caché y para la reconciliación",
+      );
+    }
+
+    // El piso responde, igual que en el `.md` sin estructura: el chat SE ABSTIENE y el
+    // rol sale de `ROLE_BY_SHAPE.text_span`. Es la línea que el plan anota al lado del
+    // adaptador — «se abstiene: el piso responde 'parrafo'» (§{Chat}).
+    if (!delChat.every((n) => n.role === "paragraph" && n.level === "physical" && n.attribution === null)) {
+      fallar(
+        "I18 · el chat se abstiene y responde el piso físico",
+        JSON.stringify(delChat.map((n) => ({ role: n.role, level: n.level, attribution: n.attribution }))),
+        "una cascada acá inventaría títulos a partir de mensajes cortos, y los estamparía como si la conversación los hubiera declarado. `attribution: null` es lo que la métrica de §{Observabilidad} lee como «lo resolvió el piso», que es la verdad",
+      );
+    }
+
+    // Y la autoría viaja PEGADA A CADA NODO, cruda. Es la única diferencia real con el
+    // camino de archivo, y la razón de que `AuthoredUnit` exista.
+    if (!delChat.every((n) => igual(n.ownAuthorship, AUTOR))) {
+      fallar(
+        "I18 · cada nodo del mensaje trae su autoría",
+        JSON.stringify(delChat.map((n) => n.ownAuthorship)),
+        "un mensaje no tiene documento del que heredar la autoría. Si se perdiera acá —que es lo que pasaba hasta el paso 5, en silencio, porque `opaqueOf` mapeaba `Unit → RawNode` sin este campo— la orquestación no tendría de dónde sacarla y atribuiría al agente de MCP lo que dijo una persona",
+      );
+    }
+  }
+
   if (fallas > 0) process.exit(1);
 
   const roles = [...new Set(crudos.map((n) => n.role))].sort();
@@ -854,7 +953,8 @@ try {
       `I4 cero fugas · I5 piso físico · I6 nada en silencio · I7 caption por dos eslabones · ` +
       `I8 selector · I9 cascada reordenada · I10 range medio abierto · I11 frontmatter hermano · ` +
       `I12 sin roles de página · I13 YAML 1.2 core · I14 contenedores · I15 el piso por contenido · ` +
-      `I16 las tres ramas · I17 el piso produce y se abstiene)\n` +
+      `I16 las tres ramas · I17 el piso produce y se abstiene · ` +
+      `I18 el chat entra por la misma puerta)\n` +
       `           ${crudos.length} nodos · ${roles.length} de ${ROLES.length} roles alcanzados: ${roles.join(" ")}\n` +
       `           piso: .conf ${P_TEXTO.toFixed(4)} imprimible → indexa · ` +
       `.png ${P_BINARIO.toFixed(4)} → on_hold`,
