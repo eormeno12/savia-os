@@ -78,13 +78,25 @@ try {
       }),
     );
   }
-  // La única dependencia de runtime del pipeline, enlazada donde el resolvedor la busca
-  // subiendo desde `<tmp>/node_modules/@savia-os/adapters/markdown.js`.
-  symlinkSync(
-    realpathSync(join(realpathSync(DEP("adapters")), "node_modules", "yaml")),
-    join(salida, "node_modules", "yaml"),
-    "dir",
-  );
+  // LAS DEPENDENCIAS DE RUNTIME DEL PIPELINE, enlazadas donde el resolvedor las busca
+  // subiendo desde `<tmp>/node_modules/@savia-os/adapters/<archivo>.js`. Se DERIVAN del
+  // manifiesto de `adapters` en vez de escribirse acá: hasta el paso 7 esta línea decía
+  // `yaml` y nada más, y al entrar `fflate` y `txml` el banco falló con
+  // `ERR_MODULE_NOT_FOUND` sobre un archivo compilado — ruidoso, pero sin nombrar la
+  // causa. Derivada, la próxima dependencia se enlaza sola.
+  {
+    const manifiesto = JSON.parse(
+      readFileSync(join(realpathSync(DEP("adapters")), "package.json"), "utf8"),
+    );
+    for (const dep of Object.keys(manifiesto.dependencies ?? {})) {
+      if (dep.startsWith("@savia-os/")) continue;
+      symlinkSync(
+        realpathSync(join(realpathSync(DEP("adapters")), "node_modules", dep)),
+        join(salida, "node_modules", dep),
+        "dir",
+      );
+    }
+  }
 
   const destino = join(salida, "orchestration");
   compilar(RAIZ, destino);
@@ -95,6 +107,7 @@ try {
     chatAdapter,
     imageAdapter,
     coldProbeOf,
+    docxAdapter,
     markdownAdapter,
     opaqueOf,
     printableProportionOf,
@@ -115,6 +128,8 @@ try {
   const bytes = corpus("manual.md");
   const conf = corpus("servidor.conf");
   const png = corpus("sello.png");
+  const docx = corpus("manual.docx");
+  const docxZip = corpus("manual-deflated.docx");
 
   const REGISTRO = registryOf([opaqueOf(markdownAdapter)]);
   // OPCIONES ES UNA FÁBRICA Y NO UN OBJETO, y eso es lo que sostiene I2 · determinismo.
@@ -1170,6 +1185,168 @@ try {
     }
   }
 
+  // ── I17 · LA CASCADA Y LA DELEGACIÓN SE COMPONEN, DE PUNTA A PUNTA ────────
+  // ES EL PASO 7 VISTO DESDE ARRIBA. `adapters` verifica que los dos eslabones
+  // resuelvan y que la pieza salga delegable; acá se verifica lo único que ese paquete
+  // NO PUEDE ver, porque no alcanza a `emission` ni a la orquestación: que el subárbol
+  // se injerte DONDE ESTABA la pieza y herede el contexto jerárquico de su contenedor.
+  //
+  // Y ES LA PRIMERA VEZ QUE LA DELEGACIÓN CORRE SOBRE UN FORMATO REAL. El paso 6 la
+  // construyó con un contenedor sintético —«todo.caja»— porque el `.md` referencia sus
+  // imágenes por URL y nunca trae bytes incrustados, así que no había a quién delegar.
+  // El `.docx` sí: su imagen está adentro y, cuando la entrada del zip va SIN
+  // COMPRIMIR, sus bytes están literales en un rango del archivo.
+  {
+    const REGIONES = [
+      { box: { frame: "img", x: 0, y: 0, width: 100, height: 40 }, text: "SELLO APROBADO", confidence: 0.9 },
+    ];
+    const r = await ingest(SUBIDA(docx, { name: "manual.docx" }), {
+      ...OPCIONES(),
+      registry: registryOf([opaqueOf(docxAdapter), opaqueOf(imageAdapter)]),
+      perceive: () => Promise.resolve(REGIONES),
+    });
+
+    // LOS DOS ESLABONES SOBREVIVEN AL PIPELINE ENTERO. En `adapters` se verifica sobre
+    // la salida del adaptador; acá, sobre la salida de `ingest`, que es lo que se
+    // persiste. La atribución es «qué eslabón resolvió cada nodo», y el plan la llama
+    // «la importante» en observabilidad justamente porque es lo único que distingue un
+    // título que el documento DECLARÓ de uno que nosotros INFERIMOS.
+    const atribuciones = new Set(r.nodes.map((n) => n.attribution));
+    for (const esperado of ["byDocxStyle", "byProminence"]) {
+      if (!atribuciones.has(esperado)) {
+        fallar(
+          `I17 · la atribución \`${esperado}\` no llegó a la salida`,
+          JSON.stringify([...atribuciones]),
+          "si la atribución se pierde entre el adaptador y el `Run`, aguas abajo no hay forma de distinguir un título declarado de uno inferido — y esa distinción es la que decide cuánta confianza merece la jerarquía de un documento",
+        );
+      }
+    }
+
+    // EL INJERTO EN SU LUGAR. Los nodos del subárbol tienen que quedar ENTRE los del
+    // documento, no al final: si salieran al final, el emisor los reencuadraría bajo la
+    // sección equivocada y las migas del subárbol serían las del último título.
+    const anclas = r.nodes.map((n) => n.location.anchor);
+    const delegados = anclas.filter((a) => a.startsWith("r#"));
+    const primero = anclas.findIndex((a) => a.startsWith("r#"));
+    if (delegados.length === 0 || primero === anclas.length - delegados.length) {
+      fallar(
+        "I17 · el subárbol no se injertó donde estaba la pieza",
+        JSON.stringify(anclas),
+        "«el resultado se injerta donde estaba la pieza, de modo que el contenido incrustado hereda el contexto jerárquico de su contenedor» (§{La delegación es emergente}). Con cero delegados la composición no ocurrió; al final, ocurrió en el lugar equivocado",
+      );
+    }
+    if (!r.nodes.filter((n) => n.location.anchor.startsWith("r#")).every((n) => n.delegation.length === 1)) {
+      fallar(
+        "I17 · los nodos delegados no llevan su cadena",
+        JSON.stringify(r.nodes.filter((n) => n.location.anchor.startsWith("r#")).map((n) => n.delegation)),
+        "la cadena es lo que corta la recursión por la guarda de ciclo y lo que dice de qué pieza salió cada nodo. Sin ella, un subárbol es indistinguible de contenido del documento padre",
+      );
+    }
+
+    // Y NIVEL MIXTO. Un documento cuyo texto se reconoce declarativamente y cuya imagen
+    // se reconoce perceptualmente no es ninguna de las dos cosas: `mixed` existe para
+    // esto y hasta el paso 7 ningún formato real lo producía.
+    if (r.achievedLevel !== "mixed") {
+      fallar(
+        "I17 · el nivel alcanzado no es `mixed`",
+        `achievedLevel=${r.achievedLevel}`,
+        "reportar `declarative` escondería que parte del documento salió de un modelo, y reportar `perceptual` escondería que la mayor parte no. `mixed` es la única lectura honesta, y este es el primer formato real que la produce",
+      );
+    }
+  }
+
+  // ── I18 · EL ASSET MATERIALIZADO ENTRA POR LA MISMA PUERTA ───────────────
+  // La otra rama del paso 7. Cuando los bytes de la pieza NO están literales en el
+  // original —comprimidos adentro de un zip, o del otro lado de una URL— el recorte por
+  // referencia no se puede expresar y hay que producirlos: guardarlos y darles
+  // dirección. Lo que este invariante afirma es que, hecho eso, la pieza recorre
+  // EXACTAMENTE el mismo camino que un recorte: `select` la reclama, el adaptador la
+  // descompone y el subárbol se injerta donde estaba.
+  {
+    const guardados = new Map();
+    const almacen = {
+      put: (k, b) => {
+        guardados.set(String(k), b);
+        return Promise.resolve();
+      },
+      get: (k) => Promise.resolve(guardados.get(String(k)) ?? null),
+    };
+    const byteHash = (b) => createHash("sha256").update(b).digest("hex");
+    const conAlmacen = {
+      ...OPCIONES(),
+      registry: registryOf([opaqueOf(docxAdapter), opaqueOf(imageAdapter)]),
+      // EL DOBLE EXIGE BYTES, y sin eso este invariante pasaba por la razón
+      // equivocada. Un `perceive` que devuelve regiones sin mirar la fuente hace que la
+      // delegación «funcione» aunque los bytes nunca lleguen: el adaptador de imagen
+      // reclama por el MIME que declaró el padre —no por el contenido, y eso es
+      // deliberado (ver `sourceOfAsset`)— así que un resolvedor roto es invisible.
+      // Medido: con la resolución de objetos propios dada vuelta, los nodos delegados
+      // seguían apareciendo. Un modelo real no puede hacer nada con cero bytes, y el
+      // doble tiene que comportarse igual.
+      perceive: async (source) => {
+        const b = await source.bytes();
+        return b.length === 0
+          ? []
+          : [{ box: { frame: "img", x: 0, y: 0, width: 100, height: 40 }, text: "SELLO", confidence: 0.9 }];
+      },
+      storage: almacen,
+      byteHash,
+    };
+    const r = await ingest(SUBIDA(docxZip, { name: "manual-deflated.docx" }), conAlmacen);
+
+    const delegados = r.nodes.filter((n) => n.location.anchor.startsWith("r#"));
+    if (delegados.length === 0 || guardados.size === 0) {
+      fallar(
+        "I18 · el asset comprimido no llegó a delegar",
+        `delegados=${delegados.length} objetos=${guardados.size} avisos=${JSON.stringify(r.sink.notices.map((n) => n.code))}`,
+        "es la mitad del paso 7 que necesita almacenamiento, y la que prueba que materializar no es un camino aparte: la pieza tiene que entrar por la MISMA puerta que un recorte por referencia y salir con el mismo subárbol injertado",
+      );
+    }
+
+    // LA DIRECCIÓN SE DERIVA DEL CONTENIDO, y esto es lo que sostiene el dedupe y el
+    // reuso del modelo: la misma imagen en cincuenta documentos se guarda UNA vez y se
+    // describe UNA vez. Se mide ingiriendo el mismo documento otra vez con el mismo
+    // almacén: no puede aparecer un objeto nuevo.
+    // Y LA DIRECCIÓN ES, LITERALMENTE, EL HASH DE LO GUARDADO. Verificarlo así y no
+    // solo por «dos corridas dan lo mismo» es lo que lo vuelve mutable: cualquier
+    // derivación determinística satisface la segunda —el corpus no varía— y solo esta
+    // atrapa una clave que salga de otra cosa.
+    for (const [clave, guardado] of guardados) {
+      if (clave !== byteHash(guardado)) {
+        fallar(
+          "I18 · la dirección del objeto no es el hash de su contenido",
+          `clave=${clave.slice(0, 16)}… hash=${byteHash(guardado).slice(0, 16)}…`,
+          "«direccionado por contenido» es lo que declara `ObjectKey` y de lo que dependen el dedupe, el reuso del modelo y —porque la dirección entra en la huella del asset— la estabilidad de la identidad de toda figura",
+        );
+      }
+    }
+
+    const antes = guardados.size;
+    await ingest(SUBIDA(docxZip, { name: "otro-nombre.docx" }), conAlmacen);
+    if (guardados.size !== antes) {
+      fallar(
+        "I18 · materializar dos veces el mismo contenido creó dos objetos",
+        `${antes} → ${guardados.size}`,
+        "si la dirección no sale del contenido, la misma imagen en dos documentos son dos objetos, se guarda dos veces y el modelo la describe dos veces. Y peor: como la dirección entra en la huella del asset, serían DOS IDENTIDADES para la misma figura, así que la curación de una no vale para la otra",
+      );
+    }
+
+    // SIN ALMACENAMIENTO, LA MISMA ENTRADA DEGRADA EN VEZ DE FALLAR. Es la contracara y
+    // va acá porque solo la orquestación puede correr las dos.
+    const sinAlmacen = await ingest(SUBIDA(docxZip, { name: "manual-deflated.docx" }), {
+      ...OPCIONES(),
+      registry: registryOf([opaqueOf(docxAdapter), opaqueOf(imageAdapter)]),
+    });
+    const códigos = sinAlmacen.sink.notices.map((n) => n.code);
+    if (sinAlmacen.nodes.length === 0 || !códigos.includes("docx.media_not_materialised")) {
+      fallar(
+        "I18 · sin almacenamiento no degrada honestamente",
+        `nodos=${sinAlmacen.nodes.length} avisos=${JSON.stringify(códigos)}`,
+        "un contexto sin bucket tiene que entregar el documento SIN esa figura y decir cuál falta. Fallar entero perdería el texto por una imagen, y callarse sería descartar en silencio",
+      );
+    }
+  }
+
   if (fallas > 0) process.exit(1);
 
   console.log(
@@ -1179,7 +1356,9 @@ try {
       `I10 degradación real y visible · I11 guardar incondicional, indexar no · ` +
       `I12 la cintura no tiene forma de documento · I13 leído y vacío avisa · ` +
       `I14 una imagen es un documento · I15 la recursión frena · ` +
-      `I16 golden de identidades, ninguna anotación se despega)\n` +
+      `I16 golden de identidades, ninguna anotación se despega · ` +
+      `I17 la cascada y la delegación se componen · ` +
+      `I18 el asset materializado entra por la misma puerta)\n` +
       `           ${corrida.nodes.length} nodos · ${corrida.fragments.length} fragmentos · ` +
       `${corrida.records.length} registros · ${corrida.sink.notices.length} avisos`,
   );

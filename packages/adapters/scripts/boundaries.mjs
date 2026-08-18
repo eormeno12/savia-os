@@ -58,10 +58,29 @@ const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = join(RAIZ, "src");
 const MUTANTES = "scripts/mutants.mjs";
 
-/** Los dos únicos paquetes que este puede alcanzar, y desde dónde. */
+/**
+ * Los únicos paquetes que este puede alcanzar, y desde dónde. `null` = cualquier
+ * archivo.
+ *
+ * `fflate` ES LA SEGUNDA DEPENDENCIA DE RUNTIME DEL PROYECTO, y entra con su razón:
+ * cuatro de los doce formatos —`.docx`, `.xlsx`, `.pptx` y `.odt`— son un zip por
+ * dentro, y descomprimir DEFLATE no es algo que se escriba a mano. Se eligió sobre las
+ * alternativas por tener CERO dependencias transitivas y funcionar sin los globales de
+ * node, las dos cosas medidas antes de agregarla. Se descartó una librería que lee
+ * `.docx` completo: devuelve HTML, o sea que hace `detect` por nosotros y borra la
+ * cascada que el paso 7 existe para probar.
+ *
+ * SU DUEÑO NO ES UN ADAPTADOR, Y ES LA PRIMERA VEZ. `yaml` vive en `markdown.ts`
+ * porque UN adaptador la usa; el zip lo consultan CUATRO, así que confinarlo a uno de
+ * ellos obligaría a `.xlsx` a importar desde `docx.ts` —una dependencia entre
+ * adaptadores donde no hay ninguna relación—. La regla se conserva entera, «una
+ * dependencia, un dueño», y el dueño es la pieza compartida: `zip.ts`.
+ */
 const PERMITIDOS = new Map([
   ["@savia-os/ir", null],
   ["yaml", "markdown.ts"],
+  ["fflate", "unzip.ts"],
+  ["txml", "docx.ts"],
 ]);
 
 /**
@@ -100,10 +119,23 @@ const FRONTERAS = [
 const PROTEGIDOS = [
   "src/registry.ts",
   "src/markdown.ts",
+  "src/zip.ts",
+  "src/unzip.ts",
+  "src/docx.ts",
   "src/floor.ts",
   "src/env.d.ts",
   "corpus/manual.md",
   "corpus/manual.golden.json",
+  // Los dos zips del paso 7, y son fixtures DISTINTOS que prueban ramas distintas. Sin
+  // el primero, I20 no tiene sobre qué correr y la mitad del paso que no necesita
+  // ninguna librería queda sin acreditar. Sin el segundo —la misma imagen, deflateada—
+  // no queda un solo archivo del corpus que OBLIGUE a materializar, y las dos mitades de
+  // «guardar es incondicional, indexar no» (I22 acá, I18 en la orquestación) se quedan
+  // sin observador. Se nombran acá en vez de confiar en que el `readFileSync` de los
+  // invariantes explote: que un guardián se caiga por un archivo que falta dice QUÉ
+  // archivo, no POR QUÉ hacía falta.
+  "corpus/manual.docx",
+  "corpus/manual-deflated.docx",
   "corpus/servidor.conf",
   "corpus/sello.png",
 ];
@@ -234,6 +266,28 @@ const archivos = readdirSync(SRC)
   .filter((f) => f.endsWith(".ts"))
   .sort();
 
+// ── RED A2 · un dueño declarado EXISTE EN DISCO ──────────────────────────────
+// Sin esto, declarar `["txml", "docx.ts"]` antes de escribir `docx.ts` pasa en VERDE:
+// ningún archivo importa el paquete, así que el chequeo de confinamiento de abajo no
+// corre nunca, y `dependencies` coincide con la lista blanca porque la lista blanca es
+// lo que se acaba de tocar. Queda una dependencia sin consumidor y un dueño que no
+// existe — el mismo «exención sin dueño» que RED A impide para los extremos, entrando
+// por la otra puerta. Es la red que sostuvo el orden en que se escribió el paso 7:
+// `txml` se declaró recién cuando `docx.ts` existió, y hasta entonces esta red era lo
+// único que podía decir la diferencia entre «confinada» y «nunca chequeada».
+{
+  const huérfanos = [...PERMITIDOS.entries()]
+    .filter(([, dueño]) => dueño !== null && !existsSync(join(SRC, dueño)))
+    .map(([paquete, dueño]) => `${paquete} → src/${dueño}`);
+  if (huérfanos.length > 0) {
+    fallar(
+      "fronteras · una dependencia declara un dueño que no existe",
+      huérfanos.join(", "),
+      "una dependencia de runtime sin consumidor es una que nadie puede justificar, y un dueño inexistente vuelve inalcanzable el chequeo de confinamiento: las dos mitades de la regla quedan verdes sin verificar nada",
+    );
+  }
+}
+
 let conIr = 0;
 for (const archivo of archivos) {
   const texto = readFileSync(join(SRC, archivo), "utf8");
@@ -319,11 +373,19 @@ if (conIr < FRONTERAS.length) {
   }
 }
 
+// Se DERIVA del mapa y no se escribe a mano. La versión anterior decía «`yaml`
+// confinada a src/markdown.ts» y caducó en el momento en que entró la segunda: una
+// cifra o una lista mantenida a mano en el resumen de un guardián es la misma clase de
+// mentira que el guardián existe para impedir.
+const confinadas = [...PERMITIDOS.entries()]
+  .filter(([, dueño]) => dueño !== null)
+  .map(([paquete, dueño]) => `${paquete}→src/${dueño}`);
+
 if (errores > 0) {
   console.error(`ADAPTERS-ERR: ${errores} violación(es) de frontera.`);
   process.exit(1);
 }
 console.log(
   `fronteras ok (${archivos.length} archivos de src, ${FRONTERAS.length} fronteras nombradas, ` +
-    `${PERMITIDOS.size} paquetes permitidos, \`yaml\` confinada a src/markdown.ts)`,
+    `${PERMITIDOS.size} paquetes permitidos, ${confinadas.length} confinada(s): ${confinadas.join(", ")})`,
 );

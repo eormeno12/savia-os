@@ -82,15 +82,24 @@ try {
       exports: { ".": "./index.js" },
     }),
   );
-  // `yaml` se ENLAZA donde el resolvedor la va a buscar subiendo desde
-  // `<tmp>/adapters/markdown.js`. Es la única dependencia de runtime del proyecto y el
-  // guardián tiene que ejercitarla de verdad: un frontmatter parseado por un doble sería
-  // el único lugar del paquete donde la prueba no toca el código que corre.
-  symlinkSync(
-    realpathSync(join(RAIZ, "node_modules", "yaml")),
-    join(salida, "node_modules", "yaml"),
-    "dir",
-  );
+  // LAS DEPENDENCIAS DE RUNTIME se ENLAZAN donde el resolvedor las va a buscar subiendo
+  // desde `<tmp>/adapters/<archivo>.js`, y el guardián tiene que ejercitarlas de verdad:
+  // un frontmatter parseado por un doble, o un zip inflado por un doble, serían los
+  // únicos lugares del paquete donde la prueba no toca el código que corre.
+  // SE DERIVAN DE `dependencies`, no se escriben a mano. Hasta el paso 7 acá decía
+  // `yaml` y nada más, y al entrar `fflate` y `txml` el banco falló con
+  // `ERR_MODULE_NOT_FOUND` sobre un archivo compilado — ruidoso, pero por un motivo que
+  // no menciona la causa. Derivada de la lista, la próxima dependencia se enlaza sola.
+  for (const dep of Object.keys(
+    JSON.parse(readFileSync(join(RAIZ, "package.json"), "utf8")).dependencies ?? {},
+  )) {
+    if (dep.startsWith("@savia-os/")) continue;
+    symlinkSync(
+      realpathSync(join(RAIZ, "node_modules", dep)),
+      join(salida, "node_modules", dep),
+      "dir",
+    );
+  }
 
   const destino = join(salida, "adapters");
   compilar(RAIZ, destino);
@@ -103,6 +112,7 @@ try {
     chatAdapter,
     imageAdapter,
     coldProbeOf,
+    docxAdapter,
     markdownAdapter,
     opaqueOf,
     printableProportionOf,
@@ -121,6 +131,8 @@ try {
   const bytes = new Uint8Array(readFileSync(join(RAIZ, "corpus", "manual.md")));
   const conf = new Uint8Array(readFileSync(join(RAIZ, "corpus", "servidor.conf")));
   const png = new Uint8Array(readFileSync(join(RAIZ, "corpus", "sello.png")));
+  const docx = new Uint8Array(readFileSync(join(RAIZ, "corpus", "manual.docx")));
+  const docxZip = new Uint8Array(readFileSync(join(RAIZ, "corpus", "manual-deflated.docx")));
 
   /**
    * LOS DOS UMBRALES SALEN DE MEDIR EL CORPUS, NO DE ELEGIR UN NÚMERO.
@@ -1116,6 +1128,184 @@ try {
     }
   }
 
+  // ── I20 · LA SONDA VE ADENTRO DE UN ZIP, Y SIN DESCOMPRIMIR ───────────────
+  // Es la mitad del paso 7 que NO necesita ninguna librería, y la que decide el tramo
+  // 2: `.docx`, `.xlsx`, `.pptx` y `.odt` comparten bytes mágicos —los cuatro empiezan
+  // con `PK\x03\x04`— así que la extensión y la firma NO alcanzan para elegir quién
+  // lee el archivo. Lo que los separa es QUÉ ENTRADAS tienen, y eso se lee caminando el
+  // directorio central: bytes, sin inflar nada.
+  //
+  // POR QUÉ IMPORTA QUE ESTO SEA OBSERVABLE. Hasta el paso 7 `zipEntries` devolvía la
+  // lista vacía, y un evidenciador que la consultara habría recibido «este zip no tiene
+  // nada» en vez de «todavía no sé leer zips». Las dos cosas se ven igual desde afuera
+  // y llevan a decisiones opuestas: la primera hace que el adaptador se abstenga con
+  // razón, la segunda que se abstenga por un bug.
+  {
+    const sondaZip = probeOf(
+      coldProbeOf(docx, "manual.docx"),
+      { kind: "channel", channel: "frontend" },
+      fuenteDe(docx, "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    );
+    const entradas = await sondaZip.zipEntries();
+    const delator = "word/document.xml";
+    if (!entradas.includes(delator)) {
+      fallar(
+        "I20 · la sonda no ve adentro del zip",
+        `entradas=${JSON.stringify(entradas)}`,
+        `\`${delator}\` es lo que distingue un \`.docx\` de un \`.xlsx\` o un \`.pptx\`, que comparten sus bytes mágicos. Sin verlo, el tramo 2 no puede elegir quién lee el archivo y los cuatro adaptadores de zip quedan indistinguibles`,
+      );
+    }
+    // La MEMOIZACIÓN es la mitad de la frase del plan que sí se cumple hoy —«una sola
+    // apertura»— y se verifica por identidad de promesa, que es lo que PROVISIONAL(#432)
+    // de `ir` exige: memoizar el VALOR resuelto haría que los cuatro evidenciadores de
+    // zip, que corren con `Promise.all`, abrieran el archivo cuatro veces.
+    if (sondaZip.zipEntries() !== sondaZip.zipEntries()) {
+      fallar(
+        "I20 · `zipEntries` no memoiza la promesa en vuelo",
+        "dos llamadas devuelven promesas distintas",
+        "`select` dispara los doce evidenciadores con `Promise.all`: sin memoizar la promesa EN VUELO —no el valor resuelto— los cuatro adaptadores de zip abren el archivo cuatro veces, y la afirmación de costo del plan pasa a ser falsa",
+      );
+    }
+    // Y NO LANZA sobre basura, que es lo que sostiene «cada adaptador se abstiene por su
+    // cuenta» en vez de que un archivo corrupto decida por los cuatro.
+    const basura = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x00, 0x01, 0x02]);
+    const sondaRota = probeOf(
+      coldProbeOf(basura, "roto.docx"),
+      { kind: "channel", channel: "frontend" },
+      fuenteDe(basura),
+    );
+    const nada = await sondaRota.zipEntries().catch(() => "TIRÓ");
+    if (nada === "TIRÓ" || nada.length !== 0) {
+      fallar(
+        "I20 · un zip roto no devuelve la lista vacía en silencio",
+        `devolvió ${JSON.stringify(nada)}`,
+        "«archivos rotos son la norma, no la excepción» (§{Los decodificadores}): si esto lanza, el evidenciador que lo consultó cuenta como `None` y un archivo corrupto decide por los cuatro adaptadores de zip en vez de que cada uno se abstenga",
+      );
+    }
+  }
+
+  // ── I21 · LA CASCADA Y LA DELEGACIÓN SE COMPONEN ─────────────────────────
+  // ES EL PASO 7, Y LO QUE PRUEBA NO ES EL FORMATO. La cascada se construyó en el paso
+  // 3 y la delegación en el paso 6, por separado; el `.docx` es el primer formato donde
+  // se encuentran — un documento que entra por la cascada y lleva adentro una pieza que
+  // delega. Acá se verifica la mitad de `adapters`: que los DOS eslabones resuelvan y
+  // que la pieza salga delegable. Que el subárbol se injerte es de `orchestration`,
+  // que es el único paquete que compone los dos lados.
+  {
+    const opacoDocx = opaqueOf(docxAdapter);
+    const corridaDocx = contextoDe();
+    const nodosDocx = await opacoDocx.recognize(fuenteDe(docx), corridaDocx.ctx);
+
+    // LOS DOS ESLABONES, cada uno con su nodo. Un `.docx` corporativo declara algunos
+    // títulos con estilo y escribe otros a mano en negrita, y sin el segundo eslabón la
+    // mitad de los títulos de un documento real caen al piso como párrafos.
+    const porEslabón = new Map(nodosDocx.map((n) => [n.attribution, n]));
+    for (const esperado of ["byDocxStyle", "byProminence"]) {
+      if (!porEslabón.has(esperado)) {
+        fallar(
+          `I21 · el eslabón \`${esperado}\` no resolvió ningún nodo`,
+          `atribuciones: ${JSON.stringify([...new Set(nodosDocx.map((n) => n.attribution))])}`,
+          "«cascada: estilo → prominencia» (§{Tramo 3 › El registro}) son DOS eslabones porque el formato solo declara la mitad de sus títulos. Si uno de los dos no resuelve nada, el banco no lo está ejerciendo y su primera falla va a ser en producción",
+        );
+      }
+    }
+    // Y EN ESE ORDEN. `cascade` reordena por nivel, así que un párrafo con estilo
+    // declarado NUNCA debe llegar a la prominencia: si llegara, un documento bien
+    // marcado quedaría a merced de un heurístico de tamaño.
+    const conEstilo = porEslabón.get("byDocxStyle");
+    const sinEstilo = porEslabón.get("byProminence");
+    if (conEstilo?.level !== "declarative" || sinEstilo?.level !== "physical") {
+      fallar(
+        "I21 · los eslabones no están en su escalón",
+        `estilo=${conEstilo?.level} prominencia=${sinEstilo?.level}`,
+        "el nivel es lo que `cascade` usa para ordenar. Con los dos en el mismo escalón el orden pasa a depender de cómo se escribió el arreglo, y `rank` deja de gobernar la precedencia",
+      );
+    }
+
+    // LA IMAGEN SALE POR RANGO Y NO MATERIALIZADA, que es lo medido: cuando la entrada
+    // del zip está SIN COMPRIMIR sus bytes están literales en el `.docx`, así que el
+    // asset se expresa como el rectángulo de un PDF —mismo objeto, ventana más chica—
+    // y entra al pipeline sin escribir un byte. Es la razón por la que este paso no
+    // necesita almacenamiento.
+    const imagen = nodosDocx.find((n) => n.body.shape === "asset");
+    if (imagen === undefined || imagen.body.ref.window.scope !== "range") {
+      fallar(
+        "I21 · la imagen incrustada no sale como un rango del propio documento",
+        `asset=${JSON.stringify(imagen?.body.ref ?? null)}`,
+        "si saliera con ventana `whole` y objeto propio, este paso dependería del almacenamiento, que no está cableado — y la mitad de los `.docx` reales, que guardan sus medios sin comprimir, pagarían una materialización que no hace falta",
+      );
+    }
+
+    // EL GOLDEN. Mismo molde que el de `manual.md` y misma variable de entorno: los dos
+    // se regeneran en la misma corrida, así que el diff se lee junto.
+    const goldenDocx = join(RAIZ, "corpus", "manual.docx.golden.json");
+    const actualDocx = JSON.stringify(
+      {
+        nodos: nodosDocx.map((n) => ({
+          anchor: n.location.anchor,
+          adapter: n.location.adapter,
+          role: n.role,
+          level: n.level,
+          attribution: n.attribution,
+          hint: n.hint,
+          body: n.body,
+        })),
+        avisos: corridaDocx.notices,
+      },
+      null,
+      2,
+    );
+    if (process.env.ADAPTERS_REGEN === "1") {
+      writeFileSync(goldenDocx, `${actualDocx}\n`, "utf8");
+      console.log("golden del .docx REGENERADO — revisá el diff antes de commitear");
+    } else {
+      const esperadoDocx = readFileSync(goldenDocx, "utf8").trimEnd();
+      if (actualDocx !== esperadoDocx) {
+        const a = actualDocx.split("\n");
+        const b = esperadoDocx.split("\n");
+        const i = a.findIndex((l, k) => l !== b[k]);
+        fallar(
+          "I21 · golden bytes→nodos del `.docx`",
+          `primera diferencia en la línea ${i + 1}\n        esperado: ${b[i]}\n        obtenido: ${a[i]}`,
+          "es el único invariante del `.docx` que compara contra algo EXTERNO al código: los demás verifican que la salida sea coherente consigo misma, y una salida puede ser coherente y ser el árbol equivocado",
+        );
+      }
+    }
+  }
+
+  // ── I22 · SIN ALMACENAMIENTO, LA IMAGEN SE ANUNCIA Y EL TEXTO ENTRA ───────
+  // La otra mitad del paso 7, y la que decide si el adaptador es honesto. Cuando la
+  // entrada del zip está COMPRIMIDA sus bytes no están literales en ningún rango, así
+  // que el recorte por referencia no se puede expresar y hay que producirlos — eso es
+  // materializar, y este banco NO TIENE ALMACENAMIENTO a propósito.
+  //
+  // LAS TRES MITADES SE VERIFICAN JUNTAS. Que la imagen no se emita es lo esperable;
+  // que el TEXTO ENTRE IGUAL es lo que separa «degradar» de «fallar»; y que haya un
+  // AVISO es lo que separa «degradar» de «descartar en silencio». Con las tres, un
+  // `.docx` cuyo medio no se pudo materializar sigue siendo un documento indexado al
+  // que le falta una figura, y se sabe cuál.
+  {
+    const corridaZip = contextoDe();
+    const nodosZip = await opaqueOf(docxAdapter).recognize(fuenteDe(docxZip), corridaZip.ctx);
+    const conAsset = nodosZip.filter((n) => n.body.shape === "asset");
+    const textos = nodosZip.filter((n) => n.body.shape === "text_span");
+    const códigos = corridaZip.notices.map((n) => n.code);
+    if (conAsset.length !== 0) {
+      fallar(
+        "I22 · se emitió un asset que no se pudo materializar",
+        JSON.stringify(conAsset.map((n) => n.body.ref)),
+        "un asset cuyos bytes no están ni en el original ni en el almacenamiento apunta a ninguna parte: la delegación no lo va a poder leer, así que sería un nodo que promete una figura que nadie puede traer",
+      );
+    }
+    if (textos.length === 0 || !códigos.includes("docx.media_not_materialised")) {
+      fallar(
+        "I22 · la degradación no es honesta",
+        `texto=${textos.length} avisos=${JSON.stringify(códigos)}`,
+        "«guardar es incondicional, indexar no»: sin texto el adaptador falló en vez de degradar, y sin aviso descartó en silencio, que es el modo de falla que §{Diagnóstico} declara inadmisible",
+      );
+    }
+  }
+
   if (fallas > 0) process.exit(1);
 
   const roles = [...new Set(crudos.map((n) => n.role))].sort();
@@ -1125,7 +1315,10 @@ try {
       `I8 selector · I9 cascada reordenada · I10 range medio abierto · I11 frontmatter hermano · ` +
       `I12 sin roles de página · I13 YAML 1.2 core · I14 contenedores · I15 el piso por contenido · ` +
       `I16 las tres ramas · I17 el piso produce y se abstiene · ` +
-      `I18 el chat entra por la misma puerta · I19 una imagen es un documento)\n` +
+      `I18 el chat entra por la misma puerta · I19 una imagen es un documento · ` +
+      `I20 la sonda ve adentro del zip sin descomprimir · ` +
+      `I21 la cascada y la delegación se componen · ` +
+      `I22 sin almacenamiento la imagen se anuncia y el texto entra)\n` +
       `           ${crudos.length} nodos · ${roles.length} de ${ROLES.length} roles alcanzados: ${roles.join(" ")}\n` +
       `           piso: .conf ${P_TEXTO.toFixed(4)} imprimible → indexa · ` +
       `.png ${P_BINARIO.toFixed(4)} → on_hold`,

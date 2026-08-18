@@ -17,7 +17,7 @@
  */
 
 import { PARAMETERS } from "./params.js";
-import type { AdapterId, MatterHash } from "./identity.js";
+import type { AdapterId, MatterHash, ObjectKey } from "./identity.js";
 import type { Classification, RecognitionLevel } from "./classification.js";
 import type { Body, ObjectRef } from "./shapes.js";
 import type { Box, LocalLocation, Location } from "./location.js";
@@ -436,6 +436,42 @@ export type Region = {
  * los bytes. Un parámetro que quien llama no puede llenar es un parámetro mentiroso.
  */
 export type PerceiveFn = (source: Source) => Promise<readonly Region[]>;
+
+/**
+ * EL ALMACENAMIENTO QUE EL PIPELINE GESTIONA Y NO IMPLEMENTA.
+ *
+ * `materialize` es la cara que ven los adaptadores —«guardá esto y dame su
+ * dirección»— y esta es la de atrás: lo que quien llama a la ingesta tiene que
+ * proveer para que aquella pueda cumplir. Entra por parámetro como `sha256`, como
+ * `perceive` y como el acuñador de identidades, y por la misma razón: escribir un
+ * bucket es I/O, y ningún paquete del pipeline puede hacer I/O sin dejar de ser
+ * verificable. El pipeline decide QUÉ se guarda, CUÁNDO y BAJO QUÉ CLAVE; el bucket
+ * lo pone el que llama.
+ *
+ * LA CLAVE LA DERIVA EL PIPELINE, NO EL ALMACENAMIENTO, y por eso `put` la recibe en
+ * vez de devolverla. Si la derivara la implementación inyectada, dos implementaciones
+ * podrían derivarla distinto y la promesa que sostiene todo lo demás —misma imagen,
+ * misma dirección, guardada una vez y descrita por el modelo una vez— dependería de
+ * código que este repo no ve. Derivándola de `ByteHashFn` —que entra por parámetro
+ * junto a esta, y aparte de `HashFn` porque aquella toma una preimagen de texto y un
+ * objeto binario no tiene preimagen— la garantía es del pipeline. Es la misma decisión
+ * que `ObjectKey` ya declaraba: «dónde quedó un objeto en el almacenamiento
+ * DIRECCIONADO POR CONTENIDO».
+ *
+ * `get` DEVUELVE `null` EN VEZ DE LANZAR, igual que el resto del borde: un objeto que
+ * no está es una condición de datos —todavía no se subió, se borró, la corrida
+ * anterior no llegó— y no una violación de contrato. Quien llama decide si eso es un
+ * aviso, una abstención o un diferido.
+ *
+ * POR QUÉ NO LO VEN LOS ADAPTADORES. Un adaptador recibe `materialize`, que es
+ * exactamente lo que necesita y nada más. Darle `get` sería darle la capacidad de leer
+ * objetos que nadie le pasó, y con ella el borde entre «lee lo que le dieron» y «va a
+ * buscar lo que quiera» dejaría de existir.
+ */
+export type Storage = {
+  put(key: ObjectKey, bytes: Uint8Array, mime: string): Promise<void>;
+  get(key: ObjectKey): Promise<Uint8Array | null>;
+};
 
 export interface Context {
   readonly diagnostics: Diagnostics;

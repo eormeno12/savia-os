@@ -650,15 +650,19 @@ const MUTANTES = [
   },
   {
     id: "S56",
-    garantía: "el grafo DECLARADO coincide con el usado: `dependencies` es `ir` + `yaml` y nada más",
+    garantía: "el grafo DECLARADO coincide con el usado: `dependencies` es exactamente la lista blanca",
     rompe: "nada visible hoy — y ese es el punto: las tres filas de arriba se satisfacen agregando la dependencia",
     cambios: [[
-      `    "@savia-os/ir": "workspace:*",\n    "yaml": "^2.8.1"`,
-      `    "@savia-os/ir": "workspace:*",\n    "yaml": "^2.8.1",\n    "typescript": "^5.9.3"`,
+      `    "txml": "^6.0.1",\n    "yaml": "^2.8.1"`,
+      `    "txml": "^6.0.1",\n    "typescript": "^5.9.3",\n    "yaml": "^2.8.1"`,
     ]],
     espera: /`dependencies` no es exactamente la lista blanca/,
     nota:
-      "sin esta mitad, S53, S54 y S55 se satisfacen agregando la dependencia y el import EL MISMO DÍA " +
+      "SU ANCLA SE MUEVE CADA VEZ QUE ENTRA UNA DEPENDENCIA, y eso es correcto: el corredor falla con «el " +
+      "texto a mutar aparece en 0 archivos», que es ruidoso y manda al lugar exacto. Pasó al entrar `fflate` " +
+      "y va a volver a pasar con `txml`. La alternativa —anclar en algo que no se mueva— acreditaría menos: " +
+      "lo que esta fila fija es el CONTENIDO de la lista, no su forma. " +
+      "Sin esta mitad, S53, S54 y S55 se satisfacen agregando la dependencia y el import EL MISMO DÍA " +
       "— y el que lo hace está siguiendo al pie de la letra lo que le dijo «Cannot find module». Lo que " +
       "de verdad impone R1 es el grafo de PAQUETES, y este es el único chequeo que lo mira",
   },
@@ -928,6 +932,151 @@ const MUTANTES = [
       "Sin este control, un guardián que congelara el texto del corredor sería indistinguible de uno que " +
       "verifica su forma, y congelarlo es la forma más rápida de que nadie lo mejore",
   },
+  // ── El lector de zip (paso 7) ─────────────────────────────────────────────
+  // Las tres las mata I20, que es el único invariante que corre el lector sobre un zip
+  // real. Las tres COMPILAN y devuelven una lista de entradas perfectamente formada:
+  // vacía, o con nombres truncados. Sin I20, ninguna se ve.
+  {
+    id: "S97",
+    garantía: "el directorio central se busca donde el formato dice, no un campo al lado",
+    rompe: "I20 · la sonda no ve adentro del zip",
+    cambios: [[
+      `const FIN_OFFSET = 16; // uint32 · dónde arranca el directorio central`,
+      `const FIN_OFFSET = 12; // uint32 · dónde arranca el directorio central`,
+    ]],
+    espera: /I20 · la sonda no ve adentro del zip/,
+    nota:
+      "el 12 es el TAMAÑO del directorio central y el 16 su OFFSET: dos uint32 consecutivos en el mismo " +
+      "registro, que es el error de lectura de especificación más plausible que hay. Con el equivocado la " +
+      "firma no coincide, el lector devuelve la lista vacía —porque es tolerante, y tiene que serlo— y el " +
+      "tramo 2 recibe «este zip no tiene nada» en vez de «no lo pude leer». Las dos se ven igual desde " +
+      "afuera y llevan a decisiones opuestas. Sin I20: NO ROMPÍA",
+  },
+  {
+    id: "S98",
+    garantía: "el nombre de la entrada se lee desde donde arranca, no un byte después",
+    rompe: "I20 · la sonda no ve adentro del zip",
+    cambios: [[
+      `      name: decodificador.decode(bytes.subarray(p + DIR_FIJO, p + DIR_FIJO + largoNombre)),`,
+      `      name: decodificador.decode(bytes.subarray(p + DIR_FIJO + ONE, p + DIR_FIJO + largoNombre)),`,
+    ]],
+    espera: /I20 · la sonda no ve adentro del zip/,
+    nota:
+      "un desplazamiento de uno en un `subarray` es el error más barato de cometer y el más difícil de " +
+      "ver: el lector sigue devolviendo CINCO entradas, con nombres que existen y son casi correctos " +
+      "(`ord/document.xml`). Nada explota, nada queda vacío, y el tramo 2 simplemente no reconoce ningún " +
+      "formato: los cuatro adaptadores de zip se abstienen y el archivo cae al piso de texto. " +
+      "Es el modo de falla que se diagnostica como «el docx no se soporta» cuando el bug está en un byte",
+  },
+  {
+    id: "S99",
+    garantía: "`zipEntries` memoiza LA PROMESA EN VUELO, no el valor resuelto",
+    rompe: "I20 · `zipEntries` no memoiza la promesa en vuelo",
+    cambios: [[
+      `      if (entries === null) entries = source.bytes().then(zipEntriesOf);`,
+      `      entries = source.bytes().then(zipEntriesOf);`,
+    ]],
+    espera: /no memoiza la promesa en vuelo/,
+    nota:
+      "es la ÚNICA mitad de «una sola apertura parcial» (§{Los tres casos}) que hoy se cumple —la otra " +
+      "está declarada PENDING en `registry.ts`— y sin ella la afirmación de costo del plan es falsa: " +
+      "`select` dispara los doce evidenciadores con `Promise.all`, y los cuatro de zip abrirían el archivo " +
+      "cuatro veces. No rompe NADA funcional: la lista sale idéntica. Solo cuesta cuatro veces más, que es " +
+      "exactamente la clase de regresión que ningún golden de contenido puede ver",
+  },
+  // ── El adaptador `.docx` (paso 7) ─────────────────────────────────────────
+  {
+    id: "S100",
+    garantía: "los dos eslabones de la cascada están en escalones DISTINTOS",
+    rompe: "I21 · los eslabones no están en su escalón",
+    cambios: [[
+      `  name: "byProminence",\n  level: "physical",`,
+      `  name: "byProminence",\n  level: "declarative",`,
+    ]],
+    espera: /I21 · los eslabones no están en su escalón/,
+    nota:
+      "`cascade` REORDENA por `rank(level)` y esa es toda la precedencia que hay. Con los dos eslabones en " +
+      "el mismo escalón el orden pasa a depender de cómo se escribió el arreglo —que este archivo escribe " +
+      "AL REVÉS del orden de ejecución a propósito, calcando a `markdown.ts`— y la prominencia ganaría " +
+      "sobre el estilo: un documento BIEN MARCADO quedaría a merced de un heurístico de tamaño. No rompe " +
+      "nada visible en el árbol de este corpus, solo cambia quién resolvió qué",
+  },
+  {
+    id: "S101",
+    garantía: "la prominencia exige negrita Y tamaño, no una de las dos",
+    rompe: "I21 · el eslabón `byProminence` no resolvió ningún nodo",
+    cambios: [[`      if (!bold || size <= cuerpo) return null;`, `      if (bold || size <= cuerpo) return null;`]],
+    espera: /el eslabón .byProminence. no resolvió ningún nodo/,
+    nota:
+      "las dos condiciones hacen falta y cada una tapa un falso positivo del otro lado: solo el tamaño " +
+      "confunde una cita destacada con un título, y sola la negrita confunde una palabra enfatizada en un " +
+      "párrafo largo. La mutación es una negación caída, que es el error más barato de cometer en una " +
+      "guarda compuesta",
+  },
+  {
+    id: "S102",
+    garantía: "el zip se infla como DEFLATE crudo, no como gzip",
+    rompe: "I21 · golden bytes→nodos del `.docx`",
+    cambios: [
+      [`import { inflateSync } from "fflate";`, `import { gunzipSync } from "fflate";`],
+      [`    return inflateSync(crudo);`, `    return gunzipSync(crudo);`],
+    ],
+    espera: /I21 · golden bytes→nodos del/,
+    nota:
+      "es la confusión clásica entre las tres envolturas de DEFLATE —cruda, zlib y gzip— y `fflate` " +
+      "exporta las tres con nombres parecidos. Un zip guarda la CRUDA. Con la equivocada, el encabezado " +
+      "no valida, se lanza, el `try` devuelve `null` y `word/document.xml` queda ilegible: el documento " +
+      "sale VACÍO con su aviso, que es tolerante y correcto, y por eso mismo no se ve sin el golden. " +
+      "Es además la única fila que acredita `unzip.ts`, que hasta el paso 7 estuvo escrito y sin consumidor. " +
+      "MUTA LAS DOS LÍNEAS —el import y la llamada— y no solo la llamada: cambiar una sola deja el símbolo " +
+      "viejo sin usar y la fila pasaría a morir por `TS6133`, o sea acreditando al compilador en vez de al " +
+      "contrato. Es la lección que el paso 12 pagó dos veces",
+  },
+  {
+    id: "S103",
+    garantía: "el rango de la imagen saltea el encabezado LOCAL, no el del directorio",
+    rompe: "I21 · golden bytes→nodos del `.docx`",
+    cambios: [[
+      `          const inicio = h + 30 + dv.getUint16(h + 26, true) + dv.getUint16(h + 28, true);`,
+      `          const inicio = h + 46 + dv.getUint16(h + 26, true) + dv.getUint16(h + 28, true);`,
+    ]],
+    espera: /I21 · golden bytes→nodos del/,
+    nota:
+      "46 es el largo fijo del encabezado del DIRECTORIO CENTRAL y 30 el del LOCAL: los dos existen en el " +
+      "mismo formato, describen la misma entrada y se confunden leyendo la especificación en diagonal. Con " +
+      "el equivocado el rango arranca 16 bytes adentro del PNG, así que la ventana existe, tiene el largo " +
+      "correcto y apunta a basura. Nada explota: el asset se emite, se delega, y el adaptador de imagen no " +
+      "lo reclama porque los bytes mágicos no son de una imagen. El documento pierde su figura EN SILENCIO",
+  },
+  {
+    id: "SC23",
+    control: true,
+    garantía: "editar la prosa del docstring del adaptador `.docx` no rompe nada",
+    cambios: [[
+      `LA IMAGEN NO SE MATERIALIZA SI NO HACE FALTA`,
+      `LA IMAGEN NO SE MATERIALIZA SI NO HACE FALTA (control SC23)`,
+    ]],
+    nota:
+      "el par de S100–S103. La mitad del archivo explica por qué hacen falta dos eslabones y por qué la " +
+      "imagen no se materializa; sin este control las cuatro filas serían indistinguibles de un guardián " +
+      "que congela el archivo. SU PRIMER ANCLA CHOCÓ CON LA REGLA DE UNICIDAD: la frase elegida estaba " +
+      "también en el comentario de I21, y `ubicar()` exige que el texto viva en UN archivo. El corredor lo " +
+      "dijo nombrando los dos. Vale como recordatorio de que las frases buenas se repiten solas",
+  },
+
+  {
+    id: "SC22",
+    control: true,
+    garantía: "editar la prosa del docstring del lector de zip no rompe nada",
+    cambios: [[
+      `ES TOLERANTE Y NO LANZA.`,
+      `ES TOLERANTE Y NO LANZA (control SC22).`,
+    ]],
+    nota:
+      "el par de S97–S99. El lector es más comentario que código —la mitad del archivo explica por qué " +
+      "está partido en dos— y sin este control las tres filas serían indistinguibles de un guardián que " +
+      "congela el archivo, que es la forma más rápida de que nadie lo pueda mejorar",
+  },
   {
     id: "SC5",
     control: true,
@@ -1020,6 +1169,16 @@ const MUTANTES = [
 const ARCHIVOS = [
   "src/registry.ts",
   "src/markdown.ts",
+  // Entran en el paso 7 con S97–S99. `corpus/manual.docx` NO entra, por el mismo
+  // criterio que el `.png` de arriba: es binario, así que una mutación textual sobre él
+  // no es escribible. Que esté en disco lo exige `boundaries.mjs`.
+  "src/zip.ts",
+  "src/unzip.ts",
+  // Entran en el paso 7 con S100–S103. El `.docx` del corpus NO entra —es un zip, o
+  // sea binario— pero su golden SÍ: es texto, y sin él una mutación de comportamiento
+  // no tendría contra qué romper.
+  "src/docx.ts",
+  "corpus/manual.docx.golden.json",
   // Entra en el paso 4 con S74–S80. Los dos archivos nuevos del corpus NO entran: no
   // aloja ninguna mutación un `.conf` cuyo contenido es irrelevante para las filas —lo
   // que decide es su EXTENSIÓN, y eso lo verifica S74 renombrándolo en memoria— y el

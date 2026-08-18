@@ -1947,8 +1947,8 @@ silencio**.
 
 # Puntos abiertos
 
-Doce. Ninguno bloquea empezar a construir: cuatro son mediciones sobre corpus real,
-dos son huecos de diseño declarados, dos son producto, uno es mecánico, dos están
+Trece. Ninguno bloquea empezar a construir: cuatro son mediciones sobre corpus real,
+tres son huecos de diseño declarados, dos son producto, uno es mecánico, dos están
 fuera de alcance y uno es un refinamiento opcional.
 
 | # | Punto | Dónde impacta |
@@ -1964,6 +1964,7 @@ fuera de alcance y uno es un refinamiento opcional.
 | **P2** | `invocacionesMáximas` por documento: cuántas descomposiciones perceptuales antes de diferir el resto. Se mide sobre documentos corporativos reales — cuánto tarda en converger la cola de pendientes — no se elige. | Tramo 3 |
 | **P3** | El almacenamiento de los `en_espera` no tiene política de cuota ni visibilidad. | Tramo 1 |
 | **P4** | Slack y Teams no están cubiertos, y necesitan un filtro de relevancia previo que vive en Capa 2/4. | Fuera del tramo |
+| **P13** | **Un asset delegado re-entra por el TRAMO 2, no por la puerta — y por eso saltea el gate.** «Un asset delega si algún adaptador reclama sus bytes» está implementado como `sourceOfAsset` → `sondaFría` → `seleccionar()`, o sea que la pieza incrustada entra donde se decide *quién sabe leerla*. Pero la puerta —tamaño, formato legible, no cifrado y **antivirus obligatorio**— es el tramo 1. Mientras ningún formato traía bytes propios eso era inocuo: el `.md` referencia sus imágenes por URL y nunca las baja, así que la profundidad de delegación era cero y no había nada que entrara por el costado. **Deja de serlo cuando el pipeline empieza a materializar**: un `.docx` limpio en la puerta puede llevar adentro un payload que el escaneo del contenedor no miró, y lo mismo vale para lo que se baje de una URL. LA SALIDA NO ES ESCANEAR EN DOS LUGARES NUEVOS, es mover un borde: **que el asset delegado re-entre por la puerta, como cualquier archivo**. Con eso hereda el gate, el antivirus y —al tener fila propia— el ESTADO, que es justo lo que le falta al caso «el antivirus marca después de que el objeto ya está guardado», para el que la máquina de estados no tiene transición. Queda por decidir si esa fila es un documento propio o un artefacto que referencia al padre, y que la carrera «escaneo en paralelo al guardado» sea la misma decisión que para el archivo de entrada y no dos. | Tramo 1 · Tramo 3 |
 | **P5** | `tipo` podría existir **solo** donde contradice al piso físico, derivando la etiqueta de display desde `forma`. Volvería inexpresable la contradicción `tipo:'parrafo'` + `forma:'grid'`. Se resiste porque perdería tipos que no overridean nada (`cita`, `lista`) y que sí sirven para filtrar. | Tramo 3 |
 
 **Resueltos al decidir la identidad (H13):** cómo se acuña un id nuevo (al azar; el

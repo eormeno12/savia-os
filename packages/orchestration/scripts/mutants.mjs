@@ -129,22 +129,21 @@ const MUTANTES = [
       "siempre se declaran antes que sus ítems—, así que el guardián la fuerza con un adaptador " +
       "SINTÉTICO que emite una pista colgante: sin él la rama es código muerto y esta fila no existiría",
   },
-  {
-    id: "S69",
-    garantía: "`materialize` RECHAZA: la delegación de este paso es de profundidad cero",
-    rompe: "la precondición de terminación, que pasa de ser un hecho a ser una convención",
-    cambios: [[
-      `      Promise.reject(new Error("ORCHESTRATION-ERR: step 3 does not materialize bytes")),`,
-      `      Promise.resolve(_bytes as unknown as ObjectRef),`,
-    ]],
-    espera: /I7 · `materialize` rechaza en el paso 3/,
-    nota:
-      "«no llamar a `materialize` es lo que hace cumplir la precondición de terminación». El plan pide " +
-      "casos de delegación con profundidad 0, 1 y ciclo; los dos últimos NO son ejercitables acá —un " +
-      "`.md` referencia sus imágenes por URL y nunca trae bytes incrustados, y el bucle de delegación " +
-      "es el paso 6— y decir «profundidad 0» no alcanza. Esta fila convierte el cero en un estado " +
-      "IMPUESTO: el día que el paso 6 lo implemente, esta línea es el sitio exacto que hay que cambiar",
-  },
+  // ─── LÁPIDA · S69, retirada en el paso 7 ──────────────────────────────────
+  // Decía «`materialize` RECHAZA: la delegación de este paso es de profundidad cero», y
+  // era verdad mientras ningún formato trajera bytes propios: con `.md` las imágenes se
+  // referencian por URL, así que no había a quién delegar y el rechazo incondicional
+  // volvía esa profundidad un HECHO en vez de una convención.
+  //
+  // El paso 7 la superó de frente: el `.docx` sí trae bytes, `materialize` guarda
+  // cuando hay almacenamiento, y la profundidad pasó a uno — que es lo que I17 e I18
+  // verifican ahora. La garantía no se perdió, cambió de forma.
+  //
+  // Y LO QUE QUEDA DE ELLA NO NECESITA FILA: que `materialize` rechace SIN
+  // almacenamiento lo impone el TIPO. Se le escribió el mutante —dar vuelta la guarda
+  // `storage === null`— y murió con `TS18047: 'storage' is possibly 'null'`, o sea
+  // acreditando al compilador. La violación es irrepresentable un peldaño más arriba,
+  // que es donde este repo la quiere.
   {
     id: "S72",
     garantía: "el contexto raíz arranca en profundidad cero",
@@ -635,6 +634,43 @@ const MUTANTES = [
   },
 
   // ── Controles ──────────────────────────────────────────────────────────────
+  // ── El asset materializado (paso 7, fase 2) ───────────────────────────────
+  {
+    id: "S104",
+    garantía: "la dirección de un objeto es el hash de SU CONTENIDO",
+    rompe: "I18 · la dirección del objeto no es el hash de su contenido",
+    cambios: [[`      const object = asObjectKey(byteHash(bytes));`, `      const object = asObjectKey(byteHash(bytes) + mime);`]],
+    espera: /la dirección del objeto no es el hash de su contenido/,
+    nota:
+      "meter el mime en la clave se hace de buena fe —«así dos objetos distintos con el mismo contenido no " +
+      "se pisan»— y rompe justo lo que el direccionamiento por contenido compra: la MISMA imagen servida " +
+      "como `image/png` y como `application/octet-stream` pasa a ser dos objetos, se guarda dos veces, el " +
+      "modelo la describe dos veces y —porque la dirección entra en la huella del asset— son DOS " +
+      "IDENTIDADES, así que la curación de una no vale para la otra. Y no rompe nada visible en el árbol",
+  },
+  {
+    id: "S106",
+    garantía: "un asset con objeto PROPIO no es un rectángulo sin bytes",
+    rompe: "I18 · el asset comprimido no llegó a delegar",
+    cambios: [[
+      `  if (ref.object !== origin.ref.object && resolve !== null) {`,
+      `  if (ref.object === origin.ref.object && resolve !== null) {`,
+    ]],
+    espera: /el asset comprimido no llegó a delegar/,
+    nota:
+      "SU INVARIANTE PASABA POR LA RAZÓN EQUIVOCADA y esta fila lo encontró. Con la comparación dada vuelta " +
+      "los nodos delegados SEGUÍAN apareciendo: el adaptador de imagen reclama por el MIME que declaró el " +
+      "padre —no por el contenido, y eso es deliberado— y el `perceive` del banco devolvía regiones sin " +
+      "mirar la fuente. O sea que la delegación «funcionaba» con cero bytes. El doble pasó a exigir bytes, " +
+      "que es lo que un modelo real hace. " +
+      "Hasta el paso 7 las dos cosas caían en la misma rama y estaba bien, porque nada se materializaba: la " +
+      "única pregunta era «¿es un rango?» y como la respuesta era no para los dos, los dos volvían vacíos. " +
+      "Uno con razón —un rectángulo de una página no existe hasta que alguien la renderiza— y el otro, " +
+      "desde que hay objetos propios, mal. Con la comparación dada vuelta el materializado vuelve a la " +
+      "rama del rectángulo: sale sin bytes, nadie lo reclama y la figura desaparece SIN UN SOLO AVISO, " +
+      "porque desde afuera es indistinguible de un asset que legítimamente no tiene bytes propios",
+  },
+
   {
     id: "SC21",
     control: true,
@@ -745,6 +781,11 @@ const ARCHIVOS = [
   // sufre. El arnés lo restaura como a cualquier otro, y el orden `^lint` del grafo
   // garantiza que la cadena de `emission` ya terminó cuando esto lo muta (S73).
   "../emission/src/reconcile.ts",
+  // El SEGUNDO `src/` ajeno, y por la misma razón que el primero: la única prueba de
+  // que un asset MATERIALIZADO entra por la misma puerta que un recorte necesita las
+  // dos mitades —el adaptador que lo produce y la orquestación que lo resuelve— y solo
+  // este paquete alcanza a las dos.
+  "../adapters/src/registry.ts",
   // El único archivo de la RAÍZ que un corredor de mutación toca en todo el repo, y va
   // con su razón: el orden entre `lint` y `lint` es un hecho del monorepo, no del
   // paquete, y el único que lo puede acreditar es el que lo sufre (S73). El arnés lo

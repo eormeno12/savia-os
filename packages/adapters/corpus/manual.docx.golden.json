@@ -1,0 +1,96 @@
+{
+  "nodos": [
+    {
+      "anchor": "p#0",
+      "adapter": "docx",
+      "role": "heading",
+      "level": "declarative",
+      "attribution": "byDocxStyle",
+      "hint": {
+        "linkage": "level",
+        "level": 1
+      },
+      "body": {
+        "shape": "text_span",
+        "text": "Manual de proveedores",
+        "marks": []
+      }
+    },
+    {
+      "anchor": "p#1",
+      "adapter": "docx",
+      "role": "paragraph",
+      "level": "physical",
+      "attribution": null,
+      "hint": null,
+      "body": {
+        "shape": "text_span",
+        "text": "Este manual describe el circuito de alta.",
+        "marks": []
+      }
+    },
+    {
+      "anchor": "p#2",
+      "adapter": "docx",
+      "role": "subheading",
+      "level": "physical",
+      "attribution": "byProminence",
+      "hint": {
+        "linkage": "level",
+        "level": null
+      },
+      "body": {
+        "shape": "text_span",
+        "text": "Alta de un proveedor",
+        "marks": []
+      }
+    },
+    {
+      "anchor": "p#3",
+      "adapter": "docx",
+      "role": "paragraph",
+      "level": "physical",
+      "attribution": null,
+      "hint": null,
+      "body": {
+        "shape": "text_span",
+        "text": "Pedir la documentacion y verificar el CUIT.",
+        "marks": []
+      }
+    },
+    {
+      "anchor": "img#4",
+      "adapter": "docx",
+      "role": "image",
+      "level": "physical",
+      "attribution": null,
+      "hint": null,
+      "body": {
+        "shape": "asset",
+        "ref": {
+          "object": "obj-1721",
+          "window": {
+            "scope": "range",
+            "start": 1305,
+            "end": 1374
+          }
+        },
+        "mime": "image/png"
+      }
+    },
+    {
+      "anchor": "p#5",
+      "adapter": "docx",
+      "role": "paragraph",
+      "level": "physical",
+      "attribution": null,
+      "hint": null,
+      "body": {
+        "shape": "text_span",
+        "text": "El sello se aplica en Legales.",
+        "marks": []
+      }
+    }
+  ],
+  "avisos": []
+}

@@ -416,6 +416,25 @@ export const preimageOfFingerprint = (body: Body): string =>
 export type HashFn = (preimage: string) => string;
 
 /**
+ * La misma función, sobre BYTES. Cierra un hueco que este paquete ya declaraba: la
+ * familia de hashes nombra `ByteHash` y `identity.ts` dice, de frente, que cinco de
+ * sus seis marcas «NO TIENEN PRODUCTOR DE NINGÚN TIPO».
+ *
+ * POR QUÉ NO ALCANZA CON `HashFn`. Aquella toma una PREIMAGEN, que es texto que `ir`
+ * construye entero —`encode(project(body))`— y por eso puede prometer inyectividad.
+ * Un objeto binario no tiene preimagen: son los bytes. Codificarlos a texto para
+ * reusar `HashFn` sería inventar una segunda serialización canónica, con su propio
+ * modo de falla, para no agregar cuatro palabras acá.
+ *
+ * PARA QUÉ SE USA: derivar la `ObjectKey` de un asset materializado. Es lo que hace
+ * cierta la promesa que sostiene el dedupe y el reuso del modelo — misma imagen, misma
+ * dirección, guardada una vez y descrita una vez— y por eso la deriva el PIPELINE y no
+ * la implementación de almacenamiento que le inyecten: una clave calculada afuera hace
+ * que esa promesa dependa de código que este repo no ve. Ver `Storage` en `adapter.ts`.
+ */
+export type ByteHashFn = (bytes: Uint8Array) => string;
+
+/**
  * `fingerprintOf` — el material de la próxima reconciliación (§{Tramo 4 › Qué sale}).
  *
  * D24 — CERRADO EN EL BLOQUE 3b. Devuelve `NodeFingerprint`, y la marca se aplica

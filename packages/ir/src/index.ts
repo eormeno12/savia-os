@@ -181,6 +181,8 @@ export {
   encode,
   preimageOfFingerprint,
   type HashFn,
+  /** La misma, sobre BYTES: deriva la dirección de un asset materializado. */
+  type ByteHashFn,
   fingerprintOf,
   similarityOfProjections,
   similarity,
@@ -236,6 +238,8 @@ export {
   type Capability,
   type Region,
   type PerceiveFn,
+  /** El almacenamiento que el pipeline GESTIONA y no implementa. */
+  type Storage,
   Evidence,
   type Origin,
   type ColdProbe,

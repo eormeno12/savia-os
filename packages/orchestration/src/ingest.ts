@@ -88,6 +88,9 @@ import {
   type RawNode,
   type Source,
   type EmittedNode,
+  type Storage,
+  type ByteHashFn,
+  asObjectKey,
   type SpendKind,
 } from "@savia-os/ir";
 
@@ -340,6 +343,26 @@ export type IngestOptions = {
    */
   readonly previousAdapter: string | null;
   readonly previousVersion: string | null;
+  /**
+   * EL ALMACENAMIENTO, y `null` = este contexto no lo tiene.
+   *
+   * El pipeline GESTIONA el almacenamiento y no lo implementa: decide qué se guarda,
+   * cuándo y bajo qué clave, y el bucket lo pone quien llama. Es la cuarta capacidad
+   * que entra así —`sha256`, `perceive` y el acuñador son las otras tres— y por la
+   * misma razón: escribir bytes es I/O, y ningún paquete del pipeline puede hacer I/O
+   * sin dejar de ser verificable.
+   *
+   * SIN ÉL, `materialize` RECHAZA y un asset que necesitaba materializarse queda
+   * anunciado en vez de emitido. No es una degradación silenciosa: el adaptador avisa,
+   * y el documento entra sin esa pieza. «Guardar es incondicional, indexar no.»
+   */
+  readonly storage?: Storage | null;
+  /**
+   * Con qué se deriva la dirección de un objeto materializado. Va junto a `storage`
+   * porque sin él no hay clave que calcular, y separado de `sha256` porque aquella
+   * toma una preimagen de texto y un objeto binario no tiene preimagen: son los bytes.
+   */
+  readonly byteHash?: ByteHashFn | null;
   readonly budget?: Budget;
   /**
    * LA CAPACIDAD PERCEPTUAL, y `undefined` significa que este contexto no la tiene.
@@ -378,6 +401,18 @@ const NEVER_ABORTED: CancellationSignal = { aborted: false };
  */
 export const contextOf = (
   limits: Budget,
+  /**
+   * Ver `IngestOptions.storage`. `null` = este contexto no puede materializar.
+   *
+   * LOS DOS LLEVAN DEFAULT, y no es cosmética: sin él, un llamador que los omite pasa
+   * `undefined`, la guarda `=== null` no lo ve y `materialize` explota con un
+   * `TypeError` en vez de rechazar con su mensaje. Lo encontró I7, que construye el
+   * contexto con un solo argumento justamente para verificar que sin almacenamiento se
+   * rechaza — o sea que el invariante que existe para probar la ausencia fue el que
+   * encontró que la ausencia no estaba bien modelada.
+   */
+  storage: Storage | null = null,
+  byteHash: ByteHashFn | null = null,
   /**
    * `null` = este contexto NO PUEDE percibir, y es el valor por defecto A PROPÓSITO.
    * El hilo que atiende el request se construye así, el worker con el modelo puesto,
@@ -423,11 +458,37 @@ export const contextOf = (
     // caché no descuenta»: si cada adaptador invocara por su cuenta, nadie podría saber
     // si descontó o no. En el paso 3 no hay caché y la invocación es directa.
     invoke: <T,>(_key: string, work: () => Promise<T>): Promise<T> => work(),
-    // RECHAZA, y eso es lo que hace verificable que la profundidad de delegación de
-    // este paso sea CERO. «No llamar a `materialize` es lo que hace cumplir la
-    // precondición de terminación» (§{Dónde frena}) — acá no se puede llamar.
-    materialize: (_bytes: Uint8Array, _mime: string): Promise<ObjectRef> =>
-      Promise.reject(new Error("ORCHESTRATION-ERR: step 3 does not materialize bytes")),
+    /**
+     * GUARDA LOS BYTES Y DEVUELVE SU DIRECCIÓN. Hasta el paso 7 rechazaba, y eso era
+     * lo que volvía verificable que la profundidad de delegación fuera cero: mientras
+     * ningún formato trajera bytes propios, «no llamar a `materialize`» era la
+     * precondición de terminación hecha hecho (§{Dónde frena}).
+     *
+     * SIGUE RECHAZANDO SIN ALMACENAMIENTO, y eso no es una regresión: un contexto sin
+     * bucket no puede materializar, y decirlo con un rechazo es lo que permite que el
+     * adaptador lo anuncie en vez de emitir un asset que apunta a ninguna parte.
+     *
+     * LA CLAVE SE DERIVA DEL CONTENIDO, así que materializar dos veces los mismos
+     * bytes devuelve la MISMA dirección: se guardan una vez y el modelo los describe
+     * una vez. Y como la dirección entra en la huella del asset, la identidad del nodo
+     * deja de depender de DÓNDE vino la imagen — que era el modo de falla de referirla
+     * por URL: alguien reacomoda su CDN y toda la curación de esa figura se despega.
+     *
+     * LA VENTANA ES `whole` PORQUE EL OBJETO ES LA PIEZA ENTERA. Un asset con objeto
+     * propio no es un recorte de nada: sus bytes son exactamente lo que se guardó.
+     */
+    materialize: (bytes: Uint8Array, mime: string): Promise<ObjectRef> => {
+      if (storage === null || byteHash === null) {
+        return Promise.reject(
+          new Error("ORCHESTRATION-ERR: this context has no storage to materialise into"),
+        );
+      }
+      if (!ctx.spend("materializedBytes", bytes.length)) {
+        return Promise.reject(new Error("ORCHESTRATION-ERR: materialised bytes budget exhausted"));
+      }
+      const object = asObjectKey(byteHash(bytes));
+      return storage.put(object, bytes, mime).then(() => ({ object, window: { scope: "whole" } }));
+    },
     perceive,
   };
   return { ctx, sink: { notices, degradations } };
@@ -505,6 +566,13 @@ const expand = async (
   chain: readonly DelegationId[],
   ctx: Context,
   registry: Registry,
+  /**
+   * Solo para RESOLVER objetos propios, y por eso NO viaja en el `Context`: un
+   * adaptador recibe `materialize` —«guardá esto»— y nada más. Darle `get` sería darle
+   * la capacidad de leer objetos que nadie le pasó, y con ella se borra el borde entre
+   * «lee lo que le dieron» y «va a buscar lo que quiera».
+   */
+  storage: Storage | null,
 ): Promise<Expansion> => {
   const out: RawNode[] = [];
   const deferred: ObjectRef[] = [];
@@ -518,7 +586,7 @@ const expand = async (
     out.push(chain.length === ZERO ? node : { ...node, delegation: chain });
     if (node.body.shape !== "asset") continue;
 
-    const sub = await delegateOne(node, node.body, origin, chain, ctx, registry);
+    const sub = await delegateOne(node, node.body, origin, chain, ctx, registry, storage);
     out.push(...sub.nodes);
     deferred.push(...sub.deferred);
     delegated = delegated || sub.delegated;
@@ -533,6 +601,13 @@ const delegateOne = async (
   chain: readonly DelegationId[],
   ctx: Context,
   registry: Registry,
+  /**
+   * Solo para RESOLVER objetos propios, y por eso NO viaja en el `Context`: un
+   * adaptador recibe `materialize` —«guardá esto»— y nada más. Darle `get` sería darle
+   * la capacidad de leer objetos que nadie le pasó, y con ella se borra el borde entre
+   * «lee lo que le dieron» y «va a buscar lo que quiera».
+   */
+  storage: Storage | null,
 ): Promise<Expansion> => {
   const matter = matterOf(asset.ref);
 
@@ -548,7 +623,10 @@ const delegateOne = async (
     return NOTHING;
   }
 
-  const source = sourceOfAsset(origin, asset);
+  // El resolvedor de objetos propios: un asset MATERIALIZADO no es un recorte del
+  // original y sus bytes solo se recuperan yendo al almacenamiento. Sin él, un asset
+  // materializado se comporta como un rectángulo —sin bytes— y nadie lo reclama.
+  const source = sourceOfAsset(origin, asset, storage === null ? null : (o) => storage.get(o));
   const probe = probeOf(
     await coldProbeOfAsset(source),
     // El origen `delegated` estrena productor: existe desde el paso 1 y nadie lo
@@ -595,7 +673,7 @@ const delegateOne = async (
     return NOTHING;
   }
 
-  const below = await expand(raw, source, [...chain, asDelegationId(matter)], inner, registry);
+  const below = await expand(raw, source, [...chain, asDelegationId(matter)], inner, registry, storage);
   return { ...below, delegated: true };
 };
 
@@ -668,6 +746,8 @@ const recognizedOfBytes = async (
   intake: Extract<Intake<unknown, unknown>, { kind: "bytes" }>,
   registry: Registry,
   ctx: Context,
+  /** Ver el parámetro homónimo de `expand`. */
+  storage: Storage | null,
 ): Promise<Recognized> => {
   const source = sourceOfBytes(intake.bytes, intake.object, intake.mime);
   const cold = coldProbeOf(intake.bytes, intake.name);
@@ -702,7 +782,7 @@ const recognizedOfBytes = async (
   // el contexto jerárquico de su contenedor» (§{La delegación es emergente}). El
   // emisor no necesita saber nada de esto: compara cadenas de delegación y reencuadra
   // solo, y eso está construido desde el paso 2.
-  const grown = await expand(raw, source, [], ctx, registry);
+  const grown = await expand(raw, source, [], ctx, registry, storage);
 
   return {
     onHold: null,
@@ -775,7 +855,12 @@ export const ingest = async <S, E>(
   intake: Intake<S, E>,
   options: IngestOptions,
 ): Promise<Run> => {
-  const { ctx, sink } = contextOf(options.budget ?? NO_BUDGET, options.perceive ?? null);
+  const { ctx, sink } = contextOf(
+    options.budget ?? NO_BUDGET,
+    options.storage ?? null,
+    options.byteHash ?? null,
+    options.perceive ?? null,
+  );
 
   // LA ÚNICA RAMA DE TODO EL ARCHIVO, y está acá arriba a propósito. De la línea
   // siguiente en adelante no hay una sola pregunta sobre de dónde vino esto: emisión,
@@ -784,7 +869,7 @@ export const ingest = async <S, E>(
   const recognized =
     intake.kind === "message"
       ? await recognizedOfMessage(intake, ctx)
-      : await recognizedOfBytes(intake, options.registry, ctx);
+      : await recognizedOfBytes(intake, options.registry, ctx, options.storage ?? null);
 
   if (recognized.onHold !== null) {
     return {

@@ -55,6 +55,11 @@ import {
   type ObjectKey,
   type Unit,
 } from "@savia-os/ir";
+// La mitad del lector de zip que NO tiene dependencias. Ver el encabezado de `zip.ts`:
+// si el selector importara la mitad que INFLA, arrastraría `fflate` y la razón escrita
+// de la regla de confinación —«el tramo 2 sigue sin depender de ninguna librería de
+// formato»— pasaría a ser falsa sin que ningún especificador de import lo mostrara.
+import { zipEntriesOf } from "./zip.js";
 
 const { zero: ZERO, one: ONE } = PARAMETERS.arithmetic;
 
@@ -110,9 +115,44 @@ export const sourceOfBytes = (
  * es lo que hace que la guarda de ciclo y el caché vean la misma materia, y lo que
  * permite que el punto fijo compare `(objeto, ventana)` contra lo que entró.
  */
-export const sourceOfAsset = (origin: Source, asset: BodyOf<"asset">): Source => {
+export const sourceOfAsset = (
+  origin: Source,
+  asset: BodyOf<"asset">,
+  /**
+   * CÓMO SE TRAE UN OBJETO PROPIO, y por qué entra por parámetro. Un asset
+   * MATERIALIZADO no es un recorte del original: sus bytes se guardaron aparte y solo
+   * se recuperan yendo al almacenamiento. Este paquete no puede alcanzarlo —no puede
+   * importar nada más que `ir`, `yaml`, `fflate` y `txml`— así que quien compone los
+   * dos lados le pasa el resolvedor. `null` = este contexto no puede traer objetos, y
+   * entonces un asset materializado se comporta como un rectángulo: sin bytes.
+   */
+  resolve: ((object: ObjectKey) => Promise<Uint8Array | null>) | null = null,
+): Source => {
   const { ref, mime } = asset;
   const shared = { ref, mime } as const;
+  // EL TERCER CASO, y hasta el paso 7 no existía porque nada se materializaba. Un
+  // objeto PROPIO —dirección distinta de la del origen— sí tiene bytes, y confundirlo
+  // con el rectángulo de una página es lo que hacía este código cuando las dos cosas
+  // caían en la misma rama: la única pregunta era «¿es un rango?», y como la respuesta
+  // era no para los dos, los dos volvían vacíos. Uno con razón y el otro mal.
+  if (ref.object !== origin.ref.object && resolve !== null) {
+    let traído: Promise<Uint8Array> | null = null;
+    // Se memoiza LA PROMESA EN VUELO por la misma razón que `zipEntries`: el selector
+    // dispara los evidenciadores en paralelo y cada uno puede pedir los bytes.
+    const traer = () => {
+      if (traído === null) traído = resolve(ref.object).then((b) => b ?? EMPTY_BYTES);
+      return traído;
+    };
+    return {
+      ...shared,
+      size: origin.size,
+      bytes: traer,
+      range: (a, b) => traer().then((all) => all.subarray(Math.max(ZERO, a), Math.max(ZERO, b))),
+      stream: async function* () {
+        yield await traer();
+      },
+    };
+  }
   if (ref.window.scope !== "range") {
     // SIN BYTES PROPIOS, y devolverlo vacío es lo correcto, no una carencia. Un
     // rectángulo de una página renderizada no existe hasta que alguien la renderiza,
@@ -189,9 +229,21 @@ export const coldProbeOf = (bytes: Uint8Array, name: string | null): ColdProbe =
  * abrirían el archivo cuatro veces. La afirmación de costo del plan —«una sola
  * apertura parcial» (§{Los tres casos})— es verdadera bajo una y falsa bajo la otra.
  *
- * `zipEntries` devuelve vacío y no lanza: el paso 3 no tiene ningún adaptador de zip,
- * y hacerla fallar volvería `None` a cualquier evidenciador que la consultara — o
- * sea, decidiría por adaptadores que todavía no existen.
+ * `zipEntries` NO LANZA, y eso sobrevive al paso 7: un zip ilegible devuelve la lista
+ * vacía, porque hacerla fallar volvería `None` a cualquier evidenciador que la
+ * consultara — o sea, un archivo corrupto decidiría por los cuatro adaptadores de zip
+ * en vez de dejar que cada uno se abstenga.
+ *
+ * PENDING(cola del zip): la frase del plan tiene DOS MITADES y hoy se cumple UNA. «Una
+ * sola apertura parcial» (§{Los tres casos}) — lo de «una sola» lo da la memoización de
+ * la promesa en vuelo, que es la mitad que decide el costo con doce evidenciadores
+ * corriendo. Lo de «parcial» NO: se lee el archivo entero. El directorio central y su
+ * registro de fin están al FINAL, así que la lectura parcial es una COLA y no un
+ * prefijo, y su ventana es un número que decide comportamiento y que nadie midió —el
+ * registro de fin son 22 bytes más un comentario de hasta 64 KiB, así que la cola no
+ * tiene tope conocido—. Inventarlo acá sería la precisión falsa que `PARAMETERS` existe
+ * para impedir. Se mide cuando llegue `.xlsx`, que es donde un archivo grande deja de
+ * ser hipotético; sobre un `.docx` de kilobytes la diferencia no se puede cronometrar.
  */
 export const probeOf = (cold: ColdProbe, origin: Origin, source: Source): Probe => {
   let lines: Promise<readonly string[]> | null = null;
@@ -208,7 +260,7 @@ export const probeOf = (cold: ColdProbe, origin: Origin, source: Source): Probe 
       return lines;
     },
     zipEntries: () => {
-      if (entries === null) entries = Promise.resolve([]);
+      if (entries === null) entries = source.bytes().then(zipEntriesOf);
       return entries;
     },
   };

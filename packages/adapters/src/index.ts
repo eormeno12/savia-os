@@ -72,6 +72,8 @@ export {
   markdownAdapter,
 } from "./markdown.js";
 
+export { type DocxSignals, DOCX_ID, docxAdapter } from "./docx.js";
+
 export {
   IMAGE_ID,
   type ImageSignals,
