@@ -117,7 +117,19 @@ try {
   const png = corpus("sello.png");
 
   const REGISTRO = registryOf([opaqueOf(markdownAdapter)]);
-  const OPCIONES = {
+  // OPCIONES ES UNA FÁBRICA Y NO UN OBJETO, y eso es lo que sostiene I2 · determinismo.
+  //
+  // El acuñador de `ElementId` es la única no-determinación legítima del pipeline
+  // (H13(a): reloj + azar), y el banco la aísla con un contador. Pero un contador
+  // ÚNICO compartido por las ~18 llamadas de este archivo le daría `e1..e24` a la
+  // primera corrida y `e25..e48` a la segunda: I2 se pondría rojo SOBRE UN ÁRBOL SANO,
+  // y peor, los ids de cualquier golden pasarían a depender de CUÁNTAS corridas hay
+  // más arriba — agregar un invariante entre dos movería los goldens de los de abajo.
+  // Un acoplamiento de orden entre invariantes es exactamente lo que un guardián no
+  // puede tener. Con la fábrica, cada llamada arranca su contador en cero.
+  const OPCIONES = () => {
+    let acuñados = 0;
+    return {
     registry: REGISTRO,
     sha256,
     // 60 y no otro número, y hay que decir qué es: es UN PARÁMETRO DEL BANCO, no del
@@ -125,6 +137,20 @@ try {
     // medición escrito, y 60 está elegido para que el corte por tamaño ocurra sobre un
     // corpus chico. Va dicho para que nadie lo lea como una medición.
     targetSizeChars: 60,
+    // El acuñador CONTABLE del banco. `e` de «element», y el número es el orden de
+    // acuñado dentro de ESTA corrida.
+    mint: () => asElementId(`e${(acuñados += 1)}`),
+    // Sin versión anterior: cada invariante de este archivo salvo I16 es una PRIMERA
+    // ingesta. No saltea el reconciliador — reconcilia contra una versión vacía.
+    previous: null,
+    // Los dos parámetros del banco. En una primera ingesta NO SE LEEN —sin versión
+    // anterior no hay una sola comparación de similitud— y van explícitos igual porque
+    // el tipo los exige, que es lo que impide que alguien invente un default.
+    similarityThreshold: 0.5,
+    maxComparisons: 10000,
+    previousAdapter: null,
+    previousVersion: null,
+    };
   };
 
   // La variante `bytes` de `Intake`, que desde el paso 5 lleva lo que era del entorno y
@@ -144,9 +170,16 @@ try {
     ...extra,
   });
 
-  const corrida = await ingest(SUBIDA(bytes), OPCIONES);
-  const anclaDe = (local) =>
-    local === null ? null : corrida.nodes.find((n) => n.local === local)?.location.anchor ?? "?";
+  const corrida = await ingest(SUBIDA(bytes), OPCIONES());
+  // EL `?? "?"` NO ES DECORACIÓN, y este paso midió por qué. Hasta el paso 12 este
+  // helper buscaba por `n.local`, y cuando `Run` pasó a llevar `EmittedNode` la
+  // búsqueda NO cayó al `"?"`: `undefined === undefined` matcheaba EL PRIMER NODO, así
+  // que los 24 nodos pasaron a decir que su padre era el frontmatter. Un valor
+  // plausible, no un absurdo — y regenerar el golden en ese estado habría congelado un
+  // árbol falso como LA REFERENCIA, en verde y para siempre. Por eso el re-tecleo a
+  // `id` va ANTES de cualquier regeneración, y no después.
+  const anclaDe = (id) =>
+    id === null ? null : corrida.nodes.find((n) => n.id === id)?.location.anchor ?? "?";
 
   // ── I1 · GOLDEN: BYTES → ÁRBOL, LAS DOS SALIDAS Y EL SUMIDERO ─────────────
   // Se regenera con `ORCHESTRATION_REGEN=1`, y ningún script del `package.json` lo pasa:
@@ -167,7 +200,7 @@ try {
           level: n.level,
           attribution: n.attribution,
           confidence: n.confidence,
-          parent: anclaDe(n.localParent),
+          parent: anclaDe(n.parentId),
           breadcrumbs: n.breadcrumbs.map((b) => b.text),
           hash: n.hash,
         })),
@@ -205,13 +238,63 @@ try {
 
   // ── I2 · DETERMINISMO: DOS CORRIDAS BYTE-IDÉNTICAS ────────────────────────
   {
-    const otra = await ingest(SUBIDA(bytes), OPCIONES);
+    const otra = await ingest(SUBIDA(bytes), OPCIONES());
     if (!igual(otra, corrida)) {
       fallar(
         "I2 · determinismo",
         "dos corridas sobre los mismos bytes dieron salidas distintas",
         "es precondición del caché de reconocimiento, y es el único invariante que un golden NO atrapa: una salida no determinística es golden respecto de sí misma. No es un property test —es una entrada fija corrida dos veces— y hay que llamarlo así: un property test necesita un generador de `.md`, que es una pieza que nadie presupuestó",
       );
+    }
+
+    // LA SEGUNDA MITAD, y sin ella la primera es satisfacible IGNORANDO LA COSTURA.
+    //
+    // Desde el paso 12 los ids salen de `options.mint`, y el banco provee un acuñador
+    // CONTABLE para que dos corridas den lo mismo. Pero un `ingest` que nunca llamara a
+    // `options.mint` y derivara los ids de la posición daría dos corridas idénticas y
+    // quedaría verde PARA SIEMPRE — la costura existiría sin usarse, y con ella se iría
+    // la mitad del reconciliador: `EmittedNode.id` es «de la reconciliación, NO de una
+    // fórmula» (H13(a)), y una fórmula sobre la posición es exactamente la que el plan
+    // descartó porque insertar un párrafo arriba mueve todos los ids de abajo.
+    //
+    // Con un acuñador que NO se repite, esta mitad afirma las dos cosas juntas: que los
+    // ids SÍ se mueven (o sea que la costura se usa) y que TODO LO DEMÁS NO (o sea que
+    // los ids son la única no-determinación del pipeline). Eso convierte H13(a) de
+    // supuesto en medición.
+    {
+      let n = 0;
+      const azarosa = await ingest(SUBIDA(bytes), {
+        ...OPCIONES(),
+        mint: () => asElementId(`otro#${(n += 1)}`),
+      });
+      const sinIdentidad = (r) => ({
+        ...r,
+        nodes: r.nodes.map(({ id: _i, parentId: _p, breadcrumbs, ...resto }) => ({
+          ...resto,
+          breadcrumbs: breadcrumbs.map((b) => b.text),
+        })),
+        fragments: r.fragments.map(({ nodes: _n, breadcrumbs, ...resto }) => ({
+          ...resto,
+          breadcrumbs: breadcrumbs.map((b) => b.text),
+        })),
+        records: r.records.map(({ node: _n, ...resto }) => resto),
+        matches: r.matches.length,
+      });
+      const idsDe = (r) => r.nodes.map((x) => x.id);
+      if (igual(idsDe(azarosa), idsDe(corrida))) {
+        fallar(
+          "I2 · el acuñador de `IngestOptions` no se usa",
+          `dos acuñadores distintos dieron los mismos ids: ${JSON.stringify(idsDe(corrida).slice(0, 3))}`,
+          "si cambiar el acuñador no cambia un solo id, `ingest` los está derivando de otra cosa —la posición, un hash— y eso es la fórmula de una sola versión que §{Por qué la identidad} descartó: insertar un párrafo arriba movería los ids de todos los de abajo, y la curación del cliente se despegaría en silencio",
+        );
+      }
+      if (!igual(sinIdentidad(azarosa), sinIdentidad(corrida))) {
+        fallar(
+          "I2 · cambiar el acuñador movió algo que no es un id",
+          "dos corridas con acuñadores distintos difieren en algo más que la identidad",
+          "H13(a) dice que el acuñado es la ÚNICA no-determinación del pipeline. Si al cambiarlo se mueve el texto de un fragmento, una huella o un aviso, entonces hay una segunda fuente de azar y el caché de reconocimiento deja de ser sano",
+        );
+      }
     }
   }
 
@@ -230,8 +313,14 @@ try {
         "sin el nodo, todo lo de abajo es vacuamente cierto y las filas que lo acreditan pasan en verde",
       );
     } else {
-      const enMigas = corrida.nodes.filter((n) => n.breadcrumbs.some((b) => b.ref === fm.local));
-      const hijos = corrida.nodes.filter((n) => n.localParent === fm.local);
+      // LAS DOS MITADES SE ROMPIERON EN DIRECCIONES OPUESTAS cuando `Run` cambió, y
+      // por eso van juntas y anotadas. `n.parentId === fm.id` gritó —`undefined ===
+      // undefined` daba TRUE para los 24 nodos—, pero `b.ref === fm.id` comparaba un
+      // `ElementId` contra `undefined`, no matcheaba nunca, y quedaba VACUAMENTE VERDE.
+      // Arreglar solo la que grita habría apagado sin ruido la garantía que el propio
+      // docstring dice que está medida: que editar `version:` no re-embeba el archivo.
+      const enMigas = corrida.nodes.filter((n) => n.breadcrumbs.some((b) => b.ref === fm.id));
+      const hijos = corrida.nodes.filter((n) => n.parentId === fm.id);
       if (enMigas.length > 0 || hijos.length > 0) {
         fallar(
           "I3 · el frontmatter es hermano, no ancestro",
@@ -239,10 +328,10 @@ try {
           "`ContextualFingerprint` es `sha256(miga ‖ texto)` y de ahí sale `FragmentId`: con el frontmatter adentro de la miga de todos, cambiar una línea de metadato le mueve el id a cada fragmento del archivo y despega la curación del cliente EN SILENCIO",
         );
       }
-      if (fm.breadcrumbs.length > 0 || fm.localParent !== null) {
+      if (fm.breadcrumbs.length > 0 || fm.parentId !== null) {
         fallar(
           "I3 · el frontmatter cuelga de la raíz",
-          `tiene ${fm.breadcrumbs.length} migas y su padre es ${JSON.stringify(anclaDe(fm.localParent))}`,
+          `tiene ${fm.breadcrumbs.length} migas y su padre es ${JSON.stringify(anclaDe(fm.parentId))}`,
           "está ANTES de todas las secciones y no pertenece a ninguna: darle la sección del primer título sería archivarlo bajo algo que no lo contiene",
         );
       }
@@ -266,7 +355,10 @@ try {
       );
     }
     const solos = satélites.filter((n) =>
-      corrida.fragments.some((f) => igual(f.nodes, [n.local])),
+      // La MISMA asimetría que I3: esta mitad se calla (`igual(f.nodes, [undefined])`
+      // no matchea nunca, así que «ningún satélite quedó solo» daba verde de mentira) y
+      // la de abajo grita. Las dos se re-teclean juntas.
+      corrida.fragments.some((f) => igual(f.nodes, [n.id])),
     );
     if (solos.length > 0) {
       fallar(
@@ -287,7 +379,7 @@ try {
       );
     });
     const rescatadas = conEpígrafe.filter((n) =>
-      corrida.fragments.some((f) => f.nodes.includes(n.local) && f.text !== ""),
+      corrida.fragments.some((f) => f.nodes.includes(n.id) && f.text !== ""),
     );
     if (conEpígrafe.length === 0 || rescatadas.length !== conEpígrafe.length) {
       fallar(
@@ -307,7 +399,7 @@ try {
       evidence: () => Promise.resolve(Evidence.None),
       recognize: () => Promise.resolve([]),
     };
-    const r = await ingest(SUBIDA(bytes), { ...OPCIONES, registry: registryOf([mudo]) }).catch(
+    const r = await ingest(SUBIDA(bytes), { ...OPCIONES(), registry: registryOf([mudo]) }).catch(
       (e) => ({ tiró: String(e) }),
     );
     if (r.tiró !== undefined) {
@@ -350,7 +442,7 @@ try {
           },
         ]),
     };
-    const r = await ingest(SUBIDA(bytes), { ...OPCIONES, registry: registryOf([colgante]) }).catch(
+    const r = await ingest(SUBIDA(bytes), { ...OPCIONES(), registry: registryOf([colgante]) }).catch(
       (e) => ({ tiró: String(e) }),
     );
     const códigos = r.sink?.notices.map((n) => n.code) ?? [];
@@ -418,7 +510,7 @@ try {
   // que no cambia nada no es un parámetro pendiente de medición, es código muerto — y
   // dejarlo escrito como pendiente sería inventar una medición que nadie va a hacer.
   {
-    const grande = await ingest(SUBIDA(bytes), { ...OPCIONES, targetSizeChars: 100000 });
+    const grande = await ingest(SUBIDA(bytes), { ...OPCIONES(), targetSizeChars: 100000 });
     if (grande.fragments.length >= corrida.fragments.length) {
       fallar(
         "I8 · el tamaño objetivo decide dónde corta",
@@ -435,7 +527,7 @@ try {
   {
     const otroAutor = await ingest(
       SUBIDA(bytes, { when: "2030-01-01T00:00:00.000Z", actor: "otra-persona" }),
-      OPCIONES,
+      OPCIONES(),
     );
     const huellas = corrida.nodes.map((n) => n.hash);
     const otras = otroAutor.nodes.map((n) => n.hash);
@@ -469,7 +561,7 @@ try {
   // exactamente igual que uno completo es el defecto: quien consume la memoria no puede
   // saber que lo que está leyendo perdió su estructura.
   {
-    const r = await ingest(SUBIDA(conf, { name: "servidor.conf" }), { ...OPCIONES, registry: CON_PISO });
+    const r = await ingest(SUBIDA(conf, { name: "servidor.conf" }), { ...OPCIONES(), registry: CON_PISO });
     if (r.adapter !== TEXT_FLOOR_ID || r.nodes.length === 0 || r.fragments.length === 0) {
       fallar(
         "I10 · un archivo que ningún adaptador reclama entra igual",
@@ -495,7 +587,7 @@ try {
     }
     // El piso en el registro NO le roba el archivo al dedicado, y el golden lo prueba
     // sin repetirse: la corrida del `.md` con el piso puesto tiene que ser IDÉNTICA.
-    const conPiso = await ingest(SUBIDA(bytes), { ...OPCIONES, registry: CON_PISO });
+    const conPiso = await ingest(SUBIDA(bytes), { ...OPCIONES(), registry: CON_PISO });
     if (!igual(conPiso, corrida)) {
       fallar(
         "I10 · agregar el piso al registro no mueve al `.md`",
@@ -512,7 +604,7 @@ try {
   // llegue el adaptador. `on_hold` no es «rechazado», es «todavía no lo soportamos».
   {
     const antes = JSON.stringify(png);
-    const r = await ingest(SUBIDA(png, { name: "sello.png" }), { ...OPCIONES, registry: CON_PISO }).catch(
+    const r = await ingest(SUBIDA(png, { name: "sello.png" }), { ...OPCIONES(), registry: CON_PISO }).catch(
       (e) => ({ tiró: String(e) }),
     );
     if (r.tiró !== undefined) {
@@ -564,7 +656,7 @@ try {
       recognize: () => Promise.resolve([]),
     };
     const reintento = await ingest(SUBIDA(png, { name: "sello.png" }), {
-      ...OPCIONES,
+      ...OPCIONES(),
       registry: registryOf([...CON_PISO, imagenSintética]),
     });
     if (reintento.adapter !== "imagen-sintetica" || reintento.onHold !== null) {
@@ -601,7 +693,7 @@ try {
         adapter: chatAdapter,
         input: { author: AUTOR, paragraphs: párrafos.map((t) => ({ text: t, marks: [] })) },
       },
-      OPCIONES,
+      OPCIONES(),
     );
 
     // (a) El mensaje recorre TODO: emisión, migas, huellas, fragmentación. Si alguno de
@@ -650,7 +742,7 @@ try {
     // y pasando a ser una igualdad entre dos hexadecimales.
     const comoArchivo = await ingest(
       SUBIDA(new TextEncoder().encode(`${párrafos.join("\n\n")}\n`), { name: "nota.md" }),
-      OPCIONES,
+      OPCIONES(),
     );
     const huellasDelChat = mensaje.nodes.map((n) => n.hash);
     const huellasDelMd = comoArchivo.nodes.map((n) => n.hash);
@@ -684,7 +776,7 @@ try {
           paragraphs: [],
         },
       },
-      OPCIONES,
+      OPCIONES(),
     );
     if (!vacío.sink.notices.some((n) => n.code === "intake.empty")) {
       fallar(
@@ -706,7 +798,7 @@ try {
     const {
       registry: _r,
       ...sinRegistro
-    } = OPCIONES;
+    } = OPCIONES();
     const mudoQueGana = {
       id: asAdapterId("gana-y-no-produce"),
       level: "declarative",
@@ -788,7 +880,7 @@ try {
 
     // ── (a) CON la capacidad: el subárbol se injerta ──────────────────────────
     const conModelo = await ingest(CAJA, {
-      ...OPCIONES,
+      ...OPCIONES(),
       registry: REG,
       perceive: () => Promise.resolve(REGIONES),
     });
@@ -831,7 +923,7 @@ try {
     }
 
     // ── (d) SIN la capacidad: no se invoca, se anota ──────────────────────────
-    const sinModelo = await ingest(CAJA, { ...OPCIONES, registry: REG }).catch((e) => ({
+    const sinModelo = await ingest(CAJA, { ...OPCIONES(), registry: REG }).catch((e) => ({
       tiró: String(e),
     }));
     if (sinModelo.tiró !== undefined) {
@@ -923,7 +1015,7 @@ try {
 
     const r = await ingest(
       SUBIDA(new TextEncoder().encode("abcdefgh"), { name: "x.espejo" }),
-      { ...OPCIONES, registry: registryOf([contenedor, espejo]) },
+      { ...OPCIONES(), registry: registryOf([contenedor, espejo]) },
     ).catch((e) => ({ tiró: String(e) }));
 
     if (r.tiró !== undefined) {
@@ -968,14 +1060,13 @@ try {
   // de `manual.golden.json`, y si el texto existiera en dos archivos esa mutación
   // pasaría a tocar los dos y la fila diría otra cosa de la que dice.
   {
-    const v2 = await ingest(SUBIDA(corpus("manual.v2.md"), { name: "manual.v2.md" }), OPCIONES);
-    if (!v2.ok && v2.nodes === undefined) {
-      fallar("I16 · la v2 del corpus no se pudo ingerir", "sin nodos no hay nada que reconciliar", "");
-    }
-
-    // La memoria de la versión anterior, construida desde la corrida de v1: tiene
-    // `hash`, `role` y `body`, y la proyección sale de `ir`. Es el mismo material que
-    // el tramo 7 va a persistir en el índice.
+    // LA MEMORIA DE LA VERSIÓN ANTERIOR, con ids LEGIBLES. `corrida` ya viene
+    // reconciliada —`ingest` lo hace desde el paso 12— y sus ids son los del acuñador
+    // contable (`e1..e24`). Acá se los reescribe a `v1#<ancla>` a propósito, por dos
+    // razones: el golden se lee, y los dos espacios de acuñado quedan DISJUNTOS. Sin
+    // eso, la corrida de v2 acuñaría `e1` para su única alta —su contador también
+    // arranca en cero— y ese string ya lo lleva un nodo distinto de v1: el golden
+    // saldría plausible y mentiría.
     const previous = knownVersionOf(
       corrida.nodes.map((n, order) => ({
         id: asElementId(`v1#${n.location.anchor}`),
@@ -987,30 +1078,33 @@ try {
       })),
     );
 
-    let acuñados = 0;
-    const r = reconcile(v2.nodes, previous, {
-      mint: () => asElementId(`nuevo#${(acuñados += 1)}`),
-      // LOS DOS SON PARÁMETROS DEL BANCO, no del producto — igual que `targetSizeChars`
-      // arriba. `PARAMETERS.identity.similarityThreshold` y `.maxComparisons` siguen en
-      // `null` con su plan de medición escrito. El umbral se elige holgado a propósito:
-      // los pares correctos del corpus dan 0.60 y 0.79, y los distractores 0.00, así
-      // que CUALQUIER valor entre ambos da el mismo golden. Que el resultado no dependa
-      // del número es lo que permite que el número siga sin medirse.
-      similarityThreshold: 0.5,
-      maxComparisons: 10000,
+    // LA RECONCILIACIÓN LA HACE `ingest`, no este guardián. Hasta el paso 12 este bloque
+    // llamaba a `reconcile` directo porque la orquestación no lo invocaba; ahora
+    // llamarlo a mano probaría la función y NO el cableado, que es lo que este paso
+    // agrega. El umbral se elige holgado a propósito: los pares correctos del corpus
+    // dan 0.60 y 0.79 y los distractores 0.00, así que CUALQUIER valor entre ambos da
+    // el mismo golden — que el resultado no dependa del número es lo que permite que el
+    // número siga sin medirse.
+    const v2 = await ingest(SUBIDA(corpus("manual.v2.md"), { name: "manual.v2.md" }), {
+      ...OPCIONES(),
+      previous,
       previousAdapter: corrida.adapter,
       previousVersion: "v1",
     });
-
-    if (!r.ok) {
+    if (v2.metrics === null) {
       fallar(
-        "I16 · la reconciliación falló",
-        JSON.stringify(r.failure),
-        "las tres fallas son violaciones de CONTRATO, no condiciones de datos: sobre dos versiones de un `.md` sano ninguna puede ocurrir",
+        "I16 · la v2 del corpus no llegó a reconciliar",
+        `adapter=${JSON.stringify(v2.adapter)} nodos=${v2.nodes.length} avisos=${JSON.stringify(v2.sink.notices.map((n) => n.code))}`,
+        "`metrics` en `null` es «esta corrida no reconcilió». Sobre dos versiones de un `.md` sano tiene que haber reconciliado, así que un `null` acá es la señal de que el cableado se cortó antes de llegar",
       );
     } else {
-      const porLocal = new Map(r.matches.map((m) => [m.local, m.by]));
-      const anclas = anchorsOf(v2.nodes, previous, () => {});
+      // SE CRUZA POR `id` Y NO POR `local`. El `LocalId` deja de salir de `ingest` en el
+      // paso 12, y cruzar por él fallaría MUDO: `get(undefined)` devuelve `undefined`, el
+      // `?? null` lo vuelve `null`, y el golden se regeneraría con `"by": null` en las 23
+      // filas sin que nada lance — o sea perdiendo justo la columna sin la cual «un
+      // reconciliador que acierta por casualidad se ve igual que uno que funciona».
+      // `Match.id` es el `ElementId`, que sí viaja en el nodo emitido.
+      const porId = new Map(v2.matches.map((m) => [m.id, m.by]));
       // EL REMAPEO VA EN EL GOLDEN, y no es relleno. `parentId` y las migas se remapean
       // desde la MISMA tabla que el `id`, así que sin ellos una mutación que remape las
       // migas por su TEXTO en vez de por su referencia —que es el punto entero de C15,
@@ -1018,16 +1112,15 @@ try {
       // saldrían perfectos y el árbol quedaría cosido al nodo equivocado.
       const actual = JSON.stringify(
         {
-          nodos: r.output.nodes.map((n, i) => ({
-            anchorV2: v2.nodes[i].location.anchor,
+          nodos: v2.nodes.map((n) => ({
+            anchorV2: n.location.anchor,
             id: n.id,
-            by: porLocal.get(v2.nodes[i].local) ?? null,
+            by: porId.get(n.id) ?? null,
             parentId: n.parentId,
             migas: n.breadcrumbs.map((b) => b.ref),
           })),
-          bajas: r.output.removals,
-          cercos: { de: anclas.length, parten: fencesOf(anclas).length },
-          metricas: r.output.metrics,
+          bajas: v2.removals,
+          metricas: v2.metrics,
         },
         null,
         2,
@@ -1065,7 +1158,7 @@ try {
       // LAS DOS SUMAS, y no son un test del golden: valen para cualquier entrada.
       // Salen de que todo se derive de `matches`, así que solo pueden fallar si
       // alguien reintroduce contadores paralelos.
-      const m = r.output.metrics;
+      const m = v2.metrics;
       const emparejados = m.byHash + m.bySimilarity + m.byResidue;
       if (emparejados + m.additions !== m.newNodes || emparejados + m.removals !== m.oldNodes) {
         fallar(

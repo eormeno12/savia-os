@@ -43,7 +43,7 @@
     },
     {
       "anchorV2": "p#16",
-      "id": "nuevo#1",
+      "id": "e1",
       "by": null,
       "parentId": "v1#Alta de un proveedor",
       "migas": [
@@ -225,10 +225,6 @@
     "v1#Cierre",
     "v1#p#47"
   ],
-  "cercos": {
-    "de": 19,
-    "parten": 18
-  },
   "metricas": {
     "anchoring": 0.7916666666666666,
     "byHash": 19,

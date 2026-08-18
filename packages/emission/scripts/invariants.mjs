@@ -164,6 +164,8 @@ try {
   const {
     emit,
     group,
+    reconcile,
+    knownVersionOf,
     CASES,
     GROUPING_CASES,
     CANONICAL_CASE,
@@ -171,7 +173,7 @@ try {
     EDITED_HEADING,
     DANGLING_PARENT,
   } = await import(pathToFileURL(join(destinoEmission, "index.js")).href);
-  const { cohesionOf, isLead, isNode, isRowNode, rank, render } = await import(
+  const { asElementId, cohesionOf, isLead, isNode, isRowNode, rank, render } = await import(
     pathToFileURL(join(destinoIr, "index.js")).href
   );
 
@@ -488,8 +490,42 @@ try {
       );
       continue;
     }
-    const nodos = emitidos.nodes;
-    const porLocal = new Map(nodos.map((n) => [n.local, n]));
+    // EL TRAMO 5 CORRE DESPUÉS DEL RECONCILIADOR (paso 12). Antes de este paso el
+    // banco pasaba `emitidos.nodes` derecho a `group`, y no por decisión: el
+    // reconciliador no existía. El plan lo declara al abrir el tramo — «Entra: la
+    // lista plana del tramo 4, CON IDENTIDAD y migas».
+    //
+    // EL ACUÑADOR ES FRESCO POR CASO, y eso es la mitad del invariante y no un
+    // detalle: con un contador compartido entre casos, los ids de un caso dependerían
+    // de cuántos casos hay arriba, y agregar uno movería las expectativas de todos los
+    // demás. Un acoplamiento de orden entre casos es exactamente lo que un banco no
+    // puede tener.
+    //
+    // `knownVersionOf([])` ES LA PRIMERA INGESTA, no un atajo: no hay versión anterior
+    // contra la cual comparar, así que los tres pases no corren y los 24 nodos se
+    // acuñan. Es el mismo camino que recorre un documento la primera vez que entra.
+    let acuñados = 0;
+    const reconciliado = reconcile(emitidos.nodes, knownVersionOf([]), {
+      mint: () => asElementId(`e${(acuñados += 1)}`),
+      // LOS DOS SON PARÁMETROS DEL BANCO y en este camino NO SE LEEN: sin versión
+      // anterior no hay una sola comparación de similitud. Van explícitos igual
+      // porque el tipo los exige, que es lo que impide que alguien invente un default
+      // el día que sí haga falta.
+      similarityThreshold: 0.5,
+      maxComparisons: 10000,
+      previousAdapter: null,
+      previousVersion: null,
+    });
+    if (!reconciliado.ok) {
+      fallar(
+        `reconciliación fallida — ${caso.name}`,
+        `falla: ${JSON.stringify(reconciliado.failure)}`,
+        "las tres fallas de `reconcile` son violaciones de CONTRATO, no condiciones de datos: sobre nodos emitidos por `emit` ninguna puede ocurrir",
+      );
+      continue;
+    }
+    const nodos = reconciliado.output.nodes;
+    const porLocal = new Map(nodos.map((n) => [n.id, n]));
     const g = group(nodos, caso.targetSizeChars);
     const cohesión = (local) => {
       const n = porLocal.get(local);
@@ -509,7 +545,7 @@ try {
       const apariciones = g.fragments.flatMap((f) => f.nodes);
       const cubiertos = new Set(apariciones);
       const referidos = new Set(g.fragments.flatMap((f) => f.breadcrumbs.map((b) => b.ref)));
-      const perdidos = nodos.filter((n) => !cubiertos.has(n.local) && !referidos.has(n.local));
+      const perdidos = nodos.filter((n) => !cubiertos.has(n.id) && !referidos.has(n.id));
       if (perdidos.length > 0 || apariciones.length !== cubiertos.size) {
         fallar(
           `I12 · ningún nodo se pierde — ${caso.name}`,
@@ -547,10 +583,10 @@ try {
     {
       const referidos = new Set(g.fragments.flatMap((f) => f.breadcrumbs.map((b) => b.ref)));
       const huérfanos = nodos.filter(
-        (n) => isLead(n.role, n.body.shape) && !referidos.has(n.local),
+        (n) => isLead(n.role, n.body.shape) && !referidos.has(n.id),
       );
       const propios = huérfanos.filter((n) =>
-        g.fragments.some((f) => igual(f.nodes, [n.local])),
+        g.fragments.some((f) => igual(f.nodes, [n.id])),
       );
       if (propios.length !== huérfanos.length) {
         fallar(
@@ -639,7 +675,7 @@ try {
         if (previo === undefined) return false;
         if (cohesionOf(previo.role, previo.body.shape) === "lead") return false;
         return !g.fragments.some(
-          (f) => f.nodes.includes(n.local) && f.nodes.includes(previo.local),
+          (f) => f.nodes.includes(n.id) && f.nodes.includes(previo.id),
         );
       });
       if (despegados.length > 0) {
@@ -719,7 +755,7 @@ try {
       // dos tienen que apuntar al mismo nodo o la respuesta exacta no se puede citar
       // de vuelta a su origen.
       const enFragmento = new Set(g.fragments.flatMap((f) => f.nodes));
-      const locales = new Set(filas.map((n) => n.local));
+      const locales = new Set(filas.map((n) => n.id));
       const descolgados = g.records.filter(
         (r) => !locales.has(r.node) || !enFragmento.has(r.node),
       );
@@ -739,11 +775,11 @@ try {
       // si la composición no fuera a buscar el esquema al container, la fila se
       // indexa sin sus etiquetas y deja de ser recuperable por nombre de columna.
       for (const n of filas) {
-        const suyo = g.fragments.find((f) => f.nodes.includes(n.local));
+        const suyo = g.fragments.find((f) => f.nodes.includes(n.id));
         const conEsquema =
-          n.localParent === null
+          n.parentId === null
             ? null
-            : porLocal.get(n.localParent)?.body.schema ?? null;
+            : porLocal.get(n.parentId)?.body.schema ?? null;
         if (conEsquema !== null && (suyo === undefined || !suyo.text.includes(conEsquema[0]))) {
           fallar(
             `I18 · la fila se renderiza con el esquema de su container — ${caso.name}`,

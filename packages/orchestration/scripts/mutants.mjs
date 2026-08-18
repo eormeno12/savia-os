@@ -54,8 +54,8 @@ const MUTANTES = [
     garantía: "el tamaño objetivo lo PROVEE el llamador (`Pending` en `params.ts`)",
     rompe: "toda frontera de fragmento del corpus",
     cambios: [[
-      `  const grouped = group(emission.nodes, options.targetSizeChars);`,
-      `  const grouped = group(emission.nodes, 300);`,
+      `  const grouped = group(reconciled.output.nodes, options.targetSizeChars);`,
+      `  const grouped = group(reconciled.output.nodes, 300);`,
     ]],
     espera: /I1 · golden bytes→árbol/,
     nota:
@@ -86,7 +86,7 @@ const MUTANTES = [
     id: "S71",
     garantía: "el ÁRBOL viaja en la salida, no solo los fragmentos",
     rompe: "el golden entero — y con él las seis filas que dependen de que sea bytes→ÁRBOL",
-    cambios: [[`    nodes: emission.nodes,`, `    nodes: [],`]],
+    cambios: [[`    nodes: reconciled.output.nodes,`, `    nodes: [],`]],
     espera: /I1 · golden bytes→árbol/,
     nota:
       "ES LA FILA QUE JUSTIFICA LA FORMA DEL GOLDEN. El plan pide «bytes → árbol» y la primera versión " +
@@ -262,8 +262,8 @@ const MUTANTES = [
     garantía: "cero dependencias de runtime: ni un `node:`",
     rompe: "el borde de dependencias, que deja de coincidir con el borde de formato",
     cambios: [[
-      `import { group, emit } from "@savia-os/emission";`,
-      `import { createHash } from "node:crypto";\nexport const _sha = createHash;\nimport { group, emit } from "@savia-os/emission";`,
+      `import {\n  group,\n  emit,\n  reconcile,\n  knownVersionOf,`,
+      `import { createHash } from "node:crypto";\nexport const _sha = createHash;\nimport {\n  group,\n  emit,\n  reconcile,\n  knownVersionOf,`,
     ]],
     espera: /src\/ingest\.ts importa `node:crypto`/,
     nota:
@@ -610,6 +610,28 @@ const MUTANTES = [
       "emparejamiento visiblemente absurdo sobre este corpus —los distractores dan 0.00— pero SÍ agranda " +
       "el dominio, y eso se ve en `comparisons`, que el golden congela: 6 pasa a 9. Es el único canal por " +
       "el que la guarda es observable sin un caso adversarial, y es exactamente para lo que ese campo entró",
+  },
+
+  {
+    id: "S96",
+    garantía: "los ids salen del ACUÑADOR, no de una fórmula sobre la posición",
+    rompe: "la segunda mitad de I2 · determinismo",
+    cambios: [[
+      `    const id = assigned[at] ?? options.mint();`,
+      `    const id = assigned[at] ?? (node.local as unknown as ElementId);`,
+    ]],
+    espera: /I2 · el acuñador/,
+    nota:
+      "ES EL ATAJO QUE ALGUIEN ESCRIBE DE BUENA FE —«el `LocalId` ya es único en la corrida, ¿para qué " +
+      "acuñar?»— y compila sin tocar nada más. Y es EXACTAMENTE la fórmula de una sola versión que " +
+      "§{Por qué la identidad} descartó: el `LocalId` es posicional, así que insertar un párrafo arriba " +
+      "le mueve el id a todos los de abajo y despega su curación en silencio. LA PRIMERA MITAD DE I2 " +
+      "QUEDA VERDE con esta mutación —dos corridas siguen dando lo mismo, porque la posición es " +
+      "determinística— y ese es el punto de la fila: hasta el paso 12 NINGÚN mutante del repo tenía " +
+      "`espera: /I2/`, así que un `ingest` que ignorara la costura del acuñador habría pasado para " +
+      "siempre. La mitad que la mata es la que corre una tercera vez con un acuñador distinto y exige " +
+      "que los ids SE MUEVAN. No acredita por casualidad: `options.mint` es un acceso a propiedad, no " +
+      "un símbolo que quede huérfano, así que `TS6133` no puede matarla",
   },
 
   // ── Controles ──────────────────────────────────────────────────────────────

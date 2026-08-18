@@ -719,8 +719,8 @@ const MUTANTES = [
     id: "M47",
     garantía: "un título que no contextualizó nada emite su propio fragmento",
     cambios: [[
-      `    if (referenced.has(n.local)) continue;`,
-      `    if (referenced.has(n.local) || nodes.length > ZERO) continue;`,
+      `    if (referenced.has(n.id)) continue;`,
+      `    if (referenced.has(n.id) || nodes.length > ZERO) continue;`,
     ]],
     espera: /I14 · el título que no contextualizó nada emite su propio fragmento/,
     nota:
@@ -747,11 +747,15 @@ const MUTANTES = [
   {
     id: "M49",
     garantía: "un nodo-FILA emite además un registro (la mitad σ del split π/σ)",
-    cambios: [[`    if (isRowNode(n.body)) {`, `    if (isRowNode(n.body) && n.local === n.localParent) {`]],
+    cambios: [[`    if (isRowNode(n.body)) {`, `    if (isRowNode(n.body) && n.id === n.parentId) {`]],
     espera: /I18 · un registro por nodo-fila/,
     nota:
       "rompe LA SALIDA EXACTA: la planilla se puede buscar por similitud y no se puede consultar. La " +
-      "guarda imposible conserva `isRowNode` en uso. Es la mitad del recorrido que NINGÚN adaptador del " +
+      "guarda imposible conserva `isRowNode` en uso. SU ANCLA NO SE MOVIÓ EN EL PASO 12 Y AUN ASÍ HUBO QUE " +
+      "TOCARLA: el re-tecleo de `grouping.ts` a `EmittedNode` dejó su REEMPLAZO sin compilar (TS2339, " +
+      "`local` no existe en `EmittedNode`), así que la fila pasó a morir acreditando al COMPILADOR en " +
+      "vez de a I18. El corredor lo dijo; el ancla sola no habría avisado, porque el ancla no se movió. " +
+      "Es la mitad del recorrido que NINGÚN adaptador del " +
       "paso 3 ejercita —una tabla de markdown es la tabla chica, `grain: 'whole'`— y por eso el caso es " +
       "sintético: está escrito, no tapado",
   },
@@ -792,8 +796,8 @@ const MUTANTES = [
     id: "M56",
     garantía: "el registro apunta a SU fila — las dos salidas referencian el mismo nodo",
     cambios: [[
-      `  return { coordinate: n.location.coordinate, values, node: n.local };`,
-      `  return { coordinate: n.location.coordinate, values, node: n.localParent ?? n.local };`,
+      `  return { coordinate: n.location.coordinate, values, node: n.id };`,
+      `  return { coordinate: n.location.coordinate, values, node: n.parentId ?? n.id };`,
     ]],
     espera: /I18 · las dos salidas referencian el mismo nodo-fila/,
     nota:
@@ -1045,8 +1049,8 @@ const MUTANTES = [
     control: true,
     garantía: "renombrar una variable local del recorrido de agrupación no cambia nada",
     cambios: [[
-      `  const sealed: (LocalFragment & { readonly order: number })[] = [];`,
-      `  const cerrados: (LocalFragment & { readonly order: number })[] = [];\n  const sealed = cerrados;`,
+      `  const sealed: (StableFragment & { readonly order: number })[] = [];`,
+      `  const cerrados: (StableFragment & { readonly order: number })[] = [];\n  const sealed = cerrados;`,
     ]],
     nota:
       "el par de M36–M52: lo que esas filas fijan es el COMPORTAMIENTO del recorrido, no cómo se llaman " +

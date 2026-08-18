@@ -21,12 +21,20 @@
  * de `synthetic.ts` y de nodos-fila escritos a mano, y los doce adaptadores siguen
  * sin existir. Si hubiera hecho falta uno solo, el borde no sería real.
  *
- * LO QUE ESTE TRAMO NO HACE, y no por olvido: no acuña identidad ni calcula huellas.
- * Su salida es `LocalFragment` y `LocalDataRecord`, no `StableFragment` /
- * `StableDataRecord` — el `FragmentId` se deriva de `(DocumentId,
- * contextualFingerprint)` y acá no hay ninguno de los dos. Ver PROVISIONAL(#75) en
- * `ir/src/outputs.ts`, que es el mismo movimiento que PROVISIONAL(#66) hizo para
- * `RoutedNode`.
+ * CORRE DESPUÉS DEL RECONCILIADOR, y desde el paso 12 el tipo lo dice: consume
+ * `EmittedNode` y no `EmittedNode`. El plan lo declara al abrir el tramo —«Entra: la
+ * lista plana del tramo 4, CON IDENTIDAD y migas» (§{Las dos salidas})— y hasta este
+ * paso el código hacía lo contrario, no por decisión sino porque el reconciliador no
+ * existía todavía: `group` corría antes porque no había nada después.
+ *
+ * LO QUE ESTE TRAMO SIGUE SIN HACER, y no por olvido: no acuña identidad PROPIA ni
+ * calcula huellas. Su salida es `StableFragment` y `StableDataRecord` —las referencias
+ * a los nodos ya son definitivas, que es lo que `Stable*` significa en las tres
+ * familias— y NO `IdentifiedFragment`: ese lleva además `id` y
+ * `contextualFingerprint`, y acá no hay con qué. El `FragmentId` se deriva de
+ * `(DocumentId, contextualFingerprint)` y el `DocumentId` vive en `Ingestion`, un
+ * tramo más arriba; la huella depende de una normalización que el contrato declara
+ * abierta. Ver GLOSARIO.md P23/P24 y PROVISIONAL(#75) en `ir/src/outputs.ts`.
  */
 
 import {
@@ -39,20 +47,20 @@ import {
   render,
   type Cohesion,
   type FieldValue,
-  type LocalBreadcrumb,
-  type LocalDataRecord,
-  type LocalFragment,
-  type LocalId,
+  type StableBreadcrumb,
+  type StableDataRecord,
+  type StableFragment,
+  type ElementId,
   type RecognitionLevel,
-  type RoutedNode,
+  type EmittedNode,
 } from "@savia-os/ir";
 
 const { zero: ZERO } = PARAMETERS.arithmetic;
 
 /** Las dos salidas del recorrido. Salen juntas o el split π/σ es media promesa. */
 export type Grouping = {
-  readonly fragments: readonly LocalFragment[];
-  readonly records: readonly LocalDataRecord[];
+  readonly fragments: readonly StableFragment[];
+  readonly records: readonly StableDataRecord[];
 };
 
 // ─────────────────────────────── El acumulador ───────────────────────────────
@@ -71,8 +79,8 @@ export type Grouping = {
 type Open = {
   readonly order: number;
   readonly parts: string[];
-  readonly breadcrumbs: readonly LocalBreadcrumb[];
-  readonly nodes: LocalId[];
+  readonly breadcrumbs: readonly StableBreadcrumb[];
+  readonly nodes: ElementId[];
   readonly cohesion: Cohesion;
   readonly levels: RecognitionLevel[];
   readonly confidences: (number | null)[];
@@ -94,7 +102,7 @@ const worstLevel = (ls: readonly RecognitionLevel[]): RecognitionLevel =>
  * `null` de afuera = NINGÚN nodo reportó confianza, o sea el fragmento enteramente
  * declarativo, que es el MÁS confiable. Nunca «cero». Ver el #74 de `Fragment`.
  */
-const confidenceOf = (cs: readonly (number | null)[]): LocalFragment["confidence"] => {
+const confidenceOf = (cs: readonly (number | null)[]): StableFragment["confidence"] => {
   const reported = cs.filter((c): c is number => c !== null);
   const first = reported[ZERO];
   if (first === undefined) return null;
@@ -104,7 +112,7 @@ const confidenceOf = (cs: readonly (number | null)[]): LocalFragment["confidence
   };
 };
 
-const sealOf = (o: Open): LocalFragment & { readonly order: number } => ({
+const sealOf = (o: Open): StableFragment & { readonly order: number } => ({
   order: o.order,
   // Las migas NO se concatenan acá: el tramo 6 las concatena al embeber
   // (§{Las dos salidas}). Meterlas en `text` duplicaría el título — y además
@@ -128,9 +136,9 @@ const sealOf = (o: Open): LocalFragment & { readonly order: number } => ({
  * dos consumidores no inventen dos `DataRecord` distintos de la misma planilla.
  */
 const recordOf = (
-  n: RoutedNode,
+  n: EmittedNode,
   schema: readonly string[] | null,
-): LocalDataRecord | null => {
+): StableDataRecord | null => {
   if (n.body.shape !== "grid") return null;
   if (n.location.coordinate.space !== "grid") return null;
   const row = n.body.rows[ZERO];
@@ -142,7 +150,7 @@ const recordOf = (
     used.add(key);
     values.push({ label: key, value: cell.text });
   }
-  return { coordinate: n.location.coordinate, values, node: n.local };
+  return { coordinate: n.location.coordinate, values, node: n.id };
 };
 
 // ─────────────────────────────── El recorrido ────────────────────────────────
@@ -156,27 +164,27 @@ const recordOf = (
  * número inventado por la ventana.
  */
 export const group = (
-  nodes: readonly RoutedNode[],
+  nodes: readonly EmittedNode[],
   targetSizeChars: number,
 ): Grouping => {
-  const sealed: (LocalFragment & { readonly order: number })[] = [];
-  const records: LocalDataRecord[] = [];
+  const sealed: (StableFragment & { readonly order: number })[] = [];
+  const records: StableDataRecord[] = [];
   /** El esquema de cada container ya emitido, para las filas que cuelgan de él. */
-  const schemaOf = new Map<LocalId, readonly string[] | null>();
+  const schemaOf = new Map<ElementId, readonly string[] | null>();
 
-  const started = (i: number, n: RoutedNode, text: string, cohesion: Cohesion): Open => ({
+  const started = (i: number, n: EmittedNode, text: string, cohesion: Cohesion): Open => ({
     order: i,
     parts: text === "" ? [] : [text],
     breadcrumbs: n.breadcrumbs,
-    nodes: [n.local],
+    nodes: [n.id],
     cohesion,
     levels: [n.level],
     confidences: [n.confidence],
   });
 
-  const add = (o: Open, n: RoutedNode, text: string): Open => {
+  const add = (o: Open, n: EmittedNode, text: string): Open => {
     if (text !== "") o.parts.push(text);
-    o.nodes.push(n.local);
+    o.nodes.push(n.id);
     o.levels.push(n.level);
     o.confidences.push(n.confidence);
     return o;
@@ -207,14 +215,14 @@ export const group = (
    * posible: `started` no se llama desde el recorrido. Es la diferencia entre
    * arreglar el bug y volverlo inescribible.
    */
-  const reopen = (i: number, n: RoutedNode, text: string, cohesion: Cohesion): Open => {
+  const reopen = (i: number, n: EmittedNode, text: string, cohesion: Cohesion): Open => {
     if (open !== null) sealed.push(sealOf(open));
     return started(i, n, text, cohesion);
   };
 
   for (const [i, n] of nodes.entries()) {
-    if (n.body.shape === "container") schemaOf.set(n.local, n.body.schema);
-    const schema = n.localParent === null ? null : schemaOf.get(n.localParent) ?? null;
+    if (n.body.shape === "container") schemaOf.set(n.id, n.body.schema);
+    const schema = n.parentId === null ? null : schemaOf.get(n.parentId) ?? null;
 
     // PROVISIONAL(#53): `render` devuelve `null` para `asset` y `container`. El nodo
     // entra igual, con texto vacío — «un nodo entra entero en algún fragmento,
@@ -280,13 +288,13 @@ export const group = (
   const referenced = new Set(sealed.flatMap((f) => f.breadcrumbs.map((b) => b.ref)));
   for (const [i, n] of nodes.entries()) {
     if (cohesionOf(n.role, n.body.shape) !== "lead") continue;
-    if (referenced.has(n.local)) continue;
+    if (referenced.has(n.id)) continue;
     sealed.push(
       sealOf({
         order: i,
         parts: [render(n.body, null) ?? ""],
         breadcrumbs: n.breadcrumbs,
-        nodes: [n.local],
+        nodes: [n.id],
         cohesion: "lead",
         levels: [n.level],
         confidences: [n.confidence],

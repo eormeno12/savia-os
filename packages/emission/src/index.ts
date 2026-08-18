@@ -24,6 +24,16 @@
  * sale de `reconcile`, que corre después. Ver PROVISIONAL(#66) y PROVISIONAL(#75) en
  * `ir/src/outputs.ts`.
  *
+ * EL PASO 12 PUSO A LOS TRES EN SU ORDEN: `emit → reconcile → group`. El plan lo
+ * declara al abrir el tramo 5 —«Entra: la lista plana del tramo 4, CON IDENTIDAD y
+ * migas»— y hasta ese paso el código hacía lo contrario, no por decisión sino porque
+ * el reconciliador no existía: `group` corría antes porque no había nada después. Así
+ * que `group` consume `EmittedNode` y entrega `StableFragment`/`StableDataRecord`, con
+ * las referencias a los nodos ya definitivas. Lo que NO entrega es
+ * `IdentifiedFragment`: los dos campos que ese lleva —`id` y `contextualFingerprint`—
+ * dependen del `DocumentId` y de una normalización que el contrato declara abierta, y
+ * ninguno de los dos existe todavía en este tramo (GLOSARIO.md, P23/P24).
+ *
  * LO QUE SIGUE SIN ESTAR ACÁ, Y NO POR OLVIDO:
  *
  *   · el índice de reconciliación (tramo 4, pieza 3) — las dos tablas que el plan

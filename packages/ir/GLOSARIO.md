@@ -791,6 +791,54 @@ comportamiento —bajar `anchoring` sería mentir sobre una métrica que mide ot
 
 ---
 
+## 17 · Paso 12 — el cableado, y la palabra «Stable» devuelta a su significado
+
+**Agregado el 2026-08-18**, antes de escribir una línea del cableado de `reconcile`
+dentro de `ingest`, por la regla del cierre. El paso 12 hace que la orquestación
+**llame** al reconciliador: hasta hoy la pieza existía, estaba acreditada y no la
+invocaba nadie del producto.
+
+> **Primero, lo que las reglas SÍ determinaban.** El orden `emit → reconcile → group`
+> no es una decisión de nombres sino de plan, y el plan lo dice literal («**Entra:** la
+> lista plana del tramo 4, **con identidad** y migas», §{Tramo 5}); la afirmación
+> contraria de `outputs.ts` —«el tramo 5 corre ANTES del reconciliador»— se escribió
+> cuando el reconciliador no existía y describía el orden de implementación de entonces
+> como si fuera una regla del diseño. `Fragmento → Fragment`, `Registro → DataRecord` y
+> `Miga → Breadcrumb` ya están en §3 y §4. Los cuatro parámetros nuevos de la
+> orquestación ya tienen nombre: `mint`/`MintFn` es P20, `similarityThreshold` y
+> `maxComparisons` viven en `PARAMETERS.identity` desde el paso 1, y
+> `previousAdapter`/`previousVersion` son campos ya escritos de
+> `ReconciliationMetrics`. **Ninguno de estos va en la tabla.**
+
+| # | Símbolo | **Queda** | Por qué no la que salía sola |
+|---|---|---|---|
+| **P23** | el fragmento cuyas **referencias** ya son definitivas | **`StableFragment = Fragment<ElementId>`** — el tipo EXISTENTE pierde sus dos campos de más | **No nace un nombre: se le devuelve a uno el significado que la familia ya le había dado.** `Stable*` significa **una sola cosa** en las otras dos familias —`StableBreadcrumb = Breadcrumb<ElementId>`, `StableDataRecord = DataRecord<ElementId>`, o sea *el espacio de referencias es el definitivo*— y la de fragmentos se quedó con el nombre de la familia y le colgó `id` y `contextualFingerprint`. La salida que este paso necesita es exactamente `Fragment<ElementId>`, así que la alternativa era **un tercer calificativo solo para fragmentos**, con «Stable» significando una cosa en dos familias y otra en la tercera. Y hay una prueba de que el concepto ya trabajaba sin nombre: `invariants.ts` assertea sobre `Fragment<ElementId>` escrito a mano y explica por qué **no** sobre `StableFragment` — «la diferencia es la que separa **acreditar de aparentar**: `StableFragment` tiene DOS CAMPOS DE MÁS», o sea que la aserción pasaría por los campos que faltan y no por el espacio de referencias. Con esta fila, esa aserción puede nombrar el tipo en vez de reconstruirlo |
+| **P24** | el fragmento que además tiene **identidad propia** | **`IdentifiedFragment = StableFragment & { id: FragmentId; contextualFingerprint: ContextualFingerprint }`** | Es el tipo que hasta hoy se llamaba `StableFragment`, con el nombre que dice **qué es** y no qué le hacen. **`IndexedFragment` se descarta y es la que salía sola**: nombra lo que un tramo POSTERIOR le hace, que es el defecto exacto que §14 le señaló a `CascadeResult` («nombra al productor en vez de a la cosa») y §15 a `plainTextAdapter` («nombra un FORMATO»). Y es peor que esos dos, porque el tipo se llamaría «indexado» durante todo el rato en que **todavía no está indexado** — se construye en el tramo 5 y se indexa en el 7. Tampoco alcanza con mirar a un solo consumidor: el docstring dice «lo que el tramo 6 **embebe** y el tramo 7 **indexa**», así que `EmbeddableFragment` erraría igual y por la otra mitad. Lo que los dos campos compran es **identidad**: `contextualFingerprint` es la identidad de contenido —«Identidad, dedupe y base de `FragmentId`»— y `id` es la dirección que se deriva de ella. `AddressableFragment` nombra solo la segunda mitad. **El contraste con P23 es el que hace legible al par:** `Stable*` dice que *sus referencias* son definitivas, `Identified*` dice que *él mismo* tiene identidad — y por eso el cuarto nombre existe solo para fragmentos y no desbalancea nada: el fragmento es la única de las tres salidas que adquiere identidad propia (`DataRecord` «no lleva identidad propia ni huella», y una miga tampoco) |
+
+### El precio de P23, dicho de frente
+
+**Un tipo exportado cambia de significado**, y eso es más caro que agregar uno: quien
+lea un commit viejo o el `README` de otro paso va a encontrar `StableFragment` con dos
+campos que ya no tiene. Va anotado acá porque el diff no lo va a explicar solo.
+
+Lo que lo hace pagable —y hay que decir las tres cosas juntas, o la decisión parece más
+barata de lo que es— es que **`StableFragment` no tiene un solo consumidor de runtime**
+(solo el barril y menciones en prosa), que **el compilador encuentra todos los usos** y
+que **la aserción `_S7` mejora con el cambio** en vez de sobrevivirlo. Si alguna de las
+tres no valiera, la opción correcta sería el tercer nombre.
+
+### Lo que este bloque NO borra, y por qué no es una omisión
+
+`LocalFragment` y `LocalDataRecord` **se quedan sin productor** cuando `group` pasa a
+consumir `EmittedNode`, y **no se borran**. Es la tentación exacta de «menos piezas» y
+acá es un error medido: `LocalFragment` es el sujeto de tres garantías que **no tienen
+nada que ver con quién lo produce** —`_LocalFragmentHasNoId` (el tramo 5 no puede llevar
+un `FragmentId`), `_S7` (los dos espacios de `Ref` de `Fragment` no colapsan) y la fila
+de mutante que muta su declaración—. Borrar el alias las apaga **las tres de un saque, y
+en verde**. Un tipo sin productor no es un tipo sin trabajo.
+
+---
+
 ## La regla que gobierna a este documento
 
 **Si un término no está acá y ninguna regla de §2 lo determina, no se inventa: se

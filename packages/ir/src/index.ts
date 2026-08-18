@@ -208,6 +208,8 @@ export {
   type Fragment,
   type LocalFragment,
   type StableFragment,
+  /** El fragmento que además tiene identidad propia (P24). Lo produce el tramo 7. */
+  type IdentifiedFragment,
   type Vector,
   type FieldValue,
   type DataRecord,

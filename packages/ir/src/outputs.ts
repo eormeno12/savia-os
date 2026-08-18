@@ -546,16 +546,49 @@ export type Fragment<Ref> = {
 export type LocalFragment = Fragment<LocalId>;
 
 /**
- * El fragmento ya reconciliado e identificado: lo que el tramo 6 embebe y el tramo 7
- * indexa. Es el `Fragment` que el plan declara (§{Las dos salidas}).
+ * El fragmento cuyas REFERENCIAS ya son las definitivas: lo que produce el tramo 5
+ * una vez que el reconciliador corrió, en el orden que el plan declara («Entra: la
+ * lista plana del tramo 4, con identidad y migas», §{Las dos salidas}).
  *
- * LOS DOS CAMPOS DE MÁS NO SON UN ADORNO DEL NOMBRE: son EXACTAMENTE lo que separa a
- * los dos tramos. `id` sale de la reconciliación (por `contextualFingerprint`, y ese
- * por las migas ya estables); la huella sale de una preimagen cuya normalización el
- * contrato todavía declara abierta. Mientras las dos cosas falten, no hay `Fragment`
- * completo que producir — y el tipo lo dice en vez de dejarlo a la disciplina.
+ * `Stable*` SIGNIFICA UNA SOLA COSA EN LAS TRES FAMILIAS, y desde el paso 12 también
+ * acá: el espacio de referencias es el definitivo, igual que en `StableBreadcrumb` y
+ * `StableDataRecord`. Hasta este paso este tipo llevaba además `id` y
+ * `contextualFingerprint`, o sea que «Stable» quería decir una cosa en dos familias y
+ * otra en la tercera; los dos campos se mudaron a `IdentifiedFragment`, que dice qué
+ * son. Ver GLOSARIO.md, P23 — y ahí también el precio, dicho de frente: un tipo
+ * exportado cambió de significado.
+ *
+ * ES EL TIPO SOBRE EL QUE `_S7` YA ASSERTEABA SIN NOMBRARLO. La aserción se escribía
+ * contra `Fragment<ElementId>` a mano y el comentario explicaba por qué NO contra
+ * `StableFragment`: con los dos campos de más, la no-asignabilidad se cumplía sola
+ * —por los campos ausentes— y habría seguido cumpliéndose con las dos referencias
+ * iguales. Sin ellos, lo único que separa a los dos tipos es `Ref`, que es lo que esa
+ * fila existe para fijar.
  */
-export type StableFragment = Fragment<ElementId> & {
+export type StableFragment = Fragment<ElementId>;
+
+/**
+ * El fragmento que además tiene IDENTIDAD PROPIA: lo que el tramo 6 embebe y el tramo
+ * 7 indexa. Es el `Fragment` completo que el plan declara (§{Las dos salidas}).
+ *
+ * LOS DOS CAMPOS DE MÁS NO SON UN ADORNO DEL NOMBRE, y son lo que la orquestación NO
+ * PUEDE producir — por eso `Run` entrega `StableFragment` y no esto:
+ *   · `id` se deriva de `(DocumentId, contextualFingerprint)` y el `DocumentId` vive
+ *     en el envoltorio `Ingestion`, un tramo más arriba.
+ *   · la huella sale de una preimagen cuya normalización el contrato todavía declara
+ *     abierta (`PARAMETERS.grouping.maxBreadcrumbLength` en `null`). Calcularla hoy
+ *     congela la base de la clave del caché de vectores con una regla sin decidir, y
+ *     un hash mal preimaginado NO FALLA: sirve el vector de otro, para siempre.
+ * Mientras las dos cosas falten no hay fragmento completo que producir, y el tipo lo
+ * dice en vez de dejarlo a la disciplina.
+ *
+ * NO SE LLAMA `IndexedFragment`, y la razón está en GLOSARIO.md, P24: ese nombre
+ * nombra lo que un tramo POSTERIOR le hace —el mismo defecto que `CascadeResult` y
+ * `plainTextAdapter`— y encima mentiría durante todo el rato en que el fragmento
+ * todavía no está indexado. Lo que los dos campos compran es identidad: la huella es
+ * la de contenido, y el `id` es la dirección que se deriva de ella.
+ */
+export type IdentifiedFragment = StableFragment & {
   /** Ver PROVISIONAL(#69) en `FragmentId`. */
   readonly id: FragmentId;
   /**

@@ -122,7 +122,6 @@ import type { fingerprintOf } from "./projection.js";
 import {
   NODE_BRAND,
   type Annotation,
-  type Fragment,
   type Ingestion,
   type LocalDataRecord,
   type LocalFragment,
@@ -131,6 +130,7 @@ import {
   type RawNode,
   type ReconciliationMetrics,
   type StableDataRecord,
+  type StableFragment,
 } from "./outputs.js";
 import {
   EVIDENCE_SCALE,
@@ -371,13 +371,24 @@ type _S6 = True<
 // genérico mal parametrizado —`type LocalFragment = Fragment<ElementId>`— deja `_S6`
 // intacta y colapsa igual los dos extremos del pipeline.
 //
-// Van sobre `Fragment<ElementId>` y no sobre `StableFragment`, y la diferencia es la
-// que separa acreditar de aparentar: `StableFragment` tiene DOS CAMPOS DE MÁS, así
-// que contra él la no-asignabilidad se cumple sola —por los campos ausentes— y
-// seguiría cumpliéndose con las dos referencias iguales. Contra `Fragment<ElementId>`
-// lo ÚNICO que las separa es `Ref`, que es lo que estas filas existen para fijar.
+// Van sobre `StableFragment`, y hasta el paso 12 NO PODÍAN: este comentario decía
+// «van sobre `Fragment<ElementId>` y no sobre `StableFragment`», porque aquel tipo
+// llevaba DOS CAMPOS DE MÁS y contra él la no-asignabilidad se cumplía sola —por los
+// campos ausentes— y habría seguido cumpliéndose con las dos referencias IGUALES. Era
+// la diferencia entre acreditar y aparentar, y obligaba a escribir el tipo a mano.
+// El paso 12 mudó esos dos campos a `IdentifiedFragment` (GLOSARIO.md, P23/P24), así
+// que ahora lo ÚNICO que separa a los dos tipos es `Ref` y la fila puede nombrarlos.
+//
+// EL PELIGRO NO DESAPARECIÓ: SE VOLVIÓ LATENTE, y va escrito para que no se redescubra
+// caro. El día que alguien le agregue UN campo a `StableFragment`, `_S7` vuelve a
+// cumplirse por ese campo y deja de fijar el espacio de referencias — en verde, y sin
+// que M54 avise, porque M54 seguiría rompiendo igual (por el campo, no por `Ref`). No
+// tiene mutante propio: la mutación que lo mostraría es «agregar un campo Y aplicar
+// M54», y este corredor aplica una fila por vez. Lo que sí lo contiene es la regla de
+// P24 — los campos que un fragmento gana al adquirir identidad propia van a
+// `IdentifiedFragment`, y `StableFragment` no se ensancha.
 type _S7 = True<
-  NotAssignableTo<LocalFragment, Fragment<ElementId>, "a tramo-5 fragment is accepted where a reconciled one is required — the two ref spaces of Fragment collapsed">
+  NotAssignableTo<LocalFragment, StableFragment, "a tramo-5 fragment is accepted where a reconciled one is required — the two ref spaces of Fragment collapsed">
 >;
 type _S8 = True<
   NotAssignableTo<LocalDataRecord, StableDataRecord, "a tramo-5 data record is accepted where a reconciled one is required — the two ref spaces of DataRecord collapsed">

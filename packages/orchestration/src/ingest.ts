@@ -35,7 +35,14 @@
  *     debía traer y que hasta hoy no existía en ningún paquete.
  */
 
-import { group, emit } from "@savia-os/emission";
+import {
+  group,
+  emit,
+  reconcile,
+  knownVersionOf,
+  type KnownVersion,
+  type Match,
+} from "@savia-os/emission";
 import {
   coldProbeOf,
   coldProbeOfAsset,
@@ -67,8 +74,11 @@ import {
   type DelegationId,
   type Degradation,
   type HashFn,
-  type LocalDataRecord,
-  type LocalFragment,
+  type StableDataRecord,
+  type StableFragment,
+  type ElementId,
+  type ReconciliationMetrics,
+  type MintFn,
   type MatterHash,
   type Node,
   type Notice,
@@ -77,7 +87,7 @@ import {
   type PerceiveFn,
   type RawNode,
   type Source,
-  type RoutedNode,
+  type EmittedNode,
   type SpendKind,
 } from "@savia-os/ir";
 
@@ -110,9 +120,41 @@ export type Sink = {
  * es lo que el reconciliador del paso 11 consume.
  */
 export type Run = {
-  readonly nodes: readonly RoutedNode[];
-  readonly fragments: readonly LocalFragment[];
-  readonly records: readonly LocalDataRecord[];
+  readonly nodes: readonly EmittedNode[];
+  readonly fragments: readonly StableFragment[];
+  readonly records: readonly StableDataRecord[];
+  /**
+   * LAS BAJAS: los nodos de la versión anterior que ya no están. El tramo 7 tiene que
+   * borrar sus filas y sus puntos, y NADIE MÁS LE ENTREGA LA LISTA — sin esto el índice
+   * acumula contenido borrado que sigue siendo recuperable con procedencia confiable.
+   */
+  readonly removals: readonly ElementId[];
+  /**
+   * LAS TRECE CANTIDADES DE LA DEGRADACIÓN HONESTA, o `null` si esta corrida no llegó
+   * a reconciliar (nadie reclamó el documento, la emisión falló, la lectura fue vacía).
+   *
+   * `null` Y NO UN OBJETO EN CERO, y la diferencia importa: un `anchoring` de cero
+   * significa «se perdió toda la identidad previa» y es la alarma del peor modo de
+   * falla del pipeline. Una corrida que ni siquiera reconcilió no puede reportar eso
+   * sin mentir — «no se midió» y «se midió cero» son cosas distintas, y es la misma
+   * distinción que `RawNode.confidence` hace entre «no reportó» y «reportó bajo».
+   *
+   * QUIÉN EMITE EL EVENTO NO ES EL RECONCILIADOR: es puro y devuelve números. Comparar
+   * `anchoring` contra `PARAMETERS.identity.anchoringThreshold` —que sigue en `null`—
+   * y emitir la alerta es de quien tenga el umbral, o sea el llamador.
+   */
+  readonly metrics: ReconciliationMetrics | null;
+  /**
+   * CON QUÉ CRITERIO se emparejó cada nodo: por hash, por similitud o por residuo.
+   *
+   * Es la desagregación por nodo de los tres conteos de `metrics`, y viaja porque sin
+   * ella «un reconciliador que acierta por casualidad se ve igual que uno que
+   * funciona»: mover un emparejamiento del pase 1 al 3 significa que la identidad dejó
+   * de conservarse por CONTENIDO y pasó a conservarse por PARECIDO, y con solo los
+   * agregados ese cambio no se ve. Cabe en `Run` por lo que `Run` es (GLOSARIO.md, P8):
+   * el registro de qué pasó ESTA vez.
+   */
+  readonly matches: readonly Match[];
   readonly sink: Sink;
   readonly achievedLevel: AchievedLevel;
   readonly adapter: AdapterId | null;
@@ -258,6 +300,46 @@ export type IngestOptions = {
    * este parámetro.
    */
   readonly targetSizeChars: number;
+  /**
+   * EL ACUÑADOR. Acuñar un `ElementId` es reloj + azar (H13(a)), o sea impuro, así que
+   * entra por parámetro igual que `sha256` — y por la misma razón, que no es la
+   * frontera sino que es lo ÚNICO que vuelve verificable el determinismo: un banco que
+   * provee un acuñador contable puede afirmar «se acuñaron exactamente N» y comparar
+   * dos corridas.
+   */
+  readonly mint: MintFn;
+  /**
+   * LA VERSIÓN ANTERIOR, o `null` si es la primera ingesta de este documento.
+   *
+   * `null` NO SALTEA EL RECONCILIADOR: se reconcilia contra una versión VACÍA. Saltearlo
+   * haría que esa rama devolviera nodos sin identidad donde el tipo promete
+   * `EmittedNode`, y los caminos vacíos pasarían por ahí sin que nada lo viera. El caso
+   * ya está contemplado aguas abajo: `anchoring` tiene su rama para cero nodos viejos,
+   * escrita justamente para no dar `NaN` en la primera ingesta.
+   *
+   * DE DÓNDE SALE NO ES DE ACÁ. Elegir contra qué versión reconciliar —`hash →
+   * documento`, con su filtro por organización para que no cruce tenants— vive un nivel
+   * más arriba, y para cuando llega acá ya se eligió.
+   */
+  readonly previous: KnownVersion | null;
+  /**
+   * Los dos que `PARAMETERS.identity` declara MEDIBLES y tiene en `null`, con el mismo
+   * argumento que `targetSizeChars` acá arriba: el tipo obliga a que quien los necesite
+   * los provea, y un literal sería un número inventado con precisión falsa.
+   */
+  readonly similarityThreshold: number;
+  readonly maxComparisons: number;
+  /**
+   * QUÉ ADAPTADOR Y QUÉ VERSIÓN produjeron la corrida ANTERIOR (H16). Viajan a
+   * `ReconciliationMetrics` y no son derivables acá.
+   *
+   * Existen porque un anclaje bajo tiene DOS causas que desde afuera se ven idénticas y
+   * cuyas consecuencias son opuestas: o el documento se reescribió —y reemplazar en
+   * bloque es correcto— o CAMBIÓ EL ADAPTADOR, y entonces reemplazar destruye la
+   * curación de todos los documentos de ese formato a la vez.
+   */
+  readonly previousAdapter: string | null;
+  readonly previousVersion: string | null;
   readonly budget?: Budget;
   /**
    * LA CAPACIDAD PERCEPTUAL, y `undefined` significa que este contexto no la tiene.
@@ -519,7 +601,16 @@ const delegateOne = async (
 
 // ─────────────────────────────── La espina dorsal ────────────────────────────
 
-const EMPTY = { nodes: [], fragments: [], records: [] } as const;
+// Las cinco salidas vacías. `metrics` va en `null` y no en un objeto en cero: ver el
+// campo en `Run` — una corrida que no reconcilió no puede reportar un anclaje sin mentir.
+const EMPTY = {
+  nodes: [],
+  fragments: [],
+  records: [],
+  removals: [],
+  metrics: null,
+  matches: [],
+} as const;
 
 /**
  * Lo que las DOS entradas producen, y a partir de acá no hay dos caminos.
@@ -752,11 +843,45 @@ export const ingest = async <S, E>(
     };
   }
 
-  const grouped = group(emission.nodes, options.targetSizeChars);
+  // EL RECONCILIADOR VA ENTRE EL EMISOR Y LA AGRUPACIÓN, y ese orden es del plan:
+  // «Entra: la lista plana del tramo 4, CON IDENTIDAD y migas» (§{Las dos salidas}).
+  // Hasta el paso 12 `group` corría antes, y no por decisión — el reconciliador no
+  // existía, así que no había nada que pudiera correr primero.
+  //
+  // CORRE UNA SOLA VEZ, como `emit` y como `group`: la recursión de la delegación vive
+  // ENTERA aguas arriba, así que para cuando se llega acá ya hay una lista plana con
+  // los subárboles injertados. No hay ningún camino en el que la delegación obligue a
+  // reconciliar dos veces, que sería acuñar dos veces los mismos nodos.
+  const reconciled = reconcile(emission.nodes, options.previous ?? knownVersionOf([]), {
+    mint: options.mint,
+    similarityThreshold: options.similarityThreshold,
+    maxComparisons: options.maxComparisons,
+    previousAdapter: options.previousAdapter,
+    previousVersion: options.previousVersion,
+  });
+  if (!reconciled.ok) {
+    // Las tres fallas de `reconcile` son violaciones de CONTRATO —dos nodos con el
+    // mismo id local, un acuñador que repitió, una referencia colgante—, no condiciones
+    // de los datos. Van a un aviso PROPIO y no a `emission.failed`: son dos superficies
+    // que fallan por razones distintas, y fundirlas dejaría a quien lea el sumidero sin
+    // poder distinguir «el árbol no se pudo armar» de «la identidad no se pudo
+    // asignar». Es la misma razón por la que `emission.failed` no va a `on_hold`.
+    ctx.diagnostics.notice(
+      "reconciliation.failed",
+      null,
+      `${reconciled.failure.kind} at position ${reconciled.failure.position}`,
+    );
+    return { ...EMPTY, sink, achievedLevel, adapter, deferred, onHold: null };
+  }
+
+  const grouped = group(reconciled.output.nodes, options.targetSizeChars);
   return {
-    nodes: emission.nodes,
+    nodes: reconciled.output.nodes,
     fragments: grouped.fragments,
     records: grouped.records,
+    removals: reconciled.output.removals,
+    metrics: reconciled.output.metrics,
+    matches: reconciled.matches,
     sink,
     achievedLevel,
     adapter,
