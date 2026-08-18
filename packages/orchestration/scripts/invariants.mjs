@@ -1321,6 +1321,63 @@ try {
       }
     }
 
+    // ── EL GOLDEN DE LA RAMA COMPRIMIDA ──────────────────────────────────────
+    // El paso 7 lo dejó declarado como faltante: `manual-deflated.docx` tenía dos
+    // observadores de COMPORTAMIENTO —I22 acá al lado y las guardas de arriba— y ningún
+    // `bytes → nodos` congelado. Las guardas contestan preguntas sueltas («¿delegó?»,
+    // «¿la clave es el hash?»); el golden contesta la que ninguna de ellas hace: si algo
+    // MÁS se movió.
+    //
+    // VA EN LA ORQUESTACIÓN Y NO EN `adapters`, y no es preferencia: el banco de aquel
+    // paquete rechaza al materializar A PROPÓSITO —es lo que vuelve verificable I22— así
+    // que allá esta rama no existe. El único lugar donde el asset materializado llega a
+    // tener nodos es acá.
+    //
+    // CONGELA TAMBIÉN EL ALMACENAMIENTO, que es la mitad que un golden de nodos no ve:
+    // sin la columna `objetos` el golden no distingue materializar de degradar, porque
+    // los nodos delegados se ven igual vengan de donde vengan.
+    {
+      const anclaZip = (id) => r.nodes.find((n) => n.id === id)?.location.anchor ?? "?";
+      const goldenZip = join(RAIZ, "corpus", "manual-deflated.golden.json");
+      const actualZip = JSON.stringify(
+        {
+          adapter: r.adapter,
+          achievedLevel: r.achievedLevel,
+          árbol: r.nodes.map((n) => ({
+            anchor: n.location.anchor,
+            role: n.role,
+            shape: n.body.shape,
+            level: n.level,
+            attribution: n.attribution,
+            parent: anclaZip(n.parentId),
+            whence: n.whence,
+            delegation: n.delegation,
+            hash: n.hash,
+          })),
+          objetos: [...guardados].map(([clave, bytes]) => [clave, bytes.length]),
+          sumidero: r.sink,
+        },
+        null,
+        2,
+      );
+      if (process.env.ORCHESTRATION_REGEN === "1") {
+        writeFileSync(goldenZip, `${actualZip}\n`, "utf8");
+        console.log("golden del `.docx` deflateado REGENERADO — revisá el diff antes de commitear");
+      } else {
+        const esperadoZip = readFileSync(goldenZip, "utf8").trimEnd();
+        if (actualZip !== esperadoZip) {
+          const a = actualZip.split("\n");
+          const b = esperadoZip.split("\n");
+          const i = a.findIndex((l, k) => l !== b[k]);
+          fallar(
+            "I18 · golden bytes→nodos del `.docx` deflateado",
+            `línea ${i + 1}: esperaba ${JSON.stringify(b[i])}, vino ${JSON.stringify(a[i])}`,
+            "el asset materializado recorre el pipeline entero y el golden es lo único que verifica que TODO el recorrido siga dando lo mismo. Las guardas de arriba preguntan cosas puntuales; esto pregunta si algo más se movió",
+          );
+        }
+      }
+    }
+
     const antes = guardados.size;
     await ingest(SUBIDA(docxZip, { name: "otro-nombre.docx" }), conAlmacen);
     if (guardados.size !== antes) {
@@ -1347,6 +1404,91 @@ try {
     }
   }
 
+  // ── I19 · LA PROCEDENCIA VIAJA, Y LA HUELLA ES CIEGA A ELLA ───────────────
+  // Las DOS mitades juntas, y por el mismo motivo que I9 las exige para la autoría:
+  // «la procedencia no entra en la huella» lo cumple perfectamente una procedencia que
+  // no existe. Sin la mitad positiva, el invariante lo satisface borrar el campo.
+  //
+  // EL MISMO CONTENEDOR CON OTRA DIRECCIÓN es lo que vuelve al par discriminante, y no
+  // hace falta un segundo fixture: se ingiere el MISMO `.docx` declarando otra
+  // `ObjectKey` de entrada, que es exactamente el caso real de la misma figura llegando
+  // adentro de dos documentos distintos. El asset materializado tiene que dar el MISMO
+  // objeto y la MISMA huella —su dirección es el hash de su contenido, y el contenido no
+  // cambió— y distinta procedencia, porque salió de otro lado.
+  {
+    const guardados = new Map();
+    const almacen = {
+      put: (k, b) => {
+        guardados.set(String(k), b);
+        return Promise.resolve();
+      },
+      get: (k) => Promise.resolve(guardados.get(String(k)) ?? null),
+    };
+    const byteHash = (b) => createHash("sha256").update(b).digest("hex");
+    const opcionesDe = () => ({
+      ...OPCIONES(),
+      registry: registryOf([opaqueOf(docxAdapter), opaqueOf(imageAdapter)]),
+      perceive: async (source) => {
+        const b = await source.bytes();
+        return b.length === 0
+          ? []
+          : [{ box: { frame: "img", x: 0, y: 0, width: 100, height: 40 }, text: "SELLO", confidence: 0.9 }];
+      },
+      storage: almacen,
+      byteHash,
+    });
+
+    const de = async (contenedor) => {
+      const r = await ingest(
+        SUBIDA(docxZip, { name: "manual-deflated.docx", object: asObjectKey(contenedor) }),
+        opcionesDe(),
+      );
+      return r.nodes.find((n) => n.body.shape === "asset") ?? null;
+    };
+
+    const enA = await de("contenedor-A");
+    const enB = await de("contenedor-B");
+
+    // (1) LLEGA. Sin esto, las otras dos mitades las cumple `null`.
+    if (enA === null || enA.whence === null || enA.whence.path !== "word/media/sello.png") {
+      fallar(
+        "I19 · la procedencia no llegó a la salida",
+        JSON.stringify(enA === null ? null : enA.whence),
+        "el único que sabe de dónde salieron los bytes es el adaptador que abrió el zip: si no lo escribe en la unidad, o si el compositor no lo copia al nodo, el dato no existe en ningún otro lado del pipeline y no hay de dónde reconstruirlo",
+      );
+    }
+
+    // (2) DISTINGUE. La misma figura desde dos contenedores tiene dos procedencias.
+    if (enA !== null && enB !== null && enA.whence?.container === enB.whence?.container) {
+      fallar(
+        "I19 · la procedencia no distingue dos contenedores",
+        String(enA.whence?.container),
+        "si la procedencia fuera igual para los dos, no contestaría la única pregunta que existe para contestar. Es el modo de falla de guardarla pegada al objeto: una clave, N apariciones, y la segunda pisa a la primera",
+      );
+    }
+
+    // (3) LA HUELLA ES CIEGA — LATENTE, y se dice de frente. Hoy esta comparación NO
+    // PUEDE ponerse roja, y no por debilidad del banco: `whence` es hermano de `body` y
+    // `fingerprintOf` recibe `Body`, así que la ceguera la impone la FIRMA. Se midió:
+    // ninguna mutación del sitio de materialización la mueve, porque ahí la procedencia
+    // no está siquiera en alcance léxico. Quien la impone hoy es la frontera
+    // `projection.ts ↛ provenance.ts`, acreditada rompiéndola por miembro (M46, M49 y
+    // ahora M66).
+    //
+    // SE QUEDA PORQUE SE VUELVE VIVA, y el caso ya está escrito en el repo: el día que
+    // el `.md` materialice sus imágenes por enlace, el productor de assets deja de ser
+    // uno. Y ese camino HOY mete la URL adentro de la `ObjectKey` (`markdown.ts`), o sea
+    // que direcciona por origen en vez de por contenido — exactamente lo que esta
+    // comparación detecta. Sin ella, ese bug entra sin que nada se ponga rojo.
+    if (enA !== null && enB !== null && enA.hash !== enB.hash) {
+      fallar(
+        "I19 · la procedencia movió la huella",
+        `${enA.hash} ≠ ${enB.hash}`,
+        "la dirección de un objeto es el hash de su contenido justamente para ser CIEGA a de dónde vino: eso es lo que hace que la misma imagen en cincuenta documentos se guarde una vez y el modelo la describa una vez. Si la procedencia moviera la huella serían cincuenta identidades para una figura, y la curación de una no valdría para las otras cuarenta y nueve",
+      );
+    }
+  }
+
   if (fallas > 0) process.exit(1);
 
   console.log(
@@ -1358,7 +1500,8 @@ try {
       `I14 una imagen es un documento · I15 la recursión frena · ` +
       `I16 golden de identidades, ninguna anotación se despega · ` +
       `I17 la cascada y la delegación se componen · ` +
-      `I18 el asset materializado entra por la misma puerta)\n` +
+      `I18 el asset materializado entra por la misma puerta · ` +
+      `I19 la procedencia viaja y la huella es ciega a ella)\n` +
       `           ${corrida.nodes.length} nodos · ${corrida.fragments.length} fragmentos · ` +
       `${corrida.records.length} registros · ${corrida.sink.notices.length} avisos`,
   );

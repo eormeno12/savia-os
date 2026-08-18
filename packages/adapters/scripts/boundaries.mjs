@@ -136,6 +136,15 @@ const PROTEGIDOS = [
   // archivo, no POR QUÉ hacía falta.
   "corpus/manual.docx",
   "corpus/manual-deflated.docx",
+  // Y el golden del primero, que quedó sin proteger cuando se lo creó: sin él, I21
+  // no tiene contra qué romper y cuatro mutantes de comportamiento se apagan juntos.
+  "corpus/manual.docx.golden.json",
+  // El tercero, y prueba algo que los otros dos no pueden: un `.docx` que hereda el
+  // tamaño de su cuerpo de `styles.xml`. Sus dos valores están peleados A PROPÓSITO
+  // —`docDefaults` 48 contra `Normal` 22—, así que si desapareciera, el orden de
+  // precedencia que el formato fija se quedaría sin un solo observador y S107 moriría
+  // por falta de sujeto en vez de por la garantía.
+  "corpus/manual-heredado.docx",
   "corpus/servidor.conf",
   "corpus/sello.png",
 ];

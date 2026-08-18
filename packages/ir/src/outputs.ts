@@ -20,7 +20,7 @@ import type {
 // que vuelve escribible `projection.ts ↛ provenance.ts`. Nació como `authorship.ts`
 // con un solo miembro; `DelegationId` se le sumó en este bloque y el archivo pasó a
 // llamarse por la categoría, que ya tiene criterio. Ver su encabezado.
-import type { Authorship, DelegationId } from "./provenance.js";
+import type { Authorship, DelegationId, Whence } from "./provenance.js";
 import type { Body, Shape } from "./shapes.js";
 import type { Token } from "./projection.js";
 import type { Hint, RecognitionLevel, Role } from "./classification.js";
@@ -113,6 +113,22 @@ export type RawNode = {
    * `DelegationId`. NO entra en la huella.
    */
   readonly delegation: readonly DelegationId[];
+  /**
+   * DE DÓNDE SALIERON LOS BYTES de este nodo. `null` = del propio documento. Sale de
+   * la unidad del adaptador y se copia tal cual; ver `Unit.whence` y `Whence`.
+   *
+   * ES HERMANO DE `body`, Y AHÍ ESTÁ LA GARANTÍA. `fingerprintOf` recibe `Body`, así
+   * que un campo de este nivel NO PUEDE entrar en la huella: no es que hoy no entre,
+   * es que no hay forma de escribir el código que lo cuele. Adentro de `Body` quedaría
+   * afuera solo por omisión —porque `project` casualmente lee `ref` y nada más— y el
+   * próximo que agregue una rama lo rompería sin enterarse.
+   *
+   * Y TIENE QUE NO ENTRAR: la clave de un objeto es el hash de su contenido, o sea que
+   * la misma imagen traída desde dos documentos da UNA sola dirección a propósito. Si
+   * la procedencia moviera la huella, serían dos identidades para la misma figura y
+   * toda la curación de una de las dos se despegaría.
+   */
+  readonly whence: Whence | null;
   /**
    * PROVISIONAL(#61): campo NUEVO — Qué eslabón de la cascada resolvió este nodo.
    * `null` = lo resolvió el piso físico. La observabilidad lo llama «la importante»

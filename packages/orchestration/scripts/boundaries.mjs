@@ -151,6 +151,12 @@ const fallar = (qué, detalle, porqué) => {
     "corpus/manual.golden.json",
     "corpus/manual.identity.golden.json",
     "../adapters/corpus/manual.v2.md",
+    // El tercer golden y su entrada, los dos de la deuda del paso 7. El `.docx`
+    // deflateado es el ÚNICO archivo del corpus que obliga a materializar: sin él, la
+    // rama que guarda bytes se queda sin un solo observador en todo el repo, porque el
+    // banco de `adapters` rechaza al materializar a propósito.
+    "corpus/manual-deflated.golden.json",
+    "../adapters/corpus/manual-deflated.docx",
   ];
   const faltantes = protegidos.filter((f) => !existsSync(join(RAIZ, f)));
   if (faltantes.length > 0) {

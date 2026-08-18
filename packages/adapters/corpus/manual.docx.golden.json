@@ -10,6 +10,7 @@
         "linkage": "level",
         "level": 1
       },
+      "whence": null,
       "body": {
         "shape": "text_span",
         "text": "Manual de proveedores",
@@ -23,6 +24,7 @@
       "level": "physical",
       "attribution": null,
       "hint": null,
+      "whence": null,
       "body": {
         "shape": "text_span",
         "text": "Este manual describe el circuito de alta.",
@@ -39,6 +41,7 @@
         "linkage": "level",
         "level": null
       },
+      "whence": null,
       "body": {
         "shape": "text_span",
         "text": "Alta de un proveedor",
@@ -52,6 +55,7 @@
       "level": "physical",
       "attribution": null,
       "hint": null,
+      "whence": null,
       "body": {
         "shape": "text_span",
         "text": "Pedir la documentacion y verificar el CUIT.",
@@ -65,6 +69,10 @@
       "level": "physical",
       "attribution": null,
       "hint": null,
+      "whence": {
+        "container": "obj-1721",
+        "path": "word/media/sello.png"
+      },
       "body": {
         "shape": "asset",
         "ref": {
@@ -85,6 +93,7 @@
       "level": "physical",
       "attribution": null,
       "hint": null,
+      "whence": null,
       "body": {
         "shape": "text_span",
         "text": "El sello se aplica en Legales.",

@@ -235,7 +235,8 @@ export const imageAdapter: FileAdapter<ImageSignals> = {
         body: bodyOf(source, region),
         // `visual` es la coordenada que `location.ts` reserva para esto, y lleva la
         // caja: es lo que permite citar «acá, en esta parte de la imagen».
-        location: { anchor: `r#${i}`, coordinate: { space: "visual", box: region.box } },
+        whence: null,
+      location: { anchor: `r#${i}`, coordinate: { space: "visual", box: region.box } },
       }),
     );
   },

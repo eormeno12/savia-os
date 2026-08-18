@@ -324,6 +324,140 @@ que peleó su lugar— **no corría en dos de los cuatro canales**, y en un terc
 rompía en cuanto alguien renombraba o movía el archivo. El tramo 4 no lo discutía en
 ningún lado.
 
+## La carpeta local
+
+El canal `carpeta local` es captación **pasiva**: una carpeta en la máquina del
+usuario que un agente liviano observa y sincroniza sola. Esta sección fija su
+mecánica, que la auditoría marcó ausente (#36: *«no hay campo en el registro que
+guarde esa identidad, así que carpeta y conectores crean documento nuevo en cada
+sincronización y la reconciliación nunca corre»*).
+
+### El agente observa, Savia decide
+
+**El agente no toma una sola decisión.** Hashea y reporta; todo lo demás pasa del
+lado del servidor. Es lo que lo mantiene liviano —un sha256 y una llamada, cero
+parseo, cero adaptadores— y lo que permite que agregar un adaptador nuevo despierte
+el histórico de todos los clientes sin actualizar una sola máquina.
+
+```
+el agente reporta          apareció      ruta P, contenido H
+                           desapareció   ruta P, que tenía contenido H
+                           barrido       completo · interrumpido
+
+Savia decide               ¿H ya lo tenemos?        → no pedir bytes, solo registrar
+                           ¿H es versión de algo?   → reconciliador, por nodos distintivos
+                           ¿la ausencia es baja?    → política de retiro, más abajo
+```
+
+**El hash se calcula en el cliente, y no es una concesión al agente.** Hashear no es
+decidir: es una función determinística sin política adentro, del mismo orden que leer
+el tamaño. Y moverlo al servidor lo empeora todo, porque **Savia solo puede hashear
+lo que ya se subió**: se pierde el dedupe previo a la transferencia —cuarenta
+máquinas con la misma presentación la suben cuarenta veces— y, para saber qué
+desapareció, el servidor tendría que llevar un mapa `ruta → documento`. Es decir:
+mover el hash al servidor vuelve al sistema **más** dependiente de la ruta, que es
+justo lo que §{Los dos hashes} descartó.
+
+Para no rehashear el corpus entero en cada barrido, el agente cachea por
+`(ruta, tamaño, mtime)` y solo recalcula cuando eso cambia.
+
+### La ruta es procedencia, nunca identidad
+
+La ruta viaja en el reporte y **se guarda**, para poder mostrarle al usuario de dónde
+salió cada cosa. Lo que no hace es decidir quién es qué: eso lo decide el contenido,
+por la razón que esta misma sección ya fijó —una ruta cambia al mover o renombrar—.
+Es la misma distinción que el tramo 3 aplica a los bytes incrustados.
+
+Con eso, los tres casos que rompen a un sincronizador ingenuo se resuelven solos:
+
+| En la carpeta | Qué ve el agente | Qué concluye Savia |
+|---|---|---|
+| **Mover a otra subcarpeta** | el contenido sigue presente | nada cambió |
+| **Renombrar** | el contenido sigue presente | nada cambió |
+| **Editar y guardar** | un contenido se fue, otro llegó | el reconciliador decide si es versión nueva |
+
+El tercero es el importante: el agente **no sabe** que hubo una edición. Reporta los
+dos hechos y el servidor concluye, con el mecanismo de §{Los dos hashes} —qué
+documento comparte más nodos distintivos— y el `anclaje` confirmando o descartando.
+
+### La identidad de la fuente
+
+La fila `documento` necesita la identidad local para poder resolver una baja:
+
+```
+documento.fuente        raízVigilada · rutaRelativa · idDeArchivoDelSO · últimoHashVisto
+```
+
+Sin esa columna el evento «desapareció tal contenido» no se puede mapear a un
+documento, y la reconciliación no corre nunca para este canal. Es el hallazgo #36 y
+hay que cerrarlo aunque la política de borrado fuera otra.
+
+### Borrar en la carpeta RETIRA, no destruye
+
+**Es la decisión, y la razón es R3.** La regla parte el mundo en dos: la IR es *lo que
+el documento dijo* y se regenera desde los bytes; las anotaciones son *lo que Savia
+concluyó o una persona decidió* y viven en Postgres. **La carpeta es autoritativa
+sobre la primera mitad y nunca tuvo la segunda.** Un borrado que arrastre las dos le
+da a un `rm` en el Finder el poder de destruir trabajo que la carpeta no puede
+mostrar y no puede devolver.
+
+Un archivo que desaparece de la carpeta pasa a estado **`retirado`**: sale de la
+búsqueda, de la síntesis y del índice. Para el usuario desaparece de Savia, que es
+exactamente lo que pidió. Lo que NO pasa es que se borre la otra mitad.
+
+**Qué sobrevive a un retiro, y por qué cada uno:**
+
+| Sobrevive | Por qué |
+|---|---|
+| Las anotaciones con `origen: humano` | Es curación **atribuible a una persona**. `actor` «se sabe cuando se curó, o no se sabe nunca» |
+| Las marcas de sensibilidad | Son anotaciones. Sin ellas, el archivo re-agregado vuelve **sin marcar** y se indexa limpio: no es pérdida, es una regresión de privacidad **en silencio** |
+| Los `ElementId` y el índice de reconciliación | Se acuñan al azar y solo se conservan reconciliando. Sin índice, re-agregar el archivo **no es una edición: es una primera ingesta**, y toda la curación se despega |
+| El historial de versiones | El índice acumula como git. La carpeta tiene UNA versión; las anteriores son de Savia y solo de Savia |
+| `selladoEn` | «Esto lo dijo el CFO en marzo» es la mitad del valor de la memoria. Re-ingerir sella hoy: marzo se convierte en agosto |
+| El objeto original | Está direccionado por CONTENIDO y deduplicado a propósito. Purgarlo rompe la cita verbatim de todos los otros documentos que lo comparten — que esta carpeta ni siquiera puede ver |
+
+Y por eso el retiro es **reversible**: si el archivo vuelve, vuelve entero.
+
+**Es consistente con una decisión ya tomada.** Desconectar un conector no borra lo
+captado. Que borrar un archivo sí destruyera sería la política opuesta para el mismo
+hecho —dejar de tener acceso a una fuente— en los dos canales pasivos.
+
+### Una desaparición es una hipótesis, no un hecho
+
+El agente no puede distinguir «lo borré» de «no lo veo». Producen el mismo evento el
+disco desmontado, la carpeta movida entera, un permiso denegado, el guardado atómico
+de Office —que borra y recrea— y los *placeholders* de los sincronizadores de
+terceros, que dejan el archivo en 0 bytes. Por eso una desaparición **propone** un
+retiro y no lo ejecuta:
+
+1. **Cuarentena.** El retiro espera una ventana antes de aplicarse. Absorbe el
+   guardado atómico y el mover-y-recrear.
+2. **La raíz tiene que estar viva.** Antes de procesar cualquier baja se confirma que
+   la carpeta vigilada existe y es legible. Si la raíz no está, es **desconexión**.
+3. **Corte por volumen.** Si desaparece de golpe una fracción alta del corpus, se
+   congela todo y no se retira nada. Cubre disco desconectado y carpeta renombrada.
+4. **Correlación por contenido.** Un hash que reaparece en cualquier punto del árbol
+   dentro de la ventana es un **movimiento**, no una baja.
+5. **Deshidratado no es ausente.** Un archivo marcado como *solo en línea* por otro
+   sincronizador no cuenta como desaparecido.
+
+Las tres primeras llevan números —cuánto dura la cuarentena, qué fracción dispara el
+corte, cuánto tiempo un retirado sigue siendo recuperable— y **ninguno se inventa
+acá**: van a `PARAMETERS` con su unidad, qué deciden y cómo se medirían.
+
+### Qué falta decidir del canal
+
+- **Si el retiro es visible o silencioso.** Preguntarle al usuario «desaparecieron 12
+  archivos de tu carpeta, ¿los saco?» es más seguro contra falsos positivos y tensiona
+  con que la captación pasiva sea invisible.
+- **Si la carpeta es fuente de verdad de la PERSONA o de la ORGANIZACIÓN.** Un
+  documento captado de la carpeta de alguien puede estar alimentando skills de los que
+  depende otro equipo. Que una persona ordenando su escritorio degrade el skill de
+  otro es gobernanza de Capa 3, no sincronización.
+- **La transición de `retirado`.** Un archivo se puede borrar en cualquier punto, así
+  que el estado tiene que ser alcanzable desde los ocho anteriores. Es parte del hueco
+  mayor: la máquina de estados sigue sin transiciones.
+
 ## Caché de reconocimiento
 
 Como el reconocimiento es determinístico, su resultado es cacheable. En una
@@ -1947,9 +2081,9 @@ silencio**.
 
 # Puntos abiertos
 
-Trece. Ninguno bloquea empezar a construir: cuatro son mediciones sobre corpus real,
+Catorce. Ninguno bloquea empezar a construir: cuatro son mediciones sobre corpus real,
 tres son huecos de diseño declarados, dos son producto, uno es mecánico, dos están
-fuera de alcance y uno es un refinamiento opcional.
+fuera de alcance, uno es un refinamiento opcional y uno está DECIDIDO y sin implementar.
 
 | # | Punto | Dónde impacta |
 |---|---|---|
@@ -1965,6 +2099,7 @@ fuera de alcance y uno es un refinamiento opcional.
 | **P3** | El almacenamiento de los `en_espera` no tiene política de cuota ni visibilidad. | Tramo 1 |
 | **P4** | Slack y Teams no están cubiertos, y necesitan un filtro de relevancia previo que vive en Capa 2/4. | Fuera del tramo |
 | **P13** | **Un asset delegado re-entra por el TRAMO 2, no por la puerta — y por eso saltea el gate.** «Un asset delega si algún adaptador reclama sus bytes» está implementado como `sourceOfAsset` → `sondaFría` → `seleccionar()`, o sea que la pieza incrustada entra donde se decide *quién sabe leerla*. Pero la puerta —tamaño, formato legible, no cifrado y **antivirus obligatorio**— es el tramo 1. Mientras ningún formato traía bytes propios eso era inocuo: el `.md` referencia sus imágenes por URL y nunca las baja, así que la profundidad de delegación era cero y no había nada que entrara por el costado. **Deja de serlo cuando el pipeline empieza a materializar**: un `.docx` limpio en la puerta puede llevar adentro un payload que el escaneo del contenedor no miró, y lo mismo vale para lo que se baje de una URL. LA SALIDA NO ES ESCANEAR EN DOS LUGARES NUEVOS, es mover un borde: **que el asset delegado re-entre por la puerta, como cualquier archivo**. Con eso hereda el gate, el antivirus y —al tener fila propia— el ESTADO, que es justo lo que le falta al caso «el antivirus marca después de que el objeto ya está guardado», para el que la máquina de estados no tiene transición. Queda por decidir si esa fila es un documento propio o un artefacto que referencia al padre, y que la carrera «escaneo en paralelo al guardado» sea la misma decisión que para el archivo de entrada y no dos. | Tramo 1 · Tramo 3 |
+| **P14** | **DECIDIDO, NO IMPLEMENTADO — todo asset cuyos bytes YA EXISTAN se materializa; la ventana por referencia queda solo para los que no.** El paso 7 expresó la imagen sin comprimir de un `.docx` como `(objeto del contenedor, ventana)` para no escribir bytes, y eso es un error medido: `ref.object` ENTRA EN LA HUELLA, así que el mismo logo adentro de cincuenta contenedores da **cincuenta direcciones y cincuenta identidades**, y el caché de reconocimiento se indexa por ahí. O sea que «200 encabezados con el mismo logo → 1 invocación + 199 aciertos» (§{La delegación es emergente}) es verdadero SOLO si el logo tiene una dirección, y con la forma por rango tiene doscientas. Y hoy que tenga una o doscientas depende de si Word lo comprimió — la misma clase de dependencia que se rechazó explícitamente para la procedencia («si de eso dependiera que la pieza sepa de dónde salió, la respuesta cambiaría según quién exportó el archivo», `docx.ts`), aplicada al campo que pesa más. EL CORTE CORRECTO NO ES comprimido/sin comprimir, ES: **¿los bytes ya existen?** Una entrada de zip es un HECHO —están ahí, hay que copiarlos—; un rectángulo de un PDF es una PROMESA —no existen hasta que alguien renderiza— y ESE es el caso que la forma por referencia justifica, que es para el que C4 se escribió. El costo se da vuelta al mirarlo: se paga una copia de cada imagen DISTINTA (direccionada por contenido, o sea el logo una vez y no cincuenta) y se ahorran cuarenta y nueve llamadas a modelo, que cuestan órdenes de magnitud más que un blob. Y de yapa desaparece la exención de la rama sin comprimir frente al antivirus, con su supuesto incómodo de «depende de si el escáner abre contenedores». Mueve: el golden de `manual.docx`, I21 (que hoy verifica lo contrario) y las filas S105/S106. NO mueve la aritmética del encabezado local del zip: se sigue necesitando para LEER los bytes, deja de usarse para EXPRESAR una ventana. | Tramo 3 |
 | **P5** | `tipo` podría existir **solo** donde contradice al piso físico, derivando la etiqueta de display desde `forma`. Volvería inexpresable la contradicción `tipo:'parrafo'` + `forma:'grid'`. Se resiste porque perdería tipos que no overridean nada (`cita`, `lista`) y que sí sirven para filtrar. | Tramo 3 |
 
 **Resueltos al decidir la identidad (H13):** cómo se acuña un id nuevo (al azar; el

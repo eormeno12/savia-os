@@ -107,7 +107,13 @@ export {
 // (`scripts/boundaries.mjs`). Nació como `authorship.ts` con un solo miembro y se
 // renombró al mudarse `DelegationId`, que declaraba el mismo invariante sin ninguna
 // frontera que lo impusiera. El criterio de membresía está en su encabezado.
-export { type Authorship, type DelegationId, asDelegationId } from "./provenance.js";
+export {
+  type Authorship,
+  type DelegationId,
+  asDelegationId,
+  /** De dónde salieron los bytes de un asset: contenedor + ruta adentro. */
+  type Whence,
+} from "./provenance.js";
 
 // Ubicación y coordenadas.
 export {

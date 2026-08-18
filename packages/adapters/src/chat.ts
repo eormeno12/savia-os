@@ -127,7 +127,8 @@ export const chatAdapter: ChannelAdapter<ChatSignals, Message> = {
         (p, i): AuthoredUnit<ChatSignals> => ({
           signals: {},
           body: { shape: "text_span", text: p.text, marks: p.marks },
-          location: { anchor: `msg#${i}`, coordinate: { space: "source" } },
+          whence: null,
+      location: { anchor: `msg#${i}`, coordinate: { space: "source" } },
           ownAuthorship: input.author,
         }),
       ),

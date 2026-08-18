@@ -686,7 +686,8 @@ export const markdownAdapter: FileAdapter<MdSignals> = {
         (d): Unit<MdSignals> => ({
           signals: d.signals,
           body: d.body,
-          location: { anchor: d.anchor, coordinate: { space: "source" } },
+          whence: null,
+    location: { anchor: d.anchor, coordinate: { space: "source" } },
         }),
       );
     }),

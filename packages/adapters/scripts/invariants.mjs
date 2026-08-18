@@ -133,6 +133,7 @@ try {
   const png = new Uint8Array(readFileSync(join(RAIZ, "corpus", "sello.png")));
   const docx = new Uint8Array(readFileSync(join(RAIZ, "corpus", "manual.docx")));
   const docxZip = new Uint8Array(readFileSync(join(RAIZ, "corpus", "manual-deflated.docx")));
+  const docxHer = new Uint8Array(readFileSync(join(RAIZ, "corpus", "manual-heredado.docx")));
 
   /**
    * LOS DOS UMBRALES SALEN DE MEDIR EL CORPUS, NO DE ELEGIR UN NÚMERO.
@@ -1248,6 +1249,11 @@ try {
           level: n.level,
           attribution: n.attribution,
           hint: n.hint,
+          // ENTRA AL MOLDE EN LA DEUDA DEL PASO 7, y es el único observador de la
+          // procedencia de la rama SIN COMPRIMIR: I19 de la orquestación corre sobre el
+          // `.docx` deflateado, así que sin esta columna el `whence` del recorte por
+          // referencia se puede borrar y nada se pone rojo.
+          whence: n.whence,
           body: n.body,
         })),
         avisos: corridaDocx.notices,
@@ -1306,6 +1312,43 @@ try {
     }
   }
 
+  // ── I23 · EL CUERPO HEREDADO CUENTA COMO CUERPO ───────────────────────────
+  // El caso que `PENDING(docDefaults)` dejó abierto y que este bloque cierra: un `.docx`
+  // que NO declara el tamaño en ninguna corrida y lo hereda de `word/styles.xml`. Es la
+  // mitad de los documentos corporativos, no un caso raro.
+  //
+  // EL FIXTURE DISCRIMINA EL ORDEN DE PRECEDENCIA, y por eso sus dos valores están
+  // deliberadamente peleados: `docDefaults` declara 48 y el estilo `Normal` declara 22,
+  // que es el orden INVERSO al que saldría de leer el primero que aparezca. Si ganara
+  // `docDefaults`, el cuerpo mediría 48 y el título —que declara 32— sería MÁS CHICO que
+  // el cuerpo, así que no habría un solo título por prominencia. O sea que (a) no se
+  // cumple por casualidad: exige que `Normal` pise a `docDefaults`, que es como lo
+  // resuelve Word.
+  {
+    const corridaHer = contextoDe();
+    const nodosHer = await opaqueOf(docxAdapter).recognize(fuenteDe(docxHer), corridaHer.ctx);
+    const porProminencia = nodosHer.filter((n) => n.attribution === "byProminence");
+    const alPiso = nodosHer.filter((n) => n.attribution === null);
+
+    // (a) el título heredado SÍ sale, y sale por el eslabón físico
+    if (porProminencia.length !== 1 || porProminencia[0]?.role !== "subheading") {
+      fallar(
+        "I23 · el título heredado no lo resolvió `byProminence`",
+        JSON.stringify(nodosHer.map((n) => [n.role, n.attribution])),
+        "en el documento típico de este hueco el cuerpo NO declara tamaño y el título SÍ, así que si el heredado no entra AL HISTOGRAMA el modal queda en el tamaño del propio título y la comparación `mayor que el cuerpo` se cumple contra sí misma. El documento pierde todos sus títulos sin estilo y cae entero al piso, en silencio",
+      );
+    }
+
+    // (b) …y el cuerpo NO sale, que es la mitad sin la cual (a) la cumple marcar todo
+    if (alPiso.length !== nodosHer.length - 1 || !alPiso.every((n) => n.role === "paragraph")) {
+      fallar(
+        "I23 · el cuerpo heredado no cayó al piso",
+        JSON.stringify(alPiso.map((n) => [n.role, n.attribution])),
+        "sin esta mitad, «el título heredado se reconoce» lo cumple una implementación que marca como título a todos los párrafos del documento — que es el error opuesto y del mismo tamaño",
+      );
+    }
+  }
+
   if (fallas > 0) process.exit(1);
 
   const roles = [...new Set(crudos.map((n) => n.role))].sort();
@@ -1318,7 +1361,8 @@ try {
       `I18 el chat entra por la misma puerta · I19 una imagen es un documento · ` +
       `I20 la sonda ve adentro del zip sin descomprimir · ` +
       `I21 la cascada y la delegación se componen · ` +
-      `I22 sin almacenamiento la imagen se anuncia y el texto entra)\n` +
+      `I22 sin almacenamiento la imagen se anuncia y el texto entra · ` +
+      `I23 el cuerpo heredado cuenta como cuerpo)\n` +
       `           ${crudos.length} nodos · ${roles.length} de ${ROLES.length} roles alcanzados: ${roles.join(" ")}\n` +
       `           piso: .conf ${P_TEXTO.toFixed(4)} imprimible → indexa · ` +
       `.png ${P_BINARIO.toFixed(4)} → on_hold`,

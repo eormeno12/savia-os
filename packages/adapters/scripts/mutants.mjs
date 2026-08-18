@@ -1005,12 +1005,18 @@ const MUTANTES = [
     id: "S101",
     garantía: "la prominencia exige negrita Y tamaño, no una de las dos",
     rompe: "I21 · el eslabón `byProminence` no resolvió ningún nodo",
-    cambios: [[`      if (!bold || size <= cuerpo) return null;`, `      if (bold || size <= cuerpo) return null;`]],
+    cambios: [[
+      `      if (!u.signals.bold || tamaño <= cuerpo) return null;`,
+      `      if (u.signals.bold || tamaño <= cuerpo) return null;`,
+    ]],
     espera: /el eslabón .byProminence. no resolvió ningún nodo/,
     nota:
       "las dos condiciones hacen falta y cada una tapa un falso positivo del otro lado: solo el tamaño " +
       "confunde una cita destacada con un título, y sola la negrita confunde una palabra enfatizada en un " +
       "párrafo largo. La mutación es una negación caída, que es el error más barato de cometer en una " +
+      "REANCLADA en la deuda del paso 7: la línea pasó de `size` a `tamaño`, que es el tamaño EFECTIVO —el " +
+      "de la corrida, o el heredado del documento—, así que el ancla vieja quedó en cero ocurrencias. Es el " +
+      "caso que la nota de M49 describe al revés: acá el ancla se movió y el corredor lo dijo. " +
       "guarda compuesta",
   },
   {
@@ -1047,6 +1053,49 @@ const MUTANTES = [
       "el equivocado el rango arranca 16 bytes adentro del PNG, así que la ventana existe, tiene el largo " +
       "correcto y apunta a basura. Nada explota: el asset se emite, se delega, y el adaptador de imagen no " +
       "lo reclama porque los bytes mágicos no son de una imagen. El documento pierde su figura EN SILENCIO",
+  },
+  // ── Deuda del paso 7 · de dónde salieron los bytes ────────────────────────
+  {
+    id: "S104",
+    garantía: "el compositor COPIA la procedencia al nodo, no la descarta",
+    cambios: [["      whence: u.whence,", "      whence: null,"]],
+    espera: /I21 · golden bytes→nodos del/,
+    nota: "es la fila que descubrió que el campo nacía sin acreditar: `whence` se agregó a `Unit`, a `RawNode` y a los siete literales, los nueve paquetes compilaron y los cuatro guardianes quedaron VERDES — o sea que el campo entero se podía borrar sin que nada se pusiera rojo. La mutación es el atajo que alguien escribe de buena fe cuando el tipo pide un campo y no sabe con qué llenarlo",
+  },
+  {
+    id: "S105",
+    garantía: "la rama SIN COMPRIMIR también dice de dónde salió, no solo la materializada",
+    cambios: [[
+      `            whence: { container: input.ref.object, path: entrada.name },\n            body: { shape: "asset", ref: { object: input.ref.object, window }, mime: mimeDe(entrada.name) },`,
+      `            whence: null,\n            body: { shape: "asset", ref: { object: input.ref.object, window }, mime: mimeDe(entrada.name) },`,
+    ]],
+    espera: /I21 · golden bytes→nodos del/,
+    nota: "las dos ramas del `.docx` llevan la MISMA procedencia y la sangría NO alcanza para distinguirlas: la de esta rama —doce espacios— es SUBCADENA de la de la otra —catorce—, así que `ubicar` la encontraba dos veces. Por eso el ancla es el par `whence` + `body`, y por eso en el código `whence` va arriba: la línea de `body` de esta rama es la única del archivo que nombra la ventana. La tentación es leer `null` acá como correcto —el objeto ya es el contenedor, así que «no vino de ningún lado»— y es falso: la ventana dice DÓNDE EN BYTES, no cómo se llamaba. Con `null`, la respuesta a «de dónde vino esta imagen» dependería de si el escritor de Word la comprimió o no",
+  },
+  // ── Deuda del paso 7 · el cuerpo heredado ─────────────────────────────────
+  {
+    id: "S106",
+    garantía: "el tamaño heredado entra AL HISTOGRAMA, no solo a la comparación",
+    cambios: [["      const s = efectivo(u.signals);", "      const s = u.signals.size;"]],
+    espera: /I23 · el título heredado no lo resolvió/,
+    nota: "es LA fila del bloque, y acredita la decisión de precedencia y no la de leer el archivo. La mutación es exactamente la versión que sale sola —«saco el modal de lo declarado, y si queda `null` uso el del documento»—: compila, no mueve el golden de `manual.docx` porque ahí todos declaran, y sobre el fixture heredado el histograma vuelve a quedar `{32: 1}`, el modal vuelve a ser el tamaño del propio título y `32 <= 32` lo mata. Un respaldo que solo dispara con el modal en `null` NUNCA SE EJECUTA en el documento que existe para arreglar",
+  },
+  {
+    id: "S107",
+    garantía: "el estilo `Normal` PISA a `docDefaults`, que es como lo resuelve el formato",
+    cambios: [["  if (delEstilo !== null) return delEstilo;", "  if (delEstilo === null) return delEstilo;"]],
+    espera: /I23 · el título heredado no lo resolvió/,
+    nota: "`docDefaults` es el escalón más bajo de la cascada de Word y el estilo por defecto de párrafo lo pisa. Con el orden dado vuelta, el fixture heredado da cuerpo 48 contra un título de 32: el título pasa a ser MÁS CHICO que el cuerpo y desaparece. Por eso los dos valores del fixture están peleados y en ese orden — con `Normal` y `docDefaults` de acuerdo, esta fila no tendría cómo romper",
+  },
+  {
+    id: "S108",
+    garantía: "`styles.xml` se lee de verdad: el heredado no sale de ningún lado más",
+    cambios: [[
+      "  const xml = zipEntryOf(bytes, STYLES);",
+      "  const xml = zipEntryOf(bytes, STYLES) === null ? null : null;",
+    ]],
+    espera: /I23 · el título heredado no lo resolvió/,
+    nota: "la mutación CONSERVA la llamada y descarta el resultado, y no es rebusque: `const xml = null;` huerfaniza `STYLES` y `zipEntryOf` deja de tener este consumidor, así que el mutante muere con TS6133 y acredita al COMPILADOR en vez de a la garantía. Se midió las dos veces — la versión ingenua daba verde en el corredor y roja en `tsc`, que es el peor de los dos mundos: parece que la garantía no existe cuando en realidad el mutante estaba mal escrito",
   },
   {
     id: "SC23",

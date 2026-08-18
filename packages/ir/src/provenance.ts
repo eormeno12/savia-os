@@ -81,7 +81,7 @@
  * `invariants.ts`, y las dos se corrigieron en este bloque.
  */
 
-import type { ActorId, Instant, Nominal } from "./identity.js";
+import type { ActorId, Instant, Nominal, ObjectKey } from "./identity.js";
 
 /**
  * Quién dijo qué y cuándo. Obligatoria en todos los nodos (§{Tramo 3 › Qué sale}):
@@ -178,3 +178,44 @@ export type DelegationId = Nominal<string, "DelegationId">;
  * igual que los quince de `identity.ts`.
  */
 export const asDelegationId = (v: string): DelegationId => v as DelegationId;
+
+/**
+ * DE DÓNDE SALIERON LOS BYTES — el contenedor donde se encontró la referencia, y la
+ * referencia tal como estaba escrita ahí (GLOSARIO.md, P25).
+ *
+ * ES LA OTRA MITAD DE UN PAR. `ObjectKey` dice dónde quedó un objeto EN NUESTRO
+ * almacenamiento y es direccionado por contenido; este dice dónde estaba antes de que
+ * le diéramos esa dirección. Las dos rutas se guardan, y ninguna de las dos sirve sola:
+ * la interna no dice de dónde vino, y la original no dice dónde buscarlo.
+ *
+ * POR QUÉ NO ALCANZABA CON `ObjectKey`, y es la razón de fondo de todo el tipo. La
+ * clave es el hash del contenido, así que el logo que aparece en cincuenta documentos
+ * da CINCUENTA VECES LA MISMA CLAVE — y eso es deliberado: es lo que hace que se guarde
+ * una vez y el modelo lo describa una vez. Pero las rutas de origen son cincuenta
+ * distintas. **Una clave, N procedencias.** Colgarle la ruta al objeto obliga a pisar,
+ * a ignorar o a acumular, y las tres o pierden información o vuelven al almacenamiento
+ * un registro con estado. Colgándosela al NODO la cantidad calza sola: hay un nodo por
+ * aparición, y cada uno lleva la suya.
+ *
+ * UNA SOLA FORMA PARA LOS DOS CASOS, y no hizo falta una unión. Un `.docx` da
+ * `(el .docx, "word/media/sello.png")`; un `.md` que referencia una imagen por enlace
+ * dará `(el .md, "https://cdn.acme.com/fig.png")`. En los dos hay un contenedor y una
+ * dirección relativa a él. `path` es OPACO a propósito: interpretarlo —resolverlo,
+ * bajarlo, validarlo— es trabajo de quien lo escribió, y este tipo solo lo transporta.
+ *
+ * `container` ES UNA `ObjectKey` y no un nombre de archivo ni una `Source`, porque
+ * tiene que seguir siendo cierto después de que alguien renombre el documento: es la
+ * única dirección del contenedor que no se mueve.
+ *
+ * NUNCA ENTRA EN LA HUELLA, y acá eso no es una promesa sino la firma: `fingerprintOf`
+ * recibe `Body`, y este viaja como HERMANO de `body` en `RawNode`, no como campo suyo.
+ * No hay forma de escribir el código que lo cuele. Si entrara, la misma imagen traída
+ * desde dos documentos serían dos identidades y toda la curación de esa figura se
+ * despegaría — que es el modo de falla exacto que el direccionamiento por contenido
+ * existe para impedir. Es el mismo lugar y la misma razón que `DelegationId`, y la
+ * frontera `projection.ts ↛ provenance.ts` lo cubre sin escribir una línea nueva.
+ */
+export type Whence = {
+  readonly container: ObjectKey;
+  readonly path: string;
+};

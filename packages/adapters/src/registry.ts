@@ -470,6 +470,9 @@ const recognizerOf = <S, E>(
       body: u.body,
       location: { ...u.location, adapter: a.id, within: [] },
       hint: r === null ? null : r.hint,
+      // SE COPIA TAL CUAL, y no se deriva: el único que sabe de dónde salieron los
+      // bytes es el adaptador que abrió el contenedor. Acá ese dato ya no existe.
+      whence: u.whence,
       delegation: [],
       attribution: r === null ? null : r.attribution,
       level: r === null ? "physical" : r.level,

@@ -839,6 +839,54 @@ en verde**. Un tipo sin productor no es un tipo sin trabajo.
 
 ---
 
+## 18 · Deuda del paso 7 — de dónde salieron los bytes
+
+El paso 7 dejó escrito que faltaba guardar **las dos rutas**: la interna, que ya
+existe y es la `ObjectKey`, y la original, que no tenía dónde vivir. Un solo símbolo
+nuevo, y la fila existe porque **todos los nombres obvios tienen dueño**.
+
+| # | Símbolo | **Queda** | Por qué no la que salía sola |
+|---|---|---|---|
+| **P25** | de dónde salieron los bytes de un asset | **`Whence`** = `{ container: ObjectKey; path: string }`, en `provenance.ts` · campo **`whence`** en `Unit` y en `RawNode` | **`Provenance` es la CATEGORÍA y no puede ser un miembro.** E2 (§11) fundó `provenance.ts` justamente porque con dos miembros «el archivo pasaría a nombrar a uno de los dos y a esconder al otro»; darle el nombre de la categoría al tercero es ese mismo error servido al revés, y encima el peor de los dos: esconde a `Authorship` y a `DelegationId` a la vez. **`Origin` está tomado** (`Origin['kind']`, D6) y **`Source` lleva ⚠ doble** (§3 y §5) y ADEMÁS ya es un campo de `Authorship` con otro significado — las tres colisiones que P17 ya había recorrido para otro símbolo. `Location` es de `RawNode.location` («dónde está en el documento», no «de dónde vino») y `Route` es del tramo 4. **`Locator` se descarta por casi-colisión**: queda a una letra de `Location` en un tipo que lleva los dos campos, que es la clase de vecindad que P13 evitó entre `Span` y `text_span`. `Whence` es literalmente «de dónde», que es la pregunta que el campo contesta, y **no tiene un solo homónimo en los cuatro paquetes** |
+
+### Por qué CABE en `provenance.ts`, con el criterio del módulo aplicado
+
+El criterio de membresía pide las tres y `Whence` las cumple sin forzar ninguna:
+
+1. **Dice CÓMO LLEGÓ, no QUÉ ES.** `word/media/sello.png` no dice nada del contenido:
+   el mismo PNG con otro nombre adentro del mismo `.docx` es el mismo PNG.
+2. **La huella tiene que ser CIEGA a él**, y acá la ceguera es ESTRUCTURAL y no una
+   promesa: `fingerprintOf` recibe `Body`, y `whence` es hermano de `body`, no un campo
+   suyo. No hay forma de escribir el código que lo cuele. Es el mismo lugar y la misma
+   razón que `delegation` y `attribution`, que ya llevan «NO entra en la huella» escrito
+   en su docstring.
+3. **Viaja pegado al contenido, no al registro.** Sale del adaptador junto con la
+   unidad y llega al nodo; no es la identidad de una fila del tramo 1.
+
+### La forma, y por qué UNA sola sirve para los dos casos
+
+`{ container, path }` — el objeto donde se encontró la referencia, y la referencia
+**tal como estaba escrita ahí**. Un `.docx` da `(el .docx, "word/media/sello.png")`;
+un `.md` con una imagen por enlace dará `(el .md, "https://cdn.acme.com/fig.png")`.
+No hace falta una unión: en los dos casos hay un contenedor y una dirección relativa
+a él, y el `path` es opaco a propósito — interpretarlo es trabajo de quien lo escribió.
+
+`container` es `ObjectKey` y no un `Source` ni un nombre de archivo porque tiene que
+seguir siendo cierto después de que el documento se renombre: es la única dirección
+del contenedor que no se mueve.
+
+### El precio, dicho de frente
+
+`whence` es un campo **requerido de valor nulable** en `Unit`, no opcional. Los siete
+literales de unidad de los cinco adaptadores tienen que escribirlo, y seis escriben
+`null`. Con `?` el adaptador que materializa compila sin él y **la procedencia se
+pierde en silencio** — que es exactamente el argumento con el que `AuthoredUnit` hizo
+`ownAuthorship` obligatoria («con `?` el adaptador de canal compila sin ella y la
+corrida entera atribuye los mensajes a quien los mandó por MCP»). El precio es
+mecánico y lo cobra `tsc` de una vez; el modo de falla del `?` no lo cobra nadie.
+
+---
+
 ## La regla que gobierna a este documento
 
 **Si un término no está acá y ninguna regla de §2 lo determina, no se inventa: se

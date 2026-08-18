@@ -24,6 +24,14 @@
  * el rectángulo de un PDF —mismo objeto, ventana más chica— y entra al pipeline por el
  * camino que ya existe, sin escribir un byte.
  *
+ * SUPERADO POR P14, Y SE DEJA ESCRITO ACÁ PARA QUE NADIE LEA EL PÁRRAFO DE ARRIBA COMO
+ * VIGENTE. La medición del rango es correcta y la conclusión no: `ref.object` entra en la
+ * huella, así que expresar la imagen como una ventana sobre el contenedor le da al mismo
+ * logo TANTAS IDENTIDADES COMO CONTENEDORES lo lleven, y el caché de reconocimiento se
+ * indexa por ahí. La decisión tomada es materializar todo asset cuyos bytes ya existan y
+ * dejar la ventana por referencia para los que todavía no existen —el rectángulo de un
+ * PDF—. Está en Puntos abiertos, P14, con el costo y lo que mueve.
+ *
  * CUANDO SÍ HACE FALTA, SE MATERIALIZA, y esa es la otra rama. Si la entrada está
  * deflateada sus bytes no están literales en ningún rango, así que el recorte por
  * referencia no se puede expresar y hay que PRODUCIRLOS: inflar y guardar. La pieza
@@ -56,6 +64,7 @@ import { parse } from "txml";
 
 const DOCUMENT = "word/document.xml";
 const RELS = "word/_rels/document.xml.rels";
+const STYLES = "word/styles.xml";
 const STORED = 0;
 /** El prefijo de los estilos de título en el vocabulario de Word. */
 const HEADING_STYLE = "heading";
@@ -72,6 +81,15 @@ export type DocxSignals = {
   readonly style: string | null;
   /** En medios puntos, tal como OOXML lo escribe. `null` = el párrafo no lo declara. */
   readonly size: number | null;
+  /**
+   * El tamaño que el DOCUMENTO declara en `word/styles.xml`, constante en todas las
+   * unidades. `null` = el documento tampoco lo declara.
+   *
+   * VA SEPARADO DE `size` Y NO RESUELTO ADENTRO DE ÉL, y eso conserva entera la frase
+   * que abre este tipo: `size` es lo que el PÁRRAFO declara, y meterle el heredado lo
+   * volvería mentira. Quien los combina es el eslabón que necesita la combinación.
+   */
+  readonly defaultSize: number | null;
   readonly bold: boolean;
 };
 
@@ -110,11 +128,44 @@ const enteroDe = (n: Nodo | null): number | null => {
   return Number.isNaN(parsed) ? null : parsed;
 };
 
-const señalesDe = (p: Nodo): DocxSignals => ({
+const señalesDe = (p: Nodo, defaultSize: number | null): DocxSignals => ({
   style: buscar(p, "w:pStyle")?.attributes?.["w:val"] ?? null,
   size: enteroDe(buscar(p, "w:sz")),
+  defaultSize,
   bold: buscar(p, "w:b") !== null,
 });
+
+/**
+ * EL TAMAÑO QUE EL DOCUMENTO DECLARA, leído de `word/styles.xml`. `null` = no lo
+ * declara, o no hay `styles.xml`, o no infla — un `.docx` sin estilos no es un archivo
+ * roto, así que se abstiene sin avisar, igual que el resto del adaptador.
+ *
+ * EL ORDEN LO FIJA EL FORMATO, no una preferencia: el estilo por defecto de párrafo
+ * —`Normal` en la práctica— PISA a `docDefaults`, que es el escalón más bajo de la
+ * cascada de Word. Por eso se busca primero el estilo y solo después el default.
+ *
+ * NO SE BUSCA `w:sz` SOBRE LA RAÍZ, y esa es la trampa de este archivo: `buscar` es un
+ * DFS de primer match, así que sobre `w:styles` entero devolvería el `w:sz` del PRIMER
+ * estilo que aparezca —casi siempre `Heading1`—, y el adaptador terminaría creyendo que
+ * el cuerpo del documento mide lo que miden sus títulos. La búsqueda se acota primero al
+ * nodo del estilo, y recién ahí se baja.
+ */
+const tamañoPorDefectoDe = (bytes: Uint8Array): number | null => {
+  const xml = zipEntryOf(bytes, STYLES);
+  if (xml === null) return null;
+  const raíz = parse(new TextDecoder().decode(xml)) as unknown[];
+  const estilos = raíz.flatMap((n) => (esNodo(n) ? recolectar(n, "w:style", []) : []));
+  const normal = estilos.find(
+    (e) =>
+      e.attributes?.["w:styleId"] === "Normal" ||
+      (e.attributes?.["w:default"] === "1" && e.attributes?.["w:type"] === "paragraph"),
+  );
+  const delEstilo = normal === undefined ? null : enteroDe(buscar(normal, "w:sz"));
+  if (delEstilo !== null) return delEstilo;
+  const defaults = raíz.flatMap((n) => (esNodo(n) ? recolectar(n, "w:rPrDefault", []) : []));
+  const primero = defaults[0];
+  return primero === undefined ? null : enteroDe(buscar(primero, "w:sz"));
+};
 
 /**
  * EL PRIMER ESLABÓN — lo que el formato DICE. Declarativo, y se ABSTIENE donde la
@@ -142,6 +193,26 @@ const byDocxStyle = <S extends DocxSignals,>(): CascadeLink<S> => ({
 });
 
 /**
+ * EL TAMAÑO QUE RIGE UNA UNIDAD: lo que la corrida declara, y si no declara, lo que
+ * declara el documento. Es la cascada de OOXML —`w:r/w:rPr/w:sz` pisa al estilo, y el
+ * estilo pisa a `docDefaults`— resuelta en una línea.
+ *
+ * SE APLICA ANTES DE CONTAR, y ahí está toda la decisión de este bloque. La versión
+ * obvia —«saco el modal de lo declarado, y si queda `null` uso el del documento»—
+ * ARREGLA EL CASO RARO Y DEJA PASAR EL FRECUENTE, y se midió: en el documento típico de
+ * este hueco el cuerpo NO declara y el título SÍ, así que el histograma queda `{32: 1}`,
+ * el modal queda 32 —el tamaño del propio título— y `32 <= 32` lo mata. El respaldo
+ * nunca se ejecutaría, porque el modal nunca es `null`.
+ *
+ * Dicho al derecho: el default NO COMPITE con el modal, lo ALIMENTA. Ocupa el lugar de
+ * las unidades que se abstuvieron, que es justamente lo que las vuelve el CUERPO en vez
+ * de invisibles. Entre unidades sigue ganando el modal OBSERVADO, y tiene que seguir
+ * ganando: un `.docx` puede declarar `Normal = 22` y tener sus cuarenta párrafos
+ * pisados a 24 por corrida, y ahí el 22 es una declaración muerta.
+ */
+const efectivo = (s: DocxSignals): number | null => s.size ?? s.defaultSize;
+
+/**
  * EL SEGUNDO ESLABÓN — los títulos que el formato NO declara (§{`porProminencia`}).
  *
  * ES RELATIVO AL DOCUMENTO Y POR ESO ES UNA FÁBRICA. El tamaño del cuerpo no es un
@@ -150,13 +221,23 @@ const byDocxStyle = <S extends DocxSignals,>(): CascadeLink<S> => ({
  * cosas, porque solo el tamaño confunde una cita destacada con un título, y sola la
  * negrita confunde una palabra enfatizada en un párrafo largo.
  *
- * PENDING(docDefaults): si un documento declara el tamaño de su cuerpo SOLO en
- * `word/styles.xml` —en `docDefaults` o en el estilo Normal— y no en cada corrida,
- * este eslabón no tiene contra qué comparar y se ABSTIENE. Es lo correcto: sin cuerpo
- * conocido, «más grande» no significa nada. Pero el costo es real y hay que medirlo
- * antes de decidir si vale leer `styles.xml`: esos documentos pierden sus títulos sin
- * estilo y caen al piso como párrafos. Se mide contando, sobre documentos corporativos
- * reales, cuántos declaran tamaño por corrida y cuántos solo por defecto.
+ * EL CUERPO HEREDADO CUENTA COMO CUERPO, y hasta la deuda del paso 7 no contaba. Un
+ * documento que declara el tamaño SOLO en `word/styles.xml` dejaba a este eslabón sin
+ * modal y lo hacía abstenerse para todos, así que perdía sus títulos sin estilo y caía
+ * entero al piso — la mitad de los documentos corporativos, no un caso raro.
+ *
+ * LO QUE NO ALCANZABA ERA EL RESPALDO OBVIO, y ese es el hallazgo de este bloque. «Si
+ * el modal queda `null`, uso el de `styles.xml`» arregla el caso raro y deja pasar el
+ * frecuente: en el documento típico el cuerpo NO declara y el título SÍ, así que el
+ * modal NO queda `null` — queda igual al tamaño del propio título, y la comparación se
+ * cumple contra sí misma. El respaldo nunca se ejecutaría. Por eso la cascada se
+ * resuelve POR UNIDAD y antes de contar (ver `efectivo`), y por eso el fixture del
+ * banco declara `docDefaults` y `Normal` en desacuerdo: sin eso, el orden de precedencia
+ * que el formato fija no tendría observador.
+ *
+ * Sigue siendo cierto que sin cuerpo conocido «más grande» no significa nada: un
+ * documento que no declara el tamaño en ningún lado deja el modal en `null` y este
+ * eslabón se abstiene para todos, igual que antes.
  *
  * Es `physical` y no `declarative`: sale de propiedades del render, no de algo que el
  * documento afirme. Eso lo pone DESPUÉS en la cascada, que `cascade` reordena por
@@ -168,7 +249,7 @@ const byProminence = <S extends DocxSignals,>(): CascadeLink<S> => ({
   detect: (units) => {
     const cuenta = new Map<number, number>();
     for (const u of units) {
-      const s = u.signals.size;
+      const s = efectivo(u.signals);
       if (s !== null) cuenta.set(s, (cuenta.get(s) ?? 0) + 1);
     }
     let cuerpo: number | null = null;
@@ -180,9 +261,9 @@ const byProminence = <S extends DocxSignals,>(): CascadeLink<S> => ({
       }
     }
     return (u: Unit<S>): Classification | null => {
-      const { size, bold } = u.signals;
-      if (cuerpo === null || size === null) return null;
-      if (!bold || size <= cuerpo) return null;
+      const tamaño = efectivo(u.signals);
+      if (cuerpo === null || tamaño === null) return null;
+      if (!u.signals.bold || tamaño <= cuerpo) return null;
       // SIN NIVEL, y `null` no es «no sé»: es «es un título y su nivel se deduce de
       // dónde está» — el emisor lo abre bajo el título vigente más profundo. Inventar
       // un número acá sería fabricar una jerarquía que el documento no declara.
@@ -249,9 +330,13 @@ export const docxAdapter: FileAdapter<DocxSignals> = {
       const párrafos: Nodo[] = [];
       for (const raíz of árbol) recolectar(raíz, "w:p", párrafos);
 
+      // UNA VEZ POR DOCUMENTO, no por párrafo: es un dato del archivo, y leerlo adentro
+      // del bucle abriría e inflaría `styles.xml` una vez por unidad.
+      const porDefecto = tamañoPorDefectoDe(bytes);
+
       const salida: Unit<DocxSignals>[] = [];
       for (const [i, p] of párrafos.entries()) {
-        const señales = señalesDe(p);
+        const señales = señalesDe(p, porDefecto);
         const blip = buscar(p, "a:blip");
         const embed = blip?.attributes?.["r:embed"] ?? null;
         if (embed !== null) {
@@ -289,6 +374,11 @@ export const docxAdapter: FileAdapter<DocxSignals> = {
             salida.push({
               signals: señales,
               body: { shape: "asset", ref, mime },
+              // DE DÓNDE SALIÓ, y acá el campo hace su trabajo entero: la dirección
+              // del objeto es el hash de SU CONTENIDO, así que la misma imagen en
+              // cincuenta documentos da una sola clave —a propósito— y con ella se
+              // pierde de cuál salió esta. `whence` es lo único que lo conserva.
+              whence: { container: input.ref.object, path: entrada.name },
               location: { anchor: `img#${i}`, coordinate: { space: "source" } },
             });
             continue;
@@ -297,8 +387,17 @@ export const docxAdapter: FileAdapter<DocxSignals> = {
           const h = entrada.local;
           const inicio = h + 30 + dv.getUint16(h + 26, true) + dv.getUint16(h + 28, true);
           const window: Window = { scope: "range", start: inicio, end: inicio + entrada.compressed };
+          // LA MISMA PROCEDENCIA QUE LA OTRA RAMA, y no `null`, aunque acá el objeto ya
+          // sea el contenedor. La ventana dice DÓNDE EN BYTES; no dice cómo se llamaba.
+          // Y que un `.docx` guarde su logo comprimido o sin comprimir es una decisión
+          // del escritor de Word: si de eso dependiera que la pieza sepa de dónde salió,
+          // la respuesta a «de dónde vino esta imagen» cambiaría según quién exportó el
+          // archivo. Va ARRIBA de `body` y no abajo para que el par de líneas sea un
+          // ancla de mutación única: con la sangría sola no alcanza, porque la de esta
+          // rama es SUBCADENA de la de la otra.
           salida.push({
             signals: señales,
+            whence: { container: input.ref.object, path: entrada.name },
             body: { shape: "asset", ref: { object: input.ref.object, window }, mime: mimeDe(entrada.name) },
             location: { anchor: `img#${i}`, coordinate: { space: "source" } },
           });
@@ -309,6 +408,7 @@ export const docxAdapter: FileAdapter<DocxSignals> = {
         salida.push({
           signals: señales,
           body: { shape: "text_span", text: texto, marks: [] },
+          whence: null,
           location: { anchor: `p#${i}`, coordinate: { space: "source" } },
         });
       }

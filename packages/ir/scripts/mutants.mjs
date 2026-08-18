@@ -525,6 +525,19 @@ const MUTANTES = [
     espera: /frontera/i,
     nota: "fila NUEVA, y no es M46 repetida: hasta este bloque `DelegationId` vivía en `identity.ts`, que `projection.ts` YA importa desde D24, así que este mismo mutante pasaba EN VERDE — verificado antes de mudarlo, con los siete guardianes limpios. Es la deuda que el bloque 3b dejó escrita en tres docstrings («su protección pasó de débil a ninguna») y que ninguna fila acreditaba. Va como fila propia y no ampliando M46 a propósito: un mutante que importara los DOS tipos se pondría rojo por `Authorship` solo, y sería indistinguible de M46 — acreditaría la mudanza sin haberla ejercido",
   },
+  // ── Deuda del paso 7 · el TERCER miembro de la frontera ────────────────────
+  {
+    id: "M70",
+    garantía: "R1 — projection.ts no puede alcanzar provenance.ts (la PROCEDENCIA en la huella)",
+    cambios: [[
+      `export type ByteHashFn = (bytes: Uint8Array) => string;`,
+      // Misma lección que M46 y M49: el import tiene que USARSE o TS6133 mata la corrida
+      // antes de que el guardián de fronteras llegue a mirar.
+      `import type { Whence } from "./provenance.js";\nexport type _ProcedenciaEnLaHuella = Whence;\nexport type ByteHashFn = (bytes: Uint8Array) => string;`,
+    ]],
+    espera: /frontera/i,
+    nota: "fila propia y no M46/M49 ampliadas, por la razón que la nota de M49 dejó escrita: un mutante que importara dos de los tres miembros se pondría rojo por el primero y no acreditaría nada del tercero. Es LA garantía de `Whence`, y hoy es la única que puede ponerse roja: la mitad de comportamiento —I19(3), «la misma figura desde dos contenedores da la misma huella»— NO ES FALSIFICABLE mientras el único productor de assets materializados sea el `.docx`, porque `whence` es hermano de `body` y en el sitio de materialización no está ni en alcance léxico. Se midió antes de escribir esta fila. O sea que la ceguera de la huella la impone ACÁ el grafo de módulos, y allá la firma de `fingerprintOf`",
+  },
   {
     id: "M50",
     garantía: "la cifra de llamadas a NotAssignableTo no se puede desincronizar del AST",

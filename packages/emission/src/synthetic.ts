@@ -86,6 +86,8 @@ const node = (
     location: location(anchor),
     hint,
     delegation,
+    // Nodos SINTÉTICOS: no salieron de ningún contenedor. Ver `Whence`.
+    whence: null,
     attribution: null,
     level: "declarative",
     confidence: null,
@@ -529,6 +531,8 @@ const withLevel = (t: string, level: RecognitionLevel, confidence: number | null
     location: location(t),
     hint: null,
     delegation: [],
+    // Nodos SINTÉTICOS: no salieron de ningún contenedor. Ver `Whence`.
+    whence: null,
     attribution: null,
     level,
     confidence,
@@ -686,6 +690,8 @@ const region = (schema: readonly string[]): Node =>
     },
     hint: { linkage: "parent", id: REGION, parent: null },
     delegation: [],
+    // Nodos SINTÉTICOS: no salieron de ningún contenedor. Ver `Whence`.
+    whence: null,
     attribution: null,
     level: "declarative",
     confidence: null,
@@ -710,6 +716,8 @@ const rowNode = (row: number, texts: readonly string[]): Node =>
     },
     hint: { linkage: "parent", id: asLocalId(`row#${row}`), parent: REGION },
     delegation: [],
+    // Nodos SINTÉTICOS: no salieron de ningún contenedor. Ver `Whence`.
+    whence: null,
     attribution: null,
     level: "declarative",
     confidence: null,

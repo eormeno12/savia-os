@@ -1,0 +1,98 @@
+{
+  "adapter": "docx",
+  "achievedLevel": "mixed",
+  "árbol": [
+    {
+      "anchor": "p#0",
+      "role": "heading",
+      "shape": "text_span",
+      "level": "declarative",
+      "attribution": "byDocxStyle",
+      "parent": "?",
+      "whence": null,
+      "delegation": [],
+      "hash": "9071a789a07b112cb2be9bfd08a6219e437f6eff32fed1b0ac8e5532d0e46420"
+    },
+    {
+      "anchor": "p#1",
+      "role": "paragraph",
+      "shape": "text_span",
+      "level": "physical",
+      "attribution": null,
+      "parent": "p#0",
+      "whence": null,
+      "delegation": [],
+      "hash": "f98fafdeb6b576b377fa1eba49eeb679f5c1439292387b9ed04a475c73ca2c0a"
+    },
+    {
+      "anchor": "p#2",
+      "role": "subheading",
+      "shape": "text_span",
+      "level": "physical",
+      "attribution": "byProminence",
+      "parent": "p#0",
+      "whence": null,
+      "delegation": [],
+      "hash": "f50a6991ade13bc7b1ce5a7c88dc36d92b78ff607fab3ca83e79685ebafa39ae"
+    },
+    {
+      "anchor": "p#3",
+      "role": "paragraph",
+      "shape": "text_span",
+      "level": "physical",
+      "attribution": null,
+      "parent": "p#2",
+      "whence": null,
+      "delegation": [],
+      "hash": "e13c0208f0be28c200552a81683be8aea823d0fa500e53956de743418eaadcf3"
+    },
+    {
+      "anchor": "img#4",
+      "role": "image",
+      "shape": "asset",
+      "level": "physical",
+      "attribution": null,
+      "parent": "p#2",
+      "whence": {
+        "container": "obj-1716",
+        "path": "word/media/sello.png"
+      },
+      "delegation": [],
+      "hash": "cd6397379cf058eb6399c7f51f9a94e4d3147ce37ed00bbe980e22e6a5fecee5"
+    },
+    {
+      "anchor": "r#0",
+      "role": "heading",
+      "shape": "text_span",
+      "level": "perceptual",
+      "attribution": "topmost",
+      "parent": "img#4",
+      "whence": null,
+      "delegation": [
+        "b1ff9c8ea3a780bad09b346c423d2d0e46815926879b18e841d928376a946640#whole"
+      ],
+      "hash": "66441031f3fe33852dff241c48b76bedc604ee2dbd823a58701dad6a3ab7ae1e"
+    },
+    {
+      "anchor": "p#5",
+      "role": "paragraph",
+      "shape": "text_span",
+      "level": "physical",
+      "attribution": null,
+      "parent": "p#2",
+      "whence": null,
+      "delegation": [],
+      "hash": "ac6ab2219d1992b5d2bf0c215230f82817ff484a4da891b9e721bbd37ef2ac72"
+    }
+  ],
+  "objetos": [
+    [
+      "b1ff9c8ea3a780bad09b346c423d2d0e46815926879b18e841d928376a946640",
+      69
+    ]
+  ],
+  "sumidero": {
+    "notices": [],
+    "degradations": []
+  }
+}

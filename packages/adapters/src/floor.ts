@@ -221,7 +221,8 @@ export const textFloorAdapter = (
         (b): Unit<FloorSignals> => ({
           signals: {},
           body: { shape: "text_span", text: b.text, marks: [] },
-          location: { anchor: `line#${b.line}`, coordinate: { space: "source" } },
+          whence: null,
+    location: { anchor: `line#${b.line}`, coordinate: { space: "source" } },
         }),
       ),
     ),

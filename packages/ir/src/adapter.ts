@@ -20,6 +20,7 @@ import { PARAMETERS } from "./params.js";
 import type { AdapterId, MatterHash, ObjectKey } from "./identity.js";
 import type { Classification, RecognitionLevel } from "./classification.js";
 import type { Body, ObjectRef } from "./shapes.js";
+import type { Whence } from "./provenance.js";
 import type { Box, LocalLocation, Location } from "./location.js";
 import type { AchievedLevel, Channel, RawNode } from "./outputs.js";
 
@@ -608,6 +609,22 @@ export type Unit<S> = {
   /** Una de las seis formas — CRUZA el borde. */
   readonly body: Body;
   readonly location: LocalLocation;
+  /**
+   * DE DÓNDE SALIERON LOS BYTES, y `null` = de ningún lado en particular: la unidad
+   * es contenido del propio documento y no una pieza traída de otro lugar. Ver
+   * `Whence` (GLOSARIO.md, P25).
+   *
+   * SOLO EL ADAPTADOR LO SABE, y por eso viaja acá y no lo escribe la orquestación al
+   * injertar como hace con `delegation`. Cuando el `.docx` materializa una imagen, el
+   * único que tiene `word/media/sello.png` en la mano es el que abrió el zip; dos
+   * capas más arriba ese dato ya no existe.
+   *
+   * REQUERIDO Y DE VALOR NULABLE, no opcional, y es deliberado por el precedente de
+   * `AuthoredUnit.ownAuthorship`: con `?` el adaptador que materializa compila sin él
+   * y la procedencia se pierde EN SILENCIO. Escribir `null` es una decisión que se ve
+   * en el diff; omitir el campo no se ve en ningún lado.
+   */
+  readonly whence: Whence | null;
 };
 
 /**

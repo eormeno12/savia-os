@@ -672,6 +672,23 @@ const MUTANTES = [
   },
 
   {
+    id: "S107",
+    garantía: "la imagen MATERIALIZADA dice de dónde salió, y es la única que no puede reconstruirlo",
+    cambios: [["              whence: { container: input.ref.object, path: entrada.name },", "              whence: null,"]],
+    espera: /I19 · la procedencia no llegó a la salida/,
+    nota: "el hermano de S105 con el observador cambiado, y la asimetría es el punto. En la rama SIN COMPRIMIR la dirección del asset ES el contenedor, así que perder la procedencia duele pero es reconstruible; en esta la dirección es el hash del contenido, que es CIEGO a de dónde vino por diseño, y con `whence` en `null` no queda un solo dato en todo el pipeline que diga de cuál documento salió esta figura. El ancla es de catorce espacios y sí es única: la de doce es subcadena de esta, no al revés",
+  },
+  {
+    id: "S108",
+    garantía: "un objeto materializado es la pieza ENTERA, y su ventana lo dice de UNA sola manera",
+    cambios: [[
+      "      return storage.put(object, bytes, mime).then(() => ({ object, window: { scope: \"whole\" } }));",
+      "      return storage\n        .put(object, bytes, mime)\n        .then(() => ({ object, window: { scope: \"range\", start: 0, end: bytes.length } }));",
+    ]],
+    espera: /I18 · golden bytes→nodos del/,
+    nota: "la mutación dice LO MISMO —el rango completo de los bytes ES la pieza entera— y ahí está el veneno: no cambia un solo comportamiento, así que las tres guardas de I18 siguen verdes (delegó, la clave es el hash, no hubo objeto de más). Lo único que se mueve es la HUELLA, porque `window` entra en la preimagen del asset. Dos formas de escribir «todo» son dos identidades para la misma figura, y la única red que lo ve es el golden. Es exactamente la clase de cambio que este paso agregó el golden para atrapar",
+  },
+  {
     id: "SC21",
     control: true,
     garantía: "editar la prosa de un docstring del reconciliador no rompe nada",
@@ -772,6 +789,9 @@ const ARCHIVOS = [
   "package.json",
   "corpus/manual.golden.json",
   "corpus/manual.identity.golden.json",
+  // El de la rama comprimida, y entra con su consumidor: sin él en esta lista, S108
+  // no tiene qué mutar y la única garantía que solo el golden ve queda sin fila.
+  "corpus/manual-deflated.golden.json",
   "scripts/boundaries.mjs",
   "scripts/invariants.mjs",
   // El `src/` de OTRO paquete, y va con la misma razón que `turbo.json` de abajo: el
@@ -786,6 +806,11 @@ const ARCHIVOS = [
   // dos mitades —el adaptador que lo produce y la orquestación que lo resuelve— y solo
   // este paquete alcanza a las dos.
   "../adapters/src/registry.ts",
+  // El CUARTO archivo ajeno, y entra en la deuda del paso 7 por la misma razón que los
+  // otros: la procedencia de la rama COMPRIMIDA no tiene observador en `adapters` —el
+  // banco de ahí no puede materializar a propósito—, así que el único paquete que puede
+  // acreditarla es este, que corre las dos mitades.
+  "../adapters/src/docx.ts",
   // El único archivo de la RAÍZ que un corredor de mutación toca en todo el repo, y va
   // con su razón: el orden entre `lint` y `lint` es un hecho del monorepo, no del
   // paquete, y el único que lo puede acreditar es el que lo sufre (S73). El arnés lo
