@@ -1,0 +1,397 @@
+//! EL LAZO: la vuelta completa de una raiz. Es el unico modulo que compone a los otros
+//! —la misma forma que `@savia-os/orchestration` tiene en el pipeline— y por eso es el
+//! unico que puede ver a la vez la plataforma, el almacen y el protocolo.
+//!
+//! Hace tres cosas, en este orden y no en otro:
+//!
+//!  1. **Abre el barrido** con el denominador, enumera, y le pasa CADA ruta a la maquina.
+//!     El recorrido marca `vista_en` —contabilidad suya, no efecto de la maquina— y va
+//!     armando el `IndiceDeContenido` con las rutas NUEVAS, que es contra lo que MOVE
+//!     correlaciona.
+//!  2. **Cierra el barrido**, que es cuando MOVE y ROOT tienen respuesta completa: se
+//!     anulan las bajas que resultaron movimientos ANTES de transmitir, y se agregan las
+//!     de las filas que el recorrido no vio.
+//!  3. **Drena**, en orden por raiz, con un solo trabajo en vuelo. Los HECHOS primero y
+//!     los BYTES despues, que es lo que impide que una semana sin conexion se convierta
+//!     en un backlog de subida de archivos que en realidad solo se movieron.
+#![forbid(unsafe_code)]
+
+use crate::almacen::Almacen;
+use crate::colas::{Desenlace, Proximo, Recibido, Trabajo, TrabajoId};
+use crate::dominio::{BarridoId, EstadoDelBarrido, RaizId, RutaRelativa};
+use crate::inventario::Inventario;
+use crate::maquina::{self, Nodo, OrigenDeSenal, Senal};
+use crate::plataforma::{Plataforma, RelojDePlataforma, ResultadoDeEnumeracion};
+use crate::protocolo::{Clase, Cliente, FalloDeProtocolo};
+use crate::salvaguardas::{IndiceDeContenido, Politica};
+
+#[derive(Default, Debug)]
+pub struct ResumenDelBarrido {
+    pub enumeradas: usize,
+    pub apariciones: u64,
+    pub bajas: u64,
+    pub omitidos_por_deshidratacion: u64,
+    pub esperando: u64,
+    pub movimientos: u64,
+    pub indeterminados: u64,
+    pub cierre: Option<EstadoDelBarrido>,
+}
+
+/// Una vuelta sobre una raiz. **No transmite nada**: solo llena el almacen. El drenaje es
+/// aparte a proposito — el contrato con la cola dice que ninguna baja se transmite con
+/// un barrido abierto de esa raiz.
+pub fn barrer(
+    raiz: &RaizId,
+    barrido: BarridoId,
+    plataforma: &dyn Plataforma,
+    almacen: &mut Almacen,
+    politica: &Politica,
+) -> ResumenDelBarrido {
+    let mut resumen = ResumenDelBarrido::default();
+    let Some(registrada) = almacen.inventario().raiz(raiz) else {
+        return resumen;
+    };
+    let (segmento, _total) = almacen.abrir_barrido(raiz, barrido.clone());
+
+    let evidencia = plataforma.evidencia_de_raiz(&registrada);
+    let (rutas, recorrido_completo) = match &evidencia.enumeracion {
+        ResultadoDeEnumeracion::Listada { entradas, errores } => (
+            entradas.iter().map(|e| e.ruta.clone()).collect::<Vec<_>>(),
+            // Un recorrido con huecos NO puede afirmar «barri entero». Marcarlo completo
+            // convierte las ausencias del tramo ilegible en evidencia de baja.
+            errores.is_empty(),
+        ),
+        ResultadoDeEnumeracion::Fallo(_) => (Vec::new(), false),
+    };
+    resumen.enumeradas = rutas.len();
+
+    let mut indice = IndiceDeContenido::nuevo();
+    let reloj = RelojDePlataforma(plataforma);
+
+    for ruta in &rutas {
+        // ANTES de decidir: ¿esta ruta sostenia contenido al empezar el paso? Es lo unico
+        // que distingue «reaparecio donde antes no estaba» de «se edito lo que ya
+        // estaba», y hay que leerlo aca porque despues de `comprometer` el inventario ya
+        // dice otra cosa. Ver `IndiceDeContenido::anotar_ruta_nueva`.
+        let estrenaba = crate::inventario::estrena_contenido(
+            almacen
+                .inventario()
+                .asiento(raiz, ruta)
+                .and_then(|a| a.fila),
+        );
+        // Contabilidad del RECORRIDO, no efecto de la maquina: `vista_en` es lo que hace
+        // que al cerrar las filas no vistas sean el conjunto de ausencias.
+        almacen.marcar_vista(raiz, ruta, &barrido);
+        let senal = Senal {
+            raiz: raiz.clone(),
+            ruta: ruta.clone(),
+            origen: OrigenDeSenal::TurnoDelBarrido,
+        };
+        let paso = maquina::decidir(
+            &senal,
+            Some(&barrido),
+            plataforma,
+            almacen.inventario(),
+            &reloj,
+            politica,
+        );
+        match &paso.nodo {
+            Nodo::Aparecio => resumen.apariciones += 1,
+            Nodo::Desaparecio => resumen.bajas += 1,
+            Nodo::Omitido => resumen.omitidos_por_deshidratacion += 1,
+            Nodo::Esperando { .. } => resumen.esperando += 1,
+            Nodo::Movimiento { .. } => resumen.movimientos += 1,
+            Nodo::Indeterminado(_) => resumen.indeterminados += 1,
+            _ => {}
+        }
+        // El indice se alimenta SOLO con rutas que ESTRENARON contenido en este barrido:
+        // es lo que hace que «reaparecio» signifique «aparecio donde antes no estaba» y
+        // no «existe en algun lado». Con el arbol entero, borrar una de dos copias
+        // identicas no produce baja nunca; con toda `Aparecio`, una edicion en el lugar
+        // se vuelve el destino de un movimiento que nadie hizo y la baja del otro archivo
+        // se destruye. El guardian es `estrenaba`, leido antes de decidir, porque es el
+        // contrato que `anotar_ruta_nueva` declara y no lo puede verificar sola.
+        if estrenaba && let Some(crate::salvaguardas::Hecho::Aparecio(a)) = &paso.hecho {
+            indice.anotar_ruta_nueva(a.ruta().clone(), *a.hash().bytes());
+        }
+        almacen.comprometer(raiz, Some(&barrido), paso);
+    }
+
+    let cierre = maquina::cerrar_barrido(
+        raiz,
+        &barrido,
+        plataforma,
+        almacen.inventario(),
+        &reloj,
+        &indice,
+        recorrido_completo,
+    );
+    // Las que el cierre descubrio, menos las que resultaron movimientos al terminar el
+    // recorrido. `saturating_sub` porque `anular` puede tapar bajas que la vuelta conto
+    // durante el recorrido, y un contador en negativo seria peor que uno en cero.
+    resumen.bajas =
+        (resumen.bajas + cierre.bajas.len() as u64).saturating_sub(cierre.anular.len() as u64);
+    let estado = almacen.comprometer_cierre(raiz, &barrido, segmento, cierre);
+    resumen.cierre = Some(estado);
+    resumen
+}
+
+/// Una senal suelta del observador (fuera de un barrido). Se separa de `barrer` porque
+/// **sin barrido abierto una ausencia no produce una baja**: agenda.
+pub fn atender_evento(
+    raiz: &RaizId,
+    ruta: RutaRelativa,
+    plataforma: &dyn Plataforma,
+    almacen: &mut Almacen,
+    politica: &Politica,
+) -> Nodo {
+    let reloj = RelojDePlataforma(plataforma);
+    let senal = Senal {
+        raiz: raiz.clone(),
+        ruta,
+        origen: OrigenDeSenal::EventoDelSistema,
+    };
+    let paso = maquina::decidir(
+        &senal,
+        None,
+        plataforma,
+        almacen.inventario(),
+        &reloj,
+        politica,
+    );
+    let nodo = paso.nodo.clone();
+    almacen.comprometer(raiz, None, paso);
+    nodo
+}
+
+#[derive(Debug)]
+pub enum ResultadoDelDrenaje {
+    Vacia,
+    Detenida(crate::colas::MotivoDeDetencion),
+}
+
+/// Drena una raiz hasta que no queda trabajo o hasta que un error de credenciales la
+/// detiene. **Un trabajo en vuelo por vez**: dos en paralelo reordenan, y el orden ES el
+/// significado.
+pub fn drenar(
+    raiz: &RaizId,
+    plataforma: &dyn Plataforma,
+    almacen: &mut Almacen,
+    cliente: &Cliente,
+    traza: &mut Vec<String>,
+) -> ResultadoDelDrenaje {
+    // EL LAZO NO PUEDE GIRAR EN VACIO, Y LA GARANTIA ES ESTRUCTURAL, NO UNA LISTA DE
+    // VARIANTES. La lista de abajo dice cuando VALE LA PENA seguir; esto dice cuando la
+    // cola NO SE MOVIO, que es otra cosa y es la que mata. Un `Desenlace` que el `match`
+    // de `Colas::resolver` no atienda para ese trabajo devuelve el trabajo identico y el
+    // `loop` no termina jamas: el agente deja de barrer, deja de reportar bajas, y
+    // martilla al servidor a miles de peticiones por segundo con el panel diciendo
+    // «sincronizando». Comparar el trabajo —no su id, que `Subir` y `ConfirmarSubida`
+    // comparten— es lo que hace que ninguna variante futura pueda reintroducirlo.
+    let mut anterior: Option<Trabajo> = None;
+    loop {
+        let proximo = almacen.siguiente(raiz);
+        let trabajo = match proximo {
+            Proximo::Nada => return ResultadoDelDrenaje::Vacia,
+            Proximo::Detenida(m) => return ResultadoDelDrenaje::Detenida(m),
+            Proximo::Trabajo(t) => *t,
+        };
+        if anterior.as_ref() == Some(&trabajo) {
+            traza.push("  (la cola no se movio: se corta el drenaje)".into());
+            return ResultadoDelDrenaje::Vacia;
+        }
+        let (id, desenlace) = ejecutar(raiz, plataforma, almacen, cliente, &trabajo, traza);
+        // Si el trabajo no avanza —reintentable con la red caida— se corta el lazo en vez
+        // de girar para siempre. El reintento con espera es del drenador de produccion, y
+        // su curva entra por parametro; aca no se inventa ninguna.
+        let avanza = matches!(
+            desenlace,
+            Desenlace::Entregado(_) | Desenlace::IlegibleEnDisco | Desenlace::Ambiguo
+        );
+        almacen.resolver(raiz, &id, desenlace);
+        if !avanza {
+            return ResultadoDelDrenaje::Vacia;
+        }
+        anterior = Some(trabajo);
+    }
+}
+
+fn ejecutar(
+    raiz: &RaizId,
+    plataforma: &dyn Plataforma,
+    almacen: &mut Almacen,
+    cliente: &Cliente,
+    trabajo: &Trabajo,
+    traza: &mut Vec<String>,
+) -> (TrabajoId, Desenlace) {
+    match trabajo {
+        Trabajo::AbrirBarrido { id, total, .. } => {
+            traza.push(format!("sweep.open total={total}"));
+            // EL PADRON TODAVIA NO SE MANDA, y esto lo deja a la vista en vez de
+            // esconderlo: la respuesta ya TRAE `padron_requerido` —el servidor compara
+            // ese `total` contra sus documentos vivos— y el agente lo registra en la
+            // traza sin actuarlo. Actuarlo pide un lugar propio en el orden fijo del
+            // segmento (abrir, observar, desvanecer, cerrar), inmediatamente ANTES del
+            // cierre, porque es en `sweep.close` donde la diferencia de conjuntos se
+            // aplica. Mientras tanto: el desfase se DETECTA y no se corrige.
+            let r = cliente.abrir_barrido(raiz, *total);
+            if let Ok(b) = &r
+                && b.padron_requerido
+            {
+                traza.push("sweep.open -> PADRON REQUERIDO (no implementado)".to_string());
+            }
+            (
+                id.clone(),
+                a_desenlace(r.map(|b| Recibido::Barrido(b.sweep_id))),
+            )
+        }
+        Trabajo::Observar { id, entradas, .. } => {
+            traza.push(format!("presence.observed x{}", entradas.len()));
+            (
+                id.clone(),
+                a_desenlace(
+                    cliente
+                        .reportar_observados(raiz, entradas)
+                        .map(Recibido::Decisiones),
+                ),
+            )
+        }
+        Trabajo::Desvanecer { id, entradas, .. } => {
+            traza.push(format!("presence.vanished x{}", entradas.len()));
+            // La firma exige el testigo de raiz viva. Se recalcula aca porque entre el
+            // cierre del barrido y la transmision puede haber pasado tiempo, y el testigo
+            // tiene que ser de AHORA.
+            let Some(registrada) = almacen.inventario().raiz(raiz) else {
+                return (
+                    id.clone(),
+                    Desenlace::Reintentable("raiz desconocida".into()),
+                );
+            };
+            let estado = crate::salvaguardas::raiz_viva(
+                &registrada,
+                &plataforma.evidencia_de_raiz(&registrada),
+            );
+            if !estado.permite_reportar_bajas() {
+                // NI UNA BAJA. Y no es un fallo: es la salvaguarda 2 haciendo su trabajo
+                // en el ultimo momento posible.
+                traza.push("  (raiz no viva: NINGUNA baja sale)".into());
+                return (id.clone(), Desenlace::Reintentable("raiz no viva".into()));
+            }
+            let bajas = reconstruir_bajas(&estado, entradas);
+            (
+                id.clone(),
+                a_desenlace(
+                    cliente
+                        .reportar_desaparecidos(raiz, &bajas, &estado)
+                        .map(|_| Recibido::Nada),
+                ),
+            )
+        }
+        Trabajo::CerrarBarrido {
+            id, sweep, cierre, ..
+        } => {
+            traza.push(format!("sweep.close {cierre:?}"));
+            (
+                id.clone(),
+                a_desenlace(
+                    cliente
+                        .cerrar_barrido(sweep, *cierre)
+                        .map(Recibido::Retirados),
+                ),
+            )
+        }
+        Trabajo::Subir {
+            id, ruta, permiso, ..
+        } => {
+            let Some(registrada) = almacen.inventario().raiz(raiz) else {
+                return (id.clone(), Desenlace::IlegibleEnDisco);
+            };
+            match plataforma.leer_para_subir(&registrada, ruta) {
+                Err(_) => {
+                    traza.push(format!("PUT {} -> ilegible en disco", ruta.como_str()));
+                    (id.clone(), Desenlace::IlegibleEnDisco)
+                }
+                Ok(bytes) => {
+                    traza.push(format!("PUT {} ({} bytes)", ruta.como_str(), bytes.len()));
+                    let d = match cliente.subir(permiso, &bytes) {
+                        Ok(_) => Desenlace::Entregado(Recibido::Nada),
+                        // EL TOPE DEL PERMISO NO ES UNA ALERTA PARA UNA PERSONA. Es la
+                        // comprobacion previa diciendo que los bytes que hay en disco ya
+                        // no son los que se decidieron subir —el permiso se emitio contra
+                        // un tamano observado—, que es literalmente lo que
+                        // `IlegibleEnDisco` significa: «cambiaron entre la decision y el
+                        // PUT». Clasificarlo como cola muerta envenenaba la ruta PARA
+                        // SIEMPRE por un archivo que el usuario puede achicar o borrar al
+                        // minuto siguiente, y sin que nada lo dijera.
+                        Err(FalloDeProtocolo::NoCabeEnElPermiso { .. }) => {
+                            traza.push("  (no entra en el permiso: se vuelve a observar)".into());
+                            Desenlace::IlegibleEnDisco
+                        }
+                        Err(e) => a_desenlace(Err(e)),
+                    };
+                    (id.clone(), d)
+                }
+            }
+        }
+        Trabajo::ConfirmarSubida { id, permiso, .. } => {
+            traza.push("upload.completed".into());
+            // El testigo `Subido` no se puede fabricar, asi que la segunda fase se hace
+            // con el id persistido. Es el precio de partir la subida en dos fases, y se
+            // paga a proposito: un ACK perdido reintenta el ACK, no el archivo entero.
+            let r = cliente.confirmar_subida_reanudada(permiso);
+            match r {
+                Ok(c) => {
+                    if c.divergio {
+                        traza.push(
+                            "  DIVERGENCIA: se corrige el inventario con el verificado".into(),
+                        );
+                    }
+                    (
+                        id.clone(),
+                        Desenlace::Entregado(Recibido::Verificado(c.verificado)),
+                    )
+                }
+                Err(e) => (id.clone(), a_desenlace(Err(e))),
+            }
+        }
+    }
+}
+
+/// Reconstruye las `Desaparicion` pasando por la puerta. **No hay atajo**: la cola guarda
+/// ruta y hash verificado, y volver a construirlas exige otra vez el `EstadoDeRaiz`.
+fn reconstruir_bajas(
+    estado: &crate::salvaguardas::EstadoDeRaiz,
+    entradas: &[(RutaRelativa, crate::dominio::HashVerificado)],
+) -> Vec<crate::salvaguardas::Desaparicion> {
+    entradas
+        .iter()
+        .filter_map(|(r, h)| crate::salvaguardas::puerta_de_baja(estado, r.clone(), Some(*h)).ok())
+        .collect()
+}
+
+/// La traduccion de `FalloDeProtocolo` a `Desenlace`, y es el unico lugar donde ocurre.
+/// Aguas abajo se lee `clase()` y **nunca** el codigo HTTP crudo: la cola no debe saber
+/// que existe un 403.
+fn a_desenlace(r: Result<Recibido, FalloDeProtocolo>) -> Desenlace {
+    match r {
+        Ok(v) => Desenlace::Entregado(v),
+        Err(e) => match e.clase() {
+            Clase::Reintentable => Desenlace::Reintentable(format!("{e:?}")),
+            Clase::Credenciales => Desenlace::Credenciales(format!("{e:?}")),
+            Clase::Ambiguo => Desenlace::Ambiguo,
+            Clase::ColaMuerta => Desenlace::Rechazado {
+                // El codigo real, y SOLO para la alerta que una persona va a leer: una
+                // entrada muerta que dice `0` obliga a buscar el 404 adentro del texto de
+                // debug. Aguas abajo se sigue ramificando por `clase()` y nunca por este
+                // numero, que es la regla que el modulo declara.
+                status: e.codigo_http().unwrap_or(0),
+                cuerpo: format!("{e:?}"),
+                // Vacio = el lote entero. Aislar por biseccion cual entrada provoca el
+                // `400` cuesta hasta log2(n) llamadas y compra una alerta que nombra LA
+                // ruta culpable en vez de las cuarenta del barrido; es una decision de
+                // costo y todavia no se tomo.
+                culpables: Vec::new(),
+            },
+        },
+    }
+}

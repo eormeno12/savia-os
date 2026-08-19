@@ -1,0 +1,53 @@
+# El nucleo del agente de carpeta. TODAVIA NO ES TAURI: `tauri` no es dependencia y no
+# lo va a ser en este tramo. La carpeta se llama `src-tauri` porque el `package.json` de
+# `@savia-os/folder-agent` ya la nombra asi, y cambiarla despues cuesta menos que
+# desincronizar hoy los dos lados. Cuando llegue la UI, este mismo crate queda de
+# biblioteca y el binario de Tauri lo consume; por eso hay `lib.rs` ademas de `main.rs`.
+[package]
+name = "savia-folder-nucleo"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97"
+publish = false
+
+[lib]
+name = "savia_folder_nucleo"
+path = "src/lib.rs"
+
+[[bin]]
+name = "folder-agent"
+path = "src/main.rs"
+
+# CUATRO DEPENDENCIAS, Y CADA UNA TIENE UN TRABAJO QUE NO SE PUEDE HACER A MANO SIN
+# ARRIESGAR CORRECCION:
+#
+#  · `libc`       — los syscalls de macOS que el nucleo necesita SIN abrir el archivo:
+#                   `SF_DATALESS` en `st_flags`, `mach_continuous_time` y
+#                   `setiopolicy_np`. Cero deps transitivas.
+#  · `sha2`       — el hash de los bytes. Escribirlo a mano es 60 lineas conocidas y un
+#                   riesgo que no compra nada: si difiere en un bit del `createHash` de
+#                   Node, el dedupe previo a la transferencia deja de funcionar y el
+#                   sintoma es «todo sale upload», que parece un problema de servidor.
+#  · `serde`      — las formas del alambre. A mano se pierden `#[serde(flatten)]` para
+#  · `serde_json`   `{path, decision}` y el sobre `untagged` que prueba `{error}` ANTES
+#                   del valor, que es lo unico que impide leer un 200 con error como
+#                   exito.
+#
+# LO QUE NO ESTA, Y POR QUE:
+#  · `ureq`/`reqwest` — el transporte de ESTE tramo habla HTTP plano contra el simulador
+#    en 127.0.0.1. Un cliente a mano sobre `TcpStream` son ~90 lineas confinadas a
+#    `protocolo/transporte.rs`. DISPARADOR NOMBRADO PARA CAMBIARLO: el dia que haya un
+#    permiso prefirmado real (https, redirecciones, `Content-Length` derivado del
+#    archivo), se cambia por `ureq` con `rustls` y la edicion es de un archivo.
+#  · `rusqlite`  — el inventario y las colas son hoy de memoria. La transaccion comun
+#    que el diseno exige («estado y cola son una sola escritura») esta impuesta por la
+#    forma —un unico `&mut Almacen` y un solo metodo que escribe las dos mitades— y NO
+#    por durabilidad. DISPARADOR NOMBRADO: el dia que el agente tenga que sobrevivir a
+#    un reinicio, entra `rusqlite` con `bundled`, WAL y `synchronous=NORMAL`, y las dos
+#    mitades siguen en el MISMO archivo, que es lo que hace legal ese `NORMAL`.
+#  · `unicode-normalization` — ver `dominio::RutaRelativa::canonica`.
+[dependencies]
+libc = "0.2"
+sha2 = "0.10"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

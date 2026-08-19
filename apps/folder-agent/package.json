@@ -7,6 +7,10 @@
   "scripts": {
     "sim": "node sim/server.ts",
     "sim:ejercicio": "node sim/ejercicio.ts",
-    "lint": "node sim/ejercicio.ts"
+    "lint": "node sim/ejercicio.ts",
+    "nucleo:build": "cargo build --manifest-path src-tauri/Cargo.toml",
+    "nucleo:test": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "nucleo:lint": "cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings && cargo fmt --manifest-path src-tauri/Cargo.toml --check && cargo check --manifest-path src-tauri/Cargo.toml --all-targets --target x86_64-pc-windows-msvc",
+    "nucleo:banco": "cargo test --manifest-path src-tauri/Cargo.toml -- --ignored --test-threads=1"
   }
 }
