@@ -538,6 +538,72 @@ const MUTANTES = [
     espera: /frontera/i,
     nota: "fila propia y no M46/M49 ampliadas, por la razón que la nota de M49 dejó escrita: un mutante que importara dos de los tres miembros se pondría rojo por el primero y no acreditaría nada del tercero. Es LA garantía de `Whence`, y hoy es la única que puede ponerse roja: la mitad de comportamiento —I19(3), «la misma figura desde dos contenedores da la misma huella»— NO ES FALSIFICABLE mientras el único productor de assets materializados sea el `.docx`, porque `whence` es hermano de `body` y en el sitio de materialización no está ni en alcance léxico. Se midió antes de escribir esta fila. O sea que la ceguera de la huella la impone ACÁ el grafo de módulos, y allá la firma de `fingerprintOf`",
   },
+  // ── La máquina de estados · las cuatro respuestas, una fila cada una ───────
+  // `DOCUMENT_STATES` vivió ocho meses SIN UNA SOLA FILA, y con razón: eran ocho
+  // literales que nadie consultaba. Con `TRANSITIONS` deciden comportamiento, así que
+  // cada respuesta que el docstring declara haber tomado necesita poder ponerse roja
+  // — la tabla sola no dice qué fila contesta qué pregunta.
+  {
+    id: "M71",
+    garantía: "de `received` solo se sale LEYENDO: no se afirma nada de bytes que nadie miró",
+    cambios: [[`  ["received", "recognizing"],`, `  ["received", "indexing"],`]],
+    espera: /desde `received` se sale a/,
+    nota: "es el atajo que sale solo cuando alguien lee el orden del plan al pie de la letra —«validar en la puerta» es el paso 1— sin ver que con subida prefirmada la API NO TOCA BYTES: cuando nos enteramos de que hay un objeto, ya está en el bucket. Saltar a `indexing` es indexar un archivo del que no sabemos ni el tamaño ni si está cifrado ni si tiene virus",
+  },
+  {
+    id: "M72",
+    garantía: "a `rejected` se llega por UN solo lado, porque hay un solo lugar donde se descubre",
+    cambios: [[
+      `  ["recognizing", "rejected"],`,
+      `  ["recognizing", "rejected"],\n  ["received", "rejected"],`,
+    ]],
+    espera: /a `rejected` se llega desde/,
+    nota: "la fila agregada es plausible —«rechazar apenas llega»— y es justamente lo que la subida prefirmada vuelve imposible: en `received` nadie leyó un byte todavía. Un segundo predecesor sería una causa de rechazo que el plan no tiene, y las tres que sí tiene están ubicadas: virus y cifrado en la primera lectura, tamaño en el permiso",
+  },
+  {
+    id: "M73",
+    garantía: "un `en_espera` reactivado vuelve a RECONOCER, no a la puerta",
+    cambios: [[`  ["on_hold", "recognizing"],`, `  ["on_hold", "received"],`]],
+    espera: /desde `on_hold` se sale a/,
+    nota: "vuelve a `received` es la lectura ingenua de «se reintenta»: sonaría a empezar de cero. Pero lo que cambió es que existe un adaptador nuevo — el objeto ya está hasheado y escaneado, y su veredicto es del CONTENIDO, así que no caduca. Re-leerlo entero no aprende nada y paga otro escaneo",
+  },
+  {
+    id: "M74",
+    garantía: "`partial` NO es terminal: los pendientes se drenan",
+    cambios: [[`  ["partial", "indexing"],\n`, ``]],
+    espera: /`partial` quedó terminal/,
+    nota: "borrar esa fila es la mutación más barata de todas y la que más se parece a una simplificación: el estado sigue existiendo, sigue siendo alcanzable, y todo compila. Lo único que cambia es que un documento con delegaciones pendientes se queda ahí para siempre — contra «no se descarta: queda encolado y el documento se marca `parcial`». Muere por DOS guardianes a la vez, R4 y E5, y eso es correcto: un terminal de más y un drenaje de menos son el mismo error visto de los dos lados",
+  },
+  {
+    id: "M75",
+    garantía: "`isTerminal` se DERIVA de la tabla, no la contradice",
+    cambios: [[
+      `  !TRANSITIONS.some(([from]) => from === state);`,
+      `  TRANSITIONS.some(([from]) => from === state);`,
+    ]],
+    espera: /los terminales son/,
+    nota: "una negación caída. La función es la que decide si un worker deja de esperar por un documento, así que invertida hace lo contrario exacto: espera para siempre por los tres que terminaron y abandona los cinco que seguían",
+  },
+  {
+    id: "M76",
+    garantía: "`canTransition` respeta la tabla en las DOS direcciones",
+    cambios: [[
+      `  TRANSITIONS.some(([a, b]) => a === from && b === to);`,
+      `  TRANSITIONS.some(([a, b]) => a === from || b === to);`,
+    ]],
+    espera: /no coincide con la tabla/,
+    nota: "un `&&` que se vuelve `||`, y el mutante usa los dos parámetros para no morir con TS6133 acreditando al compilador. Es la función que un worker consulta ANTES de escribir: con `||` deja pasar cualquier salto que toque un estado nombrado, y la tabla pasa a ser decorativa. Lo caza el barrido de los 64 pares, que existe justamente porque la mitad NEGATIVA —qué NO se puede— es la que una implementación permisiva satisface sin que nadie la mire",
+  },
+  {
+    id: "MC13",
+    control: true,
+    garantía: "editar la prosa del docstring de la máquina de estados no rompe nada",
+    cambios: [[
+      `LAS CUATRO RESPUESTAS`,
+      `LAS CUATRO RESPUESTAS (control MC13)`,
+    ]],
+    nota: "el par de M71–M76. El docstring de `TRANSITIONS` es el más largo del paquete —lleva las cuatro respuestas, el fail-closed, la resolución de la contradicción del plan y por qué no hay checkpointing— y nada de eso puede decidir comportamiento: si un guardián se pusiera rojo al editarlo, estaría verificando la prosa en vez de la tabla",
+  },
   {
     id: "M50",
     garantía: "la cifra de llamadas a NotAssignableTo no se puede desincronizar del AST",
@@ -556,7 +622,7 @@ const MUTANTES = [
       `node scripts/mutants.mjs`,
     ]],
     espera: /guardian left out of `lint`/,
-    nota: "primera fila que muta `package.json`, y por eso el archivo entra en ARCHIVOS. Es el equivalente de I11a de `packages/emission`, que `ir` no tenía: un guardián que no corre NO AVISA QUE NO CORRIÓ, así que sacarlo de la cadena deja el paquete verde y apaga en silencio todo lo que ese script acredita. La mutación saca justamente a `numbers.mjs`, que es el que sostiene los tres censos. Sin el chequeo: NO ROMPÍA — el corredor arma su propia cadena en `guardianes()` y es ciego a lo que diga `package.json`",
+    nota: "primera fila que muta `package.json`, y por eso el archivo entra en ARCHIVOS. Es el equivalente de I11a de `packages/emission`, que `ir` no tenía: un guardián que no corre NO AVISA QUE NO CORRIÓ, así que sacarlo de la cadena deja el paquete verde y apaga en silencio todo lo que ese script acredita. La mutación saca justamente a `numbers.mjs`, que es el que sostiene los tres censos. Sin el chequeo: NO ROMPÍA — el corredor armaba su propia cadena a mano en `guardianes()`, ciega a lo que dijera `package.json`. Esa ceguera dejó de existir en la deuda del paso 7 (ver `CADENA`), y con eso M51 pasó a decir MÁS de lo que decía: `boundaries.mjs` exige que todo `scripts/*.mjs` DEL DISCO esté en `lint`, y `CADENA` es `lint` menos el corredor, así que entre las dos sale que todo guardián que existe corre TAMBIÉN bajo mutación. Es lo que faltaba el día que `states.mjs` corría en `lint`, no corría acá, y M71–M76 salieron «NO ROMPIÓ» estando bien",
   },
   {
     id: "M52",
@@ -975,20 +1041,77 @@ const ARCHIVOS = [
   // Entra en el bloque 3c, con M51 y M52. Es el ÚNICO que no es de `src/`, y entra
   // por la misma razón que los demás: aloja una garantía —qué guardianes corre `lint`
   // y cuál NO puede correr `build`— que hasta este bloque no verificaba nadie en `ir`.
-  // La cadena de `guardianes()` de este archivo está escrita a mano y es ciega a
-  // `package.json`, así que sin las dos filas el chequeo nuevo sería indistinguible de
-  // uno que no puede fallar.
+  // Sin las dos filas, el chequeo de `boundaries.mjs` sería indistinguible de uno que no
+  // puede fallar.
+  //
+  // Desde la deuda del paso 7 este archivo además DECIDE qué corre el corredor: `CADENA`
+  // se deriva de `lint` restándole `mutants.mjs`. Congelada al cargar, a propósito, para
+  // que la mutación de M51 no le apague al corredor el mismo guardián que tiene que
+  // cazarla — la explicación larga está en el docstring de `CADENA`.
   "package.json",
 ];
 
+/**
+ * LA CADENA QUE CORRE EL CORREDOR SE **DERIVA** DE `lint`, Y NO SE ESCRIBE A MANO.
+ *
+ * Hasta el paso 7 esta cadena era un literal —los siete guardianes, tipeados acá— y la
+ * nota de M51 lo dejó escrito como una propiedad («el corredor arma su propia cadena en
+ * `guardianes()` y es ciego a lo que diga `package.json`»). Era un HUECO, no una
+ * propiedad, y la máquina de estados lo cobró: `states.mjs` entró en `lint` y en `build`,
+ * quedó fuera de este literal, y sus seis filas —M71 a M76, correctas todas— salieron
+ * **«NO ROMPIÓ — la garantía se perdió»**. Seis falsos negativos que se leen exactamente
+ * igual que seis garantías de verdad rotas, que es la peor forma de fallar que tiene un
+ * arnés: el que lo lee sale a arreglar el contrato en vez del arnés.
+ *
+ * La simetría con M51 es exacta y vale nombrarla. M51 acredita que **ningún guardián
+ * puede quedarse fuera de `lint`**. Lo que faltaba es el otro lado: ningún guardián puede
+ * quedarse fuera **del corredor**. Un guardián que corre en `lint` pero no bajo mutación
+ * no está apagado —se ejecuta, y protege— pero TODO lo que acredita queda sin acreditar,
+ * y el arnés miente en la dirección ruidosa. Derivar cierra el hueco en el peldaño 2 de
+ * la escalera —no hay dos listas que puedan divergir porque hay UNA— en vez del 3, que
+ * sería un `assert` comparando el literal contra `package.json`.
+ *
+ * SE CONGELA AL CARGAR, Y ESO ES LO QUE SALVA A M51. `package.json` está en `ARCHIVOS`:
+ * M51 le SACA `numbers.mjs` a la cadena de `lint` para probar que sacarlo se nota. Si esta
+ * derivación leyera el archivo en cada llamada, la mutación de M51 le sacaría `numbers.mjs`
+ * también al corredor —o sea, apagaría al guardián que tiene que cazarla— y M51 dejaría de
+ * morir. Un módulo de nivel superior se evalúa una sola vez y ANTES de la primera mutación
+ * (la corrida base de `guardianes()` está más abajo, y el bucle todavía más), así que lo que
+ * se congela es el árbol limpio. Es el mismo razonamiento que `ORIGINALES`.
+ */
+const CADENA = (() => {
+  const { scripts } = JSON.parse(readFileSync(ruta("package.json"), "utf8"));
+  const pasos = String(scripts?.lint ?? "")
+    .split("&&")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  // El corredor NO se corre a sí mismo, y que él sea el último paso de `lint` no es una
+  // convención de estilo: es la única forma de que el resto de la cadena esté verde antes
+  // de que alguien mute nada. Si deja de estarlo, la resta de abajo sacaría al guardián
+  // equivocado y el corredor quedaría acreditando de menos EN SILENCIO — que es el hueco
+  // que este bloque existe para cerrar. Así que se falla ruidoso y acá.
+  if (pasos.at(-1) !== "node scripts/mutants.mjs") {
+    throw new Error(
+      `IR-ERR: el corredor deriva su cadena de \`lint\` restándose a sí mismo, y esperaba\n` +
+        `ser el ÚLTIMO paso. El último es: ${pasos.at(-1) ?? "(cadena vacía)"}\n` +
+        `Cadena leída: ${pasos.join(" && ")}`,
+    );
+  }
+  // `tsc --noEmit` se reescribe al binario local: `execSync` no pasa por el resolvedor de
+  // scripts de pnpm, así que `node_modules/.bin` no está en el PATH del hijo.
+  return pasos
+    .slice(0, -1)
+    .map((p) => (p === "tsc --noEmit" ? "./node_modules/.bin/tsc --noEmit" : p))
+    .join(" && ");
+})();
+
 const guardianes = () => {
   try {
-    const salida = execSync(
-      `./node_modules/.bin/tsc --noEmit && node scripts/boundaries.mjs && ` +
-        `node scripts/projection.mjs && node scripts/geometry.mjs && ` +
-        `node scripts/cohesion.mjs && node scripts/citations.mjs && node scripts/numbers.mjs`,
-      { cwd: RAIZ, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
-    );
+    const salida = execSync(CADENA, {
+      cwd: RAIZ,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     return { verde: true, salida };
   } catch (e) {
     return { verde: false, salida: `${e.stdout ?? ""}${e.stderr ?? ""}` };
@@ -1032,6 +1155,40 @@ const soloUno = (texto, buscar, id) => {
 };
 
 // ── Corrida ──────────────────────────────────────────────────────────────────
+/**
+ * LOS IDS SON ÚNICOS, y hasta la deuda del paso 7 nadie lo comprobaba: la lista llegó a
+ * tener DOS `MC12` y el corredor imprimió las dos filas sin decir una palabra.
+ *
+ * No es cosmético, y tiene dos daños distintos. El primero es el atajo de acá abajo:
+ * `mutants.mjs MC12` deja de significar «corré ESE mutante» y corre los dos, así que el
+ * error de `soloUno()` —el que dice «el texto a mutar aparece N veces»— sale rotulado con
+ * un id que no distingue cuál de los dos se pudrió, que es exactamente el diagnóstico que
+ * ese mensaje existe para dar. El segundo es la prosa: este paquete referencia filas por
+ * id en todos lados —«es M9c aplicado al otro censo», «no es M46 repetida»—, y un id
+ * duplicado vuelve esas referencias ambiguas hacia atrás, sobre notas ya escritas.
+ *
+ * Va antes del filtro y no después: si la lista está mal formada, el atajo tampoco vale.
+ *
+ * Se acreditó a mano —el corredor no puede mutarse a sí mismo— duplicando un id y viendo
+ * salir el rojo. Hacía falta: la primera versión contaba con `!vistos.add(id)`, y `add`
+ * devuelve el Set, no un booleano, así que el filtro era constantemente falso y el chequeo
+ * pasaba en verde SOBRE LA LISTA DUPLICADA. Un chequeo que no puede fallar es peor que
+ * ninguno, porque además ocupa el lugar.
+ */
+{
+  const cuenta = new Map();
+  for (const m of MUTANTES) cuenta.set(m.id, (cuenta.get(m.id) ?? 0) + 1);
+  const repetidos = [...cuenta].filter(([, n]) => n > 1).map(([id, n]) => `${id} (×${n})`);
+  if (repetidos.length > 0) {
+    console.error(
+      `IR-ERR: ids de mutante repetidos — ${repetidos.join(", ")}\n` +
+        "        un id nombra UNA fila: el atajo `mutants.mjs <id>` y las referencias en\n" +
+        "        las notas dependen de que así sea",
+    );
+    process.exit(1);
+  }
+}
+
 const soloEste = process.argv[2];
 const lista = soloEste ? MUTANTES.filter((m) => m.id === soloEste) : MUTANTES;
 if (soloEste && lista.length === 0) {

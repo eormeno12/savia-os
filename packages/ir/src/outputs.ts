@@ -929,16 +929,12 @@ export type AchievedLevel = (typeof ACHIEVED_LEVELS)[number];
 /**
  * §{Tramo 1 › El registro}.
  *
- * `ir` declara los OCHO valores y NADA MÁS. Las transiciones no están en el plan
- * (auditoría #1: «la máquina de estados no tiene transiciones») y no son una
- * decisión que un contrato de tipos pueda tomar: si `partial` es terminal, qué lo
- * convierte en `indexed` cuando drenan los pendientes, si `on_hold` va a
- * `received` o a `recognizing`, si `rejected` es alcanzable después de `received`
- * (necesario para el antivirus tardío), y qué estado tiene un documento «guardado
- * pero no escaneado». Sin las transiciones no se puede escribir ningún worker.
+ * `on_hold` y no `queued` ni `waiting` (GLOSARIO.md, G5): `queued` afirmaría una cola
+ * con orden, y el plan no la tiene.
  *
- * `on_hold` y no `queued` ni `waiting` (GLOSARIO.md, G5): `queued` afirmaría una
- * cola con orden, que es justamente lo que este docstring dice que el plan no tiene.
+ * LAS CUATRO PREGUNTAS QUE ESTE DOCSTRING DECLARABA ABIERTAS ESTÁN CONTESTADAS, y sus
+ * respuestas viven en `TRANSITIONS`, acá abajo. Se contestaron todas de una porque
+ * todas colgaban de un mismo hecho que el plan tiene escrito y no usa. Ver ahí.
  */
 export const DOCUMENT_STATES = [
   "received",
@@ -951,3 +947,158 @@ export const DOCUMENT_STATES = [
   "on_hold",
 ] as const;
 export type DocumentState = (typeof DOCUMENT_STATES)[number];
+
+/**
+ * LA MÁQUINA DE ESTADOS, y por qué las transiciones sí son una decisión que este
+ * contrato puede tomar (§{Tramo 1 › El registro}, §{El orden importa}).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * EL HECHO QUE LAS DESTRABA, y estaba escrito en el plan sin usarse: LA PUERTA NO
+ * PUEDE VALIDAR NADA. El plan decide subida prefirmada —«la API no toca bytes: emite
+ * el permiso y después verifica que el objeto llegó» (§{Tramo 1 › Decisiones})— así
+ * que cuando nos enteramos de que hay bytes, los bytes YA ESTÁN EN EL BUCKET. La
+ * puerta que §{El orden importa} dibuja como preventiva es, con esa decisión,
+ * DETECTIVE. La auditoría lo enunció así: «no se puede validar bytes que la API no
+ * ve».
+ *
+ * Y este contrato ya había mudado una mitad de esa puerta sin decirlo: `ByteHash`
+ * declara que el hash «lo calcula el WORKER en la primera lectura del objeto, no la
+ * puerta». La otra mitad —el escaneo— quedó sin mudar, y de ahí salían las cuatro
+ * preguntas.
+ *
+ * LA PUERTA ES LA PRIMERA LECTURA DEL OBJETO. Una sola pasada hace todo lo que el
+ * plan reparte entre los pasos 1 y 3: hash de bytes, escaneo, ¿está cifrado?, sonda
+ * fría. Nada de eso puede pasar antes, y todo puede pasar junto.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * LAS CUATRO RESPUESTAS
+ *
+ *   1. «¿Qué estado tiene un documento GUARDADO PERO NO ESCANEADO?» → `received`,
+ *      y siempre lo fue. No falta un noveno estado: faltaba dejar de fingir que la
+ *      puerta previene. `received` significa «el objeto existe y ningún worker lo
+ *      leyó».
+ *   2. «¿`rejected` es alcanzable después de `received`?» → Sí, y por el ÚNICO
+ *      camino que hay. Las dos causas que el plan nombra —virus y cifrado sin
+ *      contraseña— se descubren las dos en la primera lectura, o sea desde
+ *      `recognizing`. La tercera, el tamaño, NO ENTRA ACÁ: se impone en el permiso
+ *      prefirmado (`content-length-range`), que es la única palanca preventiva que
+ *      la subida directa deja en pie. Un archivo demasiado grande nunca llega a ser
+ *      un documento.
+ *   3. «¿`on_hold` va a `received` o a `recognizing`?» → A `recognizing`. Lo que
+ *      cambió cuando un `en_espera` se reactiva es que existe un adaptador nuevo; el
+ *      objeto ya está hasheado y escaneado, y volver a `received` lo re-leería
+ *      entero para no aprender nada.
+ *   4. «¿`partial` es terminal, y qué lo convierte en `indexed`?» → NO es terminal, y
+ *      lo que lo mueve ya existe y no está cableado: `Run.deferred`. Un documento
+ *      sale a `partial` en vez de a `indexed` cuando quedaron assets sin descomponer
+ *      —«no se descarta: queda encolado y el documento se marca `parcial`»
+ *      (§{Dónde frena})— y vuelve a `indexing` cuando uno drena. La regla es una
+ *      línea: `deferred.length > 0`.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * FAIL-CLOSED, Y ES LA DECISIÓN QUE MÁS CUESTA. Si el escáner no contesta —caído,
+ * timeout, saturado— el documento NO AVANZA: se queda en `recognizing`, reintenta, y
+ * tras N intentos cae a `failed` con alerta. Reusa la única transición que el plan ya
+ * nombraba («tras N reintentos, cola de descarte, estado `fallido` y alerta»,
+ * §{Tramo 1 › Decisiones}) y el único parámetro que ya existe para eso
+ * (`PARAMETERS.intake.maxRetries`, hoy en `null`).
+ *
+ * El costo va escrito porque es real: si el escáner se cae una hora, nada se indexa
+ * esa hora. Se elige igual, y la razón es que «antivirus obligatorio — requisito
+ * enterprise, no opcional» (§{Tramo 1 › Decisiones}) es falso bajo cualquier otra
+ * política: fail-open indexa contenido que nadie miró, y retractar un fragmento ya
+ * vectorizado no es una operación que este pipeline tenga.
+ *
+ * Y LA CONTRADICCIÓN DEL PLAN NO SE RESUELVE TIRANDO UNA FRASE. «Se rechaza solo en
+ * la puerta» y «el antivirus corre en paralelo al guardado, no antes» están a once
+ * líneas y parecen incompatibles. Las dos quedan verdaderas si «el guardado» es LA
+ * SUBIDA DEL CLIENTE y «la puerta» es LA PRIMERA LECTURA: el escaneo corre en
+ * paralelo a la subida y termina antes de que el worker empiece. El argumento de
+ * latencia del plan se sostiene entero — la latencia que alguien percibe termina
+ * cuando su subida termina, y el reconocimiento YA es un worker asincrónico.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * LAS COLAS SE REEMPLAZAN, NO SE BORRAN. `partial → indexing` es la transición que
+ * drena un pendiente, y la pregunta que destapa es qué pasa con la cola vieja cuando
+ * el documento se reingiere. La respuesta sale de R3 —el cuerpo se regenera ENTERO
+ * desde los bytes en cada re-ingesta— y vale para los dos casos: si reingerís el mismo
+ * contenido con más capacidades, la corrida nueva mira los mismos bytes con más
+ * herramientas y su cola es la autoridad; si reingerís porque el documento cambió, la
+ * cola vieja apunta a assets que quizá ya no existen, y drenarlos sería descomponer una
+ * imagen que el autor borró. En los dos, la corrida nueva REEMPLAZA. La cola es un
+ * hecho de la corrida, no del documento — el mismo diagnóstico que la lápida de
+ * `Enrichment` en `shapes.ts` y que `Whence` en `provenance.ts`.
+ *
+ * Y `partial → indexing` NO ES INCONDICIONAL: dispara solo si el pendiente que drenó
+ * pertenece a la VERSIÓN VIGENTE. Un drenaje de una versión superada se descarta en
+ * silencio, y no es un error — es trabajo que dejó de tener sentido. Sin esa guarda se
+ * re-indexa contenido de la versión vieja adentro de un documento que ya se movió.
+ *
+ * LO QUE NO SE REEMPLAZA es el veredicto del escaneo, y sale gratis: como el sujeto es
+ * el objeto y el objeto se direcciona por contenido, reingerir NO RE-ESCANEA. Si el
+ * escaneo colgara del documento, cada reingesta lo pagaría de nuevo.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * POR QUÉ NO HAY UN NOVENO ESTADO PARA «SUSPENDIDO», ni contexto guardado por borde de
+ * tramo. La tentación es tratar cada documento como un proceso y persistir su contexto
+ * en cada corte; se analizó y compra menos de lo que parece, porque este pipeline ya
+ * hizo que REHACER SEA BARATO Y SEGURO: la identidad se direcciona por contenido, los
+ * tramos son funciones puras —`emit`, `reconcile` y `group` van de dato a dato, sin
+ * estado oculto que cruce un borde— y lo caro se memoiza por contenido. Un reintento da
+ * los mismos ids, los mismos fragmentos y el mismo objeto.
+ *
+ * De hecho el CACHÉ es mejor que un checkpoint y lo reemplaza: un checkpoint ahorra
+ * rehacer lo ya hecho DE ESTE documento; el caché lo ahorra de TODOS.
+ *
+ * QUEDA UN SOLO PASO QUE NO SE PUEDE REHACER, y es el acuñado: H13(a) declara que es
+ * reloj + azar, y el invariante de determinismo lo mide exigiendo que otro acuñador
+ * mueva los ids Y NADA MÁS. Si una corrida muere después de acuñar y antes de
+ * persistir, el reintento acuña ids distintos. Pero eso no pide checkpointing: pide que
+ * la salida de una corrida se persista ENTERA O NADA, junto con los ids que acuñó. Una
+ * transacción al final, no un guardado en cada borde.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * LO QUE NO ESTÁ ACÁ, Y NO ES OLVIDO: el asset DELEGADO no tiene estado, porque no es
+ * un documento. Se midió qué costaría que lo fuera y no es una lista de costos, es la
+ * función borrándose: las migas del subárbol delegado son las del contenedor PORQUE
+ * la pila del emisor es una sola por corrida, así que una corrida aparte las deja
+ * vacías y «un párrafo que estaba adentro de una imagen que estaba bajo un título»
+ * pierde el título. Además `ctx.ancestors` arranca vacío en cada corrida y no se
+ * persiste, o sea que la guarda de ciclo desaparece y «A contiene B contiene A» pasa
+ * de atajado a bucle infinito ENTRE corridas.
+ *
+ * Lo que hereda el escaneo no es el asset: es SU OBJETO. La regla que P13 pide —«que
+ * la carrera sea la misma decisión que para el archivo de entrada y no dos»— se
+ * cumple moviendo el sujeto: **todo objeto de nuestro bucket se escanea una vez,
+ * indexado por su hash de contenido**. Como el almacenamiento es direccionado por
+ * contenido, el mismo logo en cincuenta documentos se escanea UNA VEZ: el dedupe que
+ * ya existe paga el escaneo.
+ */
+export const TRANSITIONS = [
+  ["received", "recognizing"],
+  ["recognizing", "rejected"],
+  ["recognizing", "on_hold"],
+  ["recognizing", "indexing"],
+  ["recognizing", "failed"],
+  ["on_hold", "recognizing"],
+  ["indexing", "indexed"],
+  ["indexing", "partial"],
+  ["indexing", "failed"],
+  ["partial", "indexing"],
+] as const satisfies readonly (readonly [DocumentState, DocumentState])[];
+
+/** Un paso legal de la máquina. */
+export type DocumentTransition = (typeof TRANSITIONS)[number];
+
+/**
+ * Los tres estados de los que no se sale. Se DERIVA de `TRANSITIONS` y no se escribe
+ * a mano, por la misma razón que el resumen del guardián de fronteras se deriva del
+ * mapa: una lista paralela mantenida a mano es la mentira que el próximo agregado
+ * introduce sin que nadie la vea.
+ */
+export const isTerminal = (state: DocumentState): boolean =>
+  !TRANSITIONS.some(([from]) => from === state);
+
+/** Si el paso es legal. Es la función que un worker consulta antes de escribir. */
+export const canTransition = (from: DocumentState, to: DocumentState): boolean =>
+  TRANSITIONS.some(([a, b]) => a === from && b === to);

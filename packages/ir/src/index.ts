@@ -234,6 +234,11 @@ export {
   type AchievedLevel,
   DOCUMENT_STATES,
   type DocumentState,
+  /** Los pasos legales de la máquina, y las cuatro respuestas en su docstring. */
+  TRANSITIONS,
+  type DocumentTransition,
+  isTerminal,
+  canTransition,
 } from "./outputs.js";
 
 // Contrato de adaptador.

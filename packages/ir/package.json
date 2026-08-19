@@ -18,9 +18,10 @@
     "geometry": "node scripts/geometry.mjs",
     "cohesion": "node scripts/cohesion.mjs",
     "citations": "node scripts/citations.mjs",
+    "states": "node scripts/states.mjs",
     "numbers": "node scripts/numbers.mjs",
-    "build": "tsc --noEmit && node scripts/boundaries.mjs && node scripts/projection.mjs && node scripts/geometry.mjs && node scripts/cohesion.mjs && node scripts/citations.mjs && node scripts/numbers.mjs",
-    "lint": "tsc --noEmit && node scripts/boundaries.mjs && node scripts/projection.mjs && node scripts/geometry.mjs && node scripts/cohesion.mjs && node scripts/citations.mjs && node scripts/numbers.mjs && node scripts/mutants.mjs",
+    "build": "tsc --noEmit && node scripts/boundaries.mjs && node scripts/projection.mjs && node scripts/geometry.mjs && node scripts/cohesion.mjs && node scripts/states.mjs && node scripts/citations.mjs && node scripts/numbers.mjs",
+    "lint": "tsc --noEmit && node scripts/boundaries.mjs && node scripts/projection.mjs && node scripts/geometry.mjs && node scripts/cohesion.mjs && node scripts/states.mjs && node scripts/citations.mjs && node scripts/numbers.mjs && node scripts/mutants.mjs",
     "mutants": "node scripts/mutants.mjs"
   },
   "dependencies": {},
