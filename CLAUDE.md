@@ -14,6 +14,8 @@ savia-os/
 │   └── app/               (vacío — el B2B nuevo va acá; scaffold pendiente)
 ├── packages/
 │   ├── ir/               @savia-os/ir             el contrato del pipeline · 0 deps de runtime
+│   ├── intake/           @savia-os/intake         tramo 1: la puerta (mitad de RECHAZO) y el
+│   │                                              disparador de `en_espera`
 │   ├── adapters/         @savia-os/adapters       tramos 2 y 3: sonda · registro · selector ·
 │   │                                              cascada · el `.md` · el piso de texto
 │   ├── emission/         @savia-os/emission       tramos 4 y 5: ruta + emisor + agrupación
@@ -66,16 +68,17 @@ pnpm build              # build de todos los workspaces
 - Configs TypeScript compartidas: extender desde `@savia-os/tsconfig/nextjs` o `@savia-os/tsconfig/base`.
 - Turbo cachea `.next/**` y `dist/**`. No modificar `turbo.json` salvo que cambie el pipeline.
 
-## El pipeline de ingesta (`packages/ir` · `adapters` · `emission` · `orchestration`)
+## El pipeline de ingesta (`packages/ir` · `intake` · `adapters` · `emission` · `orchestration`)
 
-Cuatro paquetes, escritos en ese orden. `ir` es el **contrato** y se congela primero;
-los otros tres lo implementan. La autoridad de nombres es
+Cinco paquetes. `ir` es el **contrato** y se congela primero; los otros cuatro lo
+implementan. La autoridad de nombres es
 [`packages/ir/GLOSARIO.md`](packages/ir/GLOSARIO.md): **un término que ninguna regla del
 §2 determine se agrega ahí ANTES de escribirlo en código.**
 
 | Paquete | Qué contiene | Deps de runtime |
 |---|---|---|
 | `@savia-os/ir` | las seis formas, `Role`, `Hint`, `Cohesion`, la proyección canónica, los invariantes de tipo | **ninguna** |
+| `@savia-os/intake` | tramo 1: `admit` —la mitad de RECHAZO de la puerta— y `claimedBy`, el disparador de `en_espera` | `ir` |
 | `@savia-os/adapters` | tramos 2 y 3: sonda, registro, selector, cascada, `opaqueOf`, el adaptador `.md` y el piso de texto | `ir` + **`yaml`** |
 | `@savia-os/emission` | tramos 4 y 5: ruta, emisor y agrupación | `ir` |
 | `@savia-os/orchestration` | `ingest(bytes) → Run` — el único que compone los otros tres | `ir`, `adapters`, `emission` |
@@ -85,6 +88,11 @@ no la disciplina:**
 
 - **`adapters` y `emission` NUNCA se ven entre sí.** `ir` es el único paquete que los dos
   alcanzan. Lo que vuelve no vacía esa frase es que `orchestration` los componga.
+- **`intake` alcanza `ir` y NADA MÁS, y nadie del pipeline lo alcanza a él.** Corre aguas
+  ARRIBA: su salida no es un `Run` sino un veredicto y una fila, y quien lo compone con el
+  resto es el host (`apps/api`). Que no llegue a `adapters` es lo que impone la garantía
+  central del tramo 1: **`admit` no puede calcular `encrypted`**, así que lo recibe ya
+  establecido y el fail-closed vive en una tabla de seis casos y no adentro de un `catch`.
 - **`adapters` es el único paquete del pipeline con dependencias de runtime**, y la única
   que hay —`yaml`— está **confinada a `src/markdown.ts`**. Los otros tres están en cero:
   `sha256` y `targetSizeChars` entran por parámetro exactamente para eso, y ni un

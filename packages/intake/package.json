@@ -1,0 +1,30 @@
+{
+  "name": "@savia-os/intake",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Tramo 1: la mitad de RECHAZO de la puerta, que es la que ningún adaptador puede tomar. `admit` decide con el veredicto ya establecido —nunca escanea, y NO PUEDE escanear porque no alcanza `adapters`— y `claimedBy` dice qué sondas en espera despierta un adaptador nuevo sin leer un solo objeto. La mitad de ACEPTACIÓN ya vive en `adapters` y no se duplica acá.",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "boundaries": "node scripts/boundaries.mjs",
+    "invariants": "node scripts/invariants.mjs",
+    "citations": "node scripts/citations.mjs",
+    "mutants": "node scripts/mutants.mjs",
+    "lint": "node scripts/boundaries.mjs && tsc --noEmit && node scripts/invariants.mjs && node scripts/citations.mjs && node scripts/mutants.mjs",
+    "build": "node scripts/boundaries.mjs && tsc --noEmit && node scripts/invariants.mjs && node scripts/citations.mjs"
+  },
+  "dependencies": {
+    "@savia-os/ir": "workspace:*"
+  },
+  "devDependencies": {
+    "@savia-os/tsconfig": "workspace:*",
+    "typescript": "^5.9.3"
+  }
+}
