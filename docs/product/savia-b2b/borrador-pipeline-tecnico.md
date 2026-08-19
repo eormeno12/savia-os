@@ -361,6 +361,45 @@ justo lo que §{Los dos hashes} descartó.
 Para no rehashear el corpus entero en cada barrido, el agente cachea por
 `(ruta, tamaño, mtime)` y solo recalcula cuando eso cambia.
 
+### El hash del cliente es una afirmación, no la autoridad
+
+**Se hashea en los dos lados, y hay que decir por qué eso no es redundancia** — porque
+leído sin esta distinción, el contrato dice que este canal es ilegal.
+
+`ByteHash` fija que el hash de los bytes **lo calcula el worker en la primera lectura
+del objeto**: con subida prefirmada la API no ve bytes, así que nadie puede computarlo
+en la puerta. Y saca de ahí una consecuencia dura: *«el dedupe de blobs no puede ocurrir
+en la puerta ni ser la clave de escritura del objeto»*. Pero el camino `known` de este
+canal **es** dedupe en la puerta, hecho con un hash que mandó el cliente.
+
+Las dos afirmaciones son verdaderas. Lo que las separa son dos usos del mismo valor:
+
+| Uso del hash que manda el cliente | Veredicto |
+|---|---|
+| **Preguntar «¿ya lo tenés?»** para saltarse una transferencia | **Legal.** Una coincidencia solo puede direccionar un objeto que este lado ya escribió y ya verificó, así que el cliente no hace aparecer contenido que nunca subió |
+| **Escribir un objeto nuevo bajo esa clave** | **Prohibido.** Un cliente que afirma `H` y sube otros bytes envenena el almacén: la dirección `H` pasaría a contener algo que no hashea a `H`, y **todos** los documentos que la comparten —que son, por diseño de la deduplicación, los de toda la organización— quedarían apuntando a contenido ajeno |
+
+O sea: **el hash del cliente es una afirmación; el del servidor es la autoridad.** Un
+objeto nuevo se escribe siempre bajo el que computó el worker, nunca bajo el afirmado.
+
+**La fuga que esto sí tiene, dicha de frente:** contestar `known` le confirma al cliente
+que ese contenido exacto ya existe. Como para preguntar hay que tener el archivo —el
+hash es de sus bytes— no se filtra contenido, se filtra **existencia**. Es chica y es
+real, y es de Capa 3: queda anotada, no resuelta acá.
+
+**Y la divergencia se cierra, no se guarda.** Entre que el agente hashea y que termina
+el PUT, el archivo puede cambiar: el servidor computa `H'` y el agente sigue creyendo
+`H`. Un `desapareció(P, H)` posterior no matchea con nada. Guardar el hash del cliente
+del lado del servidor **no arregla eso** —solo deja registrada la discrepancia—. Lo que
+la cierra es que **`upload.completed` devuelva el hash verificado** y el agente corrija
+su inventario con él. Es una llamada que ya existe para confirmar que el objeto llegó;
+devolver lo que el worker computó al leerlo no agrega un viaje.
+
+**Consecuencia para el registro, y decide una columna:** con el lazo cerrado, «el último
+hash que vio el agente» y `Ingestion.version` son el mismo valor, así que no hacen falta
+las dos. Sin el lazo cerrado, la segunda no sería redundancia sino el registro de una
+desincronización que nadie repara — que es peor que no tenerla.
+
 ### La ruta es procedencia, nunca identidad
 
 La ruta viaja en el reporte y **se guarda**, para poder mostrarle al usuario de dónde

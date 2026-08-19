@@ -323,6 +323,18 @@ export type Instant = Nominal<string, "Instant">;
  * en la fila `documento` entre la recepción y la primera lectura, y por lo tanto el
  * dedupe de blobs (§{Tramo 1 › Decisiones}) NO puede ocurrir en la puerta ni ser la
  * clave de escritura del objeto. Eso contradice el orden de §{El orden} y toca C6.
+ *
+ * EL CANAL `folder` NO CONTRADICE ESA CONSECUENCIA, y va dicho porque parece que sí.
+ * Ese canal trae un hash calculado por el CLIENTE y lo usa para saltarse la
+ * transferencia —«¿ya lo tenés?»—, o sea que hace dedupe en la puerta con un valor que
+ * este lado no computó. Lo que el párrafo de arriba prohíbe es OTRO uso: tomar el valor
+ * afirmado como CLAVE DE ESCRITURA de un objeto nuevo. Una coincidencia solo direcciona
+ * objetos que este lado ya escribió y ya verificó, así que no hace aparecer contenido
+ * que nadie subió; un objeto nuevo se escribe SIEMPRE bajo el hash que el worker computa
+ * al leerlo. El hash del cliente es una afirmación y este es la autoridad, y de ahí sale
+ * que el reporte de subida completada tenga que DEVOLVER el verificado: sin eso, el
+ * cliente y el registro pueden creer cosas distintas del mismo archivo para siempre.
+ * §{El hash del cliente}.
  */
 export type ByteHash = Nominal<string,"ByteHash">;
 
