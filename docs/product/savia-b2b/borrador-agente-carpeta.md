@@ -135,8 +135,9 @@ que el usuario crea que perdió algo. El agente no reporta ni una baja en ese es
 **Y `Congelado` ya no es una pregunta.** Cuando el retiro era una decisión visible, ese
 estado esperaba a un humano. Con el retiro silencioso no hay a quién preguntarle, así que
 el corte por volumen deja de ser una consulta y pasa a ser **una exigencia de más
-evidencia**: se retiene, se espera a que `root.probe` confirme que la raíz está viva, se
-exige al menos un barrido completo más, y si la ausencia sigue ahí el retiro ocurre sin
+evidencia**: se retiene y se exige al menos un barrido completo más sobre esa raíz —que
+es, a la vez, la prueba de que la raíz está viva y de que los archivos siguen sin estar—,
+y si la ausencia sigue ahí el retiro ocurre sin
 avisar. Es la misma lógica que ya gobierna la cuarentena —«una desaparición es una
 hipótesis, no un hecho» y «tiempo sin observación no es evidencia»— aplicada al caso
 masivo. El estado se muestra porque el usuario merece ver que algo está en curso, no
@@ -152,8 +153,8 @@ defecto. El estado se dice con los tonos ya definidos (`successInk`, `warningInk
 
 ## El protocolo contra Savia
 
-Siete llamadas, y **ninguna es una invención**: cada una sale de un hecho que el plan
-ya fija. El vocabulario del agente es cerrado —apareció · desapareció · barrido— y el
+Seis llamadas, y **ninguna es una invención**: cada una sale de un hecho que el plan
+ya fija. **Las seis van del agente al servidor**, y eso no es estilo — ver abajo. El vocabulario del agente es cerrado —apareció · desapareció · barrido— y el
 protocolo no puede tener más verbos que esos, más lo que la subida prefirmada obligue.
 
 | Llamada | Dirección | Por qué existe |
@@ -164,7 +165,18 @@ protocolo no puede tener más verbos que esos, más lo que la subida prefirmada 
 | `upload.completed` | agente ↔ Savia | El plan decide que la API emite el permiso y **después** verifica que el objeto llegó. El único que sabe que el PUT terminó es quien lo hizo. **Y la respuesta devuelve el hash verificado**: el que el agente mandó era una afirmación, el que el worker computó al leer el objeto es la autoridad, y entre los dos momentos el archivo pudo cambiar. Sin ese retorno, el agente y el registro pueden creer cosas distintas del mismo archivo para siempre, y una desaparición posterior no matchea con nada |
 | `presence.vanished` | agente → Savia | Es «desapareció ruta P, que tenía contenido H». El nombre es deliberado: reporta un **hecho observado**, no pide un retiro |
 | `sweep.close` | agente → Savia | Un barrido interrumpido y un borrado masivo producen el mismo conjunto de desapariciones. Sin este reporte el corte por volumen no puede distinguirlos |
-| `root.probe` | Savia → agente | La cuarentena vence del lado del servidor, y la salvaguarda exige confirmar que la raíz está viva **en ese momento**, no cuando se observó |
+
+**Las seis van en una sola dirección, y `root.probe` murió por eso.** Había una séptima
+—`Savia → agente`, «¿la raíz está viva?»— para que la cuarentena confirmara al vencer. No
+puede existir: **un agente de escritorio no es direccionable**. Está detrás de NAT, sin
+puerto abierto, y la mitad del tiempo suspendido; el servidor no lo puede llamar.
+
+Y al buscarle reemplazo resultó que no hacía falta ninguno: **la evidencia que buscaba ya
+viaja en `sweep.close`**, y más fuerte. Un `root.probe` dice «la raíz existe»; un barrido
+que cerró COMPLETO sobre esa raíz dice «la raíz existe **y** los archivos siguen sin
+estar». Es literalmente lo que la cuarentena ya exige —«que pase la ventana y que haya
+habido al menos un barrido completo más durante ella»—. La séptima llamada era una forma
+peor de preguntar algo que la sexta ya contesta.
 
 **La API nunca toca bytes.** El tope de tamaño no se valida en ninguna llamada: viaja
 como `content-length-range` del permiso prefirmado, que es la única palanca preventiva
@@ -239,7 +251,7 @@ flowchart TD
     PUT --> DONE[upload.completed]
     COLA --> CLOSE[sweep.close<br/>completo · interrumpido]
     CLOSE --> CUAR{{cuarentena · del lado de Savia}}
-    CUAR --> PROBE[root.probe al vencer]
+    CUAR --> PROBE[barrido completo<br/>durante la ventana]
     PROBE --> RET[retiro reversible]
 ```
 

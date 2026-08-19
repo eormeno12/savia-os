@@ -1,0 +1,12 @@
+{
+  "name": "@savia-os/folder-agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "El agente del canal `folder`: observa una carpeta, hashea y reporta. Nucleo en Rust (src-tauri), cara en webview, y un servidor simulado para construirlo antes de que Savia tenga API.",
+  "scripts": {
+    "sim": "node sim/server.ts",
+    "sim:ejercicio": "node sim/ejercicio.ts",
+    "lint": "node sim/ejercicio.ts"
+  }
+}
