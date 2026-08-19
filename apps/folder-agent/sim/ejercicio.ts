@@ -101,6 +101,56 @@ const r8 = await llamar("/presence/vanished", {
 });
 afirmar((r8 as any).frozen === true, "la raiz queda congelada y exige mas evidencia", "un disco desmontado produce el mismo conjunto de ausencias que un borrado masivo, y el corte es lo unico que los separa");
 
+// ---------------------------------------------------------------------------
+// EL PADRON. Raiz aparte para no cruzarse con el estado que dejaron las ocho de
+// arriba: `root-1` quedo congelada y con dos ausencias en curso.
+// ---------------------------------------------------------------------------
+const R2 = "root-2";
+const abrirEn = (root: string, total: number) => llamar("/sweep/open", { root, total });
+const cerrar = (sweepId: string, status = "complete") => llamar("/sweep/close", { sweepId, status });
+const subirEn = async (root: string, archivos: { path: string; contenido: string }[]) => {
+  const entries = archivos.map((a) => ({ path: a.path, hash: hash(a.contenido) }));
+  const { decisions } = await llamar("/presence/observed", { root, entries });
+  for (const d of decisions as any[]) {
+    if (d.decision !== "upload") continue;
+    const a = archivos.find((x) => x.path === d.path)!;
+    await fetch(`${BASE}${d.permit.url}`, { method: "PUT", body: a.contenido });
+    await llamar("/upload/completed", { permit: d.permit.url.split("/").pop() });
+  }
+};
+
+console.log("\n9 - EL DESFASE SE DETECTA CON UN NUMERO QUE YA VIAJABA");
+const s9a = await abrirEn(R2, 0);
+await subirEn(R2, [
+  { path: "a.txt", contenido: "el a" },
+  { path: "b.txt", contenido: "el b" },
+  { path: "c-nube.txt", contenido: "el c" },
+]);
+await cerrar((s9a as any).sweepId);
+
+// El agente se reinicia SIN inventario: cree que la raiz esta vacia.
+const s9b = await abrirEn(R2, 0);
+afirmar((s9b as any).padronRequerido === true, "Savia nota que el agente no sabe de 3 documentos y pide el padron", "un barrido incremental no reporta lo que sigue igual, asi que sin el padron esos documentos no se ven faltar NUNCA y quedan vigentes para siempre");
+
+console.log("\n10 - LA DIFERENCIA RETIRA LO QUE FALTA, Y RESPETA AL DESHIDRATADO");
+// Mientras estaba caido, `b.txt` se borro. `c-nube.txt` esta deshidratado: presente,
+// pero el agente NO PUEDE leerlo, asi que viaja sin hash.
+await llamar("/presence/roster", {
+  sweepId: (s9b as any).sweepId,
+  entries: [
+    { path: "a.txt", hash: hash("el a") },
+    { path: "c-nube.txt", hash: null },
+  ],
+});
+const r10 = await cerrar((s9b as any).sweepId);
+afirmar((r10 as any).retired.length === 0, "la diferencia no retira en el acto: entra a cuarentena", "«una desaparicion es una hipotesis, no un hecho» vale igual cuando la descubre una diferencia de conjuntos y no una observacion");
+
+await new Promise((r) => setTimeout(r, 5_200));
+const s10 = await abrirEn(R2, 2);
+const r10b = await cerrar((s10 as any).sweepId);
+afirmar((r10b as any).retired.includes("b.txt"), "`b.txt`, borrado mientras el agente estaba caido, se retira", "es el agujero que el padron vino a tapar: sin el, ese documento quedaba vigente en Savia para siempre");
+afirmar(!(r10b as any).retired.includes("c-nube.txt"), "`c-nube.txt`, deshidratado y sin hash, NO se retira", "presente es presente. Omitir del padron lo que no se pudo leer retiraria archivos que estan perfectamente ahi, solo que en la nube - y en macOS leerlos para probarlo significa descargar el drive entero");
+
 console.log(`\n${fallas === 0 ? "ejercicio ok" : `EJERCICIO-ERR: ${fallas} afirmaciones fallaron`}`);
 console.log("estado final:", JSON.stringify(servidor.estado(), null, 2));
 servidor.cerrar();

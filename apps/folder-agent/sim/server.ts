@@ -41,7 +41,7 @@ type Documento = {
 const objetos = new Map<string, Uint8Array>();   // hash verificado -> bytes
 const documentos = new Map<string, Documento>(); // `${root} ${path}` -> doc
 const permisos = new Map<string, { hash: string; root: string; path: string }>();
-const barridos = new Map<string, { root: string; total: number; abierto: boolean }>();
+const barridos = new Map<string, { root: string; total: number; abierto: boolean; padron: Set<string> | null }>();
 const congeladas = new Set<string>();            // raices con el corte disparado
 let seq = 0;
 const id = (p: string) => `${p}-${(seq += 1)}`;
@@ -58,9 +58,39 @@ const rutas: Record<string, (c: any) => unknown> = {
    */
   "POST /sweep/open": ({ root, total }) => {
     const sweepId = id("sweep");
-    barridos.set(sweepId, { root, total, abierto: true });
-    anotar(`sweep.open   root=${root} denominador=${total}`);
-    return { sweepId };
+    // EL DESFASE SE DETECTA CON UN NUMERO QUE YA VIAJABA. `total` es la cuenta de filas
+    // vivas del inventario del agente; aca esta la cuenta de documentos vivos de esa
+    // raiz. Si difieren, el agente no sabe de la existencia de algunos documentos -
+    // perdio su inventario, lo restauraron de un backup, o nunca lo tuvo - y como un
+    // barrido incremental NO reporta lo que sigue igual, esos documentos no se veran
+    // faltar nunca. Pedirle el padron es la unica forma de enterarse.
+    //
+    // Lo pide SAVIA y no lo declara el agente a proposito: asi tambien se cubren los
+    // casos que el agente no puede declarar porque no los conoce - un inventario
+    // corrupto que el cree bueno, o dos agentes sobre la misma raiz.
+    const vivos = [...documentos.values()].filter((d) => d.root === root && d.retiredAt === null).length;
+    const padronRequerido = vivos !== total;
+    barridos.set(sweepId, { root, total, abierto: true, padron: null });
+    anotar(`sweep.open   root=${root} agente=${total} savia=${vivos}${padronRequerido ? " -> PADRON REQUERIDO" : ""}`);
+    return { sweepId, padronRequerido };
+  },
+
+  /**
+   * `presence.roster` - el padron. Todo lo que el agente VE en la raiz, sin bytes.
+   *
+   * `hash: null` significa PRESENTE CON HASH DESCONOCIDO, y no es un detalle: un archivo
+   * deshidratado nunca se lee, asi que el agente no tiene su hash. Omitirlo del padron
+   * lo volveria ausente y Savia lo retiraria - un archivo que esta perfectamente ahi,
+   * solo que en la nube. Presente es presente, y por que no se pudo leer es diagnostico
+   * del agente, no cambia nada de este lado.
+   */
+  "POST /presence/roster": ({ sweepId, entries }) => {
+    const b = barridos.get(sweepId);
+    if (!b) return { error: "barrido desconocido" };
+    b.padron = new Set((entries as { path: string }[]).map((e) => e.path));
+    const sinHash = (entries as { hash: string | null }[]).filter((e) => e.hash === null).length;
+    anotar(`roster       ${b.padron.size} rutas (${sinHash} sin hash: presentes, no legibles)`);
+    return { received: b.padron.size };
   },
 
   /**
@@ -156,6 +186,29 @@ const rutas: Record<string, (c: any) => unknown> = {
     if (status !== "complete") return { retired: [] };
 
     const ahora = Date.now();
+
+    // LA DIFERENCIA DE CONJUNTOS, y va aca y no al recibir el padron a proposito: un
+    // padron de un barrido INTERRUMPIDO es una lista parcial, y tratarla como el
+    // universo de lo presente retiraria todo lo que el recorrido no llego a mirar. El
+    // barrido completo es «la unica fuente legitima de un conjunto de bajas», y esta es
+    // esa regla aplicada al padron.
+    if (b.padron !== null) {
+      const ausentes = [...documentos.values()].filter(
+        (d) => d.root === b.root && d.retiredAt === null && d.ausenteDesde === null && !b.padron!.has(d.path),
+      );
+      for (const d of ausentes) d.ausenteDesde = ahora;
+      if (ausentes.length > 0) {
+        anotar(`diferencia   ${ausentes.length} documentos que el agente NO ve: ${ausentes.map((d) => d.path).join(", ")}`);
+        // El corte por volumen tambien manda aca. Es exactamente el escenario que teme:
+        // un agente que perdio su inventario y ademas barrio una raiz a medio montar
+        // produciria un padron corto, y la diferencia seria masiva.
+        const vivos = [...documentos.values()].filter((d) => d.root === b.root && d.retiredAt === null).length;
+        if (vivos > 0 && ausentes.length / vivos >= BANCO.cortePorVolumen) {
+          congeladas.add(b.root);
+          anotar(`CONGELADA ${b.root} - la diferencia del padron es el ${((ausentes.length / vivos) * 100).toFixed(0)}%`);
+        }
+      }
+    }
     const retirados: string[] = [];
     for (const d of documentos.values()) {
       if (d.root !== b.root || d.ausenteDesde === null || d.retiredAt !== null) continue;
