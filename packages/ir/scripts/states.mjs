@@ -180,6 +180,30 @@ try {
     }
   }
 
+  // ── E7 · EL RETIRO TIENE UNA SOLA REPRESENTACIÓN ──────────────────────────
+  // No es una fila defensiva contra una palabra: es la que impide que el mismo hecho
+  // se pueda escribir en DOS lugares que después discrepan. El canal `folder` decide
+  // que borrar un archivo RETIRA el documento sin destruirlo (§{Borrar en la carpeta})
+  // y eso vive en `Ingestion.retiredAt`, un `Instant` nulable. Si además existiera como
+  // estado, un documento podría tener `retiredAt` con valor y `state` en otra cosa —o
+  // al revés— y ninguna de las dos lecturas sería la autoridad.
+  //
+  // E5 YA SE PONDRÍA ROJO con el agregado ingenuo, y esta fila no lo duplica: E5 dice
+  // «los terminales cambiaron», que es un síntoma, y manda a contar sumideros. Esta
+  // dice cuál es la decisión y dónde vive la otra mitad.
+  const RETIRO = ["retired", "retirado"];
+  const comoEstado = DOCUMENT_STATES.filter((s) => RETIRO.includes(s));
+  if (comoEstado.length > 0) {
+    fallar(
+      `el retiro aparece como estado: ${comoEstado.join(", ")}\n` +
+        "        importa porque: el retiro ya vive en `Ingestion.retiredAt` y como estado sería la\n" +
+        "        MISMA cosa escrita dos veces, con dos lecturas que pueden discrepar. Además los ocho\n" +
+        "        estados contestan «¿en qué punto del pipeline está?» y el retiro contesta «¿está\n" +
+        "        vigente?»: un documento retirado que estaba `indexed` sigue estando indexado. Ver\n" +
+        "        GLOSARIO.md, P30",
+    );
+  }
+
   if (fallas > 0) process.exit(1);
 
   console.log(

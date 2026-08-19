@@ -105,6 +105,7 @@ import type {
   ContextualFingerprint,
   ElementId,
   EmbeddingKey,
+  Instant,
   LocalId,
   MatterHash,
   MintFn,
@@ -691,6 +692,25 @@ type _OriginalInhabited = True<
   >
 >;
 
+type _RetiredAtIsAnInstant = True<
+  FitsIn<
+    Ingestion["retiredAt"],
+    Instant | null,
+    "Ingestion.retiredAt stopped being an Instant — a retirement that carries a boolean cannot tell the quarantine when it happened"
+  >
+>;
+// LA MITAD DE ATRÁS ACÁ HACE DOS TRABAJOS, y por eso lleva mensaje propio en vez del
+// de la familia. Agarra el colapso a `never` como sus hermanas, y agarra ADEMÁS que
+// alguien le saque el `| null` — que es el modo de falla grave del campo: sin nulo,
+// «vigente» deja de ser expresable y todo documento nace retirado.
+type _RetiredAtNullable = True<
+  FitsIn<
+    null,
+    Ingestion["retiredAt"],
+    "Ingestion.retiredAt stopped admitting null — `vigente` is no longer expressible, so every document is born retired"
+  >
+>;
+
 type _VersionOrganizationSeparates = True<
   FitsIn<
     NodeInVersion["organization"],
@@ -726,6 +746,8 @@ export type WRAPPER_PROOFS = readonly [
   _IngestionVersionInhabited,
   _OriginalIsAnObject,
   _OriginalInhabited,
+  _RetiredAtIsAnInstant,
+  _RetiredAtNullable,
   _VersionOrganizationSeparates,
   _VersionOrganizationInhabited,
   _AnnotationActorIsActor,

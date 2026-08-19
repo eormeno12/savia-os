@@ -887,6 +887,111 @@ mecánico y lo cobra `tsc` de una vez; el modo de falla del `?` no lo cobra nadi
 
 ---
 
+## 19 · Paso 13 — el tramo 1, y los cuatro que ninguna regla determinaba
+
+El paquete se llama **`intake`** y eso ya estaba decidido: §4 lo fija desde el bloque
+inicial («el cognado `reception` es un lobby de hotel»). Lo que hay que decidir es lo
+de adentro, y son cuatro. La mitad de aceptación del tramo 1 **ya existe y no se
+renombra** —`select` devuelve `null`, el piso se abstiene y sale `Run.onHold`—; lo que
+entra acá es la mitad de RECHAZO, que es la que ningún adaptador puede tomar.
+
+> **El paquete alcanza `ir` y NADA MÁS**, que no era el plan: se scaffoldeó declarando
+> también `adapters` —«la mitad de aceptación vive allá»— y su guardián de fronteras lo
+> desmintió en la primera corrida, porque nada lo importaba. `claimedBy` recibe un
+> `OpaqueAdapter`, que es un tipo de `ir`: este paquete habla del **contrato** de
+> adaptador y nunca de un adaptador. El efecto es que «`admit` no calcula `encrypted`»
+> dejó de ser una convención de firma y pasó a ser el grafo de módulos.
+
+| # | Símbolo | **Queda** | Por qué no la que salía sola |
+|---|---|---|---|
+| **P26** | la puerta del tramo 1, y su resultado | **`admit`** · **`Admission`**, unión discriminada de **tres** brazos: `admitted` · `rejected` · `retry` | R1 da `admitir→admit` llana, y la fila existe por el TERCER BRAZO y por dos colisiones. **`accept` está tomado con otro significado**: §4 ya fijó `admiteSatelite → acceptsSatellite`, y ese «admite» es «tolera un satélite adentro», no «deja pasar por la puerta». **`Gate` se descarta aunque sea la palabra del plan**: la prosa de este repo ya la usa para otra cosa —P10 dice «la medición del **gate** de imprimibles», que es el umbral del tramo 2— así que un tipo `Gate` haría que la misma palabra nombre las dos puertas. El tercer brazo NO es un detalle: sin él, «el escáner no contestó» solo se puede codificar como uno de los otros dos, y las dos formas están mal —`admitted` es fail-open e indexa lo que nadie miró, `rejected` le miente al que subió un archivo sano—. `retry` se llama así y no `deferred` ni `pending` porque **ata con el parámetro que ya existe**, `PARAMETERS.intake.maxRetries`, que es el que decide cuándo ese brazo se vuelve `failed`. Es el argumento de P10 (`printableProportionOf` ↔ `minPrintableProportion`) aplicado de nuevo: el contrato y su parámetro no pueden tener dos vocabularios. Y `deferred` **está tomado** por `Run.deferred`, que es otra cosa |
+| **P27** | el veredicto del antivirus, y su capacidad | **`ScanVerdict`** = `clean · infected · unavailable` (§5, datos) · **`ScanFn = (object: ObjectKey, bytes: Uint8Array) => Promise<ScanVerdict>`** | `ScanVerdict` sale solo de R2 sobre dos raíces llanas de R1 (`escaneo→scan`, `veredicto→verdict`); lo que no sale solo es **el vocabulario** —§5 pide que los cerrados se escriban acá, «hoy cambiarlos es gratis y después es una migración» (D6)— ni **la firma**. `clean`/`infected` son los términos del dominio antivirus y no cognados inventados. El tercero es el que importa: `unavailable` dice **que el escáner no contestó**, y se descarta `unknown` porque describiría al archivo —«no sabemos qué es»— cuando lo que no se sabe es del escáner; se descarta `error` porque un timeout no es un error del archivo ni de nosotros. **La firma toma `ObjectKey` y ese parámetro es la garantía entera**: «todo objeto de nuestro bucket se escanea una vez, indexado por su hash de contenido» (`outputs.ts`, la máquina de estados) solo es expresable si el sujeto del escaneo es el OBJETO. Con una firma de solo bytes, memoizar sería una convención que nadie puede imponer; con la clave adentro, el peldaño es el 1 — el tipo lo pide |
+| **P28** | el motivo del rechazo | **`RejectionReason`** = `encrypted · infected` (§5, datos) · campo **`reason`** | R1+R2 llanas, y la fila existe porque **B5 parece decidir lo contrario y no lo decide**: aquel bloque eligió `Caso.porqué → why` sobre `reason`, pero con un argumento que era del consumidor —«el guardián imprime el campo detrás de la palabra *porque*»— y acá no hay tal frase: el consumidor es el mensaje al usuario. Los dos valores son exactamente los dos que el plan nombra («se rechaza solo en la puerta: cifrado sin contraseña, tamaño excedido, y lo que marque el antivirus»), **menos el tamaño**, que no entra y va dicho: con subida prefirmada se impone como `content-length-range` del permiso, o sea que un archivo demasiado grande **nunca llega a ser un documento**. `oversize` sería un valor que no puede ocurrir |
+| **P29** | qué sondas en espera despierta un adaptador nuevo | **`claimedBy(adapter, probes)`** · y su segundo brazo, **`undecidable`** | **`claimedBy` porque «reclamar» ya ES el verbo del repo para esta relación** —«el selector la reclama», «nadie lo reclama», «el adaptador de imagen no lo reclama»— así que no se elige una palabra: se usa la que los docstrings vienen usando. R7 fija `by` («nombra el criterio»). Se descartan `revive` y `awaken`, que suenan a que la sonda hace algo, cuando la sonda es el objeto de la frase. **El segundo brazo NO es defensivo, cierra media PROVISIONAL(C7)**: el plan promete que al registrar un adaptador «se recorre una tabla chica, **no se leen archivos** de almacenamiento», y el único evidenciador completo del documento hace `await s.zipEntries()`, que sí los lee. O sea que la promesa y el diseño se contradicen hoy. La salida honesta es la que este repo ya usa para `materialize` sin almacenamiento: los perezosos RECHAZAN, y el adaptador que los necesitaba sale en `undecidable` en vez de leer el objeto en silencio. Un adaptador que no puede decidir en frío es un hecho declarado, no un archivo leído de más |
+
+### Por qué `admit` NO recibe los bytes, y sí el veredicto
+
+La tentación es que la puerta escanee. No lo hace, y la razón es la misma por la que
+`fingerprintOf` recibe `Body` y no el nodo entero: **lo que la firma no admite, no se
+puede colar**. `admit` recibe `{ scan, encrypted }` —dos hechos ya establecidos— y
+devuelve la decisión. Con eso:
+
+1. La decisión es **pura y sincrónica**, así que se puede barrer entera: son tres
+   veredictos × dos valores de `encrypted` = seis casos, y el guardián los recorre
+   todos. Una función que escanea adentro no se puede barrer sin un doble.
+2. **`encrypted` es evidencia, y la evidencia es del tramo 2.** Detectar «cifrado sin
+   contraseña» es saber de formatos —el bit 0 del *general purpose bit flag* de un zip,
+   el `/Encrypt` del tráiler de un PDF— y ese conocimiento vive en `adapters` por
+   diseño. Que `intake` lo calculara sería la re-declaración que el README de `ir`
+   prohíbe, y encima duplicaría el lector de zip.
+3. El **fail-closed queda escrito en la tabla** y no en un `catch`. Un `try/catch`
+   alrededor de un escaneo que no responde es la forma en que fail-open entra sin que
+   nadie lo decida.
+
+---
+
+## 20 · El canal `folder` — el retiro, y por qué NO es un estado
+
+El canal decide que borrar un archivo de la carpeta **retira el documento y no lo
+destruye**, y que el retiro es **reversible**. Un solo símbolo nuevo, y la fila existe
+porque la forma que el plan escribió —«pasa a estado `retirado`»— **no es la que queda**.
+
+| # | Símbolo | **Queda** | Por qué no la que salía sola |
+|---|---|---|---|
+| **P30** | que un documento dejó de estar vigente porque su archivo desapareció de la carpeta | campo **`retiredAt: Instant \| null`** en `Ingestion`, y **NO** un noveno valor de `DocumentState` | La forma que sale sola es la del plan —«un archivo que desaparece de la carpeta pasa a estado `retirado`»— y no entra por tres razones que se acumulan. **(1) DESTRUIRÍA `isTerminal`.** Un archivo se borra cuando se borra, así que el retiro es alcanzable desde los ocho estados; con los ocho ganando una arista, ninguno queda con grado de salida cero y la función devuelve `false` para todos. Se derivó de `TRANSITIONS` **justamente** para que «una lista paralela mantenida a mano» no pudiera mentir, y como noveno estado se vuelve uniformemente inútil. Que E5 de `states.mjs` ya se ponga rojo ante ese cambio es la confirmación, no la objeción: el guardián que se escribió sin pensar en el retiro ya sabía que esto no cabía ahí. **(2) LA REVERSIBILIDAD NO SE ESCRIBE COMO ARISTA.** «Si el archivo vuelve, vuelve entero» significa que vuelve AL ESTADO QUE TENÍA, y un par `[retired, X]` no recuerda de dónde vino: expresarlo pide guardar el estado previo, que es un campo. O sea que la forma de estado **filtra un campo igual**, y encima perdió el que ya estaba escrito. **(3) Y LO DECIDE LA TABLA DEL PROPIO PLAN.** «Qué sobrevive a un retiro» enumera seis cosas y sobreviven las seis: las anotaciones, las marcas de sensibilidad, los `ElementId`, el índice de reconciliación, el historial, `selladoEn` y el objeto original. Un documento retirado que estaba `indexed` **sigue estando indexado** —su IR existe, sus fragmentos existen, su índice existe—, así que escribir `retired` en `state` **borra un hecho verdadero para anotar uno distinto**. Los ocho estados contestan «¿en qué punto del pipeline está?»; el retiro contesta «¿está vigente?». Son dos preguntas, y la forma del plan las mete en un campo |
+
+### Por qué `retiredAt` y no los cinco nombres vecinos
+
+`retire` es el cognado llano de «retirar» (R1) y es la palabra que el plan ya usa, así
+que no se elige un término: se traduce el que hay. Lo que sí hay que decidir es contra
+qué se lo elige, y los cinco candidatos fallan cada uno por su lado:
+
+- **`archived`** promete de más, y en la dirección peor. «Archivar» en almacenamiento
+  significa **mover a almacenamiento frío**, y el objeto no se mueve: la tabla del plan
+  dice que sobrevive intacto y deduplicado, porque purgarlo «rompe la cita verbatim de
+  todos los otros documentos que lo comparten».
+- **`deleted`** y **`removed`** afirman exactamente lo contrario de la decisión.
+- **`withdrawn`** pone el sujeto en la persona —«alguien lo retiró»— y el que retira es
+  el canal, después de una cuarentena que decide el servidor.
+- **`inactive`** y **`disabled`** describen una capacidad, no un hecho fechado, y este
+  campo tiene que llevar el instante.
+
+El sufijo **`At`** no se inventa: `createdAt` y `sealedAt` ya están en el paquete, y
+`sealedAt` está tres líneas más arriba **en este mismo tipo**. Un `Instant` que marca
+cuándo pasó algo se escribe así acá.
+
+### Por qué `Instant | null` y no un booleano
+
+Porque la cuarentena necesita **cuándo**. Un `retired: boolean` pediría un timestamp al
+lado, y dos campos que tienen que concordar son la clase de dato que se desincroniza —el
+mismo argumento con el que `isTerminal` se deriva en vez de escribirse.
+
+Y `null` no es «falta el dato»: **es el estado normal**. Un documento vigente tiene
+`retiredAt` en `null` toda su vida, que es lo que vuelve la reversibilidad gratis —se
+pone en `null` y el documento es exactamente lo que era, sin nada que restaurar—.
+
+### Lo que este bloque CORRIGE, y por qué no es una errata
+
+El plan y el borrador del agente dicen los dos «estado `retirado`», y los dos se
+corrigen. No es una errata de redacción: era la forma correcta **antes de que
+`TRANSITIONS` existiera**. Cuando se escribió esa frase la máquina de estados era una
+lista de ocho literales sin consumidor, y agregar un noveno no costaba nada porque no
+había nada que romper. El commit que le puso aristas es el que volvió incompatible la
+frase — y decidir esto antes de escribir el término es exactamente lo que la regla que
+gobierna a este documento existe para provocar.
+
+### El precio, dicho de frente
+
+**El campo NO alcanza para escribir el worker de bajas, y conviene no fingir que sí.**
+`retiredAt` dice que el documento no está vigente; no dice que la búsqueda, la síntesis
+y el índice lo excluyan. Eso son tres consumidores que todavía no existen, y cada uno
+tiene que filtrar por su lado. La forma de estado tampoco lo daba —`canTransition` no
+filtra una búsqueda— pero la ilusión era más fácil de tener, porque un estado *parece*
+que apaga el documento. Un campo nulable no lo parece, y esa honestidad es la mitad de
+por qué se elige.
+
+---
+
 ## La regla que gobierna a este documento
 
 **Si un término no está acá y ninguna regla de §2 lo determina, no se inventa: se

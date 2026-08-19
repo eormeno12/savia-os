@@ -401,9 +401,19 @@ sobre la primera mitad y nunca tuvo la segunda.** Un borrado que arrastre las do
 da a un `rm` en el Finder el poder de destruir trabajo que la carpeta no puede
 mostrar y no puede devolver.
 
-Un archivo que desaparece de la carpeta pasa a estado **`retirado`**: sale de la
+Un archivo que desaparece de la carpeta **se marca como retirado**: sale de la
 búsqueda, de la síntesis y del índice. Para el usuario desaparece de Savia, que es
 exactamente lo que pidió. Lo que NO pasa es que se borre la otra mitad.
+
+**No es un noveno estado: es un campo.** `Ingestion.retiredAt`, un instante nulable, y
+el argumento entero está en [`packages/ir/GLOSARIO.md`](../../../packages/ir/GLOSARIO.md),
+P30. En corto: los ocho estados contestan «¿en qué punto del pipeline está este
+documento?» y el retiro contesta «¿está vigente?». Un documento retirado que estaba
+`indexado` **sigue estando indexado** —la tabla de acá abajo dice que sobrevive todo—,
+así que escribirlo en `estado` borraría un hecho verdadero para anotar otro distinto. Y
+la reversibilidad sale gratis de esta forma: se pone el campo en `null` y el documento
+vuelve a ser exactamente lo que era, sin nada que restaurar. Como estado habría que
+recordar de dónde vino, que es un campo igual —pero habiendo perdido el que ya estaba—.
 
 **Qué sobrevive a un retiro, y por qué cada uno:**
 
@@ -450,13 +460,17 @@ acá**: van a `PARAMETERS` con su unidad, qué deciden y cómo se medirían.
 - **Si el retiro es visible o silencioso.** Preguntarle al usuario «desaparecieron 12
   archivos de tu carpeta, ¿los saco?» es más seguro contra falsos positivos y tensiona
   con que la captación pasiva sea invisible.
-- **Si la carpeta es fuente de verdad de la PERSONA o de la ORGANIZACIÓN.** Un
-  documento captado de la carpeta de alguien puede estar alimentando skills de los que
-  depende otro equipo. Que una persona ordenando su escritorio degrade el skill de
-  otro es gobernanza de Capa 3, no sincronización.
-- **La transición de `retirado`.** Un archivo se puede borrar en cualquier punto, así
-  que el estado tiene que ser alcanzable desde los ocho anteriores. Es parte del hueco
-  mayor: la máquina de estados sigue sin transiciones.
+- **DECIDIDO — la carpeta es fuente de verdad de la PERSONA.** El agente lo vincula el
+  usuario **desde su propia cuenta**, así que el canal es personal por construcción y
+  encaja con lo que el registro ya dice (`dueño — un User`) y con la regla de
+  deduplicación, que le da a dos personas con el mismo archivo **registros separados con
+  dueños distintos**. Lo que sigue abierto no es de quién es, sino qué pasa cuando un
+  documento captado de la carpeta de alguien alimenta skills de los que depende otro
+  equipo: que una persona ordenando su escritorio degrade el skill de otro es gobernanza
+  de Capa 3, no sincronización.
+- **Quién filtra a los retirados.** `retiredAt` dice el hecho y **no lo impone**. Que un
+  documento retirado salga de la búsqueda, de la síntesis y del índice son tres filtros
+  de tres consumidores, y ninguno de los tres existe todavía.
 
 ## Caché de reconocimiento
 

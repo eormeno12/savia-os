@@ -604,6 +604,31 @@ const MUTANTES = [
     ]],
     nota: "el par de M71–M76. El docstring de `TRANSITIONS` es el más largo del paquete —lleva las cuatro respuestas, el fail-closed, la resolución de la contradicción del plan y por qué no hay checkpointing— y nada de eso puede decidir comportamiento: si un guardián se pusiera rojo al editarlo, estaría verificando la prosa en vez de la tabla",
   },
+  // ── EL RETIRO (canal `folder`, P30) ───────────────────────────────────────
+  // Tres filas para un campo, y no es desproporcionado: `retiredAt` entró VERDE —se
+  // podía borrar entero sin que nada se pusiera rojo, que es el modo de falla que la
+  // deuda del paso 7 dejó documentado— y las tres cosas que decide son distintas.
+  {
+    id: "M77",
+    garantía: "`retiredAt` admite `null`, o sea que «vigente» es expresable",
+    cambios: [[`  readonly retiredAt: Instant | null;`, `  readonly retiredAt: Instant;`]],
+    espera: /Ingestion\.retiredAt stopped admitting null/,
+    nota: "es la mutación que sale sola al leer el tipo sin leer el docstring: un campo nulable parece un campo opcional mal escrito, y sacarle el `| null` parece limpieza. Lo que hace es volver IRREPRESENTABLE el estado normal — `null` no es «falta el dato» acá, es la vida entera de la mayoría de los documentos—, así que todo documento nacería retirado y el canal `folder` retiraría el corpus completo en su primer barrido",
+  },
+  {
+    id: "M78",
+    garantía: "`retiredAt` lleva CUÁNDO, no si",
+    cambios: [[`  readonly retiredAt: Instant | null;`, `  readonly retiredAt: boolean | null;`]],
+    espera: /Ingestion\.retiredAt stopped being an Instant/,
+    nota: "«un documento está retirado o no está: eso es un booleano» es un razonamiento correcto sobre el hecho y equivocado sobre el campo. La cuarentena vence del lado del servidor y necesita el instante; con un booleano habría que guardar el timestamp AL LADO, y dos campos que tienen que concordar son la clase de dato que se desincroniza — el mismo argumento por el que `isTerminal` se deriva en vez de escribirse",
+  },
+  {
+    id: "M79",
+    garantía: "el retiro tiene UNA representación: el campo, y no además un estado",
+    cambios: [[`  "on_hold",\n] as const;`, `  "on_hold",\n  "retired",\n] as const;`]],
+    espera: /el retiro aparece como estado/,
+    nota: "es la forma que el plan tenía escrita —«pasa a estado `retirado`»— y por eso la fila existe: la mutación no es un error de tipeo, es la decisión anterior volviendo. Muere por TRES guardianes a la vez (E2 lo ve huérfano, E3 inalcanzable, E7 lo nombra) y eso está bien: el estado huérfano y el retiro duplicado son el mismo error visto desde ángulos distintos. E7 es el único que dice CUÁL es la decisión y dónde vive la otra mitad, y por eso es el que se espera",
+  },
   {
     id: "M50",
     garantía: "la cifra de llamadas a NotAssignableTo no se puede desincronizar del AST",

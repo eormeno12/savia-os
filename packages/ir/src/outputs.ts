@@ -897,6 +897,35 @@ export type Ingestion = {
   readonly sealedAt: Instant;
   readonly achievedLevel: AchievedLevel;
   readonly state: DocumentState;
+  /**
+   * AGREGADO(canal `folder`, P30): cuándo dejó de estar vigente, o `null` si lo está.
+   *
+   * ES UN CAMPO Y NO UN NOVENO `DocumentState`, y las tres razones están en
+   * GLOSARIO.md, P30. La que más pesa acá: los ocho estados contestan «¿en qué punto
+   * del pipeline está este documento?» y el retiro contesta «¿está vigente?». Un
+   * documento retirado que estaba `indexed` SIGUE ESTANDO INDEXADO —su IR existe, sus
+   * fragmentos existen, su índice de reconciliación existe, y §{Borrar en la carpeta}
+   * enumera las seis cosas que sobreviven—, así que escribir `retired` en `state`
+   * borraría un hecho verdadero para anotar uno distinto.
+   *
+   * Y la reversibilidad, que es la decisión del canal, sale GRATIS de esta forma: se
+   * pone en `null` y el documento vuelve a ser exactamente lo que era. Como estado
+   * pediría recordar de dónde vino —un par `[retired, X]` no lo sabe—, o sea un campo
+   * igual, pero habiendo perdido el que ya estaba.
+   *
+   * `null` NO es «falta el dato»: es el estado normal, y lo es toda la vida de la
+   * mayoría de los documentos.
+   *
+   * LO QUE ESTE CAMPO NO HACE, dicho para que nadie lo suponga: no excluye nada. Que
+   * un documento retirado salga de la búsqueda, de la síntesis y del índice son tres
+   * filtros de tres consumidores que todavía no existen. El campo dice el hecho; no lo
+   * impone.
+   *
+   * NO LLEVA QUIÉN. Hoy la carpeta es la única fuente de retiros, así que el actor
+   * sería constante y un campo constante no informa. Cuando una persona pueda retirar
+   * desde la interfaz se vuelve una pregunta real, y ahí se decide.
+   */
+  readonly retiredAt: Instant | null;
 };
 
 /**
@@ -1049,6 +1078,15 @@ export type DocumentState = (typeof DOCUMENT_STATES)[number];
  *
  * De hecho el CACHÉ es mejor que un checkpoint y lo reemplaza: un checkpoint ahorra
  * rehacer lo ya hecho DE ESTE documento; el caché lo ahorra de TODOS.
+ *
+ * Y HAY UN SEGUNDO CANDIDATO A NOVENO ESTADO QUE TAMPOCO ENTRA, por una razón
+ * DISTINTA, y va acá para que quien busque «¿por qué el retiro no es un estado?»
+ * caiga en el lugar correcto. El canal `folder` decide que borrar un archivo RETIRA el
+ * documento sin destruirlo (§{Borrar en la carpeta}), y la forma que sale sola es un
+ * `retired`. No cabe: el retiro es alcanzable desde los ocho, así que ningún estado
+ * quedaría con grado de salida cero y `isTerminal` —que se deriva JUSTAMENTE para no
+ * poder mentir— devolvería `false` para todos. Vive como `Ingestion.retiredAt`, y el
+ * argumento entero está en GLOSARIO.md, P30.
  *
  * QUEDA UN SOLO PASO QUE NO SE PUEDE REHACER, y es el acuñado: H13(a) declara que es
  * reloj + azar, y el invariante de determinismo lo mide exigiendo que otro acuñador
