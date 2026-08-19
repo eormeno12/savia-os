@@ -421,15 +421,36 @@ documento comparte más nodos distintivos— y el `anclaje` confirmando o descar
 
 ### La identidad de la fuente
 
-La fila `documento` necesita la identidad local para poder resolver una baja:
+Es el hallazgo #36 y hay que cerrarlo aunque la política de borrado fuera otra. Se pidió
+como una columna de cuatro partes —`raízVigilada · rutaRelativa · idDeArchivoDelSO ·
+últimoHashVisto`— y **entran dos**:
 
 ```
-documento.fuente        raízVigilada · rutaRelativa · idDeArchivoDelSO · últimoHashVisto
+documento.watched       WatchedPath = { root: RootId, path: string }
 ```
 
-Sin esa columna el evento «desapareció tal contenido» no se puede mapear a un
-documento, y la reconciliación no corre nunca para este canal. Es el hallazgo #36 y
-hay que cerrarlo aunque la política de borrado fuera otra.
+**Los otros dos no son un recorte de alcance.** `últimoHashVisto` ya existe con otro
+nombre: es `Ingestion.version`, el `ByteHash` de los bytes recibidos, y la consulta
+`hash → documento` se hace por ahí. Y `idDeArchivoDelSO` **no es del contrato**: sirve
+para que renombrar cueste cero I/O en la máquina del usuario, este lado no puede
+verificarlo, y la ficha que el borrador del agente le escribe dice lo que es —«una pista
+que se verifica, nunca una identidad»—. Un dato que declara no ser identidad no puede ser
+la identidad de una fila.
+
+**Y la justificación de arriba estaba mal apuntada**, que es lo que se ve al escribirla:
+quien resuelve una baja es **el hash**, no la ruta. El propio agente trata dos copias del
+mismo contenido como un documento —si el hash reaparece en el árbol no reporta baja— así
+que no hay ambigüedad que una ruta tenga que desempatar. `path` sobrevive por lo que dice
+la sección de al lado: se guarda **para mostrarle al usuario de dónde salió cada cosa**.
+Y `root` sobrevive por una tercera razón que no es ninguna de las dos: **las salvaguardas
+son por raíz**, y la cuarentena y el corte por volumen corren de este lado.
+
+Las dos mitades son marca y ruta relativa a propósito, y compran lo mismo: **mover la
+raíz entera es un solo hecho**. Con rutas absolutas, todos los archivos parecen
+desaparecer a la vez.
+
+El detalle de los nombres descartados está en
+[`packages/ir/GLOSARIO.md`](../../../packages/ir/GLOSARIO.md), P31 y P32.
 
 ### Borrar en la carpeta RETIRA, no destruye
 

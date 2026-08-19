@@ -200,6 +200,15 @@ export type OrganizationId = Nominal<string, "OrganizationId">;
 export type DocumentId = Nominal<string, "DocumentId">;
 
 /**
+ * La carpeta vigilada del canal `folder` (§{La carpeta local}). Se acuña al enrolar el
+ * agente, y la marca es lo que impide el error que la vuelve inútil: **no es una ruta**.
+ * Si fuera el path absoluto, mover la raíz cambiaría la identidad de todo lo que hay
+ * adentro — que es exactamente el desastre que la ruta RELATIVA de `WatchedPath` existe
+ * para evitar, reintroducido un nivel más arriba. Con `string` pelado eso compila.
+ */
+export type RootId = Nominal<string, "RootId">;
+
+/**
  * Dónde quedó un objeto en el almacenamiento direccionado por contenido
  * (§{Tramo 1 › El registro}).
  */
@@ -519,6 +528,7 @@ export const asAdapterId = (v: string): AdapterId => v as AdapterId;
 export const asActorId = (v: string): ActorId => v as ActorId;
 export const asOrganizationId = (v: string): OrganizationId => v as OrganizationId;
 export const asDocumentId = (v: string): DocumentId => v as DocumentId;
+export const asRootId = (v: string): RootId => v as RootId;
 export const asObjectKey = (v: string): ObjectKey => v as ObjectKey;
 export const asFragmentId = (v: string): FragmentId => v as FragmentId;
 export const asInstant = (v: string): Instant => v as Instant;

@@ -992,6 +992,81 @@ por qué se elige.
 
 ---
 
+## 21 · El canal `folder` — dónde vive el archivo, y los dos campos que no entran
+
+El plan pide una columna de cuatro partes —`raízVigilada · rutaRelativa ·
+idDeArchivoDelSO · últimoHashVisto`— para «resolver una baja». **Entran dos.** Los otros
+dos no son recortes de alcance: uno ya existe con otro nombre y el otro no es del
+contrato, y las dos cosas se ven al preguntarse qué necesita el SERVIDOR, que es quien
+lleva esta fila.
+
+| # | Símbolo | **Queda** | Por qué no la que salía sola |
+|---|---|---|---|
+| **P31** | dónde vive, en la carpeta vigilada, el archivo del que salió este documento | **`WatchedPath`** = `{ root: RootId; path: string }`, en `outputs.ts` · campo **`watched`** en `Ingestion` | **Los cuatro nombres obvios tienen dueño, otra vez.** `Source` lleva ⚠ doble (§3 y §5) y además ya es un campo de `Authorship`; `Origin` está tomado (`Origin['kind']`, D6); `Provenance` es la CATEGORÍA y E2 prohíbe darle su nombre a un miembro; `Location` es de `RawNode.location` y `Route` del tramo 4, y `Locator` ya se descartó en §18 por casi-colisión con `Location`. **Y `Whence` NO sirve, que es el caso interesante**: existe, dice exactamente «de dónde», y el criterio de membresía que §18 le escribió lo EXPULSA — sus miembros «viajan pegados al contenido, no al registro» y «no son la identidad de una fila del tramo 1», que es literalmente lo que esto es. Es la primera vez que ese criterio se usa para RECHAZAR algo, que es para lo que se escribió. **`WatchedPath` porque «vigilada» es la propiedad operativa** —lo que distingue a esa carpeta de las otras cuarenta del disco es que el agente la mira— y porque ninguna de las dos palabras nombra un tipo del repo. Se descarta `FolderPath`: `folder` es un literal de `Channel`, y un tipo a un pelo del valor invita a confundir «el canal» con «la carpeta» |
+| **P32** | la raíz vigilada | **`RootId`**, marca nominal en `identity.ts` | R1 llana sobre «raíz», y la fila existe por lo que el tipo IMPIDE. **No es una ruta y tiene que no poder serlo**: se acuña al enrolar, y si fuera el path absoluto, mover la raíz cambiaría la identidad de todo lo que hay adentro — que es exactamente el desastre que `rutaRelativa` existe para evitar, reintroducido un nivel más arriba. Con `string` pelado eso compila; con la marca, no. Se descarta `FolderId` porque nombra lo que la cosa ES y adentro de una raíz hay muchas carpetas: la que importa es LA vigilada, y «root» ya es la palabra que el borrador del agente usa. `WatchRootId` repite en el nombre lo que el tipo que lo contiene ya dice |
+
+### Los dos campos que el plan pedía y NO entran
+
+**`últimoHashVisto` ya existe: es `Ingestion.version`.** El invariante `_IngestionVersionIsBytes` lo sostiene —es el `ByteHash` de los bytes recibidos— y la consulta
+`hash → documento` que el plan pide para resolver una baja se hace por ahí. Dos columnas
+con el mismo valor son la clase de dato que se desincroniza.
+
+Eso **solo vale con el lazo cerrado**, y por eso la sección «El hash del cliente es una
+afirmación, no la autoridad» va antes que este bloque: el hash del agente y el del worker
+pueden diferir si el archivo cambia entre el hasheo y el PUT, y lo que los vuelve el
+mismo valor es que `upload.completed` devuelva el verificado. Sin ese retorno la columna
+no sería redundante — sería el registro de una desincronización que nadie repara, que es
+peor que no tenerla.
+
+**`idDeArchivoDelSO` es del agente, no del contrato.** Sirve para que renombrar y mover
+cuesten cero I/O, y eso pasa en la máquina del usuario. El servidor no puede verificarlo,
+nunca se lo devuelve —cuando el inventario se pierde, el agente hace barrido completo y
+Savia contesta `known` a todo— y el propio borrador del agente dice lo que es: «una pista
+que se verifica, nunca una identidad: NTFS recicla ids y un restore los cambia todos». Un
+dato cuya ficha declara que no es identidad no puede ser la identidad de una fila.
+
+### Por qué `rutaRelativa` sobrevive, y no por la razón que el plan escribió
+
+El plan justifica la columna entera diciendo que sin ella «desapareció tal contenido» no
+se puede mapear a un documento. **Eso lo resuelve el hash**, y hay algo más fuerte: el
+propio flujograma del agente trata dos copias del mismo contenido como UN documento —la
+rama que pregunta «¿el hash reaparece en el árbol?» no reporta baja si reaparece, así que
+borrar una de dos copias se lee como movimiento—. No queda ambigüedad que una ruta tenga
+que desempatar.
+
+Sobrevive por la razón que la sección de al lado sí escribe: «la ruta viaja en el reporte
+y **se guarda**, para poder mostrarle al usuario de dónde salió cada cosa». Es procedencia
+para MOSTRAR, no identidad para RESOLVER — que es lo que el título de esa sección dice y
+lo que la justificación de esta se había olvidado.
+
+Y `root` sobrevive por una tercera razón, que no es ninguna de las dos: **las salvaguardas
+son por raíz**. La cuarentena y el corte por volumen corren del lado del servidor sobre un
+denominador por raíz, así que la fila tiene que saber a cuál pertenece — un disco externo
+desmontado no puede congelar la raíz del disco interno.
+
+### Por qué NO es una unión discriminada por canal
+
+`watched` es `null` para tres de los cuatro canales: `chat` y `frontend` no tienen fuente
+externa, y `connector` la va a tener pero **no existe**. Modelarlo hoy como
+`{ kind: "folder", … } | { kind: "connector", … }` es inventar la forma de un consumidor
+que nadie escribió, y esa clase de generalidad después no se puede borrar: el día que el
+conector exista va a querer campos que hoy no podemos adivinar, y la unión ya va a tener
+consumidores ramificando sobre ella.
+
+Un campo nulable dice lo mismo que hace falta hoy y no compromete el de mañana.
+
+### El precio, dicho de frente
+
+**`path` es un `string` opaco y su forma canónica NO está en el tipo.** El borrador del
+agente es explícito en que eso es contrato y no implementación —mayúsculas, separadores,
+normalización Unicode, longitud máxima, nombres reservados— porque macOS y Windows
+difieren en las cinco. Hoy dos agentes pueden mandar dos grafías de la misma ruta y el
+registro las va a guardar como distintas. Queda como `PROVISIONAL` en el tipo, no
+resuelto: fijar la forma canónica es una decisión con medición adentro y no se inventa
+acá.
+
+---
+
 ## La regla que gobierna a este documento
 
 **Si un término no está acá y ninguna regla de §2 lo determina, no se inventa: se

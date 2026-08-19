@@ -15,6 +15,7 @@ import type {
   LocalId,
   ObjectKey,
   OrganizationId,
+  RootId,
 } from "./identity.js";
 // La procedencia vive en su propio módulo desde el bloque 3b, y no por tamaño: es lo
 // que vuelve escribible `projection.ts ↛ provenance.ts`. Nació como `authorship.ts`
@@ -876,6 +877,41 @@ export interface Annotator {
  * IR: no se cachea, no se sirve entre tenants, y existe precisamente para que la
  * consulta `hash → documento` no cruce organizaciones.
  */
+/**
+ * Dónde vive el archivo del que salió este documento, en la carpeta vigilada
+ * (§{La carpeta local}, GLOSARIO.md P31). Solo el canal `folder` lo tiene.
+ *
+ * ES PROCEDENCIA, NO IDENTIDAD, y esa frase es del plan: «la ruta viaja en el reporte y
+ * se guarda, para poder mostrarle al usuario de dónde salió cada cosa. Lo que no hace es
+ * decidir quién es qué: eso lo decide el contenido». Quien resuelve una baja es el hash
+ * —`Ingestion.version`—, no esto.
+ *
+ * `root` ES UNA MARCA Y NO LA RUTA ABSOLUTA, y `path` es RELATIVO a ella. Las dos mitades
+ * compran la misma propiedad: mover la raíz entera es UN solo hecho. Con rutas absolutas
+ * todos los archivos parecen desaparecer a la vez, que es la diferencia entre un
+ * movimiento y un borrado masivo del corpus de alguien.
+ *
+ * Y `root` está acá, y no solo en el agente, porque LAS SALVAGUARDAS SON POR RAÍZ: la
+ * cuarentena y el corte por volumen corren de este lado sobre un denominador por raíz, y
+ * un disco externo desmontado no puede congelar la raíz del disco interno.
+ *
+ * PROVISIONAL(forma canónica de `path`): es un `string` OPACO y su grafía no está en el
+ * tipo. El borrador del agente declara que eso es contrato y no implementación —
+ * mayúsculas, separadores, normalización Unicode, longitud máxima, nombres reservados—
+ * porque macOS y Windows difieren en las cinco, así que hoy dos agentes pueden mandar
+ * dos grafías de la misma ruta y el registro las guarda como distintas. Fijarla es una
+ * decisión con medición adentro y no se inventa acá.
+ *
+ * LO QUE NO LLEVA: el id de archivo del sistema operativo. Sirve para que renombrar
+ * cueste cero I/O y eso pasa en la máquina del usuario — este lado no puede verificarlo
+ * y nunca se lo devuelve. Su propia ficha en el borrador del agente dice que es «una
+ * pista que se verifica, nunca una identidad».
+ */
+export type WatchedPath = {
+  readonly root: RootId;
+  readonly path: string;
+};
+
 export type Ingestion = {
   readonly document: DocumentId;
   readonly version: ByteHash;
@@ -926,6 +962,16 @@ export type Ingestion = {
    * desde la interfaz se vuelve una pregunta real, y ahí se decide.
    */
   readonly retiredAt: Instant | null;
+  /**
+   * AGREGADO(canal `folder`, P31): dónde vive el archivo, o `null` si no vino de una
+   * carpeta vigilada — que es el caso de tres de los cuatro canales.
+   *
+   * NULABLE Y NO UNIÓN DISCRIMINADA POR CANAL. `connector` va a querer su propia forma
+   * de «de dónde salió» y todavía no existe; modelar hoy la unión es inventarle la forma
+   * a un consumidor que nadie escribió, y esa generalidad después no se borra porque ya
+   * tiene quien ramifique sobre ella.
+   */
+  readonly watched: WatchedPath | null;
 };
 
 /**

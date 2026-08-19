@@ -113,6 +113,7 @@ import type {
   Nominal,
   ObjectKey,
   OrganizationId,
+  RootId,
 } from "./identity.js";
 import type { Box, Coordinate, Location, SourceRange } from "./location.js";
 // Se importa el VALOR y no un tipo: la aserción es sobre `ReturnType<typeof
@@ -711,6 +712,26 @@ type _RetiredAtNullable = True<
   >
 >;
 
+// LA MARCA ES LA FILA, y no un adorno: el argumento entero de `RootId` (GLOSARIO.md,
+// P32) es que la raíz NO PUEDE SER UNA RUTA. Con `string` pelado, guardar ahí el path
+// absoluto compila — y entonces mover la carpeta cambia la identidad de todo lo que
+// tiene adentro, que es el desastre que la ruta relativa existe para evitar,
+// reintroducido un nivel más arriba.
+type _WatchedRootIsBranded = True<
+  FitsIn<
+    NonNullable<Ingestion["watched"]>["root"],
+    RootId,
+    "Ingestion.watched.root stopped being a RootId — an absolute path now fits, so moving the folder rewrites the identity of everything inside it"
+  >
+>;
+type _WatchedNullable = True<
+  FitsIn<
+    null,
+    Ingestion["watched"],
+    "Ingestion.watched stopped admitting null — three of the four channels have no watched folder and can no longer be registered"
+  >
+>;
+
 type _VersionOrganizationSeparates = True<
   FitsIn<
     NodeInVersion["organization"],
@@ -748,6 +769,8 @@ export type WRAPPER_PROOFS = readonly [
   _OriginalInhabited,
   _RetiredAtIsAnInstant,
   _RetiredAtNullable,
+  _WatchedRootIsBranded,
+  _WatchedNullable,
   _VersionOrganizationSeparates,
   _VersionOrganizationInhabited,
   _AnnotationActorIsActor,

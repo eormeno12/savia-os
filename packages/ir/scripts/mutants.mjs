@@ -629,6 +629,21 @@ const MUTANTES = [
     espera: /el retiro aparece como estado/,
     nota: "es la forma que el plan tenía escrita —«pasa a estado `retirado`»— y por eso la fila existe: la mutación no es un error de tipeo, es la decisión anterior volviendo. Muere por TRES guardianes a la vez (E2 lo ve huérfano, E3 inalcanzable, E7 lo nombra) y eso está bien: el estado huérfano y el retiro duplicado son el mismo error visto desde ángulos distintos. E7 es el único que dice CUÁL es la decisión y dónde vive la otra mitad, y por eso es el que se espera",
   },
+  // ── DÓNDE VIVE EL ARCHIVO (canal `folder`, P31/P32) ───────────────────────
+  {
+    id: "M80",
+    garantía: "la raíz vigilada es una MARCA: una ruta absoluta no entra",
+    cambios: [[`  readonly root: RootId;`, `  readonly root: string;`]],
+    espera: /Ingestion\.watched\.root stopped being a RootId/,
+    nota: "es LA fila de `RootId`, porque la marca no compra separación de tipos —nadie más lleva una raíz— sino que compra IMPEDIR UN VALOR. Con `string` pelado, guardar ahí `/Users/x/Savia` compila y parece más informativo: la mutación es la simplificación que sale sola al leer el campo sin leer el docstring. Y entonces mover la carpeta cambia la identidad de todo lo que tiene adentro, que es exactamente el desastre que la ruta RELATIVA existe para evitar, reintroducido un nivel más arriba y sin que nada se ponga rojo",
+  },
+  {
+    id: "M81",
+    garantía: "`watched` admite `null`: los otros tres canales siguen siendo registrables",
+    cambios: [[`  readonly watched: WatchedPath | null;`, `  readonly watched: WatchedPath;`]],
+    espera: /Ingestion\.watched stopped admitting null/,
+    nota: "el `| null` de un campo que el canal `folder` siempre llena parece ruido, y sacarlo parece apretar el tipo. Lo que hace es volver INEXPRESABLE un documento de `chat`, `frontend` o `connector`: ninguno tiene carpeta vigilada, así que el tres cuartos del producto que no es este canal deja de poder registrarse — o peor, alguien inventa una raíz sintética para llenarlo y el campo pasa a mentir",
+  },
   {
     id: "M50",
     garantía: "la cifra de llamadas a NotAssignableTo no se puede desincronizar del AST",
