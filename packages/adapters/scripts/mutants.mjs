@@ -1040,19 +1040,26 @@ const MUTANTES = [
   },
   {
     id: "S103",
-    garantía: "el rango de la imagen saltea el encabezado LOCAL, no el del directorio",
+    garantía: "los bytes de una entrada de zip saltean el encabezado LOCAL, no el del directorio",
     rompe: "I21 · golden bytes→nodos del `.docx`",
     cambios: [[
-      `          const inicio = h + 30 + dv.getUint16(h + 26, true) + dv.getUint16(h + 28, true);`,
-      `          const inicio = h + 46 + dv.getUint16(h + 26, true) + dv.getUint16(h + 28, true);`,
+      `const LOCAL_FIJO = 30; // el encabezado local, sin las dos partes variables`,
+      `const LOCAL_FIJO = 46; // el encabezado local, sin las dos partes variables`,
     ]],
     espera: /I21 · golden bytes→nodos del/,
     nota:
       "46 es el largo fijo del encabezado del DIRECTORIO CENTRAL y 30 el del LOCAL: los dos existen en el " +
-      "mismo formato, describen la misma entrada y se confunden leyendo la especificación en diagonal. Con " +
-      "el equivocado el rango arranca 16 bytes adentro del PNG, así que la ventana existe, tiene el largo " +
-      "correcto y apunta a basura. Nada explota: el asset se emite, se delega, y el adaptador de imagen no " +
-      "lo reclama porque los bytes mágicos no son de una imagen. El documento pierde su figura EN SILENCIO",
+      "mismo formato, describen la misma entrada y se confunden leyendo la especificación en diagonal. " +
+      "SE REANCLÓ AL IMPLEMENTAR «¿los bytes ya existen?» y la garantía es la misma: la aritmética estaba DUPLICADA —`docx.ts` la repetía " +
+      "para expresar la ventana por referencia y `unzip.ts` la tiene para leer—, y la regla borró la copia. " +
+      "Queda anclada donde la aritmética vive de verdad, que además es donde tenía que estar: una fila " +
+      "sobre la copia dejaba al original sin acreditar. " +
+      "EL MODO DE FALLA CAMBIÓ DE TAMAÑO, y para mejor. Con la ventana por referencia el desplazamiento " +
+      "equivocado arrancaba 16 bytes adentro del PNG: la ventana existía, tenía el largo correcto y " +
+      "apuntaba a basura, así que el asset se emitía, se delegaba, y el adaptador de imagen no lo " +
+      "reclamaba porque los bytes mágicos no eran de una imagen — el documento perdía su figura EN " +
+      "SILENCIO. Ahora el mismo error corrompe TODA lectura del zip, `word/document.xml` incluido, y el " +
+      "documento sale vacío. Sigue siendo silencioso sin el golden, que es por lo que la fila existe",
   },
   // ── Deuda del paso 7 · de dónde salieron los bytes ────────────────────────
   {
@@ -1064,13 +1071,13 @@ const MUTANTES = [
   },
   {
     id: "S105",
-    garantía: "la rama SIN COMPRIMIR también dice de dónde salió, no solo la materializada",
+    garantía: "la imagen del `.docx` dice de qué contenedor salió",
     cambios: [[
-      `            whence: { container: input.ref.object, path: entrada.name },\n            body: { shape: "asset", ref: { object: input.ref.object, window }, mime: mimeDe(entrada.name) },`,
-      `            whence: null,\n            body: { shape: "asset", ref: { object: input.ref.object, window }, mime: mimeDe(entrada.name) },`,
+      `            whence: { container: input.ref.object, path: entrada.name },`,
+      `            whence: null,`,
     ]],
     espera: /I21 · golden bytes→nodos del/,
-    nota: "las dos ramas del `.docx` llevan la MISMA procedencia y la sangría NO alcanza para distinguirlas: la de esta rama —doce espacios— es SUBCADENA de la de la otra —catorce—, así que `ubicar` la encontraba dos veces. Por eso el ancla es el par `whence` + `body`, y por eso en el código `whence` va arriba: la línea de `body` de esta rama es la única del archivo que nombra la ventana. La tentación es leer `null` acá como correcto —el objeto ya es el contenedor, así que «no vino de ningún lado»— y es falso: la ventana dice DÓNDE EN BYTES, no cómo se llamaba. Con `null`, la respuesta a «de dónde vino esta imagen» dependería de si el escritor de Word la comprimió o no",
+    nota: "LA SIMPLIFICÓ «¿los bytes ya existen?» Y LA FILA SE VOLVIÓ MÁS FUERTE, que es el orden inverso al habitual. Su enunciado viejo —«la rama SIN COMPRIMIR también dice de dónde salió»— existía porque había DOS ramas, y su ancla tenía que ser el par `whence` + `body` porque la sangría no distinguía: la de doce espacios era SUBCADENA de la de catorce, y `ubicar` la encontraba dos veces. Con una sola rama la sangría alcanza y no hay «también». Lo que la fila dice ahora es lo que importa de verdad: la dirección del objeto es el hash de SU CONTENIDO, o sea ciega a de dónde vino por diseño y a propósito, así que `whence` es el único dato de todo el pipeline que conserva de cuál documento salió esta figura. El observador es el golden, que lleva la columna desde la deuda del paso 7. Su hermano en la orquestación es S107, que muta la misma línea con otro observador",
   },
   // ── Deuda del paso 7 · el cuerpo heredado ─────────────────────────────────
   {
@@ -1102,15 +1109,18 @@ const MUTANTES = [
     control: true,
     garantía: "editar la prosa del docstring del adaptador `.docx` no rompe nada",
     cambios: [[
-      `LA IMAGEN NO SE MATERIALIZA SI NO HACE FALTA`,
-      `LA IMAGEN NO SE MATERIALIZA SI NO HACE FALTA (control SC23)`,
+      `LOS DOS ESLABONES, Y POR QUÉ HACEN FALTA DOS.`,
+      `LOS DOS ESLABONES, Y POR QUÉ HACEN FALTA DOS (control SC23).`,
     ]],
     nota:
-      "el par de S100–S103. La mitad del archivo explica por qué hacen falta dos eslabones y por qué la " +
-      "imagen no se materializa; sin este control las cuatro filas serían indistinguibles de un guardián " +
+      "el par de S100–S103. La mitad del archivo explica por qué hacen falta dos eslabones y por qué toda " +
+      "imagen se materializa; sin este control las cuatro filas serían indistinguibles de un guardián " +
       "que congela el archivo. SU PRIMER ANCLA CHOCÓ CON LA REGLA DE UNICIDAD: la frase elegida estaba " +
       "también en el comentario de I21, y `ubicar()` exige que el texto viva en UN archivo. El corredor lo " +
-      "dijo nombrando los dos. Vale como recordatorio de que las frases buenas se repiten solas",
+      "dijo nombrando los dos. Vale como recordatorio de que las frases buenas se repiten solas. " +
+      "SE REANCLÓ AL IMPLEMENTAR «¿los bytes ya existen?»: la segunda frase —«LA IMAGEN NO SE MATERIALIZA SI NO HACE FALTA»— la borró la " +
+      "decisión, porque decía lo contrario de lo que el adaptador hace. La de ahora es de la mitad del " +
+      "docstring que la decisión no toca, que es lo que le corresponde a un control",
   },
 
   {

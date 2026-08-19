@@ -155,12 +155,28 @@ try {
    * frontera que este paquete acredita. Que quepa en veinte líneas es el dato: un
    * adaptador consume `diagnostics` y nada más.
    */
-  const contextoDe = () => {
+  /**
+   * `almacena` LO PIDE «¿los bytes ya existen?», y el default sigue siendo `false` a propósito. Desde que todo
+   * asset cuyos bytes ya existen se materializa, un contexto SIN almacenamiento no puede
+   * emitir ni una figura — ni siquiera las que están sin comprimir, que hasta el paso 7
+   * salían por referencia—. O sea que I21, que verifica que la cascada y la delegación se
+   * componen, se quedaría sin la mitad de delegación si el banco no supiera guardar.
+   *
+   * LA CLAVE ES SINTÉTICA Y ESO NO ES UN ATAJO. Que la dirección de un objeto sea el hash
+   * de su contenido lo acredita `orchestration` —I18, y la fila S105 que muta el
+   * `byteHash`—, que es el paquete donde vive el único `materialize` de verdad. Traerlo
+   * acá cruzaría la frontera que este banco existe para acreditar. Lo que I21 necesita de
+   * este doble es sólo que la pieza salga con objeto PROPIO y ventana `whole`, y para eso
+   * alcanza una clave estable: misma convención que `fuenteDe`, por largo.
+   */
+  const contextoDe = ({ almacena = false } = {}) => {
     const notices = [];
     const degradations = [];
+    const guardados = new Map();
     return {
       notices,
       degradations,
+      guardados,
       ctx: {
         diagnostics: {
           notice: (code, location, detail) =>
@@ -179,7 +195,12 @@ try {
         signal: { aborted: false },
         spend: () => true,
         invoke: (_k, work) => work(),
-        materialize: () => Promise.reject(new Error("no")),
+        materialize: (b, mime) => {
+          if (!almacena) return Promise.reject(new Error("no"));
+          const object = asObjectKey(`mat-${b.length}`);
+          guardados.set(object, { bytes: b, mime });
+          return Promise.resolve({ object, window: { scope: "whole" } });
+        },
         // `null` = este contexto NO PUEDE percibir, que es el estado del hilo del
         // request. Un contexto de banco que lo trajera por defecto escondería
         // justamente el corte que el paso 6 introduce.
@@ -1194,7 +1215,11 @@ try {
   // que es el único paquete que compone los dos lados.
   {
     const opacoDocx = opaqueOf(docxAdapter);
-    const corridaDocx = contextoDe();
+    // CON ALMACENAMIENTO desde «¿los bytes ya existen?»: la imagen de `manual.docx` está guardada SIN
+    // COMPRIMIR y hasta el paso 7 salía por referencia, sin tocar el storage. Ahora se
+    // materializa como cualquier otra, así que un banco que no supiera guardar dejaría a
+    // este invariante sin la mitad de delegación que vino a verificar.
+    const corridaDocx = contextoDe({ almacena: true });
     const nodosDocx = await opacoDocx.recognize(fuenteDe(docx), corridaDocx.ctx);
 
     // LOS DOS ESLABONES, cada uno con su nodo. Un `.docx` corporativo declara algunos
@@ -1223,17 +1248,39 @@ try {
       );
     }
 
-    // LA IMAGEN SALE POR RANGO Y NO MATERIALIZADA, que es lo medido: cuando la entrada
-    // del zip está SIN COMPRIMIR sus bytes están literales en el `.docx`, así que el
-    // asset se expresa como el rectángulo de un PDF —mismo objeto, ventana más chica—
-    // y entra al pipeline sin escribir un byte. Es la razón por la que este paso no
-    // necesita almacenamiento.
+    // LA IMAGEN SALE MATERIALIZADA, con objeto PROPIO y ventana `whole` — «¿los bytes ya existen?», y este
+    // invariante verificaba LO CONTRARIO hasta el paso 7. La entrada de `manual.docx`
+    // está guardada sin comprimir, así que sus bytes están literales en un rango del
+    // `.docx` y expresarla como el rectángulo de un PDF era posible; lo que esa cuenta no
+    // miraba es que `ref.object` ENTRA EN LA HUELLA, o sea que el mismo logo adentro de
+    // cincuenta contenedores tendría cincuenta identidades y el caché de reconocimiento
+    // se indexa por ahí.
+    //
+    // LAS DOS MITADES SON UNA SOLA AFIRMACIÓN Y HACEN FALTA LAS DOS. `whole` sin el
+    // segundo chequeo lo cumpliría un asset que apuntara al contenedor entero, que es
+    // peor que el rango; y objeto distinto sin `whole` dejaría pasar una ventana sobre un
+    // objeto propio, que es la forma que S108 de la orquestación caza en el otro lado.
     const imagen = nodosDocx.find((n) => n.body.shape === "asset");
-    if (imagen === undefined || imagen.body.ref.window.scope !== "range") {
+    const fuenteDocx = fuenteDe(docx);
+    if (
+      imagen === undefined ||
+      imagen.body.ref.window.scope !== "whole" ||
+      imagen.body.ref.object === fuenteDocx.ref.object
+    ) {
       fallar(
-        "I21 · la imagen incrustada no sale como un rango del propio documento",
-        `asset=${JSON.stringify(imagen?.body.ref ?? null)}`,
-        "si saliera con ventana `whole` y objeto propio, este paso dependería del almacenamiento, que no está cableado — y la mitad de los `.docx` reales, que guardan sus medios sin comprimir, pagarían una materialización que no hace falta",
+        "I21 · la imagen incrustada no sale materializada con objeto propio",
+        `asset=${JSON.stringify(imagen?.body.ref ?? null)} contenedor=${fuenteDocx.ref.object}`,
+        "una ventana sobre el contenedor le da al mismo logo tantas direcciones como contenedores lo lleven, y como `ref.object` entra en la huella eso son tantas IDENTIDADES —y tantas invocaciones al modelo— como copias. «200 encabezados con el mismo logo → 1 invocación + 199 aciertos» (§{La delegación es emergente}) es verdadero solo si el logo tiene UNA dirección",
+      );
+    }
+    // Y SE GUARDÓ DE VERDAD. Sin esto, un `materialize` que devolviera una referencia sin
+    // escribir nada pasaría las dos mitades de arriba: la forma sería correcta y el objeto
+    // no existiría. Es la diferencia entre acreditar la firma y acreditar el efecto.
+    if (!corridaDocx.guardados.has(imagen?.body.ref.object)) {
+      fallar(
+        "I21 · el objeto del asset no quedó en el almacenamiento",
+        `guardados=${JSON.stringify([...corridaDocx.guardados.keys()])}`,
+        "«guardar es incondicional, indexar no»: un asset que anuncia un objeto que nadie escribió es una promesa que el tramo 3 no puede cumplir cuando el selector vaya a leer esos bytes",
       );
     }
 
@@ -1249,10 +1296,13 @@ try {
           level: n.level,
           attribution: n.attribution,
           hint: n.hint,
-          // ENTRA AL MOLDE EN LA DEUDA DEL PASO 7, y es el único observador de la
-          // procedencia de la rama SIN COMPRIMIR: I19 de la orquestación corre sobre el
-          // `.docx` deflateado, así que sin esta columna el `whence` del recorte por
-          // referencia se puede borrar y nada se pone rojo.
+          // ENTRA AL MOLDE EN LA DEUDA DEL PASO 7, y sigue en el molde después de «¿los bytes ya existen?»
+          // aunque su motivo original —ser el único observador de la procedencia de la
+          // rama SIN COMPRIMIR, que I19 de la orquestación no miraba— se haya vuelto
+          // vacío al desaparecer esa rama. Ahora observa otra cosa, y más fuerte: con la
+          // imagen materializada, la dirección del objeto es el hash de su contenido y es
+          // CIEGA a de dónde vino por diseño, así que esta columna es el único lugar del
+          // golden donde queda escrito de qué contenedor salió la figura.
           whence: n.whence,
           body: n.body,
         })),
@@ -1280,32 +1330,43 @@ try {
   }
 
   // ── I22 · SIN ALMACENAMIENTO, LA IMAGEN SE ANUNCIA Y EL TEXTO ENTRA ───────
-  // La otra mitad del paso 7, y la que decide si el adaptador es honesto. Cuando la
-  // entrada del zip está COMPRIMIDA sus bytes no están literales en ningún rango, así
-  // que el recorte por referencia no se puede expresar y hay que producirlos — eso es
-  // materializar, y este banco NO TIENE ALMACENAMIENTO a propósito.
+  // La otra mitad del paso 7, y la que decide si el adaptador es honesto: este banco NO
+  // TIENE ALMACENAMIENTO a propósito.
+  //
+  // CORRE SOBRE LOS DOS CORPUS, Y ESO ES «¿los bytes ya existen?» DICHO COMO BANCO. Hasta el paso 7 solo la
+  // entrada COMPRIMIDA necesitaba materializarse —la sin comprimir salía por referencia,
+  // sin tocar el storage— así que este invariante existía únicamente para el `.docx`
+  // deflateado. Desde que el corte es «¿los bytes ya existen?» y la respuesta para una
+  // entrada de zip es SIEMPRE que sí, un contexto sin almacenamiento no puede emitir NI
+  // UNA figura. Ese es el precio de la decisión y acá se paga a la vista: si el día de mañana
+  // alguien reintrodujera la rama por referencia para «ahorrarse una copia», la mitad de
+  // `manual.docx` de este bucle se pondría verde por el motivo equivocado —emitiría el
+  // asset— y el invariante lo diría.
   //
   // LAS TRES MITADES SE VERIFICAN JUNTAS. Que la imagen no se emita es lo esperable;
   // que el TEXTO ENTRE IGUAL es lo que separa «degradar» de «fallar»; y que haya un
   // AVISO es lo que separa «degradar» de «descartar en silencio». Con las tres, un
   // `.docx` cuyo medio no se pudo materializar sigue siendo un documento indexado al
   // que le falta una figura, y se sabe cuál.
-  {
+  for (const [nombre, crudos] of [
+    ["manual.docx", docx],
+    ["manual-deflated.docx", docxZip],
+  ]) {
     const corridaZip = contextoDe();
-    const nodosZip = await opaqueOf(docxAdapter).recognize(fuenteDe(docxZip), corridaZip.ctx);
+    const nodosZip = await opaqueOf(docxAdapter).recognize(fuenteDe(crudos), corridaZip.ctx);
     const conAsset = nodosZip.filter((n) => n.body.shape === "asset");
     const textos = nodosZip.filter((n) => n.body.shape === "text_span");
     const códigos = corridaZip.notices.map((n) => n.code);
     if (conAsset.length !== 0) {
       fallar(
-        "I22 · se emitió un asset que no se pudo materializar",
+        `I22 · ${nombre} emitió un asset que no se pudo materializar`,
         JSON.stringify(conAsset.map((n) => n.body.ref)),
         "un asset cuyos bytes no están ni en el original ni en el almacenamiento apunta a ninguna parte: la delegación no lo va a poder leer, así que sería un nodo que promete una figura que nadie puede traer",
       );
     }
     if (textos.length === 0 || !códigos.includes("docx.media_not_materialised")) {
       fallar(
-        "I22 · la degradación no es honesta",
+        `I22 · ${nombre} no degradó de forma honesta`,
         `texto=${textos.length} avisos=${JSON.stringify(códigos)}`,
         "«guardar es incondicional, indexar no»: sin texto el adaptador falló en vez de degradar, y sin aviso descartó en silencio, que es el modo de falla que §{Diagnóstico} declara inadmisible",
       );

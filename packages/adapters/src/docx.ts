@@ -16,33 +16,52 @@
  * en un documento cuyo cuerpo es de 11 pt, y es cuerpo en uno cuyo cuerpo es de 16 pt»
  * (§{`detectar`}). De ahí que `detect` sea una FÁBRICA que recibe el corpus entero.
  *
- * LA IMAGEN NO SE MATERIALIZA SI NO HACE FALTA, y esto se midió. Un `.docx` guarda sus
- * imágenes en `word/media/`, y varios escritores las guardan SIN COMPRIMIR —un PNG ya
- * está comprimido y volver a deflatearlo no gana nada—. Cuando es así, los bytes del
- * PNG están LITERALES en un rango del `.docx`, verificado sobre el corpus: la firma
- * `89 50 4e 47` aparece tal cual en `[1300, 1369)`. Entonces el asset se expresa como
- * el rectángulo de un PDF —mismo objeto, ventana más chica— y entra al pipeline por el
- * camino que ya existe, sin escribir un byte.
+ * TODA IMAGEN SE MATERIALIZA, Y EL CORTE NO ES COMPRIMIDA/SIN COMPRIMIR: ES **¿LOS
+ * BYTES YA EXISTEN?**. Una entrada de zip es un HECHO —están ahí, comprimidos o
+ * no, y `zipEntryOf` los devuelve— así que la pieza sale con OBJETO PROPIO, que es el
+ * hash de su contenido, y ventana `whole`. La ventana POR REFERENCIA queda para el otro
+ * caso, que es el que la justifica y para el que se escribió: el rectángulo de un PDF,
+ * que es una PROMESA —no existe hasta que alguien renderiza esa página—.
  *
- * SUPERADO POR P14, Y SE DEJA ESCRITO ACÁ PARA QUE NADIE LEA EL PÁRRAFO DE ARRIBA COMO
- * VIGENTE. La medición del rango es correcta y la conclusión no: `ref.object` entra en la
- * huella, así que expresar la imagen como una ventana sobre el contenedor le da al mismo
- * logo TANTAS IDENTIDADES COMO CONTENEDORES lo lleven, y el caché de reconocimiento se
- * indexa por ahí. La decisión tomada es materializar todo asset cuyos bytes ya existan y
- * dejar la ventana por referencia para los que todavía no existen —el rectángulo de un
- * PDF—. Está en Puntos abiertos, P14, con el costo y lo que mueve.
+ * EL PASO 7 CORTÓ POR EL OTRO LADO Y FUE UN ERROR MEDIDO, que conviene dejar escrito
+ * porque la medición que lo motivó era correcta. Varios escritores guardan las imágenes
+ * de `word/media/` SIN COMPRIMIR —un PNG ya está comprimido y volver a deflatearlo no
+ * gana nada— y entonces sus bytes están LITERALES en un rango del `.docx`: la firma
+ * `89 50 4e 47` aparece tal cual en `[1300, 1369)` del corpus. De ahí salió expresar
+ * esa imagen como el rectángulo de un PDF —mismo objeto, ventana más chica— y no
+ * escribir un byte.
  *
- * CUANDO SÍ HACE FALTA, SE MATERIALIZA, y esa es la otra rama. Si la entrada está
- * deflateada sus bytes no están literales en ningún rango, así que el recorte por
- * referencia no se puede expresar y hay que PRODUCIRLOS: inflar y guardar. La pieza
- * queda con objeto PROPIO y ventana `whole`, y desde ahí entra al pipeline por el mismo
- * camino que la otra — el selector la reclama, el modelo la percibe, el subárbol se
- * injerta donde estaba. Materializar no es un camino aparte: es la misma puerta.
+ * Lo que esa cuenta no miraba es que **`ref.object` ENTRA EN LA HUELLA**. Con la forma
+ * por rango, el mismo logo adentro de cincuenta contenedores tiene cincuenta
+ * direcciones y por lo tanto CINCUENTA IDENTIDADES, y el caché de reconocimiento se
+ * indexa por ahí: «200 encabezados con el mismo logo → 1 invocación + 199 aciertos»
+ * (§{La delegación es emergente}) es verdadero solo si el logo tiene UNA dirección.
+ * Peor: cuál de las dos cosas pasaba dependía de si Word lo había comprimido — la misma
+ * clase de dependencia que este archivo rechaza explícitamente unas líneas más abajo
+ * para la procedencia, aplicada al campo que más pesa.
+ *
+ * EL COSTO SE DA VUELTA AL MIRARLO. Se paga una copia de cada imagen DISTINTA —el
+ * almacenamiento se direcciona por contenido, así que el logo se copia una vez y no
+ * cincuenta— y se ahorran cuarenta y nueve llamadas a modelo, que cuestan órdenes de
+ * magnitud más que un blob. Y desaparece la exención de la rama sin comprimir frente al
+ * antivirus, con su supuesto incómodo de «depende de si el escáner abre contenedores».
+ *
+ * NO SE LO CITA POR NÚMERO A PROPÓSITO. La decisión se anotó en el plan como «P14», y
+ * ese número ya nombraba otro punto —«la entrada del registro es `unknown`»—, cerrado y
+ * sacado de la tabla antes: `registry.ts` de este mismo paquete dice «eso cierra P14»
+ * hablando del otro. Está explicado en Puntos abiertos, con la regla de que un número
+ * cerrado queda quemado. Acá la decisión se nombra por lo que dice.
+ *
+ * MATERIALIZAR NO ES UN CAMINO APARTE: ES LA MISMA PUERTA. La pieza queda con objeto
+ * propio y ventana `whole`, y desde ahí entra al pipeline por el camino que ya existe —
+ * el selector la reclama, el modelo la percibe, el subárbol se injerta donde estaba.
  *
  * Y SI EL CONTEXTO NO TIENE ALMACENAMIENTO, la imagen se ANUNCIA en vez de emitirse: un
  * aviso `docx.media_not_materialised`, y el texto del documento entra igual.
  * Descartarla en silencio sería el modo de falla que §{Diagnóstico} declara
- * inadmisible; hacer fallar el documento entero sería no degradar.
+ * inadmisible; hacer fallar el documento entero sería no degradar. Con la regla nueva
+ * esa degradación alcanza a TODAS las imágenes y no solo a las comprimidas, que es el precio
+ * honesto de la decisión: un contexto sin almacenamiento ya no puede emitir figuras.
  */
 
 import {
@@ -55,7 +74,6 @@ import {
   type Probe,
   type Source,
   type Unit,
-  type Window,
 } from "@savia-os/ir";
 import { cascade } from "./registry.js";
 import { zipDirectoryOf } from "./zip.js";
@@ -65,7 +83,6 @@ import { parse } from "txml";
 const DOCUMENT = "word/document.xml";
 const RELS = "word/_rels/document.xml.rels";
 const STYLES = "word/styles.xml";
-const STORED = 0;
 /** El prefijo de los estilos de título en el vocabulario de Word. */
 const HEADING_STYLE = "heading";
 
@@ -347,58 +364,39 @@ export const docxAdapter: FileAdapter<DocxSignals> = {
             ctx.diagnostics.notice("docx.missing_media", null, `${embed} does not resolve to a zip entry`);
             continue;
           }
-          if (entrada.method !== STORED) {
-            // COMPRIMIDA: sus bytes NO están literales en ningún rango del `.docx`, así
-            // que el recorte por referencia no se puede expresar y hay que producirlos.
-            // Eso es materializar, y es la ÚNICA rama de este adaptador que necesita
-            // almacenamiento — la otra mitad de los `.docx` reales, que guardan sus
-            // medios sin comprimir, no lo toca.
-            const inflada = zipEntryOf(bytes, entrada.name);
-            if (inflada === null) {
-              ctx.diagnostics.notice("docx.unreadable_media", null, `${entrada.name} could not be inflated`);
-              continue;
-            }
-            const mime = mimeDe(entrada.name);
-            // SIN ALMACENAMIENTO, `materialize` RECHAZA y la imagen se ANUNCIA en vez de
-            // emitirse. No es descartar en silencio: el documento entra sin esa pieza y
-            // el aviso dice cuál. «Guardar es incondicional, indexar no.»
-            const ref = await ctx.materialize(inflada, mime).catch(() => null);
-            if (ref === null) {
-              ctx.diagnostics.notice(
-                "docx.media_not_materialised",
-                null,
-                `${entrada.name} is deflated and this context cannot materialise`,
-              );
-              continue;
-            }
-            salida.push({
-              signals: señales,
-              body: { shape: "asset", ref, mime },
-              // DE DÓNDE SALIÓ, y acá el campo hace su trabajo entero: la dirección
-              // del objeto es el hash de SU CONTENIDO, así que la misma imagen en
-              // cincuenta documentos da una sola clave —a propósito— y con ella se
-              // pierde de cuál salió esta. `whence` es lo único que lo conserva.
-              whence: { container: input.ref.object, path: entrada.name },
-              location: { anchor: `img#${i}`, coordinate: { space: "source" } },
-            });
+          // UNA SOLA RAMA, y esa es la mitad del punto. `zipEntryOf` devuelve el
+          // contenido de la entrada sin que a este archivo le importe cómo estaba
+          // guardado: si está sin comprimir lo recorta, si está deflateado lo infla. El
+          // método de compresión es un detalle del zip, no una bifurcación del contrato.
+          const contenido = zipEntryOf(bytes, entrada.name);
+          if (contenido === null) {
+            ctx.diagnostics.notice("docx.unreadable_media", null, `${entrada.name} could not be read`);
             continue;
           }
-          const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-          const h = entrada.local;
-          const inicio = h + 30 + dv.getUint16(h + 26, true) + dv.getUint16(h + 28, true);
-          const window: Window = { scope: "range", start: inicio, end: inicio + entrada.compressed };
-          // LA MISMA PROCEDENCIA QUE LA OTRA RAMA, y no `null`, aunque acá el objeto ya
-          // sea el contenedor. La ventana dice DÓNDE EN BYTES; no dice cómo se llamaba.
-          // Y que un `.docx` guarde su logo comprimido o sin comprimir es una decisión
-          // del escritor de Word: si de eso dependiera que la pieza sepa de dónde salió,
-          // la respuesta a «de dónde vino esta imagen» cambiaría según quién exportó el
-          // archivo. Va ARRIBA de `body` y no abajo para que el par de líneas sea un
-          // ancla de mutación única: con la sangría sola no alcanza, porque la de esta
-          // rama es SUBCADENA de la de la otra.
+          const mime = mimeDe(entrada.name);
+          // SIN ALMACENAMIENTO, `materialize` RECHAZA y la imagen se ANUNCIA en vez de
+          // emitirse. No es descartar en silencio: el documento entra sin esa pieza y
+          // el aviso dice cuál. «Guardar es incondicional, indexar no.»
+          const ref = await ctx.materialize(contenido, mime).catch(() => null);
+          if (ref === null) {
+            ctx.diagnostics.notice(
+              "docx.media_not_materialised",
+              null,
+              `${entrada.name} could not be materialised by this context`,
+            );
+            continue;
+          }
           salida.push({
             signals: señales,
+            body: { shape: "asset", ref, mime },
+            // DE DÓNDE SALIÓ, y acá el campo hace su trabajo entero: la dirección del
+            // objeto es el hash de SU CONTENIDO, así que la misma imagen en cincuenta
+            // documentos da una sola clave —a propósito, es lo que la regla vino a comprar— y
+            // con esa clave se pierde de cuál salió esta. `whence` es lo único que lo
+            // conserva. Y no depende de si el escritor de Word la comprimió: si de eso
+            // dependiera, la respuesta a «de dónde vino esta imagen» cambiaría según
+            // quién exportó el archivo.
             whence: { container: input.ref.object, path: entrada.name },
-            body: { shape: "asset", ref: { object: input.ref.object, window }, mime: mimeDe(entrada.name) },
             location: { anchor: `img#${i}`, coordinate: { space: "source" } },
           });
           continue;

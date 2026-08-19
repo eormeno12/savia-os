@@ -76,11 +76,9 @@
       "body": {
         "shape": "asset",
         "ref": {
-          "object": "obj-1721",
+          "object": "mat-69",
           "window": {
-            "scope": "range",
-            "start": 1305,
-            "end": 1374
+            "scope": "whole"
           }
         },
         "mime": "image/png"

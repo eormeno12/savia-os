@@ -673,10 +673,10 @@ const MUTANTES = [
 
   {
     id: "S107",
-    garantía: "la imagen MATERIALIZADA dice de dónde salió, y es la única que no puede reconstruirlo",
-    cambios: [["              whence: { container: input.ref.object, path: entrada.name },", "              whence: null,"]],
+    garantía: "la imagen materializada dice de dónde salió, y NADA MÁS en el pipeline lo sabe",
+    cambios: [["            whence: { container: input.ref.object, path: entrada.name },", "            whence: null,"]],
     espera: /I19 · la procedencia no llegó a la salida/,
-    nota: "el hermano de S105 con el observador cambiado, y la asimetría es el punto. En la rama SIN COMPRIMIR la dirección del asset ES el contenedor, así que perder la procedencia duele pero es reconstruible; en esta la dirección es el hash del contenido, que es CIEGO a de dónde vino por diseño, y con `whence` en `null` no queda un solo dato en todo el pipeline que diga de cuál documento salió esta figura. El ancla es de catorce espacios y sí es única: la de doce es subcadena de esta, no al revés",
+    nota: "el hermano de S105 de `adapters` con el observador cambiado: la misma línea, vista desde la salida de `ingest` en vez de desde el golden del adaptador. Lo que dice es que la dirección del asset es el hash de SU CONTENIDO —ciega a de dónde vino, por diseño y a propósito— así que con `whence` en `null` no queda un solo dato en todo el pipeline que diga de cuál documento salió esta figura. SE REANCLÓ AL IMPLEMENTAR «¿los bytes ya existen?», de catorce espacios a doce: la nota vieja explicaba que el ancla larga era la única única, porque la corta era su subcadena. Con una sola rama esa precaución sobra, y con ella se fue la asimetría que la fila describía —«en la rama sin comprimir la dirección ES el contenedor, así que perder la procedencia es reconstruible»—: ya no hay una rama donde lo sea"
   },
   {
     id: "S108",

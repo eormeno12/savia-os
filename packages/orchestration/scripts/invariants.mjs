@@ -168,6 +168,43 @@ try {
     };
   };
 
+  /**
+   * EL ALMACENAMIENTO DEL BANCO, un `Map`, Y SU `perceive` QUE EXIGE BYTES. Vivía adentro
+   * de I18 y sube acá al implementar «¿los bytes ya existen?», porque dejó de ser de un invariante: desde que TODO asset
+   * cuyos bytes ya existen se materializa, cualquier invariante que ejerza la delegación
+   * sobre un formato con medios incrustados necesita los dos. I17 es el primero que se
+   * lo encontró — corría sobre la imagen SIN COMPRIMIR, que antes salía por referencia y
+   * no tocaba el storage, y con la regla nueva se quedó sin delegación por no tener dónde guardar.
+   *
+   * EL DOBLE EXIGE BYTES, y sin eso un invariante de delegación pasa por la razón
+   * equivocada. Un `perceive` que devuelve regiones sin mirar la fuente hace que la
+   * delegación «funcione» aunque los bytes nunca lleguen: el adaptador de imagen reclama
+   * por el MIME que declaró el padre —no por el contenido, y eso es deliberado (ver
+   * `sourceOfAsset`)— así que un resolvedor roto es invisible. Medido en el paso 12: con
+   * la resolución de objetos propios dada vuelta, los nodos delegados seguían
+   * apareciendo. Un modelo real no puede hacer nada con cero bytes.
+   */
+  const almacenDe = () => {
+    const guardados = new Map();
+    return {
+      guardados,
+      almacen: {
+        put: (k, b) => {
+          guardados.set(String(k), b);
+          return Promise.resolve();
+        },
+        get: (k) => Promise.resolve(guardados.get(String(k)) ?? null),
+      },
+      byteHash: (b) => createHash("sha256").update(b).digest("hex"),
+      perceive: async (source) => {
+        const b = await source.bytes();
+        return b.length === 0
+          ? []
+          : [{ box: { frame: "img", x: 0, y: 0, width: 100, height: 40 }, text: "SELLO", confidence: 0.9 }];
+      },
+    };
+  };
+
   // La variante `bytes` de `Intake`, que desde el paso 5 lleva lo que era del entorno y
   // resultó ser de ESTA entrada: el nombre, el canal, quién subió y cuándo.
   const SUBIDA = (b, extra = {}) => ({
@@ -1197,14 +1234,27 @@ try {
   // El `.docx` sí: su imagen está adentro y, cuando la entrada del zip va SIN
   // COMPRIMIR, sus bytes están literales en un rango del archivo.
   {
-    const REGIONES = [
-      { box: { frame: "img", x: 0, y: 0, width: 100, height: 40 }, text: "SELLO APROBADO", confidence: 0.9 },
-    ];
+    // CON ALMACENAMIENTO DESDE «¿los bytes ya existen?», y el cambio no es de banco: es la decisión. La imagen
+    // de `manual.docx` está guardada SIN COMPRIMIR, así que hasta el paso 7 salía como un
+    // rango del propio `.docx` y este invariante corría sin storage. Desde que el corte es
+    // «¿los bytes ya existen?» —y para una entrada de zip la respuesta es siempre que sí—
+    // la pieza se materializa, y sin dónde guardarla no hay a quién delegar. Que este
+    // invariante lo haya cobrado de inmediato es la señal de que ejerce lo que dice.
+    const { guardados, almacen, byteHash, perceive } = almacenDe();
     const r = await ingest(SUBIDA(docx, { name: "manual.docx" }), {
       ...OPCIONES(),
       registry: registryOf([opaqueOf(docxAdapter), opaqueOf(imageAdapter)]),
-      perceive: () => Promise.resolve(REGIONES),
+      perceive,
+      storage: almacen,
+      byteHash,
     });
+    if (guardados.size === 0) {
+      fallar(
+        "I17 · la imagen sin comprimir no se materializó",
+        `guardados=${guardados.size}`,
+        "el corte es «¿los bytes ya existen?», no «¿está comprimida?». Una entrada de zip sin comprimir tiene sus bytes literales en el contenedor, y expresarla como una ventana sobre él le daría al mismo logo tantas direcciones —y tantas identidades, porque `ref.object` entra en la huella— como contenedores lo lleven",
+      );
+    }
 
     // LOS DOS ESLABONES SOBREVIVEN AL PIPELINE ENTERO. En `adapters` se verifica sobre
     // la salida del adaptador; acá, sobre la salida de `ingest`, que es lo que se
@@ -1263,32 +1313,11 @@ try {
   // EXACTAMENTE el mismo camino que un recorte: `select` la reclama, el adaptador la
   // descompone y el subárbol se injerta donde estaba.
   {
-    const guardados = new Map();
-    const almacen = {
-      put: (k, b) => {
-        guardados.set(String(k), b);
-        return Promise.resolve();
-      },
-      get: (k) => Promise.resolve(guardados.get(String(k)) ?? null),
-    };
-    const byteHash = (b) => createHash("sha256").update(b).digest("hex");
+    const { guardados, almacen, byteHash, perceive } = almacenDe();
     const conAlmacen = {
       ...OPCIONES(),
       registry: registryOf([opaqueOf(docxAdapter), opaqueOf(imageAdapter)]),
-      // EL DOBLE EXIGE BYTES, y sin eso este invariante pasaba por la razón
-      // equivocada. Un `perceive` que devuelve regiones sin mirar la fuente hace que la
-      // delegación «funcione» aunque los bytes nunca lleguen: el adaptador de imagen
-      // reclama por el MIME que declaró el padre —no por el contenido, y eso es
-      // deliberado (ver `sourceOfAsset`)— así que un resolvedor roto es invisible.
-      // Medido: con la resolución de objetos propios dada vuelta, los nodos delegados
-      // seguían apareciendo. Un modelo real no puede hacer nada con cero bytes, y el
-      // doble tiene que comportarse igual.
-      perceive: async (source) => {
-        const b = await source.bytes();
-        return b.length === 0
-          ? []
-          : [{ box: { frame: "img", x: 0, y: 0, width: 100, height: 40 }, text: "SELLO", confidence: 0.9 }];
-      },
+      perceive,
       storage: almacen,
       byteHash,
     };
@@ -1416,24 +1445,13 @@ try {
   // objeto y la MISMA huella —su dirección es el hash de su contenido, y el contenido no
   // cambió— y distinta procedencia, porque salió de otro lado.
   {
-    const guardados = new Map();
-    const almacen = {
-      put: (k, b) => {
-        guardados.set(String(k), b);
-        return Promise.resolve();
-      },
-      get: (k) => Promise.resolve(guardados.get(String(k)) ?? null),
-    };
-    const byteHash = (b) => createHash("sha256").update(b).digest("hex");
+    // UN SOLO ALMACÉN PARA LAS DOS INGESTAS, que es la mitad del punto: si cada corrida
+    // tuviera el suyo, «la misma figura da el mismo objeto» sería cierto por vacío.
+    const { almacen, byteHash, perceive } = almacenDe();
     const opcionesDe = () => ({
       ...OPCIONES(),
       registry: registryOf([opaqueOf(docxAdapter), opaqueOf(imageAdapter)]),
-      perceive: async (source) => {
-        const b = await source.bytes();
-        return b.length === 0
-          ? []
-          : [{ box: { frame: "img", x: 0, y: 0, width: 100, height: 40 }, text: "SELLO", confidence: 0.9 }];
-      },
+      perceive,
       storage: almacen,
       byteHash,
     });
@@ -1472,8 +1490,8 @@ try {
     // `fingerprintOf` recibe `Body`, así que la ceguera la impone la FIRMA. Se midió:
     // ninguna mutación del sitio de materialización la mueve, porque ahí la procedencia
     // no está siquiera en alcance léxico. Quien la impone hoy es la frontera
-    // `projection.ts ↛ provenance.ts`, acreditada rompiéndola por miembro (M46, M49 y
-    // ahora M66).
+    // `projection.ts ↛ provenance.ts`, acreditada rompiéndola por miembro (M46 para
+    // `Authorship`, M49 para `DelegationId` y M70 para `Whence`, en `packages/ir`).
     //
     // SE QUEDA PORQUE SE VUELVE VIVA, y el caso ya está escrito en el repo: el día que
     // el `.md` materialice sus imágenes por enlace, el productor de assets deja de ser
