@@ -517,9 +517,13 @@ acá**: van a `PARAMETERS` con su unidad, qué deciden y cómo se medirían.
 
 ### Qué falta decidir del canal
 
-- **Si el retiro es visible o silencioso.** Preguntarle al usuario «desaparecieron 12
-  archivos de tu carpeta, ¿los saco?» es más seguro contra falsos positivos y tensiona
-  con que la captación pasiva sea invisible.
+- **DECIDIDO — el retiro es siempre silencioso.** El agente no pregunta nunca, ni
+  siquiera cuando salta el corte por volumen; ese corte deja de ser una consulta y pasa a
+  ser una **exigencia de más evidencia** —confirmar que la raíz está viva y esperar otro
+  barrido completo—. Lo que lo vuelve tolerable es que el retiro **ya es reversible**: un
+  falso positivo cuesta devolver el archivo a la carpeta, no una pérdida. Preguntar
+  compraba seguridad contra algo recuperable, a cambio de romper lo único que este canal
+  promete, que es no tener que hacer nada.
 - **DECIDIDO — la carpeta es fuente de verdad de la PERSONA.** El agente lo vincula el
   usuario **desde su propia cuenta**, así que el canal es personal por construcción y
   encaja con lo que el registro ya dice (`dueño — un User`) y con la regla de
@@ -528,9 +532,17 @@ acá**: van a `PARAMETERS` con su unidad, qué deciden y cómo se medirían.
   documento captado de la carpeta de alguien alimenta skills de los que depende otro
   equipo: que una persona ordenando su escritorio degrade el skill de otro es gobernanza
   de Capa 3, no sincronización.
-- **Quién filtra a los retirados.** `retiredAt` dice el hecho y **no lo impone**. Que un
-  documento retirado salga de la búsqueda, de la síntesis y del índice son tres filtros
-  de tres consumidores, y ninguno de los tres existe todavía.
+- **DECIDIDO — a los retirados los filtra UN punto, no tres.** `retiredAt` dice el hecho
+  y no lo impone, y la salida obvia —que la búsqueda, la síntesis y el índice filtren cada
+  uno— son tres sitios y tres oportunidades de olvidarse; el que se olvide sirve contenido
+  que el usuario cree haber sacado. La regla se impone en la consulta que los tres
+  comparten. Se decide ahora justamente porque **ninguno de los tres existe**: después son
+  tres refactors.
+- **Y lo que sigue abierto es la gobernanza, que no la cierra ninguna de las de arriba.**
+  Un documento captado de la carpeta de alguien puede alimentar un skill del que depende
+  otro equipo. Se decidió que la organización **no** puede revocar el dispositivo de una
+  persona —el enrolamiento es personal y la revocación también— pero eso solo dice que la
+  palanca no es esa. La tensión queda entera y es de Capa 3.
 
 ## Caché de reconocimiento
 

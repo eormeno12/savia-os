@@ -28,13 +28,40 @@ conflictos, no baja archivos. El flujo va en una sola dirección.
 
 ## La forma
 
-**App de barra de menú**, en macOS y Windows a la vez.
+**App de barra de menú**, en macOS y Windows a la vez, **sobre Tauri**.
 
 Es la forma canónica de la captación pasiva —invisible hasta que hace falta— y es
-lo que el usuario ya entiende de Dropbox o Drive. Y hace falta *alguna* superficie:
-las salvaguardas producen exactamente un caso que necesita un humano —«desaparecieron
-muchos archivos de golpe, ¿los retiro?»— y un proceso sin interfaz no tiene dónde
-preguntarlo.
+lo que el usuario ya entiende de Dropbox o Drive.
+
+**Por qué hace falta una superficie, y la razón NO es la que este documento decía.**
+Decía que las salvaguardas producen un caso que necesita un humano —«desaparecieron
+muchos archivos de golpe, ¿los retiro?»— y eso dejó de ser cierto: **el retiro es
+siempre silencioso** y el agente no pregunta nunca. Lo que queda igual justifica la
+superficie: enrolar, elegir las carpetas, ver el estado, pausar. Un proceso sin
+interfaz no tiene dónde hacer ninguna de las cuatro.
+
+### El runtime: Tauri, y la validación que lo habilitó
+
+**Núcleo en Rust, cara en el webview del sistema.** La decisión no se tomó por gusto:
+el trabajo real de este agente es sistémico —cursor durable, journal de USN,
+deshidratación, identidad de volumen, un reloj que avance durante la suspensión— y eso
+va en código nativo con cualquier runtime. Lo único en disputa era la cara.
+
+**Se validó antes de decidir, porque de eso dependía la ventaja.** El argumento a favor
+de un webview es reusar el lenguaje visual, y este repo lo tiene atado a Chakra: si los
+valores no salieran sin ese runtime, el webview costaría igual que lo nativo y no
+compraría nada. Salen. Los tokens son un objeto plano bajo `defineTokens`, así que un
+paso de build los emite como variables CSS —**25 crudos y 72 semánticos, con las
+referencias `{colors.x}` resueltas a `var(--color-x)`**— sin un byte de Chakra en
+runtime. Verificado ejecutándolo.
+
+Lo que **no** sale así son las *recipes* de componentes y los `textStyles`, y no
+importa: este documento ya decía que los componentes no se reusan.
+
+Se descarta **Electron-class** porque empaqueta Chromium: ~150 MB y RAM permanente en
+la barra contradicen «un proceso liviano», que es la primera frase de este documento. Y
+se descarta **nativo puro** porque son dos implementaciones de interfaz completas, sin
+reuso, para un panel que son cinco filas y tres botones.
 
 **Las dos plataformas desde el principio**, y no por simetría: la lógica de retiro
 se rompe justo donde los dos sistemas difieren. Escribirla contra uno solo la deja
@@ -71,15 +98,22 @@ quién instaló el agente.
 Un ícono en la barra y, al hacer clic, un popover con lo mínimo:
 
 ```
-● Sincronizado · hace 2 min           ← estado, y es lo único siempre visible
-  ~/Savia                             ← la raíz vigilada
+● Sincronizado · hace 2 min           ← estado agregado, lo único siempre visible
   ─────────────────────────────
-  contrato-marco.docx     indexado
-  informe-q3.xlsx         procesando
-  planos.dwg              en espera   ← formato que todavía no leemos
+  ~/Savia                  ●          ← una fila por RAÍZ, con su propio estado
+    contrato-marco.docx     indexado
+    informe-q3.xlsx         procesando
+  /Volumes/Archivo         ○          ← ausente: el disco no está montado
+    planos.dwg              en espera ← formato que todavía no leemos
   ─────────────────────────────
   Pausar · Abrir carpeta · Ajustes
 ```
+
+**Las raíces son varias, y eso cambia el panel más de lo que parece.** El estado deja de
+ser uno: cada raíz tiene el suyo, y el de arriba es un agregado —basta que una esté
+ausente para que el conjunto no esté sincronizado—. Toda alerta tiene que decir **de qué
+raíz habla**, porque «desaparecieron 40 archivos» sin nombrar la raíz es
+indistinguible entre «se desmontó un disco» y «alguien vació una carpeta».
 
 Los estados de archivo **ya existen en el sistema de diseño** —`pending`,
 `processing`, `indexed`, `failed`— y el agente los hereda. Le falta uno: `retirado`,
@@ -92,11 +126,21 @@ Los cuatro estados propios del agente, que no son de archivo sino de la raíz:
 |---|---|---|
 | **Sincronizado** | el último barrido cerró completo | nada, y es lo normal |
 | **Barriendo** | recorrido en curso, con progreso | seguir trabajando |
-| **Carpeta ausente** | la raíz no está o no es legible | reconectar el disco, o reelegir |
-| **Congelado** | saltó el corte por volumen | confirmar o descartar el retiro |
+| **Carpeta ausente** | esa raíz no está o no es legible | reconectar el disco, o reelegir |
+| **Congelado** | saltó el corte por volumen en esa raíz | **nada: se resuelve solo** |
 
 **Carpeta ausente no es un error.** Es desconexión, y decirlo así es lo que impide
 que el usuario crea que perdió algo. El agente no reporta ni una baja en ese estado.
+
+**Y `Congelado` ya no es una pregunta.** Cuando el retiro era una decisión visible, ese
+estado esperaba a un humano. Con el retiro silencioso no hay a quién preguntarle, así que
+el corte por volumen deja de ser una consulta y pasa a ser **una exigencia de más
+evidencia**: se retiene, se espera a que `root.probe` confirme que la raíz está viva, se
+exige al menos un barrido completo más, y si la ausencia sigue ahí el retiro ocurre sin
+avisar. Es la misma lógica que ya gobierna la cuarentena —«una desaparición es una
+hipótesis, no un hecho» y «tiempo sin observación no es evidencia»— aplicada al caso
+masivo. El estado se muestra porque el usuario merece ver que algo está en curso, no
+porque tenga que hacer algo.
 
 ### El lima, y dónde no va
 
@@ -366,20 +410,80 @@ Falta además un artefacto de tokens **agnóstico**: hoy el barril arrastra el r
 Chakra, y los valores tendrían que poder emitirse como variables CSS o constantes
 nativas.
 
-## Qué queda abierto
+## Las decisiones, cerradas
 
-- **Dónde corre exactamente la línea entre asentamiento y cuarentena.** El plan trata
-  los dos como un número y son dos, con dueños distintos.
-- **El stack.** La forma está decidida, el runtime no. Un webview reusa el sistema de
-  diseño y pesa; uno nativo no reusa nada y es dos implementaciones de interfaz.
-- **Varias raíces o una.** El inventario ya está modelado por raíz, así que soportar
-  varias es barato; lo que no está decidido es si el producto las quiere.
-- **Si la organización puede revocar un dispositivo de una persona.** El enrolamiento
-  es personal, pero un equipo puede depender de lo que esa carpeta alimenta. Es
-  gobernanza de Capa 3, no del agente — pero el agente tiene que tolerar que le
-  revoquen el token sin que él lo haya pedido, y eso sí es de este documento.
-- **`maxRetries` del agente.** El parámetro existe en `PARAMETERS` pero es del lado del
-  servidor. El agente necesita el suyo.
-- **Qué hace el agente cuando el usuario mueve la raíz entera.** Las rutas relativas
-  convierten eso en un solo hecho, pero quién lo reconcilia —y si se le pregunta al
-  usuario— no está decidido.
+Las nueve que este documento y el plan tenían abiertas. Cuatro son de producto y las
+demás salen de lo ya escrito.
+
+**1 · El runtime es Tauri**, y se validó antes de decidirlo. Ver «La forma».
+
+**2 · El retiro es siempre silencioso.** El agente no pregunta nunca, ni siquiera cuando
+salta el corte por volumen. Lo que lo hace tolerable es que **el retiro es reversible por
+diseño**: si el archivo vuelve, el documento vuelve entero, con sus anotaciones, sus
+`ElementId` y su `selladoEn`. Un falso positivo cuesta un `Cmd+Z` en el Finder, no una
+pérdida. Preguntar habría comprado seguridad contra algo que ya es recuperable, a cambio
+de romper lo único que este canal promete: que no hay que hacer nada.
+
+**3 · Las raíces son varias**, desde el principio. El inventario y las salvaguardas ya
+estaban modelados por raíz, así que el costo es de interfaz: el estado se vuelve un
+agregado y toda alerta tiene que nombrar su raíz.
+
+**4 · La revocación es solo de la persona.** El enrolamiento es personal y la revocación
+también; una organización no puede revocarle el dispositivo a alguien. **Esto no cierra
+la tensión que lo motivaba, la deja entera** — ver abajo.
+
+**5 · La línea entre asentamiento y cuarentena: gobiernan eventos distintos.** Se trataban
+como un número porque los dos son «esperar un poco», y esperan cosas que no se parecen:
+
+| | Asentamiento | Cuarentena |
+|---|---|---|
+| **Dueño** | el agente | Savia |
+| **Sujeto** | un archivo | una raíz |
+| **Dispara con** | una **aparición** o una modificación | una **desaparición** |
+| **Pregunta** | ¿estos bytes dejaron de cambiar? | ¿esta ausencia es una baja? |
+| **Naturaleza** | física del sistema de archivos | política |
+
+**Nunca se aplican al mismo evento**, y esa es la línea: el asentamiento gobierna las
+altas, la cuarentena gobierna las bajas. Un archivo que se está guardando no se reporta;
+un archivo que se fue no se retira todavía. Son dos esperas y ningún solapamiento.
+
+**6 · `maxRetries` del agente NO va al contrato.** `PARAMETERS` vive en `@savia-os/ir`,
+que tiene cero dependencias de runtime y ningún conocimiento del agente; meter ahí un
+número que solo consume un binario de escritorio sería un parámetro sin consumidor en el
+paquete que más cuida no tenerlos. Va del lado del agente **con la misma disciplina**:
+unidad, qué decide y cómo se mediría el definitivo, y arranca sin valor inventado.
+
+**7 · Si el usuario mueve la raíz entera, el agente NO la busca.** Rastrear el disco
+detrás de una carpeta que se movió es caro y es intrusivo. La raíz pasa a «Carpeta
+ausente» y —por la salvaguarda que ya existe— **no se reporta ni una baja**. Si el usuario
+la vuelve a elegir en su ubicación nueva, la identidad de volumen y la del directorio
+coinciden con lo registrado al enrolar, así que es **el mismo `RootId`**: las rutas
+relativas siguen valiendo todas y no se genera un solo evento. Ese es el pago de que
+`RootId` no sea una ruta.
+
+**8 · A los retirados los filtra UN punto, no tres.** La tentación es que la búsqueda, la
+síntesis y el índice filtren cada uno por `retiredAt is null`. Son tres sitios y tres
+oportunidades de olvidarse, y el que se olvide va a servir contenido que el usuario cree
+haber sacado. Se decide ahora, mientras no existe ninguno de los tres, que la regla se
+impone en la consulta que los tres comparten. Después son tres refactors.
+
+**9 · La forma canónica de `path`: NFC y separador `/`.** Parecía difícil porque asumía
+que el servidor compara rutas. **No las compara nunca**: la identidad es el contenido, y
+esa decisión es la primera de este canal. La ruta solo se guarda para mostrarla, así que
+la canonicalización tiene que comprar una sola cosa —que el mismo archivo no aparezca con
+dos grafías— y NFC más `/` alcanza. La sensibilidad a mayúsculas queda del lado del
+agente, que es el único que sabe si su sistema de archivos las distingue.
+
+## Lo que sigue abierto
+
+- **La tensión de Capa 3, entera.** Un documento captado de la carpeta de alguien puede
+  estar alimentando un skill del que depende otro equipo, y que esa persona ordene su
+  escritorio lo degrada. Descartar que la organización revoque el dispositivo **no
+  resuelve esto**: solo dice que la palanca no es esa. Sigue siendo gobernanza, y sigue
+  sin dueño.
+- **Los cuatro números, todos sin valor.** El intervalo de asentamiento, la ventana de
+  cuarentena, la fracción del corte por volumen y el `maxRetries` del agente. Ninguno se
+  inventa: cada uno necesita unidad, qué decide y cómo se mediría.
+- **El propio agente no existe.** El protocolo está completamente especificado, así que se
+  puede construir contra un servidor simulado — y con el runtime decidido, eso ya no
+  espera a nada.
