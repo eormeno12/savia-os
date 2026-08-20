@@ -23,8 +23,15 @@ use crate::inventario::Inventario;
 use crate::maquina::{self, Nodo, OrigenDeSenal, Senal};
 use crate::plataforma::{Plataforma, RelojDePlataforma, ResultadoDeEnumeracion};
 use crate::protocolo::{Clase, Cliente, FalloDeProtocolo};
-use crate::salvaguardas::{IndiceDeContenido, Politica};
+use crate::salvaguardas::{IndiceDeContenido, Politica, PorQueNoSeReporta};
 
+/// **EL RESUMEN CUENTA LOS DIEZ NODOS, NO SEIS.** El doc de `Nodo` dice que la rama va
+/// en la salida «porque es lo que el panel muestra por raiz»; mientras cuatro variantes
+/// caian en un `_ => {}`, el panel no las podia mostrar.
+///
+/// Y las dos que faltaban son justo las que hay que ver: `RaizAusente` es la salvaguarda
+/// disparandose —«se desmonto el disco y no reporte ni una baja»— y `BajaNoReportable`
+/// OLVIDA una fila. Las dos terminaban sin dejar rastro.
 #[derive(Default, Debug)]
 pub struct ResumenDelBarrido {
     pub enumeradas: usize,
@@ -34,6 +41,39 @@ pub struct ResumenDelBarrido {
     pub esperando: u64,
     pub movimientos: u64,
     pub indeterminados: u64,
+    /// El caso nulo, y va contado igual: sin el, «de 40.000 rutas no cambio ninguna» y
+    /// «de 40.000 rutas no se pudo mirar ninguna» dan el mismo resumen vacio.
+    pub sin_cambio: u64,
+    /// LA SALVAGUARDA DISPARADA DURANTE EL RECORRIDO: una ruta que falta sobre una raiz
+    /// que no esta viva. No produce baja — y hasta ahora tampoco producia rastro.
+    pub raiz_no_viva: u64,
+    /// Se fue una ruta que Savia nunca confirmo, asi que no hay documento que retirar.
+    /// **La fila se olvida**, con lo que si no se cuenta acá no queda registro de que
+    /// existio.
+    pub sin_documento_que_retirar: u64,
+    /// **Tiene que ser cero.** `barrer` siempre pasa un barrido, asi que ninguna senal
+    /// suya puede terminar en «agenda un barrido». Se cuenta en vez de entrar en un
+    /// `unreachable!` porque un agente que vigila carpetas del usuario no puede
+    /// permitirse un panico para senalar una inconsistencia: se detecta, no se previene.
+    pub agendados: u64,
+
+    // ── Lo que el CIERRE retuvo, por motivo ──────────────────────────────────
+    //
+    // `Cierre::retenidas` los venia calculando desde siempre —su propio doc dice «para
+    // el panel, nunca para el servidor»— y NO LOS LEIA NADIE: ni `ciclo`, ni `almacen`,
+    // ni un test. El diagnostico se calculaba y se tiraba en la misma linea.
+    /// Bajas ya encoladas que se anularon porque la raiz murio a mitad del barrido.
+    pub retenidas_por_raiz_no_viva: u64,
+    /// Ausencias que el recorrido completo mostro que eran mudanzas.
+    pub retenidas_por_movimiento: u64,
+    /// Ausencias de rutas que Savia nunca confirmo. Mandarlas inflaria el numerador del
+    /// corte por volumen con archivos que del otro lado no existen.
+    pub retenidas_sin_hash_confirmado: u64,
+    /// **Hoy siempre cero, y contarlo lo deja dicho:** `PorQueNoSeReporta::Deshidratado`
+    /// esta declarado y no se construye en ningun lado. Un deshidratado sale por
+    /// `Nodo::Omitido` mucho antes de poder ser una ausencia candidata, asi que el motivo
+    /// nunca llega al cierre.
+    pub retenidas_por_deshidratacion: u64,
     pub cierre: Option<EstadoDelBarrido>,
 }
 
@@ -108,7 +148,13 @@ pub fn barrer(
             Nodo::Esperando { .. } => resumen.esperando += 1,
             Nodo::Movimiento { .. } => resumen.movimientos += 1,
             Nodo::Indeterminado(_) => resumen.indeterminados += 1,
-            _ => {}
+            Nodo::SinCambio => resumen.sin_cambio += 1,
+            Nodo::RaizAusente => resumen.raiz_no_viva += 1,
+            Nodo::BajaNoReportable => resumen.sin_documento_que_retirar += 1,
+            Nodo::AgendaBarrido => resumen.agendados += 1,
+            // SIN RAMA COMODIN A PROPOSITO: con `_ => {}` una variante nueva de `Nodo`
+            // entra al arbol y desaparece del resumen sin que nada avise. Asi el
+            // compilador obliga a decidir que se hace con ella.
         }
         // El indice se alimenta SOLO con rutas que ESTRENARON contenido en este barrido:
         // es lo que hace que «reaparecio» signifique «aparecio donde antes no estaba» y
@@ -153,6 +199,14 @@ pub fn barrer(
     // durante el recorrido, y un contador en negativo seria peor que uno en cero.
     resumen.bajas =
         (resumen.bajas + cierre.bajas.len() as u64).saturating_sub(cierre.anular.len() as u64);
+    for (_, motivo) in &cierre.retenidas {
+        match motivo {
+            PorQueNoSeReporta::RaizAusente => resumen.retenidas_por_raiz_no_viva += 1,
+            PorQueNoSeReporta::EsMovimiento { .. } => resumen.retenidas_por_movimiento += 1,
+            PorQueNoSeReporta::SinHashConfirmado => resumen.retenidas_sin_hash_confirmado += 1,
+            PorQueNoSeReporta::Deshidratado => resumen.retenidas_por_deshidratacion += 1,
+        }
+    }
     let estado = almacen.comprometer_cierre(raiz, &barrido, segmento, cierre);
     // SOLO SI EL RECORRIDO CERRO COMPLETO. Savia tambien lo exige antes de aplicar la
     // diferencia, y sostenerlo de los dos lados es deliberado: asi ninguno de los dos

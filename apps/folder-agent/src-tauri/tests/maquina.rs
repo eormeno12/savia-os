@@ -1722,3 +1722,86 @@ fn un_padron_ambiguo_no_bloquea_el_cierre() {
     assert!(vio_padron, "el padron se pidio");
     assert!(vio_cierre, "y el cierre salio igual");
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 13 · EL RESUMEN — lo que el panel puede mostrar
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn el_resumen_cuenta_lo_que_no_cambio() {
+    // IMPORTA PORQUE: sin este numero, «de 40.000 rutas no cambio ninguna» y «de 40.000
+    // rutas no se pudo mirar ninguna» producen exactamente el mismo resumen vacio, y son
+    // la vuelta sana y la vuelta rota.
+    let p = Falsa::como_macos();
+    p.poner("a.txt", b"el a", 100, Some(1));
+    p.poner("b.txt", b"el b", 100, Some(2));
+    let mut a = almacen();
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+    barrer_y_confirmar(&p, &mut a, 1);
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+    barrer_y_confirmar(&p, &mut a, 2);
+
+    // Tercera vuelta: nadie toco nada. Los contadores se reinician para medir SOLO esta.
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+    p.reiniciar_contadores();
+    let resumen = ciclo::barrer(&raiz(), BarridoId::nuevo("b3"), &p, &mut a, &politica());
+    assert_eq!(resumen.sin_cambio, 2, "las dos rutas quedaron contadas");
+    assert_eq!(resumen.apariciones, 0);
+    assert_eq!(resumen.bajas, 0);
+    assert_eq!(p.lecturas(), 0, "y ninguna costo abrir el archivo");
+}
+
+#[test]
+fn una_ausencia_sin_documento_deja_de_desaparecer_del_resumen() {
+    // IMPORTA PORQUE: esta ruta se va, no produce baja —Savia nunca confirmo su hash, asi
+    // que del otro lado no hay documento que retirar— y **la fila se OLVIDA**. Sin este
+    // contador, el archivo entra al inventario, se va, se borra el rastro, y el resumen
+    // de esa vuelta es idéntico al de una vuelta en la que no paso nada.
+    let p = Falsa::como_macos();
+    p.poner("x.txt", b"algo", 100, Some(1));
+    let mut a = almacen();
+    // Dos barridos SIN confirmar nada: la fila queda con hash afirmado, nunca verificado.
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+    ciclo::barrer(&raiz(), BarridoId::nuevo("b1"), &p, &mut a, &politica());
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+    ciclo::barrer(&raiz(), BarridoId::nuevo("b2"), &p, &mut a, &politica());
+
+    p.sacar("x.txt");
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+    let resumen = ciclo::barrer(&raiz(), BarridoId::nuevo("b3"), &p, &mut a, &politica());
+
+    assert_eq!(
+        resumen.bajas, 0,
+        "no viaja ninguna baja, que es lo correcto"
+    );
+    assert_eq!(
+        resumen.retenidas_sin_hash_confirmado, 1,
+        "pero el cierre YA sabia por que la retuvo, y ahora ese motivo llega al resumen en vez de tirarse"
+    );
+}
+
+#[test]
+fn una_mudanza_descubierta_al_cerrar_queda_contada() {
+    // IMPORTA PORQUE: el cierre anula bajas que resultaron ser mudanzas, y esa anulacion
+    // es la diferencia entre «el usuario reorganizo su carpeta» y «el usuario borro
+    // cuarenta archivos». Sin contarla, las dos vueltas se ven igual desde afuera.
+    let p = Falsa::como_macos();
+    p.poner("viejo.txt", b"el mismo contenido", 100, Some(7));
+    let mut a = almacen();
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+    barrer_y_confirmar(&p, &mut a, 1);
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+    barrer_y_confirmar(&p, &mut a, 2);
+
+    // La misma tripleta en otra ruta: es una mudanza, no una baja mas un alta.
+    p.sacar("viejo.txt");
+    p.poner("nuevo.txt", b"el mismo contenido", 100, Some(7));
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+    let resumen = ciclo::barrer(&raiz(), BarridoId::nuevo("b3"), &p, &mut a, &politica());
+
+    assert_eq!(resumen.bajas, 0, "ninguna baja: se mudo");
+    assert!(
+        resumen.movimientos + resumen.retenidas_por_movimiento > 0,
+        "y la mudanza queda contada, la vea el recorrido o la descubra el cierre: {resumen:?}"
+    );
+}
