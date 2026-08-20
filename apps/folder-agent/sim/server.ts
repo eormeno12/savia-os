@@ -27,6 +27,14 @@ const BANCO = {
   tamanoMaximo: 50 * 1024 * 1024,
 } as const;
 
+/**
+ * LO QUE EL CONGELAMIENTO EXIGE. **No es un parametro del banco**: los de arriba estan
+ * sin medir y este esta DECIDIDO por el plan, que dice que al saltar el corte por volumen
+ * «se retiene y se exige al menos UN barrido completo mas sobre esa raiz — que es, a la
+ * vez, la prueba de que la raiz esta viva y de que los archivos siguen sin estar».
+ */
+const BARRIDOS_DE_DESHIELO = 1;
+
 // -- Estado ------------------------------------------------------------------
 type Documento = {
   readonly id: string;
@@ -42,7 +50,8 @@ const objetos = new Map<string, Uint8Array>();   // hash verificado -> bytes
 const documentos = new Map<string, Documento>(); // `${root} ${path}` -> doc
 const permisos = new Map<string, { hash: string; root: string; path: string }>();
 const barridos = new Map<string, { root: string; total: number; abierto: boolean; padron: Set<string> | null }>();
-const congeladas = new Set<string>();            // raices con el corte disparado
+// raiz -> barridos COMPLETOS que todavia se le exigen antes de poder retirar
+const congeladas = new Map<string, number>();
 let seq = 0;
 const id = (p: string) => `${p}-${(seq += 1)}`;
 const clave = (root: string, path: string) => `${root} ${path}`;
@@ -166,7 +175,7 @@ const rutas: Record<string, (c: any) => unknown> = {
     // CORTE POR VOLUMEN, sobre el denominador de lo que esta vivo en la raiz.
     const fraccion = vivos.length === 0 ? 0 : (entries as unknown[]).length / vivos.length;
     if (fraccion >= BANCO.cortePorVolumen) {
-      congeladas.add(root);
+      congeladas.set(root, BARRIDOS_DE_DESHIELO);
       anotar(`CONGELADA ${root} - ${(fraccion * 100).toFixed(0)}% de golpe, se exige mas evidencia`);
     }
     return { quarantined: (entries as unknown[]).length, frozen: congeladas.has(root) };
@@ -186,6 +195,10 @@ const rutas: Record<string, (c: any) => unknown> = {
     if (status !== "complete") return { retired: [] };
 
     const ahora = Date.now();
+    // Se lee ANTES de la diferencia, porque la diferencia puede congelar en este mismo
+    // cierre — y el cierre que congela no puede contarse como la evidencia que el
+    // congelamiento exige.
+    const congeladaAlEntrar = congeladas.has(b.root);
 
     // LA DIFERENCIA DE CONJUNTOS, y va aca y no al recibir el padron a proposito: un
     // padron de un barrido INTERRUMPIDO es una lista parcial, y tratarla como el
@@ -204,11 +217,38 @@ const rutas: Record<string, (c: any) => unknown> = {
         // produciria un padron corto, y la diferencia seria masiva.
         const vivos = [...documentos.values()].filter((d) => d.root === b.root && d.retiredAt === null).length;
         if (vivos > 0 && ausentes.length / vivos >= BANCO.cortePorVolumen) {
-          congeladas.add(b.root);
+          congeladas.set(b.root, BARRIDOS_DE_DESHIELO);
           anotar(`CONGELADA ${b.root} - la diferencia del padron es el ${((ausentes.length / vivos) * 100).toFixed(0)}%`);
         }
       }
     }
+    // EL CONGELAMIENTO EXIGE, Y NO SOLO INFORMA — que es exactamente lo que le faltaba.
+    // El corte por volumen dejo de ser una consulta a una persona cuando el retiro paso a
+    // ser silencioso: no hay a quien preguntarle. Lo que queda en su lugar es **mas
+    // evidencia**, y la unica que sirve es un barrido COMPLETO sobre esa raiz, porque
+    // prueba las dos cosas a la vez: que la raiz esta viva y que los archivos siguen sin
+    // estar. Es la misma logica de la cuarentena aplicada al caso masivo.
+    //
+    // Mientras la exigencia no se cumpla, NADA se retira de esa raiz — ni las ausencias
+    // que dispararon el corte ni ninguna otra.
+    if (congeladas.has(b.root)) {
+      if (congeladaAlEntrar) {
+        const faltan = congeladas.get(b.root)! - 1;
+        if (faltan <= 0) {
+          congeladas.delete(b.root);
+          anotar(`deshielo     ${b.root} - llego el barrido completo que se exigia`);
+        } else {
+          congeladas.set(b.root, faltan);
+          anotar(`congelada    ${b.root} - faltan ${faltan} barridos completos`);
+        }
+      } else {
+        anotar(`congelada    ${b.root} - se exige ${BARRIDOS_DE_DESHIELO} barrido completo mas`);
+      }
+      // Este cierre no retira nada. El `frozen` sale despues del deshielo, asi que dice
+      // como quedo la raiz y no como entro.
+      return { retired: [], frozen: congeladas.has(b.root) };
+    }
+
     const retirados: string[] = [];
     for (const d of documentos.values()) {
       if (d.root !== b.root || d.ausenteDesde === null || d.retiredAt !== null) continue;
@@ -217,7 +257,6 @@ const rutas: Record<string, (c: any) => unknown> = {
       retirados.push(d.path);
     }
     if (retirados.length > 0) {
-      congeladas.delete(b.root);
       anotar(`RETIRO silencioso: ${retirados.join(", ")}`);
     }
     return { retired: retirados };
@@ -250,7 +289,7 @@ export const iniciar = (puerto = 4477) =>
         estado: () => ({
           documentos: [...documentos.values()].map((d) => ({ path: d.path, version: d.version.slice(0, 12), retirado: d.retiredAt !== null })),
           objetos: objetos.size,
-          congeladas: [...congeladas],
+          congeladas: [...congeladas].map(([raiz, faltan]) => `${raiz} (faltan ${faltan})`),
         }),
       });
     });

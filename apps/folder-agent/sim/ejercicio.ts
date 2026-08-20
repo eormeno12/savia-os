@@ -99,7 +99,17 @@ const r8 = await llamar("/presence/vanished", {
     { path: "copia/contrato.docx", lastSeenHash: hash("el contrato") },
   ],
 });
-afirmar((r8 as any).frozen === true, "la raiz queda congelada y exige mas evidencia", "un disco desmontado produce el mismo conjunto de ausencias que un borrado masivo, y el corte es lo unico que los separa");
+afirmar((r8 as any).frozen === true, "la raiz queda congelada", "un disco desmontado produce el mismo conjunto de ausencias que un borrado masivo, y el corte es lo unico que los separa");
+
+console.log("\n9 - Y CONGELAR EXIGE, NO SOLO INFORMA");
+// La ventana vence, y con la raiz sana esto retiraria. Congelada, no.
+await new Promise((r) => setTimeout(r, 5_200));
+const r9a = await barrer(3, async () => {});
+afirmar((r9a as any).retired.length === 0, "vencida la ventana, la raiz congelada NO retira", "es la unica diferencia entre congelar y no congelar. Sin esto el estado se reporta, se muestra en el panel, y el retiro masivo ocurre igual al vencer la ventana - o sea que el corte por volumen no separa nada");
+afirmar((r9a as any).frozen === false, "y ese barrido completo ES la evidencia: deshiela", "«se exige al menos UN barrido completo mas sobre esa raiz, que es a la vez la prueba de que la raiz esta viva y de que los archivos siguen sin estar»");
+
+const r9b = await barrer(3, async () => {});
+afirmar((r9b as any).retired.includes("contrato.docx"), "con la exigencia cumplida, el retiro ocurre en silencio", "congelar RETIENE, no cancela: si la ausencia sigue ahi despues de la evidencia extra, es un borrado de verdad y el documento se retira");
 
 // ---------------------------------------------------------------------------
 // EL PADRON. Raiz aparte para no cruzarse con el estado que dejaron las ocho de
@@ -119,7 +129,7 @@ const subirEn = async (root: string, archivos: { path: string; contenido: string
   }
 };
 
-console.log("\n9 - EL DESFASE SE DETECTA CON UN NUMERO QUE YA VIAJABA");
+console.log("\n10 - EL DESFASE SE DETECTA CON UN NUMERO QUE YA VIAJABA");
 const s9a = await abrirEn(R2, 0);
 await subirEn(R2, [
   { path: "a.txt", contenido: "el a" },
@@ -132,7 +142,7 @@ await cerrar((s9a as any).sweepId);
 const s9b = await abrirEn(R2, 0);
 afirmar((s9b as any).padronRequerido === true, "Savia nota que el agente no sabe de 3 documentos y pide el padron", "un barrido incremental no reporta lo que sigue igual, asi que sin el padron esos documentos no se ven faltar NUNCA y quedan vigentes para siempre");
 
-console.log("\n10 - LA DIFERENCIA RETIRA LO QUE FALTA, Y RESPETA AL DESHIDRATADO");
+console.log("\n11 - LA DIFERENCIA RETIRA LO QUE FALTA, Y RESPETA AL DESHIDRATADO");
 // Mientras estaba caido, `b.txt` se borro. `c-nube.txt` esta deshidratado: presente,
 // pero el agente NO PUEDE leerlo, asi que viaja sin hash.
 await llamar("/presence/roster", {
@@ -145,11 +155,18 @@ await llamar("/presence/roster", {
 const r10 = await cerrar((s9b as any).sweepId);
 afirmar((r10 as any).retired.length === 0, "la diferencia no retira en el acto: entra a cuarentena", "«una desaparicion es una hipotesis, no un hecho» vale igual cuando la descubre una diferencia de conjuntos y no una observacion");
 
+// La diferencia fue 1 de 3 vivos = 33%, o sea que ADEMAS disparo el corte por volumen.
+// Los dos mecanismos se apilan y esta bien que lo hagan: un agente que perdio su
+// inventario es exactamente el que puede mandar un padron corto.
 await new Promise((r) => setTimeout(r, 5_200));
 const s10 = await abrirEn(R2, 2);
 const r10b = await cerrar((s10 as any).sweepId);
-afirmar((r10b as any).retired.includes("b.txt"), "`b.txt`, borrado mientras el agente estaba caido, se retira", "es el agujero que el padron vino a tapar: sin el, ese documento quedaba vigente en Savia para siempre");
-afirmar(!(r10b as any).retired.includes("c-nube.txt"), "`c-nube.txt`, deshidratado y sin hash, NO se retira", "presente es presente. Omitir del padron lo que no se pudo leer retiraria archivos que estan perfectamente ahi, solo que en la nube - y en macOS leerlos para probarlo significa descargar el drive entero");
+afirmar((r10b as any).retired.length === 0, "la diferencia tambien pasa por el congelamiento", "el padron no es una via rapida al retiro: una diferencia grande de conjuntos exige la misma evidencia extra que una tanda de bajas, y por la misma razon");
+
+const s11 = await abrirEn(R2, 2);
+const r11 = await cerrar((s11 as any).sweepId);
+afirmar((r11 as any).retired.includes("b.txt"), "`b.txt`, borrado mientras el agente estaba caido, se retira", "es el agujero que el padron vino a tapar: sin el, ese documento quedaba vigente en Savia para siempre");
+afirmar(!(r11 as any).retired.includes("c-nube.txt"), "`c-nube.txt`, deshidratado y sin hash, NO se retira", "presente es presente. Omitir del padron lo que no se pudo leer retiraria archivos que estan perfectamente ahi, solo que en la nube - y en macOS leerlos para probarlo significa descargar el drive entero");
 
 console.log(`\n${fallas === 0 ? "ejercicio ok" : `EJERCICIO-ERR: ${fallas} afirmaciones fallaron`}`);
 console.log("estado final:", JSON.stringify(servidor.estado(), null, 2));
