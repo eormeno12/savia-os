@@ -14,6 +14,7 @@
     "nucleo:banco": "node sim/banco.ts",
     "nucleo:build": "cargo build --manifest-path src-tauri/Cargo.toml",
     "nucleo:lint": "pnpm nucleo:fmt && pnpm nucleo:clippy && pnpm nucleo:windows",
-    "lint": "pnpm nucleo:lint && pnpm nucleo:test && pnpm sim:ejercicio && pnpm nucleo:banco"
+    "lint": "pnpm nucleo:lint && pnpm nucleo:test && pnpm sim:ejercicio && pnpm nucleo:banco && pnpm panel:contraste",
+    "panel:contraste": "node scripts/contraste.mjs"
   }
 }

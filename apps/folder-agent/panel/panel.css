@@ -153,8 +153,15 @@
 [data-estado="sincronizado"] {
   --tono: var(--savia-color-success);
 }
+/* BARRIENDO NO LLEVA TONO, Y ESO SE MIDIO. `--savia-color-info` (#2E6B7A) sobre ink da
+   **2.67:1**: no llega ni al piso de 3:1 que la 1.4.11 pide para un grafico no textual,
+   asi que el punto seria un adorno que no se ve. El par `info`/`infoInk` del sistema esta
+   calibrado para superficie CLARA y no tiene gemelo claro.
+   La salida no es inventar un azul: es que barrer no necesita un color. No es una
+   condicion —no hay nada que atender— es ACTIVIDAD, y la actividad se dice con
+   movimiento. El punto va en el tenue del texto (6.35:1) y late. */
 [data-estado="barriendo"] {
-  --tono: var(--savia-color-info);
+  --tono: var(--texto-tenue);
 }
 [data-estado="congelado"] {
   --tono: var(--savia-color-warning);

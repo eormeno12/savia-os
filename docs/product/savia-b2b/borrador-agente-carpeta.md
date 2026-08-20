@@ -756,7 +756,28 @@ Chakra y está bien que lo haga: es el adaptador, no el contrato.
    superficie— en vez de inventar hex nuevos.
 
 3. **La escala tipográfica arranca en 16px** (`body-lg`) y no baja al *chrome* de
-   escritorio, que vive entre 11 y 13. Van como variables locales y nombradas.
+   escritorio, que vive entre 11 y 13. Van como variables locales y nombradas. Y el peso
+   **300 del display no transfiere**: a 12px es ilegible. Esa parte del sistema es de
+   tipografía de página, no de chrome.
+
+4. **Los tonos de estado están calibrados contra papel, y sobre ink cada uno cae
+   distinto.** Medidos contra `#0B2529`: `warning` 5.24:1, `success` 3.98:1, **`info`
+   2.67:1**. El último no llega ni al piso de 3:1 que la 1.4.11 pide para un gráfico no
+   textual — o sea que el punto de «Barriendo» era un punto que no se ve, y el par
+   `info`/`infoInk` no tiene gemelo claro que sirva.
+
+   La salida no fue inventar un azul: **barrer no necesita un color**. No es una condición
+   —no hay nada que atender—, es actividad, y la actividad se dice con movimiento. El
+   punto va en el tenue del texto (6.35:1) y late.
+
+   `success` a 3.98 se queda con su tono porque el piso que le corresponde es el de
+   gráfico, no el de texto: **el color nunca viaja solo** —la regla del sistema es que el
+   badge es siempre ícono más texto—, así que el que carga el contraste del mensaje es la
+   palabra, en `--texto` a 14.5:1.
+
+   Eso lo mide `scripts/contraste.mjs`, encadenado en `pnpm lint` y acreditado
+   rompiéndolo. Existe porque el defecto no lo atrapó nada: se veía bien en la maqueta,
+   pasaba `tsc`, pasaba las 99 pruebas, y era invisible en la pantalla de alguien.
 
 Y **no todo lo que existe aplica**: `radii.card` son 28px, que es el radio de una tarjeta
 de página de 900px. Sobre un popover de 340 se come la esquina. La bandeja usa
