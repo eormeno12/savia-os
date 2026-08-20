@@ -1,6 +1,30 @@
-import { createSystem, defaultConfig, defineConfig } from "@chakra-ui/react";
-import { tokens } from "./tokens";
-import { semanticTokens } from "./semantic-tokens";
+/**
+ * EL ADAPTADOR DE CHAKRA. **Chakra es un consumidor de los tokens, no su fuente.**
+ *
+ * Antes la fuente era este lado: los valores vivian bajo `defineTokens` y salian de acá
+ * hacia todos lados. La consecuencia era que una actualizacion de Chakra podia mover un
+ * color de Savia sin que nadie lo pidiera. Ahora los valores son datos en `tokens.ts` y
+ * `semantic-tokens.ts` —cero imports— y este archivo los envuelve en la forma que Chakra
+ * espera, exactamente igual que el emisor de CSS los envuelve en la que espera el agente.
+ *
+ * Lo que SI se queda de este lado son las `recipes` y los `textStyles`: son estilos de
+ * componente, no valores, y el agente no los usa. Ver el borrador del agente de carpeta,
+ * «Que se reusa del sistema de diseño, y que no».
+ */
+import {
+  createSystem,
+  defaultConfig,
+  defineConfig,
+  defineSemanticTokens,
+  defineTokens,
+} from "@chakra-ui/react";
+import { semanticTokens as datosSemanticos, tokens as datosCrudos } from "./data";
+
+// `defineTokens` y `defineSemanticTokens` son IDENTIDAD: no transforman nada, solo
+// aportan el tipo. Por eso envolver acá no puede cambiar un valor — y el golden lo
+// verifica en vez de dejarlo como promesa.
+const tokens = defineTokens(datosCrudos);
+const semanticTokens = defineSemanticTokens(datosSemanticos);
 import { textStyles } from "./text-styles";
 import { cardRecipe } from "./recipes/card";
 import { inputRecipe } from "./recipes/input";

@@ -1,6 +1,11 @@
-import { defineSemanticTokens } from "@chakra-ui/react";
-
-export const semanticTokens = defineSemanticTokens({
+/**
+ * LOS SEMANTICOS, tambien datos. Cero imports, misma razon que `tokens.ts`.
+ *
+ * `DEFAULT` anidado es la sintaxis para «el token base del grupo»: `bg.DEFAULT` se llama
+ * `bg`. Es de las pocas cosas de este archivo que hay que traducir en cada consumidor, y
+ * esta escrita acá porque el emisor de CSS la va a necesitar igual que Chakra.
+ */
+export const semanticTokens = {
   colors: {
     // Override Chakra's defaults to map to SAVIA's palette.
     // Nested DEFAULT key preserves Chakra's sub-token structure (bg.subtle, fg.muted, etc.).
@@ -129,4 +134,4 @@ export const semanticTokens = defineSemanticTokens({
     l2: { value: "12px" }, // default — buttons, inputs, selects, tags, menus
     l3: { value: "14px" }, // lg controls
   },
-});
+} as const;

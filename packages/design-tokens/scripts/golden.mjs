@@ -121,19 +121,41 @@ if (actual === esperado) {
   process.exit(0);
 }
 
-// EL DIFF, y hasta 12 lineas: un golden que solo dice «cambio» obliga a regenerarlo para
-// ver que paso, que es exactamente el habito que lo vuelve inutil.
-const a = actual.split("\n");
-const b = esperado.split("\n");
-const difs = [];
-for (let i = 0; i < Math.max(a.length, b.length) && difs.length < 12; i += 1) {
-  if (a[i] !== b[i]) difs.push(`  linea ${i + 1}\n    esperado: ${b[i] ?? "(nada)"}\n    actual:   ${a[i] ?? "(nada)"}`);
+/**
+ * EL DIFF, Y ES POR CLAVE Y NO POR LINEA. Lo aprendio fallando: al agregar dos tokens al
+ * conjunto, un diff de lineas mostro `durations.fast` contra `colors.white` —dos cosas que
+ * no tienen nada que ver— porque la insercion corrio todo lo de abajo. Un guardian que
+ * reporta desplazamiento como si fuera cambio obliga a comparar a ojo, y comparar a ojo
+ * es como se termina regenerando el golden sin leerlo.
+ *
+ * La distincion importa de verdad: AGREGAR un token no puede cambiar el aspecto de nada,
+ * y MOVER uno sí. Solo lo segundo es una alarma.
+ */
+const A = JSON.parse(actual);
+const B = JSON.parse(esperado);
+const lineas = [];
+
+for (const seccion of ["crudos", "semanticos"]) {
+  const a = A[seccion] ?? {};
+  const b = B[seccion] ?? {};
+  const movidos = Object.keys(a).filter((k) => k in b && JSON.stringify(a[k]) !== JSON.stringify(b[k]));
+  const agregados = Object.keys(a).filter((k) => !(k in b));
+  const quitados = Object.keys(b).filter((k) => !(k in a));
+  for (const k of movidos) {
+    lineas.push(`  MOVIDO   ${seccion}/${k}\n    antes: ${JSON.stringify(b[k])}\n    ahora: ${JSON.stringify(a[k])}`);
+  }
+  if (agregados.length) lineas.push(`  agregados en ${seccion}: ${agregados.join(", ")}`);
+  if (quitados.length) lineas.push(`  QUITADOS de ${seccion}: ${quitados.join(", ")}`);
 }
+for (const seccion of ["textStyles", "recipes", "globalCss"]) {
+  if (JSON.stringify(A[seccion]) !== JSON.stringify(B[seccion])) lineas.push(`  CAMBIO   ${seccion}`);
+}
+
 console.error(
   "GOLDEN-ERR: EL SISTEMA DE CHAKRA CAMBIO.\n" +
     "            `apps/landing` se ve con estos valores, asi que un cambio que no pediste\n" +
     "            le cambia el aspecto sin que nadie lo note. Si es a proposito, revisalo y\n" +
     "            recien despues: GOLDEN=reescribir node scripts/golden.mjs\n\n" +
-    difs.join("\n"),
+    (lineas.length ? lineas.join("\n") : "  (solo cambio el formato del archivo)"),
 );
 process.exit(1);

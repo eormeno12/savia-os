@@ -1,6 +1,16 @@
-import { defineTokens } from "@chakra-ui/react";
-
-export const tokens = defineTokens({
+/**
+ * LOS VALORES, Y SON DATOS. Cero imports: este archivo no sabe que existe Chakra.
+ *
+ * Es la misma forma que `packages/ir` en el pipeline —el contrato se congela primero, sin
+ * dependencias de runtime, y los consumidores lo implementan—. Acá los consumidores son
+ * dos: el adaptador de Chakra (`index.ts`, que alimenta a `apps/landing`) y el emisor de
+ * CSS que consume el agente de carpeta. **Ninguno de los dos es la fuente.**
+ *
+ * El formato —`{ value }` y las referencias `{colors.x}`— es la convencion de W3C Design
+ * Tokens, NO una invencion de Chakra: Chakra la adopto. Por eso mudarse le costo a este
+ * archivo exactamente un import.
+ */
+export const tokens = {
   colors: {
     // SAVIA brand palette — raw values, no alpha variants needed.
     // Use CSS color-mix or inline opacity (e.g. bg="ink/8") for transparency.
@@ -39,6 +49,15 @@ export const tokens = defineTokens({
       7: { value: "#A8C72B" },
       8: { value: "#E7FF18" },
     },
+
+    /**
+     * DEFINIDO ACA Y NO HEREDADO, y es lo unico que la mudanza tuvo que desenredar.
+     * `semantic-tokens.ts` referencia `{colors.white}` y ese token no era nuestro: salia
+     * del `defaultConfig` de Chakra. Mientras Chakra fuera la fuente eso era invisible;
+     * ahora que la fuente es este archivo, una referencia a algo que no esta acá es una
+     * variable CSS colgante del lado del agente — y un panel sin fondo.
+     */
+    white: { value: "#FFFFFF" },
   },
 
   fonts: {
@@ -63,6 +82,8 @@ export const tokens = defineTokens({
   // Chakra already covers: none, sm(4px), md(6px), lg(8px), xl(12px),
   // 2xl(16px), 3xl(24px), full(9999px). Only add what's genuinely missing.
   radii: {
+    /** La otra heredada. Ver `colors.white`: misma razon, mismo valor que traia Chakra. */
+    sm: { value: "0.25rem" },
     card: { value: "28px" },
     panel: { value: "40px" },
     message: { value: "22px" },
@@ -115,4 +136,4 @@ export const tokens = defineTokens({
     soft: { value: "260ms" },
     slow: { value: "700ms" },
   },
-});
+} as const;

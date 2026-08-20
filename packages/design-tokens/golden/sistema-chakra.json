@@ -126,6 +126,11 @@
       "origen": "#8A5A12",
       "var": "--chakra-colors-warning-ink"
     },
+    "colors.white": {
+      "valor": "#FFFFFF",
+      "origen": "#FFFFFF",
+      "var": "--chakra-colors-white"
+    },
     "durations.fast": {
       "valor": "160ms",
       "origen": "160ms",
@@ -215,6 +220,11 @@
       "valor": "40px",
       "origen": "40px",
       "var": "--chakra-radii-panel"
+    },
+    "radii.sm": {
+      "valor": "0.25rem",
+      "origen": "0.25rem",
+      "var": "--chakra-radii-sm"
     },
     "shadows.controlKnob": {
       "valor": "0 1px 4px rgb(11 37 41 / 0.16)",
