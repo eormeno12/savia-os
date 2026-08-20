@@ -28,6 +28,9 @@ conflictos, no baja archivos. El flujo va en una sola dirección.
 
 ## La forma
 
+> Esta sección y la que sigue son **diseño**. Nada de la interfaz existe todavía — lo
+> construido es el núcleo, y está inventariado en «Qué existe hoy del agente, y qué no».
+
 **App de barra de menú**, en macOS y Windows a la vez, **sobre Tauri**.
 
 Es la forma canónica de la captación pasiva —invisible hasta que hace falta— y es
@@ -153,20 +156,24 @@ defecto. El estado se dice con los tonos ya definidos (`successInk`, `warningInk
 
 ## El protocolo contra Savia
 
-Seis llamadas, y **ninguna es una invención**: cada una sale de un hecho que el plan
-ya fija. **Las seis van del agente al servidor**, y eso no es estilo — ver abajo. El vocabulario del agente es cerrado —apareció · desapareció · barrido— y el
-protocolo no puede tener más verbos que esos, más lo que la subida prefirmada obligue.
+**Siete llamadas sobre seis endpoints**, y **ninguna es una invención**: cada una sale
+de un hecho que el plan ya fija. Son siete y no seis porque `presence.decision` no tiene
+endpoint propio —es la *respuesta* de `presence.observed`—, y esa forma tampoco es
+estilo: ver «Savia solo puede pedir contestando». El vocabulario del agente es cerrado
+—apareció · desapareció · barrido— y el protocolo no puede tener más verbos que esos,
+más lo que la subida prefirmada obligue.
 
 | Llamada | Dirección | Por qué existe |
 |---|---|---|
-| `sweep.open` | agente → Savia | El barrido es la **unidad** sobre la que se puede decir «completo» o «interrumpido». El corte por volumen compara una fracción contra un denominador, y ese denominador solo existe si el recorrido tiene borde |
+| `sweep.open` | agente → Savia | El barrido es la **unidad** sobre la que se puede decir «completo» o «interrumpido». El corte por volumen compara una fracción contra un denominador, y ese denominador solo existe si el recorrido tiene borde. Lleva `total` —las filas vivas del inventario para esa raíz— y la respuesta trae `sweepId` y `padronRequerido` |
 | `presence.observed` | agente → Savia | Es «apareció ruta P, contenido H». Lleva hash y **cero bytes**: es la llamada que hace posible el dedupe previo a la transferencia |
 | `presence.decision` | Savia → agente | Por cada entrada: `known` (el blob ya está, no se transfiere nada, el documento se registra igual con dueño propio) o `upload` con un **permiso prefirmado** |
 | `upload.completed` | agente ↔ Savia | El plan decide que la API emite el permiso y **después** verifica que el objeto llegó. El único que sabe que el PUT terminó es quien lo hizo. **Y la respuesta devuelve el hash verificado**: el que el agente mandó era una afirmación, el que el worker computó al leer el objeto es la autoridad, y entre los dos momentos el archivo pudo cambiar. Sin ese retorno, el agente y el registro pueden creer cosas distintas del mismo archivo para siempre, y una desaparición posterior no matchea con nada |
 | `presence.vanished` | agente → Savia | Es «desapareció ruta P, que tenía contenido H». El nombre es deliberado: reporta un **hecho observado**, no pide un retiro |
+| `presence.roster` | agente → Savia | **El padrón**: todo lo que el recorrido vio, con su hash confirmado o `None`, y cero bytes. Solo se manda si `sweep.open` lo pidió. Es lo único que puede enterar a Savia de un documento que el agente no sabe que existe — ver abajo |
 | `sweep.close` | agente → Savia | Un barrido interrumpido y un borrado masivo producen el mismo conjunto de desapariciones. Sin este reporte el corte por volumen no puede distinguirlos |
 
-**Las seis van en una sola dirección, y `root.probe` murió por eso.** Había una séptima
+**Las siete las inicia el agente, y `root.probe` murió por eso.** Había una llamada más
 —`Savia → agente`, «¿la raíz está viva?»— para que la cuarentena confirmara al vencer. No
 puede existir: **un agente de escritorio no es direccionable**. Está detrás de NAT, sin
 puerto abierto, y la mitad del tiempo suspendido; el servidor no lo puede llamar.
@@ -175,8 +182,17 @@ Y al buscarle reemplazo resultó que no hacía falta ninguno: **la evidencia que
 viaja en `sweep.close`**, y más fuerte. Un `root.probe` dice «la raíz existe»; un barrido
 que cerró COMPLETO sobre esa raíz dice «la raíz existe **y** los archivos siguen sin
 estar». Es literalmente lo que la cuarentena ya exige —«que pase la ventana y que haya
-habido al menos un barrido completo más durante ella»—. La séptima llamada era una forma
-peor de preguntar algo que la sexta ya contesta.
+habido al menos un barrido completo más durante ella»—. Era una forma peor de preguntar
+algo que otra llamada ya contesta.
+
+**Savia solo puede pedir contestando, y de ahí sale la forma del protocolo entero.** Un
+servidor que no puede iniciar nada tiene un solo canal para pedir: la respuesta a una
+llamada que hizo el agente. Las dos cosas que Savia necesita viajan así, y no como
+llamada — `presence.decision` contesta «mandá estos bytes» a un `presence.observed`, y
+`padronRequerido` contesta «mandame el padrón» a un `sweep.open`. Eso explica también
+**por qué el padrón se pide en `sweep.open` y en ningún otro lado**: es la primera
+llamada del barrido, o sea el único momento en que la respuesta llega a tiempo para que
+ese mismo barrido la cumpla.
 
 **La API nunca toca bytes.** El tope de tamaño no se valida en ninguna llamada: viaja
 como `content-length-range` del permiso prefirmado, que es la única palanca preventiva
@@ -184,6 +200,60 @@ que la subida directa deja en pie.
 
 **`lastSeenByteHash` es lo que vuelve accionable una desaparición.** Sin él, «desapareció
 tal cosa» no se puede mapear a ningún documento.
+
+### El padrón, y el hueco que no cubría ninguna salvaguarda
+
+Las cinco salvaguardas protegen contra **retirar de más**. El padrón protege contra el
+error de enfrente, que es más silencioso y que no cubría nada.
+
+**El caso.** Un barrido incremental no reporta lo que sigue igual — es justamente lo que
+lo hace barato. Y tiene una consecuencia fea: si Savia tiene documentos de esa raíz que
+el agente no sabe que existen —perdió su inventario, se lo restauraron de un backup
+viejo, o nunca lo tuvo— esos documentos **no se van a ver faltar nunca**. No aparecen en
+ningún reporte, ni de alta ni de baja. Quedan vivos del lado de Savia para siempre y
+nadie se entera, ni siquiera si el archivo se borró hace un año.
+
+**Se detecta con un número que ya viajaba.** `sweep.open` lleva `total`, la cuenta de
+filas vivas del inventario del agente para esa raíz; Savia tiene su propia cuenta de
+documentos vivos. Si difieren hay desfase, y la respuesta trae `padronRequerido: true`.
+
+**Lo pide Savia, y que no lo declare el agente es lo que le da alcance.** Un agente solo
+puede declarar los desfases que conoce, y los que importan son exactamente los que no:
+un inventario corrupto que él cree bueno, una restauración desde un backup, o dos
+agentes sobre la misma raíz. Del lado del servidor la comparación no depende de que
+nadie se dé cuenta de nada.
+
+**`hash: null` significa presente con hash desconocido, y NO ausente.** Un archivo
+deshidratado no se lee nunca, así que el agente no tiene su hash. Omitirlo del padrón lo
+volvería ausente y Savia lo retiraría: un archivo que está perfectamente ahí, solo que
+en la nube. Presente es presente, y por qué no se pudo leer es diagnóstico del agente.
+
+Y tres reglas que salieron de construirlo, porque las tres son formas de mentir:
+
+- **El padrón sale del recorrido, no del inventario.** Parece que se pudiera derivar de
+  las filas vivas, y no se puede: un deshidratado que el agente ve por primera vez sale
+  del árbol de decisión sin un solo efecto y **no deja fila**. Derivarlo del inventario
+  lo dejaría afuera del padrón — que es exactamente el caso que el padrón viene a
+  arreglar. Por eso se junta durante la enumeración y se lleva encima, a diferencia de
+  los bytes, que se quedan en disco y se releen: **el recorrido que vio esas rutas ya
+  terminó.**
+- **No pasa por el límite de lote.** Un lote de hechos truncado *demora*; un padrón
+  truncado **afirma** «esto es todo lo que veo», y Savia retira todo lo que no figure.
+  Truncar hechos cuesta latencia; truncar el padrón borra documentos.
+- **Solo si el barrido cerró completo.** Savia también lo exige antes de aplicar la
+  diferencia, y sostenerlo de los dos lados es deliberado.
+
+**Es el único trabajo del agente que se puede perder sin perder nada.** Si el padrón se
+rechaza o se cae, el próximo `sweep.open` manda el mismo `total`, Savia ve el mismo
+desfase y lo vuelve a pedir: **el mecanismo que produjo el trabajo es el mismo que repara
+su pérdida**. Por eso una respuesta ambigua lo da por entregado y no envenena ninguna
+ruta de la raíz — un padrón rechazado no puede dejar en reintento a todos los archivos
+que nombra.
+
+**Y la diferencia pasa igual por el congelamiento.** Retirar por padrón no es una vía
+rápida: si lo que falta supera el corte por volumen, esa raíz se congela y se exige un
+barrido completo más, igual que cualquier otra baja. El padrón cambia **qué se ve**
+faltar, no **con qué evidencia** se retira.
 
 ## La máquina del agente
 
@@ -204,56 +274,106 @@ flowchart TD
     MARK[marcar la ruta para mirar<br/>NUNCA se reporta desde el evento] --> STAT
     STAT[stat de la ruta] --> EX{¿existe?}
 
+    EX -->|ni sí ni no| IND[INDETERMINADO · permiso denegado<br/>o error de disco · ni hecho ni efecto]
+
     EX -->|sí| DEHY{¿deshidratado?}
     DEHY -->|sí| SKIP[no es ausente · no abrir]
     DEHY -->|no| SAME{¿tamaño, mtime y fileId<br/>iguales al inventario?}
-    SAME -->|sí| NOOP[nada que hacer]
-    SAME -->|no| SETTLE{¿asentado?}
+    SAME -->|sí| DUDA{¿el hash quedó<br/>en duda?}
+    DUDA -->|no| NOOP[nada que hacer]
+    DUDA -->|sí| APP
+    SAME -->|no| DEST{¿este contenido venía<br/>de otra ruta del árbol?}
+    DEST -->|sí| MOV
+    DEST -->|no| SETTLE{¿asentado?}
     SETTLE -->|no| WAIT[esperar]
     SETTLE -->|sí| HASH[hashear]
     HASH --> APP[[apareció · ruta · H]]
 
-    EX -->|no| MOVE{¿el hash reaparece<br/>en el árbol?}
+    EX -->|no| KNOWN{¿el inventario<br/>la tenía?}
+    KNOWN -->|no| NOOP
+    KNOWN -->|sí| SWEEP{¿hay un barrido<br/>abierto?}
+    SWEEP -->|no| AGENDA[AGENDAR BARRIDO<br/>un evento no es una baja]
+    SWEEP -->|sí| MOVE{¿el hash reaparece<br/>en el árbol?}
     MOVE -->|sí| MOV[es un MOVIMIENTO<br/>actualizar ruta · no reportar]
     MOVE -->|no| ROOT{¿la raíz está viva?}
     ROOT -->|no| ABSENT[carpeta ausente<br/>NINGUNA baja se reporta]
-    ROOT -->|sí| VAN[[desapareció · ruta · último H]]
+    ROOT -->|sí| DOC{¿Savia confirmó<br/>alguna vez su hash?}
+    DOC -->|no| NADA[no hay documento que retirar<br/>la fila se olvida]
+    DOC -->|sí| VAN[[desapareció · ruta · último H]]
 
+    IND --> WATCH
     SKIP --> WATCH
     NOOP --> WATCH
     WAIT --> WATCH
     MOV --> WATCH
     ABSENT --> WATCH
+    AGENDA --> WATCH
+    NADA --> WATCH
     APP --> COLA[cola de hechos]
     VAN --> COLA
 ```
 
-Las tres ramas que hay que leer despacio, porque son las que separan este diseño de un
+**Son diez salidas y no siete, y las tres que faltaban no son casos raros.** Este
+flujograma decía «¿existe? sí/no» y asumía que un `stat` contesta una de las dos. No
+siempre: un *Full Disk Access* revocado por una actualización de macOS produce el
+conjunto **completo** de ausencias de la raíz, y `ROOT` no lo atrapa porque la carpeta
+se enumera perfecto. Esa tercera arista es `INDETERMINADO`, y nunca produce ni hecho ni
+efecto — es la diferencia entre «no está» y «no puedo mirar».
+
+Las ramas que hay que leer despacio, porque son las que separan este diseño de un
 sincronizador ingenuo:
 
-- **`MARK`** — un evento nunca produce un reporte. Es una señal para volver a mirar; el
-  hecho sale del `stat` y del hash. Los eventos hablan de rutas, y las rutas no son
-  identidad.
-- **`MOVE`** — antes de declarar una baja se pregunta si el contenido reapareció en otro
-  lado. Mover y renombrar mueren acá, y no llegan nunca al servidor.
+- **`MARK` y `SWEEP`** — un evento nunca produce un reporte. Es una señal para volver a
+  mirar; el hecho sale del `stat` y del hash. Los eventos hablan de rutas, y las rutas no
+  son identidad. `SWEEP` es donde eso se vuelve estructura: una ruta que falta **sin un
+  barrido abierto** no es una baja, es una orden de barrer, porque solo el barrido
+  establece verdad de campo.
+- **`MOVE` y `DEST`** — el movimiento se mira desde los dos extremos. `MOVE` pregunta,
+  antes de declarar una baja, si el contenido reapareció en otro lado. `DEST` es el mismo
+  hecho visto desde el destino, y hace falta por costo: sin él, la ruta nueva es una ruta
+  nueva y se hashea entera — mover una carpeta de 2 GB costaría leer 2 GB. Va **antes**
+  que `SETTLE`, porque preguntarle a un archivo movido «¿estos bytes dejaron de cambiar?»
+  no tiene sentido: no cambiaron, se mudaron.
 - **`ROOT`** — y esta es la que evita el desastre. Si la raíz no está viva, **no se
   reporta ni una baja**. Un disco desmontado produce exactamente el mismo conjunto de
   ausencias que un borrado masivo.
+- **`DOC`** — una desaparición cuyo hash Savia nunca confirmó no tiene documento que
+  retirar. La fila se olvida y no viaja nada. Sin este nodo, el agente le reporta bajas
+  de cosas que el servidor no tiene.
+- **`DUDA`** — la única salida de `NOOP` que no es un cambio en disco, y existe porque
+  sin ella un `upload.completed` cuya respuesta se perdió deja al agente sin saber qué
+  hash tiene Savia. La tripleta no cambió, así que la comparación corta el paso en cada
+  barrido y **esa ruta no vuelve a viajar nunca**. Se re-afirma el hash que ya se tiene
+  —cero lecturas, cero bytes— y el `known` la re-confirma.
 
 ### La salida
 
 ```mermaid
 flowchart TD
+    OPEN[sweep.open · lleva TOTAL<br/>= filas vivas del inventario] --> COLA
     COLA[cola de HECHOS<br/>en orden por raíz] --> OBS[presence.observed<br/>presence.vanished]
     OBS --> DEC{respuesta de Savia}
     DEC -->|known| NONE[cero bytes transferidos<br/>el documento se registra igual]
     DEC -->|upload + permiso| PUT[PUT directo al almacén<br/>la API no toca bytes]
-    PUT --> DONE[upload.completed]
-    COLA --> CLOSE[sweep.close<br/>completo · interrumpido]
-    CLOSE --> CUAR{{cuarentena · del lado de Savia}}
-    CUAR --> PROBE[barrido completo<br/>durante la ventana]
-    PROBE --> RET[retiro reversible]
+    PUT --> DONE[upload.completed<br/>devuelve el hash VERIFICADO]
+
+    OBS --> PIDIO{¿sweep.open pidió<br/>el padrón?}
+    PIDIO -->|sí| PAD[presence.roster<br/>todo lo enumerado · sin bytes]
+    PIDIO -->|no| CLOSE
+    PAD --> CLOSE
+
+    CLOSE[sweep.close<br/>completo · interrumpido] --> SAVIA{{del lado de Savia}}
+    SAVIA --> CUAR[cuarentena de las bajas<br/>+ diferencia contra el padrón]
+    CUAR --> CORTE{¿supera el corte<br/>por volumen?}
+    CORTE -->|sí| CONG[CONGELADO · se exige<br/>un barrido completo más]
+    CORTE -->|no| RET[retiro reversible]
+    CONG --> RET
 ```
+
+**El orden del segmento es fijo**: abrir → observar → desvanecer → **padrón** → cerrar, y
+recién después los bytes. Las apariciones van antes que las desapariciones porque «una
+aparición es un hecho y una desaparición es una hipótesis»; el padrón va al final porque
+solo se puede afirmar «esto es todo lo que veo» cuando el recorrido terminó.
 
 **Los hechos van primero y los bytes después.** Es lo que impide que una semana sin
 conexión se convierta en un backlog de subida de archivos que en realidad solo se
@@ -400,9 +520,57 @@ El agente **no tiene con qué hablar todavía**. En orden de dependencia:
    se medirían. Ninguno se inventa.
 7. **Enrolamiento y auth de máquina.** El token de dispositivo no existe.
 
-**Lo que sí se puede hacer en paralelo:** el protocolo está completamente especificado
-arriba, así que el agente se puede construir contra un servidor simulado y enchufarse
-después. Es la única parte que no espera a nada.
+## Qué existe hoy del agente, y qué no
+
+Este documento dijo que el agente se podía construir contra un servidor simulado sin
+esperar a nada. **Se hizo, y eso partió el agente en dos mitades muy distintas.**
+
+### El núcleo existe, y corre
+
+`apps/folder-agent/src-tauri/` — **6.468 líneas de Rust en 18 módulos, con 75 pruebas**:
+71 en proceso sobre la máquina, las salvaguardas, las colas y los guardianes, y **4 que
+hablan HTTP de verdad** contra `sim/server.ts`, el servidor simulado. Cubre el árbol de
+decisión completo con sus diez salidas, el inventario, las cinco salvaguardas, las dos
+colas con su orden y su compactación, y el cliente con las siete llamadas.
+
+Del tramo de plataforma, **macOS es la única implementación real** —`mach_continuous_time`
+para el reloj que avanza durante la suspensión, y `SF_DATALESS` por `lstat` para
+detectar la deshidratación sin materializar—. Windows tiene la firma completa y el cuerpo
+en `unimplemented!()`, acreditado con `cargo check --target x86_64-pc-windows-msvc`, que
+compila limpio: la firma es correcta aunque no haga nada.
+
+### Nada de lo que se ve existe
+
+`src-tauri/` es un nombre que anticipa el runtime: **Tauri ni siquiera es dependencia.**
+El crate depende de `libc`, `sha2`, `serde` y `serde_json`, y de nada más. No hay ícono
+de bandeja, ni popover, ni ventana de preferencias, ni selector de directorio. Hoy el
+agente es un binario de línea de comandos que toma una ruta y una URL:
+
+```
+node apps/folder-agent/sim/server.ts        # en otra terminal
+cargo run -- <ruta-de-la-raíz> [http://127.0.0.1:4477]
+```
+
+**Y no existe cómo se instala.** De los cinco pasos del enrolamiento no hay ninguno: sin
+instalador, sin código de vinculación, sin token de dispositivo. El cliente habla
+`SinAutenticar` contra `127.0.0.1` — el caso con credencial está **nombrado en el tipo**,
+para que no sea un `Option` que alguien se olvidó de llenar, pero no lo ejercita ninguna
+prueba. Es el punto 7 de la lista de arriba, y es el que bloquea a los otros cuatro: no
+hay nada que instalar hasta que haya con qué vincularse.
+
+### Y dos huecos que no son de interfaz
+
+- **La persistencia no existe.** El inventario vive en memoria y muere con el proceso. El
+  diseño pedía SQLite; lo que ese diseño compra y hoy **no** se paga es la durabilidad, y
+  lo que compra y **sí** se paga es la atomicidad — el estado y la cola viven en el mismo
+  `Almacen` y se escriben en una sola llamada, así que no hay forma de hacer una sin la
+  otra.
+- **No hay observador de eventos del sistema de archivos.** El tipo `OrigenDeSenal`
+  distingue evento de barrido y el árbol de decisión ya trata el caso —una ruta que falta
+  sin barrido abierto agenda uno en vez de reportar una baja—, pero no hay nada que
+  produzca esos eventos: ni FSEvents ni `ReadDirectoryChangesW`.
+
+Ninguno de los dos cambia una decisión de este documento. Los dos son trabajo.
 
 ## Qué se reusa del sistema de diseño, y qué no
 
@@ -496,6 +664,12 @@ agente, que es el único que sabe si su sistema de archivos las distingue.
 - **Los cuatro números, todos sin valor.** El intervalo de asentamiento, la ventana de
   cuarentena, la fracción del corte por volumen y el `maxRetries` del agente. Ninguno se
   inventa: cada uno necesita unidad, qué decide y cómo se mediría.
-- **El propio agente no existe.** El protocolo está completamente especificado, así que se
-  puede construir contra un servidor simulado — y con el runtime decidido, eso ya no
-  espera a nada.
+- **Qué es exactamente el denominador del corte por volumen.** El agente manda en
+  `sweep.open` el tamaño de su inventario para esa raíz, que es lo único que se conoce al
+  *abrir* el barrido: lo enumerado todavía no se sabe. El simulador lo guarda y calcula
+  la fracción sobre lo vivo de **su** lado. Los dos números son defendibles y no son el
+  mismo; cuál gobierna el corte no está decidido, y hoy `total` sirve para detectar el
+  desfase y nada más.
+- **La carrocería del agente no existe.** La interfaz, el enrolamiento, la persistencia y
+  los eventos del sistema de archivos — ver «Qué existe hoy del agente, y qué no». El
+  núcleo sí, y lleva 75 pruebas.

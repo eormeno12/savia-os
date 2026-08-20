@@ -1,13 +1,14 @@
 //! Windows. Firma completa, cuerpo en `unimplemented!()`.
 //!
-//! **Y HAY QUE DECIR LO QUE ESTO NO ES.** `#[cfg(windows)]` no se compila en un Mac,
-//! asi que «tiene la firma correcta» es una afirmacion que nadie verifico. El diseno de
-//! `plataforma` proponia acreditarla con
-//! `cargo check --target x86_64-pc-windows-msvc` como parte del lint; el target no esta
-//! instalado en esta maquina, asi que **queda como paso pendiente y nombrado**, no como
-//! algo hecho. Sin ese cross-check, esto se descubre roto el dia que alguien tenga un
-//! Windows — que por el diseno de este agente es el dia en que la mitad de los usuarios
-//! lo instala.
+//! **Y HAY QUE DECIR EXACTAMENTE QUE ES LO QUE ESTA ACREDITADO.** `#[cfg(windows)]` no
+//! se compila en un Mac, asi que «tiene la firma correcta» seria una afirmacion que
+//! nadie verifico. Ya no lo es: el target `x86_64-pc-windows-msvc` esta instalado y
+//! `cargo check --target x86_64-pc-windows-msvc` compila limpio.
+//!
+//! Eso acredita LA FIRMA, y nada mas. Los cuerpos siguen en `unimplemented!()`, asi que
+//! lo que el cross-check compra es que esto no se descubra roto POR NO COMPILAR el dia
+//! que alguien tenga un Windows — que por el diseno de este agente es el dia en que la
+//! mitad de los usuarios lo instala. Que ademas HAGA algo es trabajo pendiente.
 //!
 //! Lo que si esta decidido y escrito, porque son las dos POLITICAS y no dos wrappers:
 //!

@@ -58,7 +58,7 @@ const clave = (root: string, path: string) => `${root} ${path}`;
 const sha256 = (b: Uint8Array) => createHash("sha256").update(b).digest("hex");
 const anotar = (m: string) => console.log(`  . ${m}`);
 
-// -- Los cinco endpoints (seis llamadas: `presence.decision` es la respuesta) --
+// -- Los seis endpoints (siete llamadas: `presence.decision` es la respuesta) --
 const rutas: Record<string, (c: any) => unknown> = {
   /**
    * `sweep.open` - el barrido es la UNIDAD sobre la que se puede decir «completo».

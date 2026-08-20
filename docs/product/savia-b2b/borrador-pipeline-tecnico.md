@@ -515,6 +515,38 @@ Las tres primeras llevan números —cuánto dura la cuarentena, qué fracción 
 corte, cuánto tiempo un retirado sigue siendo recuperable— y **ninguno se inventa
 acá**: van a `PARAMETERS` con su unidad, qué deciden y cómo se medirían.
 
+### Y el error de enfrente: lo que no se ve faltar nunca
+
+Las cinco de arriba protegen contra **retirar de más**. Falta la mitad simétrica, que es
+más silenciosa: **un barrido incremental no reporta lo que sigue igual.** Es lo que lo
+hace barato, y tiene una consecuencia que ninguna salvaguarda cubre — si Savia tiene
+documentos de una raíz que el agente no sabe que existen, esos documentos **no se van a
+ver faltar jamás**. No aparecen en ningún reporte, ni de alta ni de baja. Pasa cuando el
+agente pierde su inventario, cuando se lo restauran de un backup viejo, o cuando dos
+agentes miran la misma raíz.
+
+**Se detecta con un número que ya viajaba.** El agente abre cada barrido declarando
+cuántas filas vivas tiene para esa raíz; Savia tiene su propia cuenta de documentos
+vivos. Si difieren hay desfase, y Savia contesta pidiendo **el padrón**: la lista de todo
+lo que ese barrido enumeró, sin bytes. Al cerrar, lo que Savia tiene vivo y el padrón no
+nombra es lo que se fue.
+
+Tres cosas que esto **no** relaja:
+
+- **La diferencia pasa igual por el corte por volumen.** Retirar por padrón no es una vía
+  rápida: si lo que falta supera la fracción, la raíz se congela y se exige un barrido
+  completo más, como cualquier otra baja.
+- **Solo cuenta si el barrido cerró completo.** Un padrón parcial afirma «esto es todo lo
+  que veo» sobre un recorrido que no terminó.
+- **«Presente pero ilegible» es presente.** Un deshidratado entra al padrón sin hash. Si
+  se lo omitiera por no tener hash, quedaría ausente y se retiraría un archivo que está
+  perfectamente ahí.
+
+Lo pide Savia y no lo declara el agente, y eso es deliberado: un agente solo puede
+declarar los desfases que conoce, y los que importan son exactamente los que no —un
+inventario corrupto que él cree bueno—. El mecanismo y sus reglas están en
+[borrador-agente-carpeta.md § El padrón](borrador-agente-carpeta.md).
+
 ### Qué falta decidir del canal
 
 - **DECIDIDO — el retiro es siempre silencioso.** El agente no pregunta nunca, ni

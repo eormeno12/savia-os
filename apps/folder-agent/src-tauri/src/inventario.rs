@@ -304,12 +304,22 @@ pub enum EfectoDeInventario {
 /// `&mut self`, asi que no hay forma de hacer una sin la otra.
 ///
 /// «Se pierde el inventario» no es un caso especial: el borrador ya dice que cuesta un
-/// barrido y Savia contesta `known` a todo. Lo que SI cuesta, y hay que decirlo, es que
-/// **lo borrado mientras no habia inventario no se retira jamas** —no hay lapidas ni
-/// filas de esos archivos, asi que ningun barrido los ve faltar— y que perder los
-/// `RootId` crearia documentos duplicados salvo que el enrolamiento sea idempotente por
-/// `(dispositivo, identidadDeVolumen, idDelDirectorio)`. Eso ultimo es un requisito que
-/// este modulo IMPONE al enrolamiento, no una dependencia que hereda.
+/// barrido y Savia contesta `known` a todo.
+///
+/// **Y LO QUE ESTO COSTABA LO CERRO EL PADRON.** Este comentario decia que lo borrado
+/// mientras no habia inventario «no se retira jamas» —no hay lapidas ni filas de esos
+/// archivos, asi que ningun barrido los ve faltar—. Dejo de ser cierto: un inventario
+/// vacio abre el barrido declarando `total = 0` contra los N documentos vivos que Savia
+/// tiene de esa raiz, el desfase salta ahi, y el padron le dice a Savia todo lo que el
+/// recorrido SI vio. Lo que Savia tiene vivo y el padron no nombra es lo que se fue.
+///
+/// Queda un borde, y hay que nombrarlo: la deteccion es por CARDINALIDAD. Un inventario
+/// corrupto que conserve la cuenta exacta y equivoque el contenido no pide padron.
+///
+/// Lo que sigue en pie es que perder los `RootId` crearia documentos duplicados salvo
+/// que el enrolamiento sea idempotente por
+/// `(dispositivo, identidadDeVolumen, idDelDirectorio)`. Eso es un requisito que este
+/// modulo IMPONE al enrolamiento, no una dependencia que hereda.
 pub struct InventarioEnMemoria {
     raices: BTreeMap<RaizId, RaizRegistrada>,
     filas: BTreeMap<(RaizId, ClaveDeRuta), Entrada>,
