@@ -461,3 +461,88 @@ fn un_token_revocado_detiene_el_dispositivo_entero() {
         "un 401 tiene que detener el dispositivo entero: {traza:?}"
     );
 }
+
+#[test]
+#[ignore = "necesita el simulador: pnpm --filter @savia-os/folder-agent sim"]
+fn el_congelamiento_de_savia_llega_hasta_el_agente() {
+    let dir = std::env::temp_dir().join(format!(
+        "savia-folder-congela-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    let nonce = dir.file_name().unwrap().to_string_lossy().to_string();
+    for n in 1..=2 {
+        std::fs::write(
+            dir.join(format!("acta-{n}.txt")),
+            format!("acta {n} de {nonce}"),
+        )
+        .unwrap();
+    }
+
+    let plataforma = PlataformaLocal::nueva().unwrap();
+    let ruta = std::fs::canonicalize(&dir).unwrap();
+    let raiz = RaizId::nueva(format!("congela-{nonce}"));
+    let huella = plataforma.huella_de_raiz(&ruta).unwrap();
+    let mut almacen = Almacen::nuevo(ParametrosDeCola {
+        max_intentos: None,
+        max_entradas_por_lote: None,
+    });
+    almacen.enrolar(RaizRegistrada {
+        id: raiz.clone(),
+        huella,
+        ruta_absoluta: ruta.clone(),
+        sensibilidad: SensibilidadAMayusculas::NoDistingue,
+    });
+
+    let (credencial, _) = credencial_enrolada();
+    let cliente = Cliente::nuevo(BaseDeApi::nueva(BASE).unwrap(), credencial, tiempos());
+    let politica = Politica::con_asentamiento(ASENTAMIENTO).unwrap();
+    let mut traza = Vec::new();
+    let mut vuelta = 0;
+    let mut ciclo_completo = |almacen: &mut Almacen, traza: &mut Vec<String>| {
+        vuelta += 1;
+        std::thread::sleep(ASENTAMIENTO);
+        ciclo::barrer(
+            &raiz,
+            BarridoId::nuevo(format!("b{vuelta}")),
+            &plataforma,
+            almacen,
+            &politica,
+        );
+        ciclo::drenar(&raiz, &plataforma, almacen, &cliente, traza);
+    };
+
+    // Dos vueltas: el asentamiento exige dos observaciones para que la aparicion se
+    // encole, y la segunda ademas sube los bytes.
+    ciclo_completo(&mut almacen, &mut traza);
+    ciclo_completo(&mut almacen, &mut traza);
+    assert!(
+        !almacen.colas().congelada(&raiz),
+        "hasta acá la raíz tiene que estar sana: si ya estuviera congelada, la afirmación de abajo sería verde sin que el borrado masivo hiciera nada. Traza: {traza:?}"
+    );
+
+    // EL BORRADO MASIVO: los dos archivos de golpe son el 100% de lo vivo, muy por
+    // encima del corte por volumen del simulador. Savia congela la raíz, y el agente
+    // **tiene que enterarse** — es uno de los cuatro estados que el panel muestra.
+    for n in 1..=2 {
+        std::fs::remove_file(dir.join(format!("acta-{n}.txt"))).unwrap();
+    }
+    ciclo_completo(&mut almacen, &mut traza);
+    assert!(
+        almacen.colas().congelada(&raiz),
+        "`sweep.close` contestó `frozen` y el agente lo tiró: sin esto el panel muestra «Sincronizado» sobre una raíz que Savia está reteniendo. Traza: {traza:?}"
+    );
+
+    // Y EL DESHIELO, que es la mitad que se olvida. Un barrido completo más sobre la
+    // misma raíz es la evidencia que el congelamiento exigía; Savia la suelta y contesta
+    // `frozen: false`. Si el agente solo supiera INSERTAR, la raíz quedaría congelada en
+    // el panel para siempre.
+    ciclo_completo(&mut almacen, &mut traza);
+    assert!(
+        !almacen.colas().congelada(&raiz),
+        "un `frozen: false` tiene que descongelar, no ser ignorado por no traer novedad. Traza: {traza:?}"
+    );
+}

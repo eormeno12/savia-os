@@ -96,7 +96,13 @@ fn confirmar_todo(a: &mut Almacen) {
                 (id, Recibido::Decisiones(vs))
             }
             Trabajo::Desvanecer { id, .. } => (id, Recibido::Nada),
-            Trabajo::CerrarBarrido { id, .. } => (id, Recibido::Retirados(Vec::new())),
+            Trabajo::CerrarBarrido { id, .. } => (
+                id,
+                Recibido::Retirados {
+                    rutas: Vec::new(),
+                    congelada: false,
+                },
+            ),
             Trabajo::Subir { id, .. } => (id, Recibido::Nada),
             Trabajo::ConfirmarSubida { id, .. } => (
                 id,
@@ -618,7 +624,13 @@ fn un_rechazo_sobre_los_bytes_no_re_sube_el_archivo_en_cada_vuelta() {
     let Trabajo::CerrarBarrido { id, .. } = *t else {
         panic!()
     };
-    c.resolver(&id, Desenlace::Entregado(Recibido::Retirados(Vec::new())));
+    c.resolver(
+        &id,
+        Desenlace::Entregado(Recibido::Retirados {
+            rutas: Vec::new(),
+            congelada: false,
+        }),
+    );
     let Proximo::Trabajo(t) = c.siguiente(&raiz) else {
         panic!("falta la subida")
     };
@@ -693,9 +705,13 @@ fn un_ack_perdido_se_re_observa_en_el_proximo_barrido() {
                     .collect();
                 (id, Desenlace::Entregado(Recibido::Decisiones(vs)))
             }
-            Trabajo::CerrarBarrido { id, .. } => {
-                (id, Desenlace::Entregado(Recibido::Retirados(Vec::new())))
-            }
+            Trabajo::CerrarBarrido { id, .. } => (
+                id,
+                Desenlace::Entregado(Recibido::Retirados {
+                    rutas: Vec::new(),
+                    congelada: false,
+                }),
+            ),
             Trabajo::Subir { id, .. } => (id, Desenlace::Entregado(Recibido::Nada)),
             // EL ACK SE PIERDE: `upload.completed` no es idempotente, asi que el reintento
             // recibe «permiso desconocido», que es indistinguible de «nunca llego».
@@ -958,7 +974,7 @@ fn un_archivo_que_no_entra_en_el_permiso_no_envenena_su_ruta() {
             "{\"decisions\":[{\"path\":\"x.txt\",\"decision\":\"upload\",\"permit\":{\"url\":\"/upload/p-1\",\"contentLengthRange\":[0,0]}}]}"
                 .into(),
         ),
-        "POST /sweep/close" => (200, "{\"retired\":[]}".into()),
+        "POST /sweep/close" => (200, "{\"retired\":[],\"frozen\":false}".into()),
         _ => (200, "{}".into()),
     }
     });

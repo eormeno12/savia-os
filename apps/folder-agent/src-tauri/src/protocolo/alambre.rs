@@ -210,6 +210,12 @@ pub struct PedidoCerrarBarrido<'a> {
 #[serde(rename_all = "camelCase")]
 pub struct RtaCerrarBarrido {
     pub retired: Vec<String>,
+    /// **SIN `#[serde(default)]`, como todo este archivo, y aca duele mas que en el
+    /// resto.** `Congelado` es uno de los cuatro estados que el panel muestra por raiz;
+    /// leer un `frozen` ausente como `false` seria mostrar «Sincronizado» sobre una raiz
+    /// que Savia esta reteniendo — o sea la respuesta tranquilizadora, que es siempre la
+    /// peor para inventar.
+    pub frozen: bool,
 }
 
 /// **EL SOBRE.** El simulador contesta `200` CON `{error: "..."}` en tres caminos:

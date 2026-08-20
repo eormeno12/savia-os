@@ -536,6 +536,12 @@ impl InventarioEnMemoria {
         }
     }
 
+    /// Las raices enroladas. Devuelve clones y no un iterador para no atar al panel a
+    /// un prestamo del inventario mientras lo recorre.
+    pub fn raices(&self) -> Vec<RaizRegistrada> {
+        self.raices.values().cloned().collect()
+    }
+
     pub fn entradas(&self, raiz: &RaizId) -> Vec<Entrada> {
         self.filas
             .iter()

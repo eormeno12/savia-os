@@ -5,6 +5,7 @@ pub mod dominio;
 pub mod hash;
 pub mod inventario;
 pub mod maquina;
+pub mod panel;
 pub mod parametros;
 pub mod persistencia;
 pub mod plataforma;

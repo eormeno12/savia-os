@@ -47,6 +47,17 @@ pub struct BarridoAbierto {
     pub padron_requerido: bool,
 }
 
+/// Lo que vuelve de `sweep.close`, y son DOS COSAS que no se pueden separar: lo que Savia
+/// retiro, y **como quedo la raiz**. Congelar no es un error ni un retiro — es que el
+/// corte por volumen se disparo y Savia esta RETENIENDO bajas hasta tener mas evidencia.
+/// Devolver solo `retirados` deja al panel sin con que distinguir «no habia nada que
+/// retirar» de «habia demasiado y no lo toque», que son la misma lista vacia.
+#[derive(Clone, Debug)]
+pub struct CierreAplicado {
+    pub retirados: Vec<RutaRelativa>,
+    pub congelada: bool,
+}
+
 // ─────────────────────────────── La base ────────────────────────────────────
 
 /// Base de la API. Se guarda SIN barra final y se CONCATENA. Se valida ACA y no en cada
@@ -701,7 +712,7 @@ impl Cliente {
         &self,
         barrido: &SweepId,
         cierre: EstadoDelBarrido,
-    ) -> Result<Vec<RutaRelativa>, FalloDeProtocolo> {
+    ) -> Result<CierreAplicado, FalloDeProtocolo> {
         const LLAMADA: &str = "sweep.close";
         // `"complete"` esta FIJADO por el simulador (`if (status !== "complete")`).
         // `"interrupted"` NO lo esta: hoy cualquier cadena distinta se comporta igual,
@@ -719,7 +730,8 @@ impl Cliente {
                 status,
             },
         )?;
-        r.retired
+        let retirados = r
+            .retired
             .into_iter()
             .map(|p| {
                 RutaRelativa::canonica(&p).map_err(|_| FalloDeProtocolo::Cuerpo {
@@ -727,7 +739,11 @@ impl Cliente {
                     detalle: format!("ruta retirada no canonica: {p}"),
                 })
             })
-            .collect()
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(CierreAplicado {
+            retirados,
+            congelada: r.frozen,
+        })
     }
 }
 

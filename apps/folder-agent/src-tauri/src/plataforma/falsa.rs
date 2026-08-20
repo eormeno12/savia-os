@@ -167,6 +167,21 @@ impl Falsa {
         });
     }
 
+    /// EL SUPLENTE, y es el gemelo de `desmontar` porque es el caso que NO se parece a
+    /// un disco que no esta: la carpeta se enumera perfecto y contesta identidad, solo
+    /// que es otra. Un banco que solo sepa desmontar no puede distinguir los dos motivos
+    /// que el panel muestra distinto.
+    pub fn suplantar(&self) {
+        self.forzar_evidencia(EvidenciaDeRaiz {
+            enumeracion: ResultadoDeEnumeracion::Listada {
+                entradas: Vec::new(),
+                errores: Vec::new(),
+            },
+            volumen: Some(IdDeVolumen::Uuid([9u8; 16])),
+            directorio: Some(IdDeArchivoDelSO(2)),
+        });
+    }
+
     pub fn lecturas(&self) -> u64 {
         self.contadores.lock().unwrap().lecturas
     }

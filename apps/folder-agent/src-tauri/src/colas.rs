@@ -33,7 +33,7 @@ use crate::dominio::{
     BarridoId, EstadoDelBarrido, HashAfirmado, HashVerificado, RaizId, RutaRelativa,
 };
 use crate::salvaguardas::{Aparicion, Desaparicion, Hecho};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 // ═══════════════════════════════ Identidades ════════════════════════════════
 
@@ -248,9 +248,17 @@ pub enum Recibido {
     Nada,
     /// El hash que computo quien LEYO los bytes. Es la autoridad.
     Verificado(HashVerificado),
-    /// Lo que `sweep.close` retiro. El agente no lo decide, solo lo muestra. **Nunca es
-    /// fuente de verdad del inventario**: un cierre reintentado devuelve menos retiros.
-    Retirados(Vec<RutaRelativa>),
+    /// Lo que `sweep.close` contesto. **Nunca es fuente de verdad del inventario**: un
+    /// cierre reintentado devuelve menos retiros.
+    ///
+    /// `congelada` no habla de estas rutas sino de la RAIZ: Savia disparo su corte por
+    /// volumen y esta reteniendo bajas. Viaja pegado a los retiros porque llega en la
+    /// misma respuesta y porque significan cosas opuestas — «retire esto» y «no retire
+    /// nada de lo que me dijiste»—, y separarlos deja lugar a aplicar uno sin el otro.
+    Retirados {
+        rutas: Vec<RutaRelativa>,
+        congelada: bool,
+    },
 }
 
 /// Lo que el INVENTARIO tiene que anotar por causa de este desenlace, y que va en la
@@ -371,6 +379,11 @@ pub struct Colas {
     muertas: Vec<EntradaMuerta>,
     #[serde(with = "crate::dominio::mapa_como_lista")]
     envenenadas: BTreeMap<(RaizId, RutaRelativa), u64>,
+    /// Las raices donde el ULTIMO `sweep.close` contesto `frozen`. Es un conjunto y no
+    /// un contador: no interesa cuantas veces congelo, interesa si esta congelada ahora.
+    /// Vive en la cola y no en el inventario porque no es un hecho sobre documentos —
+    /// ningun documento cambio— sino sobre lo que Savia esta dispuesto a aplicar.
+    congeladas: BTreeSet<RaizId>,
     detenido: Option<MotivoDeDetencion>,
     proximo_id: u64,
 }
@@ -394,6 +407,7 @@ impl Colas {
             bytes: Vec::new(),
             muertas: Vec::new(),
             envenenadas: BTreeMap::new(),
+            congeladas: BTreeSet::new(),
             detenido: None,
             proximo_id: 1,
         }
@@ -923,11 +937,22 @@ impl Colas {
                     s.intentos = 0;
                 }
             }
-            (TrabajoId::CierreDe(sid), Recibido::Retirados(rutas)) => {
+            (TrabajoId::CierreDe(sid), Recibido::Retirados { rutas, congelada }) => {
                 out.push(Confirmacion::Retirados { rutas });
-                if let Some(s) = self.segmentos.iter_mut().find(|s| s.id == *sid) {
+                let raiz = self.segmentos.iter_mut().find(|s| s.id == *sid).map(|s| {
                     s.cierre_entregado = true;
                     s.intentos = 0;
+                    s.raiz.clone()
+                });
+                // SE PISA ENTERO EN CADA CIERRE, no se acumula. `false` TIENE que poder
+                // descongelar: si solo se insertara, una raiz congelada una vez quedaria
+                // congelada para siempre en el panel aunque Savia ya la haya soltado.
+                if let Some(raiz) = raiz {
+                    if congelada {
+                        self.congeladas.insert(raiz);
+                    } else {
+                        self.congeladas.remove(&raiz);
+                    }
                 }
             }
             (TrabajoId::CierreDe(sid), _) => {
@@ -1052,6 +1077,17 @@ impl Colas {
 
     pub fn cola_muerta(&self) -> &[EntradaMuerta] {
         &self.muertas
+    }
+
+    /// Si hay un barrido ABIERTO sobre esta raiz. Es lo unico que separa «no pasa nada»
+    /// de «esta trabajando», y sin esto el panel no puede decir ninguna de las dos.
+    pub fn barriendo(&self, raiz: &RaizId) -> bool {
+        self.segmentos.iter().any(|s| s.raiz == *raiz && s.abierto)
+    }
+
+    /// Si el ULTIMO cierre de esta raiz vino congelado. Ver `Recibido::Retirados`.
+    pub fn congelada(&self, raiz: &RaizId) -> bool {
+        self.congeladas.contains(raiz)
     }
 
     pub fn detenido(&self) -> Option<MotivoDeDetencion> {

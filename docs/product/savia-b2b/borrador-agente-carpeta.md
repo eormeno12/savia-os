@@ -606,12 +606,55 @@ detectar la deshidratación sin materializar—. Windows tiene la firma completa
 en `unimplemented!()`, acreditado con `cargo check --target x86_64-pc-windows-msvc`, que
 compila limpio: la firma es correcta aunque no haga nada.
 
-### Nada de lo que se ve existe
+### La bandeja existe como derivación y como maqueta, no como ícono
+
+**`panel::vista(almacén, plataforma, tope) → Vista`**, y es lo único de la interfaz que
+está construido. Deriva y no guarda: no tiene estado propio, no muta nada y no habla con
+Savia. Un panel con estado propio sería un segundo lugar donde vive la verdad, y el día
+que se desincronice el usuario le cree al panel.
+
+Los cuatro estados por raíz existen ahora como tipo, y **la precedencia es una decisión**:
+
+```
+CarpetaAusente  >  Congelado  >  Barriendo  >  Sincronizado
+```
+
+`CarpetaAusente` gana porque con el disco afuera ningún otro estado es *averiguable*:
+decir «Sincronizado» sobre una carpeta desmontada es afirmar algo que no se miró. Y
+**`Congelado` le gana a `Barriendo`**, que es la parte que sorprende: barrer dura segundos
+y se resuelve solo, congelado dura barridos y es lo único de los cuatro que dice que pasó
+algo que el usuario no pidió. Taparlo justo mientras dura es taparlo cuando importa — y
+el que trabaja se ve igual en los contadores. El agregado de la bandeja es **el peor de
+las raíces, nunca el promedio ni el más común**: con tres carpetas sanas y una desmontada,
+un agregado que dijera «Sincronizado» es la respuesta tranquilizadora que hace que nadie
+abra el panel.
+
+Y **`frozen` viaja hasta acá**, que antes no pasaba: el simulador lo contestaba en
+`sweep.close` y el agente lo tiraba en la misma línea, así que `Congelado` no era
+mostrable. Ahora viaja en `CierreAplicado`, se guarda por raíz en la cola, y un
+`frozen: false` **descongela** — sin eso, una raíz congelada una vez quedaría congelada
+para siempre en el panel aunque Savia ya la haya soltado.
+
+De paso salieron **dos errores del simulador**, los dos de la misma familia: el barrido
+que congelaba se contaba **a sí mismo** como la evidencia extra que el congelamiento
+exige (`congeladaAlEntrar` se leía al cerrar, y `presence.vanished` ya había congelado
+antes en ese mismo barrido), y un congelamiento nuevo por diferencia de padrón lo
+consumía el descuento del anterior. Los dos hacían que el estado durara cero barridos.
+
+La maqueta es `apps/folder-agent/panel/` — HTML, CSS y una vista de ~140 líneas sobre
+`@savia-os/design-tokens/tokens.css`, con los seis estados uno al lado del otro. **Los
+datos no están escritos a mano**: salen de `panel::vista` corriendo de verdad sobre el
+almacén y viven en `panel/ejemplo.json` con un golden que se pone rojo si la forma cambia
+—porque un campo renombrado no rompe la interfaz, la hace dibujar vacío—.
+
+### Lo demás de lo que se ve no existe
 
 `src-tauri/` es un nombre que anticipa el runtime: **Tauri ni siquiera es dependencia.**
-El crate depende de `libc`, `sha2`, `serde` y `serde_json`, y de nada más. No hay ícono
-de bandeja, ni popover, ni ventana de preferencias, ni selector de directorio. Hoy el
-agente es un binario de línea de comandos que toma una ruta y una URL:
+El crate depende de `libc`, `redb`, `sha2`, `serde` y `serde_json`, y de nada más. No hay
+ícono de bandeja, ni popover de verdad, ni ventana de preferencias, ni selector de
+directorio: hay una derivación y una maqueta, y entre eso y un ítem en la barra del
+sistema está todo el *chrome*. Hoy el agente es un binario de línea de comandos que toma
+una ruta y una URL:
 
 ```
 node apps/folder-agent/sim/server.ts        # en otra terminal
@@ -635,6 +678,17 @@ pero ya no es cierto que no haya con qué vincularse.
   distingue evento de barrido y el árbol de decisión ya trata el caso —una ruta que falta
   sin barrido abierto agenda uno en vez de reportar una baja—, pero no hay nada que
   produzca esos eventos: ni FSEvents ni `ReadDirectoryChangesW`.
+
+- **Nadie anota cuándo cerró el último barrido**, así que el «· hace 2 min» del boceto no
+  se puede decir. Poner el reloj del panel y llamarlo «hace un momento» es exactamente la
+  respuesta tranquilizadora: un agente detenido hace seis horas lo diría para siempre. El
+  panel muestra el conteo en su lugar hasta que alguien persista el hecho.
+
+- **`presence.decision` contesta `known` o `upload` y nada más**, así que el estado
+  `en espera` del boceto —«formato que todavía no leemos»— no es derivable. La única
+  forma de mostrarlo sería que el agente adivine por extensión qué formatos lee Savia:
+  duplicar del lado del escritorio una decisión que es del servidor y que cambia sin que
+  el agente se entere. Es un hueco del alambre, no del panel.
 
 Eso no cambia ninguna decisión de este documento. Es trabajo.
 
@@ -683,6 +737,30 @@ El artefacto de tokens **agnóstico ya existe**: `@savia-os/design-tokens/tokens
 los 138 valores como variables CSS, y `@savia-os/design-tokens/data` los mismos como
 datos. El barril —`@savia-os/design-tokens` a secas— sigue arrastrando el runtime de
 Chakra y está bien que lo haga: es el adaptador, no el contrato.
+
+**Construir la bandeja encontró tres cosas del sistema, y una era un defecto.**
+
+1. **`--savia-font-body` era inservible fuera de Next**, y fallaba del peor modo posible.
+   Valía `var(--font-inter), system-ui, sans-serif`, y `--font-inter` lo define
+   `next/font`: en cualquier otro consumidor la sustitución es inválida al calcular el
+   valor, y eso **no cae al siguiente ítem de la lista — anula la declaración entera**. El
+   resultado no era `system-ui`, era la serif por omisión del navegador. Ahora es
+   `var(--font-inter, system-ui), …`, que en Next no cambia nada porque ahí la variable sí
+   está definida. **Corregido en el token, no en la bandeja**: cualquier `.html` suelto,
+   correo o webview tenía el mismo problema.
+
+2. **No hay capa semántica para superficie oscura.** `--savia-color-fg` es ink y
+   `--savia-color-bg` es paper: los semánticos están resueltos para claro. Los tres
+   `*-inverse` alcanzan para fondo, texto y borde, pero no para el texto tenue ni para los
+   estados. La bandeja los deriva con `color-mix` en un solo bloque —el mapa de la
+   superficie— en vez de inventar hex nuevos.
+
+3. **La escala tipográfica arranca en 16px** (`body-lg`) y no baja al *chrome* de
+   escritorio, que vive entre 11 y 13. Van como variables locales y nombradas.
+
+Y **no todo lo que existe aplica**: `radii.card` son 28px, que es el radio de una tarjeta
+de página de 900px. Sobre un popover de 340 se come la esquina. La bandeja usa
+`radii.chip` (16px). El token no está mal — el que no aplica es el otro.
 
 ## Las decisiones, cerradas
 

@@ -92,3 +92,23 @@ pub const FRACCION_DEL_CORTE: Pendiente<f64> = None;
 /// se elige. Entra por el puerto, en `Plataforma::granularidad_de_mtime`, y no vive
 /// aca.
 pub const _TOLERANCIA_DE_MTIME_NO_VIVE_ACA: () = ();
+
+// ────────────────────── 4 de 4 · de la BANDEJA ──────────────────────────────
+
+/// **filas** — cuantos archivos muestra el panel por carpeta antes de resumir el resto
+/// en «y N mas».
+///
+/// DECIDE: si el usuario ve el archivo que le importa sin desplegar nada. Un tope corto
+/// esconde el que fallo detras de un «y 12 mas»; uno largo convierte la bandeja en una
+/// lista que hay que recorrer, que es justo lo que una bandeja no es.
+///
+/// COMO SE MEDIRIA: con el alto util real del popover en las dos plataformas —que no es
+/// un numero libre: en macOS lo acota la pantalla menos la barra, y en Windows el area
+/// de notificacion—, dividido por el alto de fila del sistema de diseno, menos el
+/// encabezado y las acciones. O sea: es un numero DERIVADO de una medicion de layout, no
+/// una preferencia. Lo que falta es hacer esa medicion sobre el panel construido.
+///
+/// EL COSTO ES ASIMETRICO, y por eso el orden de `EstadoDeArchivo::prioridad` importa
+/// mas que el tope: corto con el orden bien = se esconden archivos indexados, que es lo
+/// que nadie mira; corto con el orden mal = se esconde el que fallo.
+pub const MAX_FILAS_DEL_PANEL: Pendiente<usize> = None;

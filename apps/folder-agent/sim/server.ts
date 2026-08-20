@@ -51,7 +51,10 @@ type Documento = {
 const objetos = new Map<string, Uint8Array>();   // hash verificado -> bytes
 const documentos = new Map<string, Documento>(); // `${root} ${path}` -> doc
 const permisos = new Map<string, { hash: string; root: string; path: string }>();
-const barridos = new Map<string, { root: string; total: number; abierto: boolean; padron: Set<string> | null }>();
+const barridos = new Map<
+  string,
+  { root: string; total: number; abierto: boolean; padron: Set<string> | null; congeladaAlAbrir: boolean }
+>();
 // raiz -> barridos COMPLETOS que todavia se le exigen antes de poder retirar
 const congeladas = new Map<string, number>();
 
@@ -206,7 +209,12 @@ const rutas: Record<string, (c: any) => unknown> = {
     // corrupto que el cree bueno, o dos agentes sobre la misma raiz.
     const vivos = [...documentos.values()].filter((d) => d.root === root && d.retiredAt === null).length;
     const padronRequerido = vivos !== total;
-    barridos.set(sweepId, { root, total, abierto: true, padron: null });
+    // SE ANOTA AL ABRIR, NO AL CERRAR. El congelamiento se dispara con la evidencia de
+    // ESTE barrido —`presence.vanished` llega antes que el cierre—, asi que preguntarlo
+    // al cerrar contesta «ya estaba congelada» sobre la raiz que este mismo barrido
+    // acaba de congelar, y el barrido se cuenta a si mismo como la evidencia extra que
+    // se estaba exigiendo. El estado que importa es el de ANTES de mirar.
+    barridos.set(sweepId, { root, total, abierto: true, padron: null, congeladaAlAbrir: congeladas.has(root) });
     anotar(`sweep.open   root=${root} agente=${total} savia=${vivos}${padronRequerido ? " -> PADRON REQUERIDO" : ""}`);
     return { sweepId, padronRequerido };
   },
@@ -319,13 +327,23 @@ const rutas: Record<string, (c: any) => unknown> = {
     if (!b) return { error: "barrido desconocido" };
     b.abierto = false;
     anotar(`sweep.close  root=${b.root} status=${status}`);
-    if (status !== "complete") return { retired: [] };
+    // `frozen` VIAJA EN LAS TRES SALIDAS, no solo en la que congela. Si solo apareciera
+    // cuando es `true`, el cliente necesitaria `#[serde(default)]` para leerlo — y un
+    // default es exactamente como se pierde una senal en silencio: «ausente» se leeria
+    // «no congelada», que es la respuesta tranquilizadora.
+    if (status !== "complete") return { retired: [], frozen: congeladas.has(b.root) };
 
     const ahora = Date.now();
     // Se lee ANTES de la diferencia, porque la diferencia puede congelar en este mismo
-    // cierre — y el cierre que congela no puede contarse como la evidencia que el
-    // congelamiento exige.
-    const congeladaAlEntrar = congeladas.has(b.root);
+    // cierre — y el barrido que congela no puede contarse como la evidencia que el
+    // congelamiento exige. Ver `congeladaAlAbrir` en `sweep.open`.
+    const congeladaAlEntrar = b.congeladaAlAbrir;
+    // ...y la otra mitad: un congelamiento NUEVO disparado por la evidencia de este
+    // mismo cierre REARMA la exigencia, no la cumple. Sin esta bandera, una raiz ya
+    // congelada que ademas trae una diferencia de padron masiva se descongela en el
+    // mismo cierre que la volvio a congelar — el descuento del congelamiento viejo se
+    // come al nuevo, y la evidencia extra que se estaba exigiendo termina siendo cero.
+    let congeloEnEsteCierre = false;
 
     // LA DIFERENCIA DE CONJUNTOS, y va aca y no al recibir el padron a proposito: un
     // padron de un barrido INTERRUMPIDO es una lista parcial, y tratarla como el
@@ -345,6 +363,7 @@ const rutas: Record<string, (c: any) => unknown> = {
         const vivos = [...documentos.values()].filter((d) => d.root === b.root && d.retiredAt === null).length;
         if (vivos > 0 && ausentes.length / vivos >= BANCO.cortePorVolumen) {
           congeladas.set(b.root, BARRIDOS_DE_DESHIELO);
+          congeloEnEsteCierre = true;
           anotar(`CONGELADA ${b.root} - la diferencia del padron es el ${((ausentes.length / vivos) * 100).toFixed(0)}%`);
         }
       }
@@ -359,7 +378,7 @@ const rutas: Record<string, (c: any) => unknown> = {
     // Mientras la exigencia no se cumpla, NADA se retira de esa raiz — ni las ausencias
     // que dispararon el corte ni ninguna otra.
     if (congeladas.has(b.root)) {
-      if (congeladaAlEntrar) {
+      if (congeladaAlEntrar && !congeloEnEsteCierre) {
         const faltan = congeladas.get(b.root)! - 1;
         if (faltan <= 0) {
           congeladas.delete(b.root);
@@ -386,7 +405,7 @@ const rutas: Record<string, (c: any) => unknown> = {
     if (retirados.length > 0) {
       anotar(`RETIRO silencioso: ${retirados.join(", ")}`);
     }
-    return { retired: retirados };
+    return { retired: retirados, frozen: congeladas.has(b.root) };
   },
 };
 

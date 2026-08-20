@@ -1,0 +1,438 @@
+/* ────────────────────────────────────────────────────────────────────────────
+   LA BANDEJA · el unico lugar del agente que una persona ve.
+
+   Todo el color, el radio, la curva y la duracion salen de
+   `@savia-os/design-tokens/tokens.css`. **Este archivo no define un solo valor de
+   marca**: define el mapa de una superficie OSCURA sobre esos valores, y ese mapa
+   esta en un solo bloque —`.bandeja`— para que cambiar de superficie sea cambiar
+   ese bloque y nada mas.
+
+   ── POR QUE OSCURO ─────────────────────────────────────────────────────────
+
+   La regla dura del sistema: **el lima solo existe sobre oscuro**. Sobre papel da
+   1.05:1 —ilegible— y sobre ink da ~14:1. El panel tiene UNA accion afirmativa
+   («Vincular», «Reanudar»), y esa accion es lima o no es de Savia. Una bandeja
+   clara obligaria a resolver el CTA con otro color, que es exactamente la
+   excepcion que el sistema no tiene.
+
+   Ademas: en macOS el popover hereda el material de la barra y en Windows el fondo
+   del sistema, asi que la bandeja **no puede** apoyarse en el fondo del host para
+   decir nada. Se pinta a si misma o no dice nada.
+
+   ── LO QUE ESTE ARCHIVO ENCONTRO QUE FALTA EN LOS TOKENS ───────────────────
+
+   1. **No hay capa semantica para superficie oscura.** `--savia-color-fg` es ink y
+      `--savia-color-bg` es paper: los semanticos estan resueltos para claro. Los
+      tres que si existen —`bg-inverse`, `fg-inverse`, `border-inverse`— alcanzan
+      para el fondo, el texto y el borde, pero no para el texto TENUE ni para los
+      estados. Eso se resuelve abajo con `color-mix`, o sea derivando de los tokens
+      en vez de inventar hex nuevos.
+
+   2. **La escala tipografica arranca en 16px** (`body-lg`). No hay tamanos de
+      chrome de escritorio, que viven entre 11 y 13. Van abajo como variables
+      locales y NOMBRADAS, no sueltas en cada regla.
+
+   Las dos son huecos del sistema de diseno, no de la bandeja, y estan anotadas en
+   el borrador.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+@import url("../../../packages/design-tokens/css/tokens.css");
+
+/* ═══════════════════════ EL MAPA DE LA SUPERFICIE ═════════════════════════ */
+
+.bandeja {
+  /* — Los tres que el sistema ya resolvio para oscuro — */
+  --superficie: var(--savia-color-bg-inverse);
+  --texto: var(--savia-color-fg-inverse);
+  --borde: var(--savia-color-border-inverse);
+
+  /* — Los que faltaban, DERIVADOS y no inventados — */
+  --superficie-alta: var(--savia-color-soft-ink);
+  --texto-tenue: color-mix(in srgb, var(--savia-color-fg-inverse) 62%, transparent);
+  --texto-apagado: color-mix(in srgb, var(--savia-color-fg-inverse) 40%, transparent);
+  --borde-tenue: color-mix(in srgb, var(--savia-color-fg-inverse) 8%, transparent);
+  --realce: color-mix(in srgb, var(--savia-color-fg-inverse) 6%, transparent);
+
+  /* — La escala que el sistema no baja hasta el chrome — */
+  --texto-fila: 12.5px;
+  --texto-etiqueta: 11px;
+  --texto-cabecera: 14px;
+
+  font-family: var(--savia-font-body);
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+
+  position: relative;
+  width: 340px;
+  padding: 0;
+  overflow: hidden;
+  color: var(--texto);
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  /* `chip` (16px) y NO `card` (28px): 28 es el radio de una tarjeta de pagina de
+     900px de ancho. Sobre 340px se come la esquina y la bandeja parece una
+     pastilla. El token existe, el que no aplica es el otro. */
+  border-radius: var(--savia-radius-chip);
+  box-shadow: var(--savia-shadow-float-dark);
+}
+
+/* LA PROFUNDIDAD SOBRE OSCURO ES UN HALO, NO UNA SOMBRA INTERNA NI PARTICULAS.
+   Un solo radial de lima al 8%, difuminado: es lo que el sistema pide para las
+   superficies firmadas, y es lo unico que hace que el ink no se lea como gris. */
+.bandeja::before {
+  content: "";
+  position: absolute;
+  inset: -40% 20% 55% -30%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--savia-color-signal-lime) 8%, transparent),
+    transparent
+  );
+  filter: blur(60px);
+  pointer-events: none;
+}
+
+.bandeja > * {
+  position: relative;
+}
+
+/* ═══════════════════════════ LA CABECERA ══════════════════════════════════ */
+
+.cabecera {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px 14px;
+}
+
+.cabecera__texto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cabecera__estado {
+  font-size: var(--texto-cabecera);
+  /* 300 en el display y 600 en la palabra que se enfatiza: el peso ES la jerarquia
+     tipografica del sistema. Acá el estado agregado es lo enfatizado. */
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.cabecera__detalle {
+  font-size: var(--texto-etiqueta);
+  font-weight: 400;
+  color: var(--texto-tenue);
+  line-height: 1.4;
+}
+
+/* ══════════════════════════════ EL PUNTO ══════════════════════════════════ */
+
+/* EL COLOR NUNCA VIAJA SOLO — regla 1.4.1 y regla del sistema: el badge es SIEMPRE
+   icono mas texto. Por eso el punto puede quedarse con el tono aunque el tono no
+   llegue a 4.5:1 sobre ink: como grafico no textual el piso es 3:1, y el que carga
+   el contraste del mensaje es la palabra, que va en `--texto`. Bajar el verde a
+   4.5:1 sobre oscuro habria pedido un token que el sistema no tiene, para reforzar
+   algo que ya esta dicho con palabras. */
+.punto {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--tono);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tono) 18%, transparent);
+}
+
+.punto--grande {
+  width: 10px;
+  height: 10px;
+}
+
+[data-estado="sincronizado"] {
+  --tono: var(--savia-color-success);
+}
+[data-estado="barriendo"] {
+  --tono: var(--savia-color-info);
+}
+[data-estado="congelado"] {
+  --tono: var(--savia-color-warning);
+}
+[data-estado="carpetaAusente"] {
+  --tono: var(--savia-color-danger-soft);
+}
+/* Ninguno de estos dos es un estado de carpeta: uno es del dispositivo y el otro de un
+   archivo. Comparten el tono con `carpetaAusente` porque los tres dicen lo mismo para
+   quien mira —algo necesita a una persona— y la palabra al lado es la que los separa.
+   `danger-soft` y no `danger`: es el unico rojo del sistema pensado para leerse SOBRE
+   ink (8.2:1 contra 3.6:1 del `danger` pleno). */
+[data-estado="detenido"],
+[data-estado="fallo"] {
+  --tono: var(--savia-color-danger-soft);
+}
+
+/* El barrido es lo unico que esta PASANDO, asi que es lo unico que se mueve. */
+[data-estado="barriendo"] .punto {
+  animation: latido 1.6s var(--savia-easing-savia) infinite;
+}
+
+@keyframes latido {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--tono) 18%, transparent);
+  }
+  50% {
+    opacity: 0.55;
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--tono) 6%, transparent);
+  }
+}
+
+/* ══════════════════════════════ EL AVISO ══════════════════════════════════ */
+
+/* «Savia no esta entrando» no es el estado de una carpeta: es del dispositivo, y
+   por eso ocupa una banda propia arriba de todo en vez de una fila mas. */
+.aviso {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 10px 10px;
+  padding: 11px 13px;
+  font-size: var(--texto-fila);
+  line-height: 1.35;
+  color: var(--texto);
+  background: color-mix(in srgb, var(--savia-color-danger) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--savia-color-danger-soft) 30%, transparent);
+  border-radius: 10px;
+}
+
+.aviso__icono {
+  flex: none;
+  color: var(--savia-color-danger-soft);
+}
+
+.aviso strong {
+  font-weight: 600;
+}
+
+/* ══════════════════════════════ LAS RAICES ════════════════════════════════ */
+
+.carpetas {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--borde-tenue);
+}
+
+.carpeta {
+  padding: 12px 10px 12px 18px;
+}
+
+.carpeta + .carpeta {
+  border-top: 1px solid var(--borde-tenue);
+}
+
+.carpeta__cabecera {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 8px;
+}
+
+.carpeta__ruta {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--texto-fila);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  /* La ruta se trunca por la IZQUIERDA: el final —el nombre de la carpeta— es lo
+     que identifica, y `/Users/nadie/Documentos/Trabajo/…` recortado al reves deja
+     al usuario mirando tres veces el mismo prefijo. */
+  direction: rtl;
+  text-align: left;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.carpeta__ruta > span {
+  direction: ltr;
+  unicode-bidi: bidi-override;
+}
+
+.carpeta__estado {
+  flex: none;
+  font-size: var(--texto-etiqueta);
+  color: var(--texto-tenue);
+}
+
+/* ══════════════════════════════ LOS ARCHIVOS ══════════════════════════════ */
+
+.archivos {
+  display: flex;
+  flex-direction: column;
+  margin-top: 8px;
+  list-style: none;
+}
+
+.archivo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 8px 5px 6px;
+  border-radius: var(--savia-radius-sm);
+  transition: background var(--savia-duration-fast) var(--savia-easing-savia);
+}
+
+.archivo:hover {
+  background: var(--realce);
+}
+
+.archivo__nombre {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--texto-fila);
+  color: var(--texto-tenue);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* El que fallo es el unico que pide una persona, asi que es el unico que recupera
+   el peso del texto normal. */
+.archivo[data-archivo="fallo"] .archivo__nombre {
+  color: var(--texto);
+  font-weight: 500;
+}
+
+.archivo__estado {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--texto-etiqueta);
+  color: var(--texto-apagado);
+}
+
+.archivo[data-archivo="fallo"] .archivo__estado {
+  color: var(--savia-color-danger-soft);
+}
+.archivo[data-archivo="procesando"] .archivo__estado {
+  color: var(--texto-tenue);
+}
+
+/* La barrita del que esta en vuelo. Es la unica pieza que informa progreso sin
+   fingir que sabe cuanto falta: recorre, no se llena. */
+.pista {
+  width: 26px;
+  height: 3px;
+  overflow: hidden;
+  background: var(--realce);
+  border-radius: 2px;
+}
+
+.pista::after {
+  content: "";
+  display: block;
+  width: 45%;
+  height: 100%;
+  background: var(--savia-color-signal-lime);
+  border-radius: inherit;
+  animation: recorre 1.25s var(--savia-easing-savia) infinite;
+}
+
+@keyframes recorre {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(230%);
+  }
+}
+
+.tilde {
+  color: var(--savia-color-success);
+}
+
+.mas {
+  padding: 7px 8px 1px 6px;
+  font-size: var(--texto-etiqueta);
+  color: var(--texto-apagado);
+}
+
+.vacio {
+  padding: 4px 8px 0 6px;
+  font-size: var(--texto-etiqueta);
+  color: var(--texto-apagado);
+  line-height: 1.45;
+}
+
+/* ══════════════════════════════ EL PIE ════════════════════════════════════ */
+
+.pie {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px;
+  border-top: 1px solid var(--borde-tenue);
+  background: color-mix(in srgb, var(--savia-color-soft-ink) 55%, transparent);
+}
+
+.accion {
+  padding: 7px 11px;
+  font: inherit;
+  font-size: var(--texto-fila);
+  color: var(--texto-tenue);
+  background: none;
+  border: 0;
+  border-radius: 9px;
+  cursor: pointer;
+  transition:
+    background var(--savia-duration-fast) var(--savia-easing-savia),
+    color var(--savia-duration-fast) var(--savia-easing-savia);
+}
+
+.accion:hover {
+  color: var(--texto);
+  background: var(--realce);
+}
+
+/* **LA UNICA ACCION AFIRMATIVA DEL PANEL, Y ES LA UNICA COSA LIMA.** Relleno lima
+   con texto ink, sobre ink — que es la unica combinacion que el sistema permite.
+   Nunca texto lima sobre boton ink; nunca relleno lima sobre claro. Si algun dia
+   hay dos botones lima en esta bandeja, uno de los dos esta mal. */
+.accion--afirmativa {
+  margin-left: auto;
+  font-weight: 600;
+  color: var(--savia-color-lime-contrast);
+  background: var(--savia-color-lime-solid);
+}
+
+.accion--afirmativa:hover {
+  color: var(--savia-color-lime-contrast);
+  background: var(--savia-color-lime-emphasized);
+}
+
+.accion:focus-visible {
+  outline: 2px solid var(--savia-color-lime-solid);
+  outline-offset: 2px;
+}
+
+.separador {
+  margin-left: auto;
+}
+
+/* Lo que se mueve acá informa —el barrido late, la pista recorre—, asi que apagarlo
+   no es apagar decoracion: es dejar el mensaje solo en las palabras, que ya estan. */
+@media (prefers-reduced-motion: reduce) {
+  .bandeja *,
+  .bandeja *::after,
+  .bandeja *::before {
+    animation: none !important;
+    transition: none !important;
+  }
+  .pista::after {
+    width: 100%;
+    opacity: 0.55;
+  }
+}

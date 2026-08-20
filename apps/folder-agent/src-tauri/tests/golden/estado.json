@@ -311,6 +311,7 @@
     "bytes": [],
     "muertas": [],
     "envenenadas": [],
+    "congeladas": [],
     "detenido": null,
     "proximo_id": 3
   }

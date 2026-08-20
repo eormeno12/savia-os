@@ -400,19 +400,30 @@ fn ejecutar(
             // LO QUE SAVIA RETIRO VA A LA TRAZA. El agente no lo decide y no lo puede
             // discutir, pero es lo unico que le dice que un documento suyo dejo de estar
             // vigente — y sin eso el panel no tiene como mostrarlo.
-            if let Ok(rutas) = &r
-                && !rutas.is_empty()
-            {
-                traza.push(format!(
-                    "  retirados: {}",
-                    rutas
-                        .iter()
-                        .map(|x| x.como_str().to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                ));
+            if let Ok(c) = &r {
+                if !c.retirados.is_empty() {
+                    traza.push(format!(
+                        "  retirados: {}",
+                        c.retirados
+                            .iter()
+                            .map(|x| x.como_str().to_string())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ));
+                }
+                // EL CONGELAMIENTO VA A LA TRAZA AUNQUE NO RETIRE NADA — es justamente
+                // el caso en que no retirar nada NO significa que no habia nada.
+                if c.congelada {
+                    traza.push("  raiz congelada por Savia".to_string());
+                }
             }
-            (id.clone(), a_desenlace(r.map(Recibido::Retirados)))
+            (
+                id.clone(),
+                a_desenlace(r.map(|c| Recibido::Retirados {
+                    rutas: c.retirados,
+                    congelada: c.congelada,
+                })),
+            )
         }
         Trabajo::Subir {
             id, ruta, permiso, ..

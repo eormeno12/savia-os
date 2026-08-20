@@ -46,7 +46,20 @@ use std::path::Path;
 /// abra un deposito nuevo tiene que negarse igual que uno nuevo con un deposito viejo:
 /// leer con la version equivocada no es un error que se pueda absorber, es una fila que
 /// se interpreta mal en silencio.
-pub const FORMATO: u32 = 1;
+pub const FORMATO: u32 = 2;
+
+// ── Historia del formato ────────────────────────────────────────────────────
+//
+//   1 → 2   `Colas` gana `congeladas`: las raices cuyo ultimo `sweep.close` vino con
+//           `frozen`. **No lleva migracion, y la razon es que el 1 no existe en ningun
+//           disco fuera de este repo** — el agente no se instalo en ninguna maquina
+//           todavia (no hay instalador ni firma). Un deposito 1 solo puede ser el de una
+//           corrida de desarrollo, y para ese caso `FormatoAjeno` es la respuesta
+//           correcta: se borra y se vuelve a barrer.
+//
+//           **Esta excusa se agota el dia que el agente se instale en la primera
+//           maquina.** A partir de ahi, subir este numero sin escribir la conversion
+//           significa que alguien pierde sus lapidas.
 
 const TABLA: TableDefinition<&str, &[u8]> = TableDefinition::new("almacen");
 const K_FORMATO: &str = "formato";

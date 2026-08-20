@@ -99,7 +99,13 @@ fn confirmar_todo(a: &mut Almacen) {
                 (id, Recibido::Decisiones(vs))
             }
             Trabajo::Desvanecer { id, .. } => (id, Recibido::Nada),
-            Trabajo::CerrarBarrido { id, .. } => (id, Recibido::Retirados(Vec::new())),
+            Trabajo::CerrarBarrido { id, .. } => (
+                id,
+                Recibido::Retirados {
+                    rutas: Vec::new(),
+                    congelada: false,
+                },
+            ),
             Trabajo::Subir { id, .. } => (id, Recibido::Nada),
             Trabajo::ConfirmarSubida { id, .. } => (
                 id,
@@ -803,7 +809,13 @@ fn los_hechos_van_antes_que_los_bytes() {
     let Trabajo::CerrarBarrido { id, .. } = *t else {
         unreachable!()
     };
-    c.resolver(&id, Desenlace::Entregado(Recibido::Retirados(Vec::new())));
+    c.resolver(
+        &id,
+        Desenlace::Entregado(Recibido::Retirados {
+            rutas: Vec::new(),
+            congelada: false,
+        }),
+    );
 
     let Proximo::Trabajo(t) = c.siguiente(&raiz) else {
         panic!("falta la subida")
@@ -1474,7 +1486,10 @@ fn drenar_anotando(a: &mut Almacen, padron_requerido: bool) -> Vec<String> {
             }
             Trabajo::CerrarBarrido { .. } => {
                 orden.push("cerrar".to_string());
-                Recibido::Retirados(Vec::new())
+                Recibido::Retirados {
+                    rutas: Vec::new(),
+                    congelada: false,
+                }
             }
             _ => Recibido::Nada,
         };
@@ -1693,7 +1708,10 @@ fn un_padron_ambiguo_no_bloquea_el_cierre() {
                 vio_cierre = true;
                 (
                     id.clone(),
-                    Desenlace::Entregado(Recibido::Retirados(Vec::new())),
+                    Desenlace::Entregado(Recibido::Retirados {
+                        rutas: Vec::new(),
+                        congelada: false,
+                    }),
                 )
             }
             Trabajo::Observar { id, entradas, .. } => (

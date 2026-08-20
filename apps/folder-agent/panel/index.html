@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Savia · la bandeja</title>
+    <link rel="stylesheet" href="panel.css" />
+    <style>
+      /* ─────────────────────────────────────────────────────────────────────
+         SOLO LA HOJA DE CONTACTO. Nada de acá viaja al agente: el popover de
+         verdad es un `.bandeja` solo, a 340px, sobre el material del sistema.
+         Esta pagina existe para poder mirar los seis estados al lado del otro,
+         que es la unica forma de ver si el vocabulario se sostiene.
+         ───────────────────────────────────────────────────────────────────── */
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        font-family: var(--savia-font-body);
+        color: var(--savia-color-fg);
+        background: var(--savia-color-bg);
+        padding: 56px 40px 80px;
+      }
+      .titulo {
+        max-width: 60ch;
+        margin: 0 auto 48px;
+      }
+      .titulo h1 {
+        font-size: 34px;
+        font-weight: 300;
+        letter-spacing: -0.025em;
+        line-height: 1.1;
+      }
+      .titulo h1 b { font-weight: 600; }
+      .titulo p {
+        margin-top: 14px;
+        font-size: 15px;
+        line-height: 1.65;
+        color: var(--savia-color-fg-muted);
+      }
+      .contactos {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 44px 36px;
+        justify-content: center;
+      }
+      .contacto { display: flex; flex-direction: column; gap: 14px; }
+      .contacto__rotulo {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--savia-color-fg-subtle);
+      }
+      /* El popover se muestra sobre una lamina clara para que se vea que se pinta
+         a si mismo: es lo que tiene que pasar sobre la barra de macOS. */
+      .lamina {
+        padding: 26px;
+        background: var(--savia-color-bg-subtle);
+        border: 1px solid var(--savia-color-border);
+        border-radius: 22px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="titulo">
+      <h1>La bandeja, en sus <b>seis estados</b>.</h1>
+      <p>
+        Ninguno de estos datos está escrito a mano: los seis salen de
+        <code>panel::vista</code> corriendo de verdad sobre el almacén, y viven en
+        <code>panel/ejemplo.json</code> con un golden que se pone rojo si la forma cambia.
+      </p>
+    </div>
+    <div class="contactos" id="contactos"></div>
+
+    <script type="module">
+      import { bandeja } from "./panel.js";
+      const datos = await fetch("./ejemplo.json").then((r) => r.json());
+      document.getElementById("contactos").innerHTML = datos.escenarios
+        .map(
+          (e) => `
+            <div class="contacto">
+              <span class="contacto__rotulo">${e.nombre}</span>
+              <div class="lamina">${bandeja(e.vista)}</div>
+            </div>`,
+        )
+        .join("");
+    </script>
+  </body>
+</html>

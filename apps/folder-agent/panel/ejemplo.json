@@ -1,0 +1,203 @@
+{
+  "escenarios": [
+    {
+      "nombre": "Al día",
+      "vista": {
+        "carpetas": [
+          {
+            "estado": "sincronizado",
+            "fallos": 0,
+            "filas": [
+              {
+                "estado": "procesando",
+                "ruta": "informe-q3.xlsx"
+              },
+              {
+                "estado": "indexado",
+                "ruta": "acta-2024.pdf"
+              },
+              {
+                "estado": "indexado",
+                "ruta": "contrato-marco.docx"
+              }
+            ],
+            "id": "root-1",
+            "indexados": 2,
+            "ocultas": 0,
+            "rutaAbsoluta": "/Usuarios/nadie/Savia"
+          }
+        ],
+        "detenido": null,
+        "estado": "sincronizado",
+        "fallos": 0
+      }
+    },
+    {
+      "nombre": "Barriendo",
+      "vista": {
+        "carpetas": [
+          {
+            "estado": "barriendo",
+            "fallos": 0,
+            "filas": [
+              {
+                "estado": "indexado",
+                "ruta": "acta-2024.pdf"
+              },
+              {
+                "estado": "indexado",
+                "ruta": "contrato-marco.docx"
+              },
+              {
+                "estado": "indexado",
+                "ruta": "informe-q3.xlsx"
+              }
+            ],
+            "id": "root-1",
+            "indexados": 3,
+            "ocultas": 0,
+            "rutaAbsoluta": "/Usuarios/nadie/Savia"
+          }
+        ],
+        "detenido": null,
+        "estado": "barriendo",
+        "fallos": 0
+      }
+    },
+    {
+      "nombre": "Congelado",
+      "vista": {
+        "carpetas": [
+          {
+            "estado": "congelado",
+            "fallos": 0,
+            "filas": [
+              {
+                "estado": "indexado",
+                "ruta": "acta-2024.pdf"
+              },
+              {
+                "estado": "indexado",
+                "ruta": "contrato-marco.docx"
+              },
+              {
+                "estado": "indexado",
+                "ruta": "informe-q3.xlsx"
+              }
+            ],
+            "id": "root-1",
+            "indexados": 3,
+            "ocultas": 0,
+            "rutaAbsoluta": "/Usuarios/nadie/Savia"
+          }
+        ],
+        "detenido": null,
+        "estado": "congelado",
+        "fallos": 0
+      }
+    },
+    {
+      "nombre": "Carpeta ausente",
+      "vista": {
+        "carpetas": [
+          {
+            "estado": "sincronizado",
+            "fallos": 0,
+            "filas": [
+              {
+                "estado": "indexado",
+                "ruta": "acta-2024.pdf"
+              },
+              {
+                "estado": "indexado",
+                "ruta": "contrato-marco.docx"
+              },
+              {
+                "estado": "indexado",
+                "ruta": "informe-q3.xlsx"
+              }
+            ],
+            "id": "root-1",
+            "indexados": 3,
+            "ocultas": 0,
+            "rutaAbsoluta": "/Usuarios/nadie/Savia"
+          },
+          {
+            "estado": "carpetaAusente",
+            "fallos": 0,
+            "filas": [],
+            "id": "root-2",
+            "indexados": 0,
+            "ocultas": 0,
+            "porque": "otraCarpeta",
+            "rutaAbsoluta": "/Volumes/Archivo"
+          }
+        ],
+        "detenido": null,
+        "estado": "carpetaAusente",
+        "fallos": 0,
+        "porque": "otraCarpeta"
+      }
+    },
+    {
+      "nombre": "Un archivo falló",
+      "vista": {
+        "carpetas": [
+          {
+            "estado": "sincronizado",
+            "fallos": 1,
+            "filas": [
+              {
+                "estado": "fallo",
+                "ruta": "contrato-marco.docx"
+              },
+              {
+                "estado": "indexado",
+                "ruta": "acta-2024.pdf"
+              }
+            ],
+            "id": "root-1",
+            "indexados": 2,
+            "ocultas": 1,
+            "rutaAbsoluta": "/Usuarios/nadie/Savia"
+          }
+        ],
+        "detenido": null,
+        "estado": "sincronizado",
+        "fallos": 1
+      }
+    },
+    {
+      "nombre": "Hay que volver a vincular",
+      "vista": {
+        "carpetas": [
+          {
+            "estado": "sincronizado",
+            "fallos": 0,
+            "filas": [
+              {
+                "estado": "indexado",
+                "ruta": "acta-2024.pdf"
+              },
+              {
+                "estado": "indexado",
+                "ruta": "contrato-marco.docx"
+              },
+              {
+                "estado": "indexado",
+                "ruta": "informe-q3.xlsx"
+              }
+            ],
+            "id": "root-1",
+            "indexados": 3,
+            "ocultas": 0,
+            "rutaAbsoluta": "/Usuarios/nadie/Savia"
+          }
+        ],
+        "detenido": "credenciales",
+        "estado": "sincronizado",
+        "fallos": 0
+      }
+    }
+  ]
+}
