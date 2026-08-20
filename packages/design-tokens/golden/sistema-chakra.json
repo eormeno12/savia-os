@@ -192,13 +192,13 @@
       "var": "--chakra-font-sizes-title-lg"
     },
     "fonts.body": {
-      "valor": "var(--font-inter), system-ui, sans-serif",
-      "origen": "var(--font-inter), system-ui, sans-serif",
+      "valor": "var(--font-inter, system-ui), system-ui, sans-serif",
+      "origen": "var(--font-inter, system-ui), system-ui, sans-serif",
       "var": "--chakra-fonts-body"
     },
     "fonts.heading": {
-      "valor": "var(--font-inter), system-ui, sans-serif",
-      "origen": "var(--font-inter), system-ui, sans-serif",
+      "valor": "var(--font-inter, system-ui), system-ui, sans-serif",
+      "origen": "var(--font-inter, system-ui), system-ui, sans-serif",
       "var": "--chakra-fonts-heading"
     },
     "radii.card": {

@@ -60,9 +60,16 @@ export const tokens = {
     white: { value: "#FFFFFF" },
   },
 
+  // EL FALLBACK VA ADENTRO DEL `var()`, y no es cosmetico. `--font-inter` lo define
+  // `next/font` y **solo existe en las apps de Next**: en cualquier otro consumidor
+  // —la bandeja del agente, un `.html` suelto, un correo— `var(--font-inter)` es
+  // invalido al calcular el valor, y eso no cae al siguiente item de la lista: anula
+  // la DECLARACION ENTERA. El resultado no es "system-ui", es la serif por omision del
+  // navegador. Escrito como `var(--font-inter, system-ui)` la sustitucion siempre
+  // resuelve, y en Next no cambia nada porque ahi la variable si esta definida.
   fonts: {
-    heading: { value: "var(--font-inter), system-ui, sans-serif" },
-    body: { value: "var(--font-inter), system-ui, sans-serif" },
+    heading: { value: "var(--font-inter, system-ui), system-ui, sans-serif" },
+    body: { value: "var(--font-inter, system-ui), system-ui, sans-serif" },
   },
 
   // Fluid display scale — fills the gap above Chakra's 6xl (3.75rem).
