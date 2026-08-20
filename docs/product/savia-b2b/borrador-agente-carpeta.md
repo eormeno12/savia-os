@@ -863,6 +863,9 @@ agente, que es el único que sabe si su sistema de archivos las distingue.
   la fracción sobre lo vivo de **su** lado. Los dos números son defendibles y no son el
   mismo; cuál gobierna el corte no está decidido, y hoy `total` sirve para detectar el
   desfase y nada más.
-- **La carrocería del agente no existe.** La interfaz, el enrolamiento, la persistencia y
-  los eventos del sistema de archivos — ver «Qué existe hoy del agente, y qué no». El
-  núcleo sí, y lleva 75 pruebas.
+- **La carrocería del agente sigue sin existir, pero ya no es la lista de antes.** El
+  enrolamiento, la persistencia y la derivación del panel se construyeron; el núcleo lleva
+  **99 pruebas** más las 26 afirmaciones del ejercicio. Lo que falta es lo que toca al
+  sistema operativo: Tauri como dependencia, el ícono de bandeja, el selector nativo de
+  carpeta, los permisos de disco, el instalador y la firma — y los eventos del sistema de
+  archivos. Ver «Qué existe hoy del agente, y qué no».
