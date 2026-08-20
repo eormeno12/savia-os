@@ -25,6 +25,8 @@ const BANCO = {
   cortePorVolumen: 0.3,
   /** bytes - tope del permiso prefirmado, como `content-length-range`. */
   tamanoMaximo: 50 * 1024 * 1024,
+  /** ms - cuanto vive un codigo de vinculacion sin aprobar. Producto: sin medir. */
+  ventanaDeVinculacion: 10 * 60_000,
 } as const;
 
 /**
@@ -52,11 +54,136 @@ const permisos = new Map<string, { hash: string; root: string; path: string }>()
 const barridos = new Map<string, { root: string; total: number; abierto: boolean; padron: Set<string> | null }>();
 // raiz -> barridos COMPLETOS que todavia se le exigen antes de poder retirar
 const congeladas = new Map<string, number>();
+
+/**
+ * EL ENROLAMIENTO. Dos mapas, y estan separados por la misma razon por la que el
+ * protocolo tiene `code` e `enrollmentId`: una vinculacion es un TRAMITE en curso y un
+ * token es una credencial viva. El tramite se descarta; el token se revoca.
+ */
+type Vinculacion = {
+  readonly code: string;
+  readonly expiraEn: number;
+  estado: "pending" | "approved" | "denied";
+  deviceToken: string | null;
+  userId: string | null;
+};
+const vinculaciones = new Map<string, Vinculacion>(); // enrollmentId -> tramite
+const tokens = new Map<string, string>();             // deviceToken -> userId
+
 let seq = 0;
 const id = (p: string) => `${p}-${(seq += 1)}`;
 const clave = (root: string, path: string) => `${root} ${path}`;
 const sha256 = (b: Uint8Array) => createHash("sha256").update(b).digest("hex");
 const anotar = (m: string) => console.log(`  . ${m}`);
+
+/**
+ * LAS RUTAS QUE NO EXIGEN CREDENCIAL, y son exactamente dos clases.
+ *
+ * Las de `begin`/`claim` no la pueden exigir porque SON LAS QUE LA PRODUCEN. Las de
+ * `approve`/`deny`/`revoke` no son del agente en absoluto: representan a la PERSONA
+ * actuando desde su cuenta, y en Savia de verdad las protegeria su sesion web. Aca no
+ * llevan nada porque quien las llama es el ejercicio, haciendo de humano.
+ *
+ * **Que `approve` sea inalcanzable para el cliente de Rust es la garantia entera del
+ * codigo corto**: `Cliente` no tiene un metodo que la llame, y no se le puede agregar
+ * sin que alguien tenga que justificar por que el agente se aprueba a si mismo.
+ */
+const SIN_CREDENCIAL = new Set([
+  "POST /enroll/begin",
+  "POST /enroll/claim",
+  "POST /enroll/approve",
+  "POST /enroll/deny",
+  "POST /enroll/revoke",
+]);
+
+// -- El enrolamiento (tres llamadas del agente + las de la persona) -----------
+const rutasDeEnrolamiento: Record<string, (c: any) => unknown> = {
+  /**
+   * `enroll.begin` - el primer contacto de un agente que no tiene nada.
+   *
+   * Devuelve DOS identificadores distintos a proposito: `code` es corto porque lo lee
+   * una persona, y con el NO se reclama nada; `enrollmentId` es opaco y es con lo que se
+   * reclama. Si se reclamara con el codigo, adivinar seis caracteres seria adivinar un
+   * token de dispositivo.
+   */
+  "POST /enroll/begin": ({ expiresInMs }) => {
+    const enrollmentId = id("enroll");
+    // AFFORDANCE DEL BANCO, no del producto: sin poder acortar la ventana, el camino
+    // «vencido» no lo ejerce nada y el arm del cliente queda muerto.
+    const ventana = typeof expiresInMs === "number" ? expiresInMs : BANCO.ventanaDeVinculacion;
+    const code = `${(seq * 7919) % 1000000}`.padStart(6, "0");
+    vinculaciones.set(enrollmentId, {
+      code, expiraEn: Date.now() + ventana, estado: "pending", deviceToken: null, userId: null,
+    });
+    anotar(`enroll.begin codigo=${code} (vence en ${ventana} ms)`);
+    return { enrollmentId, code, expiresIn: Math.floor(ventana / 1000) };
+  },
+
+  /**
+   * `enroll.claim` - el agente pregunta si ya lo aprobaron.
+   *
+   * ES IDEMPOTENTE, y hace falta: si la respuesta que traia el token se pierde en la
+   * red, el agente vuelve a reclamar y tiene que recibir EL MISMO token. Acunar uno
+   * nuevo dejaria vivo el anterior, que nadie va a usar y nadie va a revocar.
+   */
+  "POST /enroll/claim": ({ enrollmentId }) => {
+    const v = vinculaciones.get(enrollmentId);
+    if (!v) return { error: "vinculacion desconocida" };
+    if (v.estado === "denied") { anotar(`enroll.claim denegada`); return { status: "denied" }; }
+    // EL VENCIMIENTO SE MIRA ANTES QUE LA APROBACION Y DESPUES DE `approved`: una
+    // vinculacion ya aprobada no vence - el token que produjo es una credencial viva y
+    // se revoca, no expira con el tramite que lo emitio.
+    // `>=` Y NO `>`: alcanzado el instante de vencimiento, ya vencio. Con `>` una
+    // ventana de 0 ms depende de si el reloj avanzo un milisegundo entre `begin` y
+    // `claim`, o sea que la prueba del camino «vencido» sale cara o cruz.
+    if (v.estado === "pending" && Date.now() >= v.expiraEn) {
+      anotar(`enroll.claim vencida`);
+      return { status: "expired" };
+    }
+    if (v.estado === "pending") { anotar(`enroll.claim pendiente - nadie aprobo todavia`); return { status: "pending" }; }
+    anotar(`enroll.claim APROBADA -> token para ${v.userId}`);
+    return { status: "approved", deviceToken: v.deviceToken, userId: v.userId };
+  },
+
+  /**
+   * LA PERSONA, desde su cuenta. Recibe el CODIGO CORTO —que es lo unico que la persona
+   * ve— y no el `enrollmentId`, que ni siquiera se le muestra.
+   *
+   * **No devuelve el token.** El token viaja al agente por `claim` y por ningun otro
+   * lado: la pantalla de la persona nunca lo carga, asi que una captura de esa pantalla
+   * no es una credencial.
+   */
+  "POST /enroll/approve": ({ code, userId }) => {
+    const e = [...vinculaciones.entries()].find(([, v]) => v.code === code);
+    if (!e) return { error: "codigo desconocido" };
+    const [, v] = e;
+    if (Date.now() > v.expiraEn) return { error: "codigo vencido" };
+    v.estado = "approved";
+    v.deviceToken = id("tok");
+    v.userId = userId;
+    tokens.set(v.deviceToken, userId);
+    anotar(`APROBADO     codigo=${code} por ${userId}`);
+    return { ok: true };
+  },
+
+  "POST /enroll/deny": ({ code }) => {
+    const e = [...vinculaciones.entries()].find(([, v]) => v.code === code);
+    if (!e) return { error: "codigo desconocido" };
+    e[1].estado = "denied";
+    anotar(`DENEGADO     codigo=${code}`);
+    return { ok: true };
+  },
+
+  /**
+   * LA REVOCACION, tambien de la persona. Es lo que vuelve ejercitable el camino de
+   * credenciales del agente sin tener que romperle el token a mano.
+   */
+  "POST /enroll/revoke": ({ deviceToken }) => {
+    const habia = tokens.delete(deviceToken);
+    anotar(`REVOCADO     ${habia ? "token dado de baja" : "no habia tal token"}`);
+    return { ok: true };
+  },
+};
 
 // -- Los seis endpoints (siete llamadas: `presence.decision` es la respuesta) --
 const rutas: Record<string, (c: any) => unknown> = {
@@ -277,8 +404,26 @@ export const iniciar = (puerto = 4477) =>
         res.writeHead(200).end();
         return;
       }
-      const h = rutas[`${req.method} ${req.url}`];
-      if (!h) { res.writeHead(404).end(JSON.stringify({ error: `sin ruta: ${req.method} ${req.url}` })); return; }
+      const clave = `${req.method} ${req.url}`;
+      const h = rutas[clave] ?? rutasDeEnrolamiento[clave];
+      // EL 404 VA ANTES QUE EL 401 A PROPOSITO. Con el orden inverso, una base de API
+      // mal escrita contesta «credencial invalida» y manda a buscar el problema al lado
+      // equivocado. Aca el diagnostico vale mas que no filtrar que rutas existen: es un
+      // simulador local, no una superficie publica.
+      if (!h) { res.writeHead(404).end(JSON.stringify({ error: `sin ruta: ${clave}` })); return; }
+      // LA CREDENCIAL SE MIRA ACA, UNA VEZ Y PARA TODAS. Adentro de cada handler serian
+      // seis lugares y seis oportunidades de olvidarse, y el que se olvide es un
+      // endpoint abierto que nada distingue de uno cerrado.
+      if (!SIN_CREDENCIAL.has(clave)) {
+        const cab = req.headers.authorization;
+        const token = cab?.startsWith("Bearer ") ? cab.slice(7) : null;
+        if (!token || !tokens.has(token)) {
+          anotar(`401          ${clave} - ${token ? "token revocado o desconocido" : "sin Authorization"}`);
+          res.writeHead(401, { "content-type": "application/json" })
+            .end(JSON.stringify({ error: "credencial invalida o ausente" }));
+          return;
+        }
+      }
       const out = h(bytes.length ? JSON.parse(bytes.toString()) : {});
       res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(out));
     });

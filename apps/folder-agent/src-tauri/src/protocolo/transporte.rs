@@ -51,12 +51,18 @@ pub struct Respuesta {
 /// rutea por `${method} ${url}` exacto, asi que una barra final, un query o un join que
 /// se coma el ultimo segmento devuelven 404 — y un 404 se clasifica como cola muerta, o
 /// sea que un typo de configuracion parece seis bugs de contrato.
+///
+/// `autorizacion` es un PARAMETRO y no un campo de un cliente, para que cada sitio que
+/// pide tenga que decir explicitamente si manda la credencial. El PUT prefirmado pasa
+/// `None`, y con esta forma esa decision se lee en la llamada en vez de esconderse en
+/// un default.
 pub fn pedir(
     autoridad: &str,
     metodo: &str,
     ruta: &str,
     cuerpo: &[u8],
     tipo: Option<&str>,
+    autorizacion: Option<&str>,
     tiempos: &Tiempos,
 ) -> Result<Respuesta, FalloDeRed> {
     use std::net::ToSocketAddrs;
@@ -77,6 +83,9 @@ pub fn pedir(
     );
     if let Some(t) = tipo {
         cab.push_str(&format!("Content-Type: {t}\r\n"));
+    }
+    if let Some(a) = autorizacion {
+        cab.push_str(&format!("Authorization: {a}\r\n"));
     }
     cab.push_str("\r\n");
     s.write_all(cab.as_bytes())

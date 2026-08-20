@@ -96,6 +96,54 @@ distintos**. Con el enrolamiento del lado de la persona, la carpeta es un canal
 gobernanza de quién ve qué queda donde ya vive, en la Capa 3, en vez de heredarse de
 quién instaló el agente.
 
+#### El paso 2 sobre el alambre
+
+Tres llamadas, y **las tres las inicia el agente**, por la misma razón que el resto del
+protocolo: no es direccionable, así que la aprobación no le puede llegar — la tiene que
+ir a buscar.
+
+```
+POST /enroll/begin   {}                  → { enrollmentId, code, expiraEn }
+      ── acá el agente MUESTRA `code`, y espera ──
+      ── acá la persona lo aprueba desde su cuenta ──
+POST /enroll/claim   { enrollmentId }    → { status: "pending" }
+                                         | { status: "approved", deviceToken, userId }
+                                         | { status: "denied" | "expired" }
+```
+
+El cable va en inglés y el dominio en español, como el resto del protocolo.
+
+**El agente no se puede aprobar a sí mismo, y eso es todo lo que el código corto
+compra.** Aprobar no es una llamada del agente: es lo que hace la persona desde su
+cuenta. En el simulador vive como un endpoint aparte que llama el ejercicio —nunca el
+cliente— y esa separación es deliberada: si el agente pudiera llamarlo, el código corto
+no ataría nada.
+
+**`code` y `enrollmentId` son dos cosas distintas a propósito.** El `code` es corto
+porque lo lee un humano; el `enrollmentId` es opaco porque con él se reclama el token.
+Si se reclamara con el código corto, adivinar seis caracteres sería adivinar un token de
+dispositivo.
+
+**El token viaja en `Authorization: Bearer` en las siete llamadas del protocolo, y en
+ninguna otra.** El PUT prefirmado no lo lleva —ya estaba decidido: mandarlo sería filtrar
+el token a un host de almacenamiento de terceros que además eligió la respuesta del
+servidor—. Y las tres de acá tampoco lo pueden llevar: son las que lo producen.
+
+**Un `401` o un `403` detiene el DISPOSITIVO ENTERO, no la raíz.** El token es por
+persona, no por carpeta. Y detiene la *cola*, no el observador: el inventario se sigue
+actualizando, porque si el observador parara, las bajas de esa ventana se perderían — y
+una baja perdida deja un documento indexado para siempre.
+
+**Enrolar el dispositivo y registrar una raíz son dos actos, no uno.** El token es del
+dispositivo; cada raíz se registra aparte contra él, y ese registro tiene que ser
+**idempotente por `(dispositivo, identidadDeVolumen, idDelDirectorio)`**. No es una
+preferencia: es un requisito que el inventario le IMPONE al enrolamiento, porque sin esa
+idempotencia reelegir la misma carpeta acuña un `RootId` nuevo y duplica todos sus
+documentos.
+
+**Y hoy el token no sobrevive al proceso**, porque no hay persistencia. Cada corrida
+re-enrola. Es el mismo hueco de la sección de estado, visto desde acá.
+
 ### El panel
 
 Un ícono en la barra y, al hacer clic, un popover con lo mínimo:
@@ -518,7 +566,11 @@ El agente **no tiene con qué hablar todavía**. En orden de dependencia:
    índice son tres filtros de tres consumidores, y ninguno existe.
 6. **Los números de la cuarentena**, a `PARAMETERS`, en `null`, con unidad y con cómo
    se medirían. Ninguno se inventa.
-7. **Enrolamiento y auth de máquina.** El token de dispositivo no existe.
+7. **Enrolamiento y auth de máquina.** Del lado de Savia no existe nada: ni la pantalla
+   donde la persona aprueba un código, ni la emisión del token, ni la lista de
+   dispositivos desde la que se revoca. El **contrato** sí está fijado y ejercido contra
+   el simulador —tres llamadas, ver «El paso 2 sobre el alambre»—, así que lo que falta
+   es implementarlo, no diseñarlo.
 
 ## Qué existe hoy del agente, y qué no
 
@@ -527,11 +579,15 @@ esperar a nada. **Se hizo, y eso partió el agente en dos mitades muy distintas.
 
 ### El núcleo existe, y corre
 
-`apps/folder-agent/src-tauri/` — **6.468 líneas de Rust en 18 módulos, con 75 pruebas**:
-71 en proceso sobre la máquina, las salvaguardas, las colas y los guardianes, y **4 que
-hablan HTTP de verdad** contra `sim/server.ts`, el servidor simulado. Cubre el árbol de
-decisión completo con sus diez salidas, el inventario, las cinco salvaguardas, las dos
-colas con su orden y su compactación, y el cliente con las siete llamadas.
+`apps/folder-agent/src-tauri/` — **6.649 líneas de Rust en 18 módulos, con 79 pruebas**:
+74 en proceso sobre la máquina, las salvaguardas, las colas y los guardianes, y **5 que
+hablan HTTP de verdad** contra `sim/server.ts`, el servidor simulado, que a su vez lleva
+26 afirmaciones propias. Cubre el árbol de decisión completo con sus diez salidas, el
+inventario, las cinco salvaguardas, las dos colas con su orden y su compactación, el
+cliente con las siete llamadas, y **el enrolamiento con sus tres**.
+
+Y la cadena la corre `turbo lint`: los seis peldaños —`fmt` → `clippy` → cross-check de
+Windows → las pruebas → el ejercicio → el banco— en 25 s.
 
 Del tramo de plataforma, **macOS es la única implementación real** —`mach_continuous_time`
 para el reloj que avanza durante la suspensión, y `SF_DATALESS` por `lstat` para
@@ -551,12 +607,16 @@ node apps/folder-agent/sim/server.ts        # en otra terminal
 cargo run -- <ruta-de-la-raíz> [http://127.0.0.1:4477]
 ```
 
-**Y no existe cómo se instala.** De los cinco pasos del enrolamiento no hay ninguno: sin
-instalador, sin código de vinculación, sin token de dispositivo. El cliente habla
-`SinAutenticar` contra `127.0.0.1` — el caso con credencial está **nombrado en el tipo**,
-para que no sea un `Option` que alguien se olvidó de llenar, pero no lo ejercita ninguna
-prueba. Es el punto 7 de la lista de arriba, y es el que bloquea a los otros cuatro: no
-hay nada que instalar hasta que haya con qué vincularse.
+**Del enrolamiento existe el paso 2 y nada más.** El agente pide un código, lo muestra,
+espera a que una persona lo apruebe y reclama su token; el token viaja en
+`Authorization: Bearer` en las siete llamadas, un `401` detiene el dispositivo entero, y
+la revocación desde la cuenta lo apaga — todo eso está construido contra el simulador y
+acreditado, incluido que **el cliente no tiene con qué aprobarse a sí mismo**.
+
+Lo que no existe son los otros cuatro pasos: **sin instalador, sin permisos de disco, sin
+selector de carpeta y sin primer barrido con progreso**. Y el token no sobrevive al
+proceso, porque no hay persistencia. Sigue siendo cierto que no hay nada que instalar —
+pero ya no es cierto que no haya con qué vincularse.
 
 ### Y dos huecos que no son de interfaz
 

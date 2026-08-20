@@ -20,6 +20,7 @@
 
 use savia_folder_nucleo::almacen::Almacen;
 use savia_folder_nucleo::ciclo;
+use savia_folder_nucleo::colas::MotivoDeDetencion;
 use savia_folder_nucleo::colas::ParametrosDeCola;
 use savia_folder_nucleo::dominio::{BarridoId, RaizId, SensibilidadAMayusculas};
 #[cfg(target_os = "macos")]
@@ -27,19 +28,70 @@ use savia_folder_nucleo::plataforma::Macos as PlataformaLocal;
 #[cfg(target_os = "windows")]
 use savia_folder_nucleo::plataforma::Windows as PlataformaLocal;
 use savia_folder_nucleo::plataforma::{Plataforma, RaizRegistrada};
-use savia_folder_nucleo::protocolo::{BaseDeApi, Cliente, Credencial, Tiempos};
+use savia_folder_nucleo::protocolo::{
+    BaseDeApi, Cliente, Credencial, Reclamo, Tiempos, transporte,
+};
 use savia_folder_nucleo::salvaguardas::Politica;
 use std::time::Duration;
 
 /// Parametros del BANCO, no del producto.
 const ASENTAMIENTO: Duration = Duration::from_millis(120);
 const BASE: &str = "http://127.0.0.1:4477";
+const AUTORIDAD: &str = "127.0.0.1:4477";
 
 fn tiempos() -> Tiempos {
     Tiempos {
         conexion: Duration::from_secs(5),
         por_llamada: Duration::from_secs(30),
         envio_de_cuerpo: None,
+    }
+}
+
+/// EL HUMANO, Y EN EL BANCO TIENE QUE SER CODIGO DEL BANCO. `Cliente` no tiene ningun
+/// metodo que llame a `/enroll/approve` ni a `/enroll/revoke`, asi que estas dos son
+/// forzosamente HTTP a mano desde acá — y esa imposibilidad ES la propiedad que el
+/// codigo corto compra. El dia que alguien le agregue `aprobar()` al cliente, esta
+/// funcion deja de tener razon de existir y hay que justificar por que el agente se
+/// aprueba solo.
+fn como_humano(ruta: &str, cuerpo: String) {
+    let r = transporte::pedir(
+        AUTORIDAD,
+        "POST",
+        ruta,
+        cuerpo.as_bytes(),
+        Some("application/json"),
+        None,
+        &tiempos(),
+    )
+    .expect("el simulador tiene que estar corriendo");
+    assert_eq!(r.codigo, 200, "{ruta} fallo: {}", r.cuerpo);
+}
+
+/// Un dispositivo vinculado DE VERDAD: `begin` → (el humano aprueba) → `claim`.
+///
+/// Afirma en el medio que sin aprobacion no hay token, asi que ninguna prueba de este
+/// archivo puede quedar verde contra un servidor que reparta credenciales sin humano.
+fn credencial_enrolada() -> (Credencial, String) {
+    let sin_vincular = Cliente::nuevo(
+        BaseDeApi::nueva(BASE).unwrap(),
+        Credencial::SinAutenticar,
+        tiempos(),
+    );
+    let v = sin_vincular.enrolar().unwrap();
+    assert!(
+        matches!(sin_vincular.reclamar(&v).unwrap(), Reclamo::Pendiente),
+        "sin aprobacion humana no puede haber token"
+    );
+    como_humano(
+        "/enroll/approve",
+        format!(r#"{{"code":"{}","userId":"user-banco"}}"#, v.codigo),
+    );
+    match sin_vincular.reclamar(&v).unwrap() {
+        Reclamo::Aprobado { token, .. } => {
+            let crudo = token.0.clone();
+            (Credencial::TokenDeDispositivo(token), crudo)
+        }
+        otro => panic!("se esperaba una vinculacion aprobada, vino {otro:?}"),
     }
 }
 
@@ -87,7 +139,7 @@ fn el_ciclo_entero_contra_el_simulador() {
     });
     let cliente = Cliente::nuevo(
         BaseDeApi::nueva(BASE).unwrap(),
-        Credencial::SinAutenticar,
+        credencial_enrolada().0,
         tiempos(),
     );
     let politica = Politica::con_asentamiento(ASENTAMIENTO).unwrap();
@@ -150,7 +202,7 @@ fn el_dedupe_previo_a_la_transferencia_ahorra_los_bytes() {
     // costo es UN BARRIDO, no una re-subida.
     let cliente = Cliente::nuevo(
         BaseDeApi::nueva(BASE).unwrap(),
-        Credencial::SinAutenticar,
+        credencial_enrolada().0,
         tiempos(),
     );
     let raiz = RaizId::nueva("banco-dedupe");
@@ -198,7 +250,7 @@ fn la_divergencia_vuelve_en_el_hash_verificado() {
     // archivo PARA SIEMPRE, y una desaparicion posterior no matchea con nada.
     let cliente = Cliente::nuevo(
         BaseDeApi::nueva(BASE).unwrap(),
-        Credencial::SinAutenticar,
+        credencial_enrolada().0,
         tiempos(),
     );
     let raiz = RaizId::nueva("banco-divergencia");
@@ -256,7 +308,7 @@ fn un_agente_que_perdio_su_inventario_recupera_el_desfase_por_el_padron() {
     let raiz = RaizId::nueva(format!("padron-{nonce}"));
     let cliente = Cliente::nuevo(
         BaseDeApi::nueva(BASE).unwrap(),
-        Credencial::SinAutenticar,
+        credencial_enrolada().0,
         tiempos(),
     );
     let politica = Politica::con_asentamiento(ASENTAMIENTO).unwrap();
@@ -336,4 +388,76 @@ fn un_agente_que_perdio_su_inventario_recupera_el_desfase_por_el_padron() {
     );
 
     std::fs::remove_dir_all(&dir).ok();
+}
+
+/// **EL CAMINO QUE NO EJERCIA NADA.** La cola tiene desde el principio la regla «un error
+/// de credenciales para y avisa» —`Desenlace::Credenciales` detiene el DISPOSITIVO
+/// ENTERO, no la raiz, porque el token es por persona y no por carpeta—, y hasta ahora
+/// esa regla no la disparaba ninguna prueba de integracion: el cliente mandaba
+/// `SinAutenticar`, el simulador no miraba headers, y ningun 401 nacia nunca.
+///
+/// Se acredita con una REVOCACION y no con un token inventado, porque son dos cosas
+/// distintas: un token basura prueba que el servidor rechaza basura; un token que fue
+/// valido y dejo de serlo prueba lo que le pasa a un dispositivo real cuando su duena lo
+/// da de baja desde su cuenta — una laptop robada, o una que dejo de ser suya.
+#[test]
+#[ignore = "necesita `node apps/folder-agent/sim/server.ts` corriendo en 4477"]
+fn un_token_revocado_detiene_el_dispositivo_entero() {
+    let dir = std::env::temp_dir().join(format!(
+        "savia-folder-revoca-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    let nonce = dir.file_name().unwrap().to_string_lossy().to_string();
+    std::fs::write(dir.join("acta.txt"), format!("un acta {nonce}")).unwrap();
+
+    let plataforma = PlataformaLocal::nueva().unwrap();
+    let ruta = std::fs::canonicalize(&dir).unwrap();
+    let raiz = RaizId::nueva(format!("revoca-{nonce}"));
+    let huella = plataforma.huella_de_raiz(&ruta).unwrap();
+    let mut almacen = Almacen::nuevo(ParametrosDeCola {
+        max_intentos: None,
+        max_entradas_por_lote: None,
+    });
+    almacen.enrolar(RaizRegistrada {
+        id: raiz.clone(),
+        huella,
+        ruta_absoluta: ruta.clone(),
+        sensibilidad: SensibilidadAMayusculas::NoDistingue,
+    });
+
+    let (credencial, token) = credencial_enrolada();
+    let cliente = Cliente::nuevo(BaseDeApi::nueva(BASE).unwrap(), credencial, tiempos());
+    let politica = Politica::con_asentamiento(ASENTAMIENTO).unwrap();
+
+    // Dos vueltas SIN drenar: el asentamiento exige dos observaciones, y recien la
+    // segunda encola la aparicion. Se drena despues de revocar, a proposito.
+    for n in 1..=2 {
+        std::thread::sleep(ASENTAMIENTO);
+        ciclo::barrer(
+            &raiz,
+            BarridoId::nuevo(format!("b{n}")),
+            &plataforma,
+            &mut almacen,
+            &politica,
+        );
+    }
+    assert!(
+        almacen.colas().detenido().is_none(),
+        "hasta acá el dispositivo tiene que estar sano: si ya estuviera detenido, la afirmación de abajo sería verde sin que la revocación hiciera nada"
+    );
+
+    como_humano("/enroll/revoke", format!(r#"{{"deviceToken":"{token}"}}"#));
+
+    let mut traza = Vec::new();
+    ciclo::drenar(&raiz, &plataforma, &mut almacen, &cliente, &mut traza);
+
+    assert_eq!(
+        almacen.colas().detenido(),
+        Some(MotivoDeDetencion::Credenciales),
+        "un 401 tiene que detener el dispositivo entero: {traza:?}"
+    );
 }

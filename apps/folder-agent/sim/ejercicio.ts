@@ -11,8 +11,24 @@ import { iniciar } from "./server.ts";
 
 const BASE = "http://127.0.0.1:4477";
 const hash = (s: string) => createHash("sha256").update(s).digest("hex");
-const llamar = async (ruta: string, cuerpo: unknown) =>
-  (await fetch(`${BASE}${ruta}`, { method: "POST", body: JSON.stringify(cuerpo) })).json();
+/**
+ * EL TOKEN DE DISPOSITIVO, que a partir del bloque 0 lleva TODA llamada. Empieza en
+ * `null` a proposito: asi el primer bloque puede afirmar que sin el no entra nada.
+ */
+let TOKEN: string | null = null;
+
+const crudo = (ruta: string, cuerpo: unknown) =>
+  fetch(`${BASE}${ruta}`, {
+    method: "POST",
+    body: JSON.stringify(cuerpo),
+    headers: TOKEN ? { authorization: `Bearer ${TOKEN}` } : {},
+  });
+
+const llamar = async (ruta: string, cuerpo: unknown) => (await crudo(ruta, cuerpo)).json();
+
+/** Sin token pase lo que pase: es como habla un agente que todavia no se vinculo. */
+const llamarSinCredencial = async (ruta: string, cuerpo: unknown) =>
+  fetch(`${BASE}${ruta}`, { method: "POST", body: JSON.stringify(cuerpo) });
 
 let fallas = 0;
 const afirmar = (ok: boolean, que: string, porque: string) => {
@@ -42,6 +58,41 @@ const observar = async (archivos: { path: string; contenido: string }[]) => {
 };
 
 const servidor = await iniciar();
+
+console.log("\n0 - EL ENROLAMIENTO: sin token no entra nada");
+
+// La puerta, antes que nada. Si esto pasara, las 16 afirmaciones de abajo estarian
+// midiendo un servidor abierto.
+const sinNada = await llamarSinCredencial("/sweep/open", { root: ROOT, total: 0 });
+afirmar(sinNada.status === 401, "una llamada del protocolo sin credencial se rechaza", "el resto del ejercicio da por sentado que el token vale de algo; si el servidor aceptara sin header, todo lo que sigue seria verde por vacio");
+
+const v = await llamar("/enroll/begin", {});
+afirmar(typeof v.code === "string" && v.code !== v.enrollmentId, "`code` y `enrollmentId` son distintos", "el codigo corto lo lee una persona y el id opaco reclama el token: si fueran el mismo, adivinar seis caracteres seria adivinar un token de dispositivo");
+
+const antes = await llamar("/enroll/claim", { enrollmentId: v.enrollmentId });
+afirmar(antes.status === "pending" && antes.deviceToken === undefined, "reclamar antes de que alguien apruebe no entrega token", "es la propiedad entera del enrolamiento: el agente puede pedir todo lo que quiera y sin un humano no obtiene nada");
+
+// ── ACA HACE DE HUMANO EL EJERCICIO. El cliente de Rust NO tiene con que llamar esto ──
+const ap = await llamar("/enroll/approve", { code: v.code, userId: "user-1" });
+afirmar(ap.deviceToken === undefined, "aprobar no le devuelve el token a la persona", "el token viaja al agente por `claim` y por ningun otro lado: una captura de la pantalla de la persona no puede ser una credencial");
+
+const dado = await llamar("/enroll/claim", { enrollmentId: v.enrollmentId });
+afirmar(dado.status === "approved" && typeof dado.deviceToken === "string", "aprobado, reclamar entrega el token", "es el unico camino por el que un agente obtiene credencial");
+
+const otraVez = await llamar("/enroll/claim", { enrollmentId: v.enrollmentId });
+afirmar(otraVez.deviceToken === dado.deviceToken, "reclamar dos veces entrega el MISMO token", "si la respuesta que traia el token se pierde en la red el agente vuelve a reclamar; acunar uno nuevo dejaria vivo el anterior, que nadie va a usar y nadie va a revocar");
+
+TOKEN = dado.deviceToken;
+const conToken = await crudo("/sweep/open", { root: "root-descartable", total: 0 });
+afirmar(conToken.status === 200, "con el token, la misma llamada entra", "cierra el par: la puerta distingue, no rechaza todo");
+
+// Los dos finales del tramite, que no son el mismo y al usuario se le dicen distinto.
+const vDeny = await llamar("/enroll/begin", {});
+await llamar("/enroll/deny", { code: vDeny.code });
+afirmar((await llamar("/enroll/claim", { enrollmentId: vDeny.enrollmentId })).status === "denied", "una vinculacion denegada dice `denied`", "«alguien dijo que no» y «te tardaste» son mensajes opuestos para el usuario: colapsarlos obliga a la interfaz a inventar cual mostrar");
+
+const vExp = await llamar("/enroll/begin", { expiresInMs: 0 });
+afirmar((await llamar("/enroll/claim", { enrollmentId: vExp.enrollmentId })).status === "expired", "una vinculacion vencida dice `expired`", "sin este camino ejercido, el arm `Vencido` del cliente es codigo muerto que nadie probo");
 
 console.log("\n1 - PRIMERA VEZ: los dos se piden");
 const d1 = await barrer(2, async () => {
@@ -167,6 +218,11 @@ const s11 = await abrirEn(R2, 2);
 const r11 = await cerrar((s11 as any).sweepId);
 afirmar((r11 as any).retired.includes("b.txt"), "`b.txt`, borrado mientras el agente estaba caido, se retira", "es el agujero que el padron vino a tapar: sin el, ese documento quedaba vigente en Savia para siempre");
 afirmar(!(r11 as any).retired.includes("c-nube.txt"), "`c-nube.txt`, deshidratado y sin hash, NO se retira", "presente es presente. Omitir del padron lo que no se pudo leer retiraria archivos que estan perfectamente ahi, solo que en la nube - y en macOS leerlos para probarlo significa descargar el drive entero");
+
+console.log("\n12 - LA REVOCACION: la persona le saca el dispositivo");
+await llamar("/enroll/revoke", { deviceToken: TOKEN });
+const revocado = await crudo("/sweep/open", { root: ROOT, total: 0 });
+afirmar(revocado.status === 401, "revocado el token, el dispositivo deja de entrar", "es la unica palanca que tiene una persona sobre un agente que ya no controla - una laptop robada, o una que dejo de ser suya");
 
 console.log(`\n${fallas === 0 ? "ejercicio ok" : `EJERCICIO-ERR: ${fallas} afirmaciones fallaron`}`);
 console.log("estado final:", JSON.stringify(servidor.estado(), null, 2));

@@ -38,6 +38,7 @@ use crate::dominio::{
 };
 use crate::salvaguardas::{Desaparicion, EstadoDeRaiz};
 use alambre::*;
+use std::time::Duration;
 pub use transporte::Tiempos;
 
 /// Lo que vuelve de `sweep.open`: el id, y **si el servidor quiere el padron**.
@@ -57,8 +58,9 @@ pub struct BaseDeApi {
 }
 
 /// El caso «sin auth» se NOMBRA en vez de ser un `Option` que alguien se olvido de
-/// llenar. El simulador no mira headers, asi que hoy `SinAutenticar` es el unico camino
-/// ejercido y el otro no lo prueba nada — que es un hueco conocido, no un descuido.
+/// llenar. Los dos caminos estan ejercidos: el simulador exige `Authorization: Bearer`
+/// en las siete llamadas del protocolo y contesta `401` sin el, y el banco acredita que
+/// un token revocado detiene el dispositivo entero.
 #[derive(Clone, Debug)]
 pub enum Credencial {
     SinAutenticar,
@@ -74,6 +76,34 @@ impl std::fmt::Debug for Secreto {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("Secreto(<redactado>)")
     }
+}
+
+/// Una vinculacion EN CURSO: el agente ya se anuncio y todavia no lo aprobo nadie.
+///
+/// `codigo` es `String` y no `Secreto` A PROPOSITO, y es la unica cosa de este archivo
+/// que se imprime entera: la interfaz TIENE que mostrarlo, porque su trabajo es que un
+/// humano lo compare contra lo que ve en su cuenta. Un codigo redactado no vincula nada.
+/// El `id`, en cambio, no se muestra nunca — pero tampoco es secreto por si solo: sin la
+/// aprobacion de la persona no reclama ningun token.
+#[derive(Clone, Debug)]
+pub struct Vinculacion {
+    pub id: String,
+    pub codigo: String,
+    pub expira_en: Duration,
+}
+
+/// **`Pendiente` ES UN VALOR, NO UN ERROR.** Ver `Cliente::reclamar`.
+///
+/// `Denegado` y `Vencido` son distintos aunque los dos terminen la vinculacion, porque
+/// al usuario se le dice cosas opuestas: uno es «alguien dijo que no» y el otro «te
+/// tardaste, pedi otro codigo». Colapsarlos en un solo caso obliga a la interfaz a
+/// inventar cual de los dos mostrar.
+#[derive(Clone, Debug)]
+pub enum Reclamo {
+    Pendiente,
+    Aprobado { token: Secreto, usuario: String },
+    Denegado,
+    Vencido,
 }
 
 impl BaseDeApi {
@@ -270,26 +300,56 @@ impl Cliente {
         }
     }
 
+    /// EL HEADER SE ARMA ACA Y EN NINGUN OTRO LADO. `SinAutenticar` no manda nada, que
+    /// es lo que hace que el caso sin auth sea un camino y no un olvido.
+    fn autorizacion(&self) -> Option<String> {
+        match &self.credencial {
+            Credencial::SinAutenticar => None,
+            Credencial::TokenDeDispositivo(s) => Some(format!("Bearer {}", s.0)),
+        }
+    }
+
+    /// Las SIETE llamadas del protocolo. Todas llevan la credencial.
     fn post<R: serde::de::DeserializeOwned>(
         &self,
         llamada: &'static str,
         ruta: &str,
         cuerpo: &impl serde::Serialize,
     ) -> Result<R, FalloDeProtocolo> {
+        self.post_con(llamada, ruta, cuerpo, self.autorizacion().as_deref())
+    }
+
+    /// Las TRES del enrolamiento. **No pueden llevar credencial porque son las que la
+    /// producen**, y por eso son una funcion aparte en vez de un `if`: un `if` deja el
+    /// camino sin credencial disponible para cualquier llamada, y este es el unico
+    /// lugar del cliente donde no mandarla es correcto.
+    fn post_de_enrolamiento<R: serde::de::DeserializeOwned>(
+        &self,
+        llamada: &'static str,
+        ruta: &str,
+        cuerpo: &impl serde::Serialize,
+    ) -> Result<R, FalloDeProtocolo> {
+        self.post_con(llamada, ruta, cuerpo, None)
+    }
+
+    fn post_con<R: serde::de::DeserializeOwned>(
+        &self,
+        llamada: &'static str,
+        ruta: &str,
+        cuerpo: &impl serde::Serialize,
+        autorizacion: Option<&str>,
+    ) -> Result<R, FalloDeProtocolo> {
         let json = serde_json::to_vec(cuerpo).map_err(|e| FalloDeProtocolo::Cuerpo {
             llamada,
             detalle: e.to_string(),
         })?;
-        // La credencial se lee para que el camino exista y quede escrito que el header
-        // no esta fijado por nada: el simulador ignora headers por completo, asi que
-        // `TokenDeDispositivo` no lo ejerce ni una afirmacion del banco.
-        let _ = &self.credencial;
         let r = transporte::pedir(
             &self.base.autoridad,
             "POST",
             &self.base.ruta(ruta),
             &json,
             Some("application/json"),
+            autorizacion,
             &self.tiempos,
         )
         .map_err(FalloDeProtocolo::Transporte)?;
@@ -312,6 +372,54 @@ impl Cliente {
             }),
             Sobre::Valor(v) => Ok(v),
         }
+    }
+
+    /// `POST /enroll/begin` → `{enrollmentId, code, expiresIn}`.
+    ///
+    /// El primer contacto de un agente que no tiene NADA. Devuelve dos cosas que no se
+    /// pueden confundir: `codigo`, que se MUESTRA y no sirve para reclamar, y `id`, que
+    /// es opaco y es con lo que se reclama.
+    pub fn enrolar(&self) -> Result<Vinculacion, FalloDeProtocolo> {
+        let r: alambre::RtaEnrolar =
+            self.post_de_enrolamiento("enroll.begin", "/enroll/begin", &alambre::PedidoEnrolar {})?;
+        Ok(Vinculacion {
+            id: r.enrollment_id,
+            codigo: r.code,
+            expira_en: Duration::from_secs(r.expires_in),
+        })
+    }
+
+    /// `POST /enroll/claim` → el estado de esa vinculacion.
+    ///
+    /// **`Pendiente` NO ES UN ERROR y por eso vuelve como valor.** Es el estado normal
+    /// entre que el agente muestra el codigo y la persona lo aprueba, que puede ser un
+    /// rato largo: modelarlo como `Err` obligaria a distinguir «todavia no» de «se
+    /// rompio» en cada sitio que llame, y el primero que se olvide convierte una espera
+    /// normal en una alerta.
+    ///
+    /// **Y APROBAR NO ES UNA LLAMADA DE ESTE CLIENTE.** No existe `aprobar()` y no se
+    /// puede agregar: lo hace la persona desde su cuenta. Si el agente pudiera
+    /// aprobarse solo, el codigo corto no ataria nada.
+    pub fn reclamar(&self, vinculacion: &Vinculacion) -> Result<Reclamo, FalloDeProtocolo> {
+        let r: alambre::RtaReclamar = self.post_de_enrolamiento(
+            "enroll.claim",
+            "/enroll/claim",
+            &alambre::PedidoReclamar {
+                enrollment_id: &vinculacion.id,
+            },
+        )?;
+        Ok(match r {
+            alambre::RtaReclamar::Pending => Reclamo::Pendiente,
+            alambre::RtaReclamar::Approved {
+                device_token,
+                user_id,
+            } => Reclamo::Aprobado {
+                token: Secreto(device_token),
+                usuario: user_id,
+            },
+            alambre::RtaReclamar::Denied => Reclamo::Denegado,
+            alambre::RtaReclamar::Expired => Reclamo::Vencido,
+        })
     }
 
     /// `POST /sweep/open` → `{sweepId, padronRequerido}`.
@@ -477,6 +585,10 @@ impl Cliente {
             &ruta,
             bytes,
             Some("application/octet-stream"),
+            // **`None` ESCRITO A MANO, no heredado de un default.** Es la unica llamada
+            // del cliente que va a un host que eligio la RESPUESTA del servidor, asi
+            // que mandar el token seria entregarselo a quien conteste.
+            None,
             &self.tiempos,
         )
         .map_err(FalloDeProtocolo::Transporte)?;

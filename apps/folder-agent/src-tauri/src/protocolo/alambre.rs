@@ -19,6 +19,55 @@
 
 use serde::{Deserialize, Serialize};
 
+// ─────────────────────────── El enrolamiento ────────────────────────────────
+//
+// LAS UNICAS TRES QUE NO LLEVAN CREDENCIAL, porque son las que la producen. Van aparte
+// del resto a proposito: el resto del archivo describe el protocolo de un agente YA
+// vinculado, y estas describen como llega a estarlo.
+
+/// Cuerpo vacio: el agente no tiene NADA que ofrecer todavia. Es un tipo y no un
+/// `serde_json::json!({})` para que el cuerpo del pedido sea igual de explicito que el
+/// de las otras seis llamadas.
+#[derive(Serialize)]
+pub struct PedidoEnrolar {}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RtaEnrolar {
+    /// OPACO, y con esto se reclama. Es distinto de `code` a proposito: si se reclamara
+    /// con el codigo corto, adivinar seis caracteres seria adivinar un token de
+    /// dispositivo.
+    pub enrollment_id: String,
+    /// CORTO, y con esto NO se reclama nada. Existe para que lo lea una persona.
+    pub code: String,
+    pub expires_in: u64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PedidoReclamar<'a> {
+    pub enrollment_id: &'a str,
+}
+
+/// **`Approved` SIN token es inexpresable**, y esa es la garantia del tipo: un servidor
+/// que conteste aprobado y se olvide el token falla al deserializar en vez de dejar al
+/// agente creyendose vinculado con la credencial vacia.
+#[derive(Deserialize)]
+#[serde(tag = "status", rename_all = "lowercase")]
+pub enum RtaReclamar {
+    Pending,
+    Approved {
+        #[serde(rename = "deviceToken")]
+        device_token: String,
+        #[serde(rename = "userId")]
+        user_id: String,
+    },
+    Denied,
+    Expired,
+}
+
+// ──────────────────────── Las siete del protocolo ───────────────────────────
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PedidoAbrirBarrido<'a> {
