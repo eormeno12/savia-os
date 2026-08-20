@@ -1,0 +1,1334 @@
+{
+  "nota": "Generado por scripts/golden.mjs. No se edita a mano.",
+  "crudos": {
+    "colors.danger": {
+      "valor": "#D6483B",
+      "origen": "#D6483B",
+      "var": "--chakra-colors-danger"
+    },
+    "colors.dangerInk": {
+      "valor": "#B23529",
+      "origen": "#B23529",
+      "var": "--chakra-colors-danger-ink"
+    },
+    "colors.dangerSoft": {
+      "valor": "#F2A99E",
+      "origen": "#F2A99E",
+      "var": "--chakra-colors-danger-soft"
+    },
+    "colors.info": {
+      "valor": "#2E6B7A",
+      "origen": "#2E6B7A",
+      "var": "--chakra-colors-info"
+    },
+    "colors.infoInk": {
+      "valor": "#1C4A57",
+      "origen": "#1C4A57",
+      "var": "--chakra-colors-info-ink"
+    },
+    "colors.ink": {
+      "valor": "#0B2529",
+      "origen": "#0B2529",
+      "var": "--chakra-colors-ink"
+    },
+    "colors.line": {
+      "valor": "#DDDFDC",
+      "origen": "#DDDFDC",
+      "var": "--chakra-colors-line"
+    },
+    "colors.mist": {
+      "valor": "#ECEDEA",
+      "origen": "#ECEDEA",
+      "var": "--chakra-colors-mist"
+    },
+    "colors.paper": {
+      "valor": "#F4F4F1",
+      "origen": "#F4F4F1",
+      "var": "--chakra-colors-paper"
+    },
+    "colors.signalLime": {
+      "valor": "#E7FF18",
+      "origen": "#E7FF18",
+      "var": "--chakra-colors-signal-lime"
+    },
+    "colors.signalLimeSoft": {
+      "valor": "#F1FF67",
+      "origen": "#F1FF67",
+      "var": "--chakra-colors-signal-lime-soft"
+    },
+    "colors.slateText": {
+      "valor": "#53606C",
+      "origen": "#53606C",
+      "var": "--chakra-colors-slate-text"
+    },
+    "colors.softInk": {
+      "valor": "#152F34",
+      "origen": "#152F34",
+      "var": "--chakra-colors-soft-ink"
+    },
+    "colors.spaceScale.1": {
+      "valor": "#0B2529",
+      "origen": "#0B2529",
+      "var": "--chakra-colors-space-scale-1"
+    },
+    "colors.spaceScale.2": {
+      "valor": "#163F40",
+      "origen": "#163F40",
+      "var": "--chakra-colors-space-scale-2"
+    },
+    "colors.spaceScale.3": {
+      "valor": "#1F5A53",
+      "origen": "#1F5A53",
+      "var": "--chakra-colors-space-scale-3"
+    },
+    "colors.spaceScale.4": {
+      "valor": "#2C7560",
+      "origen": "#2C7560",
+      "var": "--chakra-colors-space-scale-4"
+    },
+    "colors.spaceScale.5": {
+      "valor": "#357A4C",
+      "origen": "#357A4C",
+      "var": "--chakra-colors-space-scale-5"
+    },
+    "colors.spaceScale.6": {
+      "valor": "#74A93F",
+      "origen": "#74A93F",
+      "var": "--chakra-colors-space-scale-6"
+    },
+    "colors.spaceScale.7": {
+      "valor": "#A8C72B",
+      "origen": "#A8C72B",
+      "var": "--chakra-colors-space-scale-7"
+    },
+    "colors.spaceScale.8": {
+      "valor": "#E7FF18",
+      "origen": "#E7FF18",
+      "var": "--chakra-colors-space-scale-8"
+    },
+    "colors.success": {
+      "valor": "#3E8E5A",
+      "origen": "#3E8E5A",
+      "var": "--chakra-colors-success"
+    },
+    "colors.successInk": {
+      "valor": "#2F7048",
+      "origen": "#2F7048",
+      "var": "--chakra-colors-success-ink"
+    },
+    "colors.warning": {
+      "valor": "#C9852A",
+      "origen": "#C9852A",
+      "var": "--chakra-colors-warning"
+    },
+    "colors.warningInk": {
+      "valor": "#8A5A12",
+      "origen": "#8A5A12",
+      "var": "--chakra-colors-warning-ink"
+    },
+    "durations.fast": {
+      "valor": "160ms",
+      "origen": "160ms",
+      "var": "--chakra-durations-fast"
+    },
+    "durations.slow": {
+      "valor": "700ms",
+      "origen": "700ms",
+      "var": "--chakra-durations-slow"
+    },
+    "durations.soft": {
+      "valor": "260ms",
+      "origen": "260ms",
+      "var": "--chakra-durations-soft"
+    },
+    "easings.savia": {
+      "valor": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "origen": "cubic-bezier(0.22, 1, 0.36, 1)",
+      "var": "--chakra-easings-savia"
+    },
+    "fontSizes.bodyLg": {
+      "valor": "clamp(16px, 1.1vw, 20px)",
+      "origen": "clamp(16px, 1.1vw, 20px)",
+      "var": "--chakra-font-sizes-body-lg"
+    },
+    "fontSizes.display2xl": {
+      "valor": "clamp(2.35rem, 5vw, 5rem)",
+      "origen": "clamp(2.35rem, 5vw, 5rem)",
+      "var": "--chakra-font-sizes-display2xl"
+    },
+    "fontSizes.display3xl": {
+      "valor": "clamp(2.75rem, 6vw, 6rem)",
+      "origen": "clamp(2.75rem, 6vw, 6rem)",
+      "var": "--chakra-font-sizes-display3xl"
+    },
+    "fontSizes.display4xl": {
+      "valor": "clamp(4.3rem, 10vw, 7.4rem)",
+      "origen": "clamp(4.3rem, 10vw, 7.4rem)",
+      "var": "--chakra-font-sizes-display4xl"
+    },
+    "fontSizes.displayLg": {
+      "valor": "clamp(36px, 4vw, 64px)",
+      "origen": "clamp(36px, 4vw, 64px)",
+      "var": "--chakra-font-sizes-display-lg"
+    },
+    "fontSizes.displayMd": {
+      "valor": "clamp(2rem, 3.4vw, 3.35rem)",
+      "origen": "clamp(2rem, 3.4vw, 3.35rem)",
+      "var": "--chakra-font-sizes-display-md"
+    },
+    "fontSizes.displayXl": {
+      "valor": "clamp(40px, 4.8vw, 80px)",
+      "origen": "clamp(40px, 4.8vw, 80px)",
+      "var": "--chakra-font-sizes-display-xl"
+    },
+    "fontSizes.titleLg": {
+      "valor": "clamp(20px, 1.6vw, 32px)",
+      "origen": "clamp(20px, 1.6vw, 32px)",
+      "var": "--chakra-font-sizes-title-lg"
+    },
+    "fonts.body": {
+      "valor": "var(--font-inter), system-ui, sans-serif",
+      "origen": "var(--font-inter), system-ui, sans-serif",
+      "var": "--chakra-fonts-body"
+    },
+    "fonts.heading": {
+      "valor": "var(--font-inter), system-ui, sans-serif",
+      "origen": "var(--font-inter), system-ui, sans-serif",
+      "var": "--chakra-fonts-heading"
+    },
+    "radii.card": {
+      "valor": "28px",
+      "origen": "28px",
+      "var": "--chakra-radii-card"
+    },
+    "radii.chip": {
+      "valor": "16px",
+      "origen": "16px",
+      "var": "--chakra-radii-chip"
+    },
+    "radii.message": {
+      "valor": "22px",
+      "origen": "22px",
+      "var": "--chakra-radii-message"
+    },
+    "radii.panel": {
+      "valor": "40px",
+      "origen": "40px",
+      "var": "--chakra-radii-panel"
+    },
+    "shadows.controlKnob": {
+      "valor": "0 1px 4px rgb(11 37 41 / 0.16)",
+      "origen": "0 1px 4px rgb(11 37 41 / 0.16)",
+      "var": "--chakra-shadows-control-knob"
+    },
+    "shadows.float": {
+      "valor": "0 34px 110px rgb(11 37 41 / 0.14)",
+      "origen": "0 34px 110px rgb(11 37 41 / 0.14)",
+      "var": "--chakra-shadows-float"
+    },
+    "shadows.floatDark": {
+      "valor": "0 30px 90px rgb(0 0 0 / 0.45)",
+      "origen": "0 30px 90px rgb(0 0 0 / 0.45)",
+      "var": "--chakra-shadows-float-dark"
+    },
+    "shadows.inset": {
+      "valor": "inset 0 1px 0 rgb(255 255 255 / 0.72)",
+      "origen": "inset 0 1px 0 rgb(255 255 255 / 0.72)",
+      "var": "--chakra-shadows-inset"
+    },
+    "shadows.soft": {
+      "valor": "0 18px 70px rgb(11 37 41 / 0.08)",
+      "origen": "0 18px 70px rgb(11 37 41 / 0.08)",
+      "var": "--chakra-shadows-soft"
+    },
+    "sizes.container": {
+      "valor": "min(calc(100% - clamp(2.5rem, 10vw, 12rem)), 78rem)",
+      "origen": "min(calc(100% - clamp(2.5rem, 10vw, 12rem)), 78rem)",
+      "var": "--chakra-sizes-container"
+    },
+    "sizes.containerNarrow": {
+      "valor": "min(calc(100% - clamp(2.5rem, 10vw, 12rem)), 62rem)",
+      "origen": "min(calc(100% - clamp(2.5rem, 10vw, 12rem)), 62rem)",
+      "var": "--chakra-sizes-container-narrow"
+    },
+    "sizes.containerWide": {
+      "valor": "min(calc(100% - clamp(2.5rem, 10vw, 12rem)), 108rem)",
+      "origen": "min(calc(100% - clamp(2.5rem, 10vw, 12rem)), 108rem)",
+      "var": "--chakra-sizes-container-wide"
+    },
+    "spacing.gridGap": {
+      "valor": "clamp(16px, 2vw, 24px)",
+      "origen": "clamp(16px, 2vw, 24px)",
+      "var": "--chakra-spacing-grid-gap"
+    },
+    "spacing.sectionY": {
+      "valor": "clamp(5rem, 8vw, 9rem)",
+      "origen": "clamp(5rem, 8vw, 9rem)",
+      "var": "--chakra-spacing-section-y"
+    },
+    "spacing.sectionYLoose": {
+      "valor": "clamp(6.5rem, 10vw, 11rem)",
+      "origen": "clamp(6.5rem, 10vw, 11rem)",
+      "var": "--chakra-spacing-section-y-loose"
+    },
+    "spacing.sectionYTight": {
+      "valor": "clamp(3.5rem, 6vw, 6.5rem)",
+      "origen": "clamp(3.5rem, 6vw, 6.5rem)",
+      "var": "--chakra-spacing-section-y-tight"
+    },
+    "spacing.stackLg": {
+      "valor": "clamp(32px, 3vw, 48px)",
+      "origen": "clamp(32px, 3vw, 48px)",
+      "var": "--chakra-spacing-stack-lg"
+    },
+    "spacing.stackMd": {
+      "valor": "clamp(24px, 2vw, 32px)",
+      "origen": "clamp(24px, 2vw, 32px)",
+      "var": "--chakra-spacing-stack-md"
+    },
+    "spacing.stackSm": {
+      "valor": "clamp(16px, 1.5vw, 24px)",
+      "origen": "clamp(16px, 1.5vw, 24px)",
+      "var": "--chakra-spacing-stack-sm"
+    },
+    "spacing.stackXl": {
+      "valor": "clamp(48px, 5vw, 80px)",
+      "origen": "clamp(48px, 5vw, 80px)",
+      "var": "--chakra-spacing-stack-xl"
+    },
+    "spacing.stackXs": {
+      "valor": "clamp(8px, 1vw, 16px)",
+      "origen": "clamp(8px, 1vw, 16px)",
+      "var": "--chakra-spacing-stack-xs"
+    },
+    "spacing.surfacePadding": {
+      "valor": "clamp(24px, 2vw, 32px)",
+      "origen": "clamp(24px, 2vw, 32px)",
+      "var": "--chakra-spacing-surface-padding"
+    }
+  },
+  "semanticos": {
+    "colors.bg": {
+      "valor": "var(--chakra-colors-paper)",
+      "origen": "{colors.paper}",
+      "var": "--chakra-colors-bg"
+    },
+    "colors.bg.inset": {
+      "valor": "rgb(11 37 41 / 0.04)",
+      "origen": "rgb(11 37 41 / 0.04)",
+      "var": "--chakra-colors-bg-inset"
+    },
+    "colors.bg.inverse": {
+      "valor": "var(--chakra-colors-ink)",
+      "origen": "{colors.ink}",
+      "var": "--chakra-colors-bg-inverse"
+    },
+    "colors.bg.panel": {
+      "valor": "var(--chakra-colors-white)",
+      "origen": "{colors.white}",
+      "var": "--chakra-colors-bg-panel"
+    },
+    "colors.bg.subtle": {
+      "valor": "var(--chakra-colors-mist)",
+      "origen": "{colors.mist}",
+      "var": "--chakra-colors-bg-subtle"
+    },
+    "colors.border": {
+      "valor": "var(--chakra-colors-line)",
+      "origen": "{colors.line}",
+      "var": "--chakra-colors-border"
+    },
+    "colors.border.inverse": {
+      "valor": "rgb(255 255 255 / 0.12)",
+      "origen": "rgb(255 255 255 / 0.12)",
+      "var": "--chakra-colors-border-inverse"
+    },
+    "colors.border.subtle": {
+      "valor": "rgb(11 37 41 / 0.10)",
+      "origen": "rgb(11 37 41 / 0.10)",
+      "var": "--chakra-colors-border-subtle"
+    },
+    "colors.danger.border": {
+      "valor": "rgb(214 72 59 / 0.40)",
+      "origen": "rgb(214 72 59 / 0.40)",
+      "var": "--chakra-colors-danger-border"
+    },
+    "colors.danger.contrast": {
+      "valor": "var(--chakra-colors-paper)",
+      "origen": "{colors.paper}",
+      "var": "--chakra-colors-danger-contrast"
+    },
+    "colors.danger.emphasized": {
+      "valor": "var(--chakra-colors-danger-ink)",
+      "origen": "{colors.dangerInk}",
+      "var": "--chakra-colors-danger-emphasized"
+    },
+    "colors.danger.fg": {
+      "valor": "var(--chakra-colors-danger-ink)",
+      "origen": "{colors.dangerInk}",
+      "var": "--chakra-colors-danger-fg"
+    },
+    "colors.danger.focusRing": {
+      "valor": "rgb(214 72 59 / 0.36)",
+      "origen": "rgb(214 72 59 / 0.36)",
+      "var": "--chakra-colors-danger-focus-ring"
+    },
+    "colors.danger.muted": {
+      "valor": "rgb(214 72 59 / 0.14)",
+      "origen": "rgb(214 72 59 / 0.14)",
+      "var": "--chakra-colors-danger-muted"
+    },
+    "colors.danger.solid": {
+      "valor": "var(--chakra-colors-danger)",
+      "origen": "{colors.danger}",
+      "var": "--chakra-colors-danger-solid"
+    },
+    "colors.danger.subtle": {
+      "valor": "rgb(214 72 59 / 0.08)",
+      "origen": "rgb(214 72 59 / 0.08)",
+      "var": "--chakra-colors-danger-subtle"
+    },
+    "colors.fg": {
+      "valor": "var(--chakra-colors-ink)",
+      "origen": "{colors.ink}",
+      "var": "--chakra-colors-fg"
+    },
+    "colors.fg.inverse": {
+      "valor": "var(--chakra-colors-paper)",
+      "origen": "{colors.paper}",
+      "var": "--chakra-colors-fg-inverse"
+    },
+    "colors.fg.muted": {
+      "valor": "var(--chakra-colors-slate-text)",
+      "origen": "{colors.slateText}",
+      "var": "--chakra-colors-fg-muted"
+    },
+    "colors.fg.subtle": {
+      "valor": "rgb(11 37 41 / 0.48)",
+      "origen": "rgb(11 37 41 / 0.48)",
+      "var": "--chakra-colors-fg-subtle"
+    },
+    "colors.info.border": {
+      "valor": "rgb(46 107 122 / 0.40)",
+      "origen": "rgb(46 107 122 / 0.40)",
+      "var": "--chakra-colors-info-border"
+    },
+    "colors.info.contrast": {
+      "valor": "var(--chakra-colors-paper)",
+      "origen": "{colors.paper}",
+      "var": "--chakra-colors-info-contrast"
+    },
+    "colors.info.emphasized": {
+      "valor": "var(--chakra-colors-info-ink)",
+      "origen": "{colors.infoInk}",
+      "var": "--chakra-colors-info-emphasized"
+    },
+    "colors.info.fg": {
+      "valor": "var(--chakra-colors-info-ink)",
+      "origen": "{colors.infoInk}",
+      "var": "--chakra-colors-info-fg"
+    },
+    "colors.info.focusRing": {
+      "valor": "rgb(46 107 122 / 0.36)",
+      "origen": "rgb(46 107 122 / 0.36)",
+      "var": "--chakra-colors-info-focus-ring"
+    },
+    "colors.info.muted": {
+      "valor": "rgb(46 107 122 / 0.14)",
+      "origen": "rgb(46 107 122 / 0.14)",
+      "var": "--chakra-colors-info-muted"
+    },
+    "colors.info.solid": {
+      "valor": "var(--chakra-colors-info)",
+      "origen": "{colors.info}",
+      "var": "--chakra-colors-info-solid"
+    },
+    "colors.info.subtle": {
+      "valor": "rgb(46 107 122 / 0.08)",
+      "origen": "rgb(46 107 122 / 0.08)",
+      "var": "--chakra-colors-info-subtle"
+    },
+    "colors.ink.border": {
+      "valor": "rgb(11 37 41 / 0.20)",
+      "origen": "rgb(11 37 41 / 0.20)",
+      "var": "--chakra-colors-ink-border"
+    },
+    "colors.ink.contrast": {
+      "valor": "var(--chakra-colors-paper)",
+      "origen": "{colors.paper}",
+      "var": "--chakra-colors-ink-contrast"
+    },
+    "colors.ink.emphasized": {
+      "valor": "var(--chakra-colors-soft-ink)",
+      "origen": "{colors.softInk}",
+      "var": "--chakra-colors-ink-emphasized"
+    },
+    "colors.ink.fg": {
+      "valor": "var(--chakra-colors-ink)",
+      "origen": "{colors.ink}",
+      "var": "--chakra-colors-ink-fg"
+    },
+    "colors.ink.focusRing": {
+      "valor": "rgb(11 37 41 / 0.22)",
+      "origen": "rgb(11 37 41 / 0.22)",
+      "var": "--chakra-colors-ink-focus-ring"
+    },
+    "colors.ink.muted": {
+      "valor": "rgb(11 37 41 / 0.08)",
+      "origen": "rgb(11 37 41 / 0.08)",
+      "var": "--chakra-colors-ink-muted"
+    },
+    "colors.ink.solid": {
+      "valor": "var(--chakra-colors-ink)",
+      "origen": "{colors.ink}",
+      "var": "--chakra-colors-ink-solid"
+    },
+    "colors.ink.subtle": {
+      "valor": "rgb(11 37 41 / 0.04)",
+      "origen": "rgb(11 37 41 / 0.04)",
+      "var": "--chakra-colors-ink-subtle"
+    },
+    "colors.lime.border": {
+      "valor": "rgb(231 255 24 / 0.40)",
+      "origen": "rgb(231 255 24 / 0.40)",
+      "var": "--chakra-colors-lime-border"
+    },
+    "colors.lime.contrast": {
+      "valor": "var(--chakra-colors-ink)",
+      "origen": "{colors.ink}",
+      "var": "--chakra-colors-lime-contrast"
+    },
+    "colors.lime.emphasized": {
+      "valor": "var(--chakra-colors-signal-lime-soft)",
+      "origen": "{colors.signalLimeSoft}",
+      "var": "--chakra-colors-lime-emphasized"
+    },
+    "colors.lime.fg": {
+      "valor": "var(--chakra-colors-soft-ink)",
+      "origen": "{colors.softInk}",
+      "var": "--chakra-colors-lime-fg"
+    },
+    "colors.lime.focusRing": {
+      "valor": "rgb(231 255 24 / 0.36)",
+      "origen": "rgb(231 255 24 / 0.36)",
+      "var": "--chakra-colors-lime-focus-ring"
+    },
+    "colors.lime.muted": {
+      "valor": "rgb(231 255 24 / 0.14)",
+      "origen": "rgb(231 255 24 / 0.14)",
+      "var": "--chakra-colors-lime-muted"
+    },
+    "colors.lime.solid": {
+      "valor": "var(--chakra-colors-signal-lime)",
+      "origen": "{colors.signalLime}",
+      "var": "--chakra-colors-lime-solid"
+    },
+    "colors.lime.subtle": {
+      "valor": "rgb(231 255 24 / 0.08)",
+      "origen": "rgb(231 255 24 / 0.08)",
+      "var": "--chakra-colors-lime-subtle"
+    },
+    "colors.mist.border": {
+      "valor": "var(--chakra-colors-line)",
+      "origen": "{colors.line}",
+      "var": "--chakra-colors-mist-border"
+    },
+    "colors.mist.contrast": {
+      "valor": "var(--chakra-colors-ink)",
+      "origen": "{colors.ink}",
+      "var": "--chakra-colors-mist-contrast"
+    },
+    "colors.mist.emphasized": {
+      "valor": "var(--chakra-colors-line)",
+      "origen": "{colors.line}",
+      "var": "--chakra-colors-mist-emphasized"
+    },
+    "colors.mist.fg": {
+      "valor": "var(--chakra-colors-slate-text)",
+      "origen": "{colors.slateText}",
+      "var": "--chakra-colors-mist-fg"
+    },
+    "colors.mist.focusRing": {
+      "valor": "rgb(11 37 41 / 0.12)",
+      "origen": "rgb(11 37 41 / 0.12)",
+      "var": "--chakra-colors-mist-focus-ring"
+    },
+    "colors.mist.muted": {
+      "valor": "rgb(11 37 41 / 0.05)",
+      "origen": "rgb(11 37 41 / 0.05)",
+      "var": "--chakra-colors-mist-muted"
+    },
+    "colors.mist.solid": {
+      "valor": "var(--chakra-colors-mist)",
+      "origen": "{colors.mist}",
+      "var": "--chakra-colors-mist-solid"
+    },
+    "colors.mist.subtle": {
+      "valor": "rgb(11 37 41 / 0.03)",
+      "origen": "rgb(11 37 41 / 0.03)",
+      "var": "--chakra-colors-mist-subtle"
+    },
+    "colors.status.failed": {
+      "valor": "var(--chakra-colors-danger-ink)",
+      "origen": "{colors.dangerInk}",
+      "var": "--chakra-colors-status-failed"
+    },
+    "colors.status.indexed": {
+      "valor": "var(--chakra-colors-success-ink)",
+      "origen": "{colors.successInk}",
+      "var": "--chakra-colors-status-indexed"
+    },
+    "colors.status.pending": {
+      "valor": "var(--chakra-colors-slate-text)",
+      "origen": "{colors.slateText}",
+      "var": "--chakra-colors-status-pending"
+    },
+    "colors.status.processing": {
+      "valor": "var(--chakra-colors-warning-ink)",
+      "origen": "{colors.warningInk}",
+      "var": "--chakra-colors-status-processing"
+    },
+    "colors.success.border": {
+      "valor": "rgb(62 142 90 / 0.40)",
+      "origen": "rgb(62 142 90 / 0.40)",
+      "var": "--chakra-colors-success-border"
+    },
+    "colors.success.contrast": {
+      "valor": "var(--chakra-colors-paper)",
+      "origen": "{colors.paper}",
+      "var": "--chakra-colors-success-contrast"
+    },
+    "colors.success.emphasized": {
+      "valor": "var(--chakra-colors-success-ink)",
+      "origen": "{colors.successInk}",
+      "var": "--chakra-colors-success-emphasized"
+    },
+    "colors.success.fg": {
+      "valor": "var(--chakra-colors-success-ink)",
+      "origen": "{colors.successInk}",
+      "var": "--chakra-colors-success-fg"
+    },
+    "colors.success.focusRing": {
+      "valor": "rgb(62 142 90 / 0.36)",
+      "origen": "rgb(62 142 90 / 0.36)",
+      "var": "--chakra-colors-success-focus-ring"
+    },
+    "colors.success.muted": {
+      "valor": "rgb(62 142 90 / 0.14)",
+      "origen": "rgb(62 142 90 / 0.14)",
+      "var": "--chakra-colors-success-muted"
+    },
+    "colors.success.solid": {
+      "valor": "var(--chakra-colors-success)",
+      "origen": "{colors.success}",
+      "var": "--chakra-colors-success-solid"
+    },
+    "colors.success.subtle": {
+      "valor": "rgb(62 142 90 / 0.08)",
+      "origen": "rgb(62 142 90 / 0.08)",
+      "var": "--chakra-colors-success-subtle"
+    },
+    "colors.warning.border": {
+      "valor": "rgb(201 133 42 / 0.42)",
+      "origen": "rgb(201 133 42 / 0.42)",
+      "var": "--chakra-colors-warning-border"
+    },
+    "colors.warning.contrast": {
+      "valor": "var(--chakra-colors-ink)",
+      "origen": "{colors.ink}",
+      "var": "--chakra-colors-warning-contrast"
+    },
+    "colors.warning.emphasized": {
+      "valor": "var(--chakra-colors-warning-ink)",
+      "origen": "{colors.warningInk}",
+      "var": "--chakra-colors-warning-emphasized"
+    },
+    "colors.warning.fg": {
+      "valor": "var(--chakra-colors-warning-ink)",
+      "origen": "{colors.warningInk}",
+      "var": "--chakra-colors-warning-fg"
+    },
+    "colors.warning.focusRing": {
+      "valor": "rgb(201 133 42 / 0.36)",
+      "origen": "rgb(201 133 42 / 0.36)",
+      "var": "--chakra-colors-warning-focus-ring"
+    },
+    "colors.warning.muted": {
+      "valor": "rgb(201 133 42 / 0.16)",
+      "origen": "rgb(201 133 42 / 0.16)",
+      "var": "--chakra-colors-warning-muted"
+    },
+    "colors.warning.solid": {
+      "valor": "var(--chakra-colors-warning)",
+      "origen": "{colors.warning}",
+      "var": "--chakra-colors-warning-solid"
+    },
+    "colors.warning.subtle": {
+      "valor": "rgb(201 133 42 / 0.10)",
+      "origen": "rgb(201 133 42 / 0.10)",
+      "var": "--chakra-colors-warning-subtle"
+    },
+    "radii.l1": {
+      "valor": "10px",
+      "origen": "10px",
+      "var": "--chakra-radii-l1"
+    },
+    "radii.l2": {
+      "valor": "12px",
+      "origen": "12px",
+      "var": "--chakra-radii-l2"
+    },
+    "radii.l3": {
+      "valor": "14px",
+      "origen": "14px",
+      "var": "--chakra-radii-l3"
+    }
+  },
+  "textStyles": {
+    "displayXl": {
+      "value": {
+        "fontSize": "{fontSizes.displayXl}",
+        "lineHeight": "0.92",
+        "letterSpacing": "0",
+        "fontWeight": "300"
+      }
+    },
+    "display2xl": {
+      "value": {
+        "fontSize": "{fontSizes.display2xl}",
+        "lineHeight": "0.88",
+        "letterSpacing": "0",
+        "fontWeight": "300"
+      }
+    },
+    "display3xl": {
+      "value": {
+        "fontSize": "{fontSizes.display3xl}",
+        "lineHeight": "0.92",
+        "letterSpacing": "0",
+        "fontWeight": "300"
+      }
+    },
+    "displayMd": {
+      "value": {
+        "fontSize": "{fontSizes.displayMd}",
+        "lineHeight": "1.02",
+        "letterSpacing": "0",
+        "fontWeight": "600"
+      }
+    },
+    "titleLg": {
+      "value": {
+        "fontSize": "{fontSizes.titleLg}",
+        "lineHeight": "1.1",
+        "letterSpacing": "0",
+        "fontWeight": "600"
+      }
+    },
+    "bodyLg": {
+      "value": {
+        "fontSize": "{fontSizes.bodyLg}",
+        "lineHeight": "1.75",
+        "letterSpacing": "0",
+        "fontWeight": "400"
+      }
+    },
+    "label": {
+      "value": {
+        "fontSize": "12px",
+        "lineHeight": "1",
+        "letterSpacing": "0.12em",
+        "fontWeight": "600",
+        "textTransform": "uppercase"
+      }
+    },
+    "pageTitle": {
+      "value": {
+        "fontSize": "{fontSizes.displayMd}",
+        "lineHeight": "1.02",
+        "letterSpacing": "-0.01em",
+        "fontWeight": "600"
+      }
+    },
+    "cardTitle": {
+      "value": {
+        "fontSize": "lg",
+        "lineHeight": "1.2",
+        "letterSpacing": "-0.01em",
+        "fontWeight": "600"
+      }
+    },
+    "metric": {
+      "value": {
+        "fontSize": "3xl",
+        "lineHeight": "1",
+        "letterSpacing": "-0.02em",
+        "fontWeight": "700",
+        "fontVariantNumeric": "tabular-nums"
+      }
+    },
+    "heroNumber": {
+      "value": {
+        "fontSize": "{fontSizes.displayLg}",
+        "lineHeight": "0.9",
+        "letterSpacing": "-0.01em",
+        "fontWeight": "300",
+        "fontVariantNumeric": "tabular-nums"
+      }
+    },
+    "heroNumberXl": {
+      "value": {
+        "fontSize": "{fontSizes.display3xl}",
+        "lineHeight": "0.9",
+        "letterSpacing": "-0.01em",
+        "fontWeight": "300",
+        "fontVariantNumeric": "tabular-nums"
+      }
+    },
+    "caption": {
+      "value": {
+        "fontSize": "sm",
+        "lineHeight": "1.5",
+        "letterSpacing": "0",
+        "fontWeight": "400"
+      }
+    }
+  },
+  "recipes": {
+    "card": {
+      "className": "savia-card",
+      "base": {
+        "borderRadius": "card",
+        "p": "surfacePadding",
+        "transitionProperty": "transform, box-shadow",
+        "transitionDuration": "fast",
+        "transitionTimingFunction": "savia"
+      },
+      "variants": {
+        "variant": {
+          "flat": {
+            "bg": "bg",
+            "color": "fg",
+            "borderWidth": "1px",
+            "borderColor": "border.subtle"
+          },
+          "elevated": {
+            "bg": "bg",
+            "color": "fg",
+            "borderWidth": "1px",
+            "borderColor": "border.subtle",
+            "boxShadow": "soft"
+          },
+          "inverse": {
+            "bg": "bg.inverse",
+            "color": "fg.inverse",
+            "boxShadow": "floatDark"
+          }
+        },
+        "interactive": {
+          "true": {
+            "cursor": "pointer",
+            "_hover": {
+              "transform": "translateY(-2px)",
+              "boxShadow": "float"
+            },
+            "_focusVisible": {
+              "outline": "2px solid",
+              "outlineColor": "ink",
+              "outlineOffset": "2px"
+            }
+          },
+          "false": {}
+        }
+      },
+      "defaultVariants": {
+        "variant": "flat",
+        "interactive": false
+      }
+    },
+    "input": {
+      "className": "chakra-input",
+      "base": {
+        "width": "100%",
+        "minWidth": "0",
+        "outline": "0",
+        "position": "relative",
+        "appearance": "none",
+        "textAlign": "start",
+        "borderRadius": "l2",
+        "_disabled": {
+          "layerStyle": "disabled"
+        },
+        "height": "var(--input-height)",
+        "minW": "var(--input-height)",
+        "--focus-color": "colors.colorPalette.focusRing",
+        "--error-color": "colors.border.error",
+        "_invalid": {
+          "focusRingColor": "var(--error-color)",
+          "borderColor": "var(--error-color)"
+        },
+        "borderColor": "border"
+      },
+      "variants": {
+        "size": {
+          "2xs": {
+            "textStyle": "xs",
+            "px": "2",
+            "--input-height": "sizes.7"
+          },
+          "xs": {
+            "textStyle": "xs",
+            "px": "2",
+            "--input-height": "sizes.8"
+          },
+          "sm": {
+            "textStyle": "sm",
+            "px": "2.5",
+            "--input-height": "sizes.9"
+          },
+          "md": {
+            "textStyle": "sm",
+            "px": "3",
+            "--input-height": "sizes.10"
+          },
+          "lg": {
+            "textStyle": "md",
+            "px": "4",
+            "--input-height": "sizes.11"
+          },
+          "xl": {
+            "textStyle": "md",
+            "px": "4.5",
+            "--input-height": "sizes.12"
+          },
+          "2xl": {
+            "textStyle": "lg",
+            "px": "5",
+            "--input-height": "sizes.16"
+          }
+        },
+        "variant": {
+          "outline": {
+            "bg": "transparent",
+            "borderWidth": "1px",
+            "borderColor": "border",
+            "focusVisibleRing": "inside",
+            "focusRingColor": "var(--focus-color)"
+          },
+          "subtle": {
+            "borderWidth": "1px",
+            "borderColor": "transparent",
+            "bg": "bg.muted",
+            "focusVisibleRing": "inside",
+            "focusRingColor": "var(--focus-color)"
+          },
+          "flushed": {
+            "bg": "transparent",
+            "borderBottomWidth": "1px",
+            "borderBottomColor": "border",
+            "borderRadius": "0",
+            "px": "0",
+            "_focusVisible": {
+              "borderColor": "var(--focus-color)",
+              "boxShadow": "0px 1px 0px 0px var(--focus-color)",
+              "_invalid": {
+                "borderColor": "var(--error-color)",
+                "boxShadow": "0px 1px 0px 0px var(--error-color)"
+              }
+            }
+          },
+          "dark-form": {
+            "bg": "fg.inverse/8",
+            "borderColor": "fg.inverse/15",
+            "color": "fg.inverse",
+            "_placeholder": {
+              "color": "fg.inverse/40"
+            },
+            "_hover": {
+              "borderColor": "fg.inverse/25"
+            },
+            "_focusVisible": {
+              "borderColor": "signalLime"
+            }
+          }
+        }
+      },
+      "defaultVariants": {
+        "size": "md",
+        "variant": "outline"
+      }
+    },
+    "marketingButton": null
+  },
+  "globalCss": {
+    "@layer base": {
+      "@keyframes spin": {
+        "0%": {
+          "transform": "rotate(0deg)"
+        },
+        "100%": {
+          "transform": "rotate(360deg)"
+        }
+      },
+      "@keyframes pulse": {
+        "50%": {
+          "opacity": "0.5"
+        }
+      },
+      "@keyframes ping": {
+        "75%, 100%": {
+          "transform": "scale(2)",
+          "opacity": "0"
+        }
+      },
+      "@keyframes bounce": {
+        "0%, 100%": {
+          "transform": "translateY(-25%)",
+          "animationTimingFunction": "cubic-bezier(0.8,0,1,1)"
+        },
+        "50%": {
+          "transform": "none",
+          "animationTimingFunction": "cubic-bezier(0,0,0.2,1)"
+        }
+      },
+      "@keyframes bg-position": {
+        "from": {
+          "backgroundPosition": "var(--animate-from, 1rem) 0"
+        },
+        "to": {
+          "backgroundPosition": "var(--animate-to, 0) 0"
+        }
+      },
+      "@keyframes position": {
+        "from": {
+          "insetInlineStart": "var(--animate-from-x)",
+          "insetBlockStart": "var(--animate-from-y)"
+        },
+        "to": {
+          "insetInlineStart": "var(--animate-to-x)",
+          "insetBlockStart": "var(--animate-to-y)"
+        }
+      },
+      "@keyframes circular-progress": {
+        "0%": {
+          "strokeDasharray": "1, 400",
+          "strokeDashoffset": "0"
+        },
+        "50%": {
+          "strokeDasharray": "400, 400",
+          "strokeDashoffset": "-100%"
+        },
+        "100%": {
+          "strokeDasharray": "400, 400",
+          "strokeDashoffset": "-260%"
+        }
+      },
+      "@keyframes expand-height": {
+        "from": {
+          "height": "var(--collapsed-height, 0)"
+        },
+        "to": {
+          "height": "var(--height)"
+        }
+      },
+      "@keyframes collapse-height": {
+        "from": {
+          "height": "var(--height)"
+        },
+        "to": {
+          "height": "var(--collapsed-height, 0)"
+        }
+      },
+      "@keyframes expand-width": {
+        "from": {
+          "width": "var(--collapsed-width, 0)"
+        },
+        "to": {
+          "width": "var(--width)"
+        }
+      },
+      "@keyframes collapse-width": {
+        "from": {
+          "width": "var(--width)"
+        },
+        "to": {
+          "width": "var(--collapsed-width, 0)"
+        }
+      },
+      "@keyframes fade-in": {
+        "from": {
+          "opacity": 0
+        },
+        "to": {
+          "opacity": 1
+        }
+      },
+      "@keyframes fade-out": {
+        "from": {
+          "opacity": 1
+        },
+        "to": {
+          "opacity": 0
+        }
+      },
+      "@keyframes slide-from-left-full": {
+        "from": {
+          "translate": "-100% 0"
+        },
+        "to": {
+          "translate": "0 0"
+        }
+      },
+      "@keyframes slide-from-right-full": {
+        "from": {
+          "translate": "100% 0"
+        },
+        "to": {
+          "translate": "0 0"
+        }
+      },
+      "@keyframes slide-from-top-full": {
+        "from": {
+          "translate": "0 -100%"
+        },
+        "to": {
+          "translate": "0 0"
+        }
+      },
+      "@keyframes slide-from-bottom-full": {
+        "from": {
+          "translate": "0 100%"
+        },
+        "to": {
+          "translate": "0 0"
+        }
+      },
+      "@keyframes slide-to-left-full": {
+        "from": {
+          "translate": "0 0"
+        },
+        "to": {
+          "translate": "-100% 0"
+        }
+      },
+      "@keyframes slide-to-right-full": {
+        "from": {
+          "translate": "0 0"
+        },
+        "to": {
+          "translate": "100% 0"
+        }
+      },
+      "@keyframes slide-to-top-full": {
+        "from": {
+          "translate": "0 0"
+        },
+        "to": {
+          "translate": "0 -100%"
+        }
+      },
+      "@keyframes slide-to-bottom-full": {
+        "from": {
+          "translate": "0 0"
+        },
+        "to": {
+          "translate": "0 100%"
+        }
+      },
+      "@keyframes slide-from-top": {
+        "0%": {
+          "translate": "0 calc(var(--slide-from-top-distance, 0.5rem) * -1)"
+        },
+        "to": {
+          "translate": "0"
+        }
+      },
+      "@keyframes slide-from-bottom": {
+        "0%": {
+          "translate": "0 var(--slide-from-bottom-distance, 0.5rem)"
+        },
+        "to": {
+          "translate": "0"
+        }
+      },
+      "@keyframes slide-from-left": {
+        "0%": {
+          "translate": "calc(var(--slide-from-left-distance, 0.5rem) * -1) 0"
+        },
+        "to": {
+          "translate": "0"
+        }
+      },
+      "@keyframes slide-from-right": {
+        "0%": {
+          "translate": "var(--slide-from-right-distance, 0.5rem) 0"
+        },
+        "to": {
+          "translate": "0"
+        }
+      },
+      "@keyframes slide-to-top": {
+        "0%": {
+          "translate": "0"
+        },
+        "to": {
+          "translate": "0 calc(var(--slide-to-top-distance, 0.5rem) * -1)"
+        }
+      },
+      "@keyframes slide-to-bottom": {
+        "0%": {
+          "translate": "0"
+        },
+        "to": {
+          "translate": "0 var(--slide-to-bottom-distance, 0.5rem)"
+        }
+      },
+      "@keyframes slide-to-left": {
+        "0%": {
+          "translate": "0"
+        },
+        "to": {
+          "translate": "calc(var(--slide-to-left-distance, 0.5rem) * -1) 0"
+        }
+      },
+      "@keyframes slide-to-right": {
+        "0%": {
+          "translate": "0"
+        },
+        "to": {
+          "translate": "var(--slide-to-right-distance, 0.5rem) 0"
+        }
+      },
+      "@keyframes scale-in": {
+        "from": {
+          "scale": "0.95"
+        },
+        "to": {
+          "scale": "1"
+        }
+      },
+      "@keyframes scale-out": {
+        "from": {
+          "scale": "1"
+        },
+        "to": {
+          "scale": "0.95"
+        }
+      },
+      "@keyframes marqueeX": {
+        "from": {
+          "transform": "translateX(0%)"
+        },
+        "to": {
+          "transform": "translateX(var(--marquee-translate))"
+        }
+      },
+      "@keyframes marqueeY": {
+        "from": {
+          "transform": "translateY(0%)"
+        },
+        "to": {
+          "transform": "translateY(var(--marquee-translate))"
+        }
+      },
+      "&*": {
+        "fontFeatureSettings": "\"cv11\"",
+        "--ring-inset": "var(--chakra-empty, )",
+        "--ring-offset-width": "0px",
+        "--ring-offset-color": "#fff",
+        "--ring-color": "rgba(66, 153, 225, 0.6)",
+        "--ring-offset-shadow": "0 0 #0000",
+        "--ring-shadow": "0 0 #0000",
+        "--brightness": "var(--chakra-empty, )",
+        "--contrast": "var(--chakra-empty, )",
+        "--grayscale": "var(--chakra-empty, )",
+        "--hue-rotate": "var(--chakra-empty, )",
+        "--invert": "var(--chakra-empty, )",
+        "--saturate": "var(--chakra-empty, )",
+        "--sepia": "var(--chakra-empty, )",
+        "--drop-shadow": "var(--chakra-empty, )",
+        "--backdrop-blur": "var(--chakra-empty, )",
+        "--backdrop-brightness": "var(--chakra-empty, )",
+        "--backdrop-contrast": "var(--chakra-empty, )",
+        "--backdrop-grayscale": "var(--chakra-empty, )",
+        "--backdrop-hue-rotate": "var(--chakra-empty, )",
+        "--backdrop-invert": "var(--chakra-empty, )",
+        "--backdrop-opacity": "var(--chakra-empty, )",
+        "--backdrop-saturate": "var(--chakra-empty, )",
+        "--backdrop-sepia": "var(--chakra-empty, )",
+        "--global-font-mono": "var(--chakra-fonts-mono)",
+        "--global-font-body": "var(--chakra-fonts-body)",
+        "--global-color-border": "var(--chakra-colors-border)"
+      },
+      "&html": {
+        "color": "var(--chakra-colors-fg)",
+        "background": "var(--chakra-colors-bg)",
+        "--bg-currentcolor": "var(--chakra-colors-bg)",
+        "lineHeight": "1.5",
+        "--chakra-colors-color-palette-50": "var(--chakra-colors-gray-50)",
+        "--chakra-colors-color-palette-100": "var(--chakra-colors-gray-100)",
+        "--chakra-colors-color-palette-200": "var(--chakra-colors-gray-200)",
+        "--chakra-colors-color-palette-300": "var(--chakra-colors-gray-300)",
+        "--chakra-colors-color-palette-400": "var(--chakra-colors-gray-400)",
+        "--chakra-colors-color-palette-500": "var(--chakra-colors-gray-500)",
+        "--chakra-colors-color-palette-600": "var(--chakra-colors-gray-600)",
+        "--chakra-colors-color-palette-700": "var(--chakra-colors-gray-700)",
+        "--chakra-colors-color-palette-800": "var(--chakra-colors-gray-800)",
+        "--chakra-colors-color-palette-900": "var(--chakra-colors-gray-900)",
+        "--chakra-colors-color-palette-950": "var(--chakra-colors-gray-950)",
+        "--chakra-colors-color-palette-contrast": "var(--chakra-colors-gray-contrast)",
+        "--chakra-colors-color-palette-fg": "var(--chakra-colors-gray-fg)",
+        "--chakra-colors-color-palette-subtle": "var(--chakra-colors-gray-subtle)",
+        "--chakra-colors-color-palette-muted": "var(--chakra-colors-gray-muted)",
+        "--chakra-colors-color-palette-emphasized": "var(--chakra-colors-gray-emphasized)",
+        "--chakra-colors-color-palette-solid": "var(--chakra-colors-gray-solid)",
+        "--chakra-colors-color-palette-focus-ring": "var(--chakra-colors-gray-focus-ring)",
+        "--chakra-colors-color-palette-border": "var(--chakra-colors-gray-border)",
+        "scrollBehavior": "smooth",
+        "overflowX": "hidden"
+      },
+      "&*::placeholder, &*[data-placeholder]": {
+        "--mix-color": "color-mix(in srgb, var(--chakra-colors-fg-muted) 80%, transparent)",
+        "color": "var(--mix-color, var(--chakra-colors-fg-muted))"
+      },
+      "&*::selection": {
+        "--mix-background": "color-mix(in srgb, var(--chakra-colors-color-palette-emphasized) 80%, transparent)",
+        "background": "var(--mix-background, var(--chakra-colors-color-palette-emphasized))",
+        "--bg-currentcolor": "var(--mix-background, var(--chakra-colors-color-palette-emphasized))"
+      },
+      "&html, &body": {
+        "minWidth": "320px"
+      },
+      "&body": {
+        "background": "var(--chakra-colors-bg)",
+        "--bg-currentcolor": "var(--chakra-colors-bg)",
+        "color": "var(--chakra-colors-fg)",
+        "fontFamily": "var(--chakra-fonts-body)",
+        "textRendering": "geometricPrecision"
+      },
+      "&::selection": {
+        "background": "rgb(11 37 41 / 0.14)",
+        "--bg-currentcolor": "rgb(11 37 41 / 0.14)"
+      },
+      "&.skip-link": {
+        "position": "fixed",
+        "left": "-9999px",
+        "top": "1rem",
+        "zIndex": 9999,
+        "background": "#0B2529",
+        "--bg-currentcolor": "#0B2529",
+        "color": "#F4F4F1",
+        "padding": "0.5rem 1rem",
+        "borderRadius": "0.375rem",
+        "fontSize": "0.875rem",
+        "fontWeight": "600",
+        "textDecoration": "none",
+        "&:focus-visible": {
+          "left": "1rem",
+          "outline": "2px solid #E7FF18",
+          "outlineOffset": "4px"
+        }
+      }
+    }
+  }
+}
