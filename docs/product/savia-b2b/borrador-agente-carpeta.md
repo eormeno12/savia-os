@@ -51,12 +51,21 @@ deshidratación, identidad de volumen, un reloj que avance durante la suspensió
 va en código nativo con cualquier runtime. Lo único en disputa era la cara.
 
 **Se validó antes de decidir, porque de eso dependía la ventaja.** El argumento a favor
-de un webview es reusar el lenguaje visual, y este repo lo tiene atado a Chakra: si los
+de un webview es reusar el lenguaje visual, y este repo lo tenía atado a Chakra: si los
 valores no salieran sin ese runtime, el webview costaría igual que lo nativo y no
-compraría nada. Salen. Los tokens son un objeto plano bajo `defineTokens`, así que un
-paso de build los emite como variables CSS —**25 crudos y 72 semánticos, con las
-referencias `{colors.x}` resueltas a `var(--color-x)`**— sin un byte de Chakra en
-runtime. Verificado ejecutándolo.
+compraría nada.
+
+**Salen, y ya no es una verificación: es un artefacto con guardián.** Los valores dejaron
+de vivir en la forma de Chakra —ahora son datos con cero imports y **Chakra es un
+consumidor más**, igual que este agente— y un paso de build emite
+`@savia-os/design-tokens/tokens.css`: **138 variables (63 crudos y 75 semánticos), con
+las referencias `{colors.x}` resueltas a `var(--savia-color-x)`**, sin una línea de
+JavaScript. El prefijo dice `savia` y no `chakra` porque acá Chakra no está, y un nombre
+que lo dijera sería falso sobre lo único que la variable garantiza.
+
+Tres guardianes lo sostienen: que los datos no importen nada, que el sistema de Chakra
+siga resolviendo idéntico —lo consume `apps/landing`— y que ninguna declaración del CSS
+emitido mencione `chakra`.
 
 Lo que **no** sale así son las *recipes* de componentes y los `textStyles`, y no
 importa: este documento ya decía que los componentes no se reusan.
@@ -670,9 +679,10 @@ el popover, la ventana de preferencias, el selector de directorio nativo —el `
 del navegador no sirve, entrega archivos sin ruta— y los flujos del sistema operativo
 (permisos, arranque al login, auto-update).
 
-Falta además un artefacto de tokens **agnóstico**: hoy el barril arrastra el runtime de
-Chakra, y los valores tendrían que poder emitirse como variables CSS o constantes
-nativas.
+El artefacto de tokens **agnóstico ya existe**: `@savia-os/design-tokens/tokens.css` son
+los 138 valores como variables CSS, y `@savia-os/design-tokens/data` los mismos como
+datos. El barril —`@savia-os/design-tokens` a secas— sigue arrastrando el runtime de
+Chakra y está bien que lo haga: es el adaptador, no el contrato.
 
 ## Las decisiones, cerradas
 

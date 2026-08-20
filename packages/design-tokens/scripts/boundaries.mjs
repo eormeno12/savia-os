@@ -18,7 +18,7 @@ import { dirname, join } from "node:path";
 const SRC = join(dirname(fileURLToPath(import.meta.url)), "..", "src");
 
 /** Los tres que forman el contrato. `index.ts` y las recipes NO estan: son el adaptador. */
-const SIN_DEPENDENCIAS = ["tokens.ts", "semantic-tokens.ts", "data.ts"];
+const SIN_DEPENDENCIAS = ["tokens.ts", "semantic-tokens.ts", "data.ts", "css.ts"];
 
 /** `data.ts` reexporta a sus dos hermanos; ningun otro relativo esta permitido. */
 const RELATIVOS_PERMITIDOS = new Set(["./tokens", "./semantic-tokens"]);
