@@ -22,9 +22,9 @@
 #![forbid(unsafe_code)]
 
 use crate::colas::{
-    Colas, Confirmacion, Desenlace, Encolado, ParametrosDeCola, Proximo, TrabajoId,
+    Colas, Confirmacion, Desenlace, Encolado, ParametrosDeCola, Proximo, SegmentoId, TrabajoId,
 };
-use crate::dominio::{BarridoId, EstadoDelBarrido, RaizId, RutaRelativa};
+use crate::dominio::{BarridoId, EstadoDelBarrido, HashVerificado, RaizId, RutaRelativa};
 use crate::inventario::{EfectoDeInventario, Inventario, InventarioEnMemoria};
 use crate::maquina::{Cierre, Paso};
 use crate::plataforma::RaizRegistrada;
@@ -104,6 +104,19 @@ impl Almacen {
         let total = self.inventario.vivos(raiz);
         let s = self.colas.abrir_barrido(raiz, barrido, total);
         (s, total)
+    }
+
+    /// **NO ES UN HECHO, ASI QUE NO LLEVA LA OTRA MITAD.** El padron no cambia nada de
+    /// lo que el agente cree que Savia sabe —no toca `estadoDeReporte` ni una fila—: es
+    /// la lista de lo que el recorrido vio, guardada al lado del segmento que la vio. Por
+    /// eso puede escribir la cola sola sin romper la regla de arriba, igual que
+    /// `abrir_barrido`.
+    pub fn registrar_padron(
+        &mut self,
+        segmento: SegmentoId,
+        entradas: Vec<(RutaRelativa, Option<HashVerificado>)>,
+    ) {
+        self.colas.registrar_padron(segmento, entradas);
     }
 
     pub fn marcar_vista(&mut self, raiz: &RaizId, ruta: &RutaRelativa, barrido: &BarridoId) {

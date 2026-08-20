@@ -18,7 +18,7 @@
 
 use crate::almacen::Almacen;
 use crate::colas::{Desenlace, Proximo, Recibido, Trabajo, TrabajoId};
-use crate::dominio::{BarridoId, EstadoDelBarrido, RaizId, RutaRelativa};
+use crate::dominio::{BarridoId, EstadoDelBarrido, HashVerificado, RaizId, RutaRelativa};
 use crate::inventario::Inventario;
 use crate::maquina::{self, Nodo, OrigenDeSenal, Senal};
 use crate::plataforma::{Plataforma, RelojDePlataforma, ResultadoDeEnumeracion};
@@ -66,6 +66,12 @@ pub fn barrer(
     resumen.enumeradas = rutas.len();
 
     let mut indice = IndiceDeContenido::nuevo();
+    // EL PADRON SE JUNTA ACA Y NO SE DERIVA DEL INVENTARIO DESPUES, porque la lista de
+    // lo presente la tiene EL RECORRIDO y no la creencia. Un deshidratado que el agente
+    // ve por primera vez sale por `Nodo::Omitido` con cero efectos: no deja fila. Un
+    // padron derivado del inventario lo omitiria, y omitir del padron es exactamente
+    // decir «no esta».
+    let mut padron: Vec<(RutaRelativa, Option<HashVerificado>)> = Vec::new();
     let reloj = RelojDePlataforma(plataforma);
 
     for ruta in &rutas {
@@ -114,7 +120,23 @@ pub fn barrer(
         if estrenaba && let Some(crate::salvaguardas::Hecho::Aparecio(a)) = &paso.hecho {
             indice.anotar_ruta_nueva(a.ruta().clone(), *a.hash().bytes());
         }
+        let desaparecio = matches!(paso.nodo, Nodo::Desaparecio);
         almacen.comprometer(raiz, Some(&barrido), paso);
+        // Se enumero y no resulto una baja ⇒ ESTA. El hash se lee DESPUES de comprometer
+        // para que una ruta recien aparecida lleve el suyo y no el anterior; `None` es
+        // «presente con hash desconocido» —deshidratado, sin asentar, o aparecido y
+        // todavia sin respuesta de Savia— y NO significa ausente.
+        if !desaparecio {
+            let confirmado = almacen
+                .inventario()
+                .asiento(raiz, ruta)
+                .and_then(|a| a.fila)
+                .and_then(|f| match f {
+                    crate::inventario::EstadoDeFila::Presente { hash, .. } => hash.confirmado(),
+                    crate::inventario::EstadoDeFila::Ausente { .. } => None,
+                });
+            padron.push((ruta.clone(), confirmado));
+        }
     }
 
     let cierre = maquina::cerrar_barrido(
@@ -132,6 +154,12 @@ pub fn barrer(
     resumen.bajas =
         (resumen.bajas + cierre.bajas.len() as u64).saturating_sub(cierre.anular.len() as u64);
     let estado = almacen.comprometer_cierre(raiz, &barrido, segmento, cierre);
+    // SOLO SI EL RECORRIDO CERRO COMPLETO. Savia tambien lo exige antes de aplicar la
+    // diferencia, y sostenerlo de los dos lados es deliberado: asi ninguno de los dos
+    // solo puede convertir un recorrido con huecos en un retiro masivo.
+    if estado == EstadoDelBarrido::Completo {
+        almacen.registrar_padron(segmento, padron);
+    }
     resumen.cierre = Some(estado);
     resumen
 }
@@ -227,22 +255,21 @@ fn ejecutar(
     match trabajo {
         Trabajo::AbrirBarrido { id, total, .. } => {
             traza.push(format!("sweep.open total={total}"));
-            // EL PADRON TODAVIA NO SE MANDA, y esto lo deja a la vista en vez de
-            // esconderlo: la respuesta ya TRAE `padron_requerido` —el servidor compara
-            // ese `total` contra sus documentos vivos— y el agente lo registra en la
-            // traza sin actuarlo. Actuarlo pide un lugar propio en el orden fijo del
-            // segmento (abrir, observar, desvanecer, cerrar), inmediatamente ANTES del
-            // cierre, porque es en `sweep.close` donde la diferencia de conjuntos se
-            // aplica. Mientras tanto: el desfase se DETECTA y no se corrige.
+            // EL SERVIDOR COMPARA ESE `total` CONTRA SUS DOCUMENTOS VIVOS y contesta si
+            // hace falta el padron. La bandera entra a la cola pegada al `sweepId`: es la
+            // respuesta a ESTE `sweep.open` y a ninguno otro.
             let r = cliente.abrir_barrido(raiz, *total);
             if let Ok(b) = &r
                 && b.padron_requerido
             {
-                traza.push("sweep.open -> PADRON REQUERIDO (no implementado)".to_string());
+                traza.push("sweep.open -> PADRON REQUERIDO".to_string());
             }
             (
                 id.clone(),
-                a_desenlace(r.map(|b| Recibido::Barrido(b.sweep_id))),
+                a_desenlace(r.map(|b| Recibido::Barrido {
+                    sweep: b.sweep_id,
+                    padron_requerido: b.padron_requerido,
+                })),
             )
         }
         Trabajo::Observar { id, entradas, .. } => {
@@ -253,6 +280,30 @@ fn ejecutar(
                     cliente
                         .reportar_observados(raiz, entradas)
                         .map(Recibido::Decisiones),
+                ),
+            )
+        }
+        Trabajo::EnviarPadron {
+            id,
+            sweep,
+            entradas,
+            ..
+        } => {
+            let sin_hash = entradas.iter().filter(|(_, h)| h.is_none()).count();
+            traza.push(format!(
+                "presence.roster x{} ({sin_hash} sin hash)",
+                entradas.len()
+            ));
+            let payload: Vec<(String, Option<String>)> = entradas
+                .iter()
+                .map(|(r, h)| (r.como_str().to_string(), h.map(|h| h.hex())))
+                .collect();
+            (
+                id.clone(),
+                a_desenlace(
+                    cliente
+                        .enviar_padron(sweep, &payload)
+                        .map(|_| Recibido::Nada),
                 ),
             )
         }
@@ -291,14 +342,23 @@ fn ejecutar(
             id, sweep, cierre, ..
         } => {
             traza.push(format!("sweep.close {cierre:?}"));
-            (
-                id.clone(),
-                a_desenlace(
-                    cliente
-                        .cerrar_barrido(sweep, *cierre)
-                        .map(Recibido::Retirados),
-                ),
-            )
+            let r = cliente.cerrar_barrido(sweep, *cierre);
+            // LO QUE SAVIA RETIRO VA A LA TRAZA. El agente no lo decide y no lo puede
+            // discutir, pero es lo unico que le dice que un documento suyo dejo de estar
+            // vigente — y sin eso el panel no tiene como mostrarlo.
+            if let Ok(rutas) = &r
+                && !rutas.is_empty()
+            {
+                traza.push(format!(
+                    "  retirados: {}",
+                    rutas
+                        .iter()
+                        .map(|x| x.como_str().to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
+            }
+            (id.clone(), a_desenlace(r.map(Recibido::Retirados)))
         }
         Trabajo::Subir {
             id, ruta, permiso, ..

@@ -115,6 +115,7 @@ pub enum TrabajoId {
     AperturaDe(SegmentoId),
     ObservadosDe(SegmentoId),
     DesvanecidosDe(SegmentoId),
+    PadronDe(SegmentoId),
     CierreDe(SegmentoId),
     Byte(u64),
 }
@@ -142,6 +143,17 @@ pub enum Trabajo {
         id: TrabajoId,
         raiz: RaizId,
         entradas: Vec<(RutaRelativa, HashVerificado)>,
+    },
+    /// EL PADRON. Todo lo que el barrido VIO, con su hash confirmado o `None`.
+    ///
+    /// Lleva las entradas encima —a diferencia de `Subir`, que lleva la ruta y deja los
+    /// bytes en disco— porque **la enumeracion no se puede volver a leer**. Los bytes
+    /// siguen ahi y se releen; el recorrido que vio estas rutas ya termino.
+    EnviarPadron {
+        id: TrabajoId,
+        raiz: RaizId,
+        sweep: SweepId,
+        entradas: Vec<(RutaRelativa, Option<HashVerificado>)>,
     },
     CerrarBarrido {
         id: TrabajoId,
@@ -222,7 +234,13 @@ pub enum Desenlace {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Recibido {
-    Barrido(SweepId),
+    /// `padron_requerido` viaja PEGADO al `sweepId` y no como una senal aparte porque es
+    /// la respuesta a ese `sweep.open` y a ninguno otro. Un barrido reintentado la
+    /// vuelve a contestar contra el estado del momento.
+    Barrido {
+        sweep: SweepId,
+        padron_requerido: bool,
+    },
     Decisiones(Vec<Veredicto>),
     /// `presence.vanished` y el PUT: no devuelven nada que la cola necesite.
     Nada,
@@ -303,6 +321,18 @@ struct Segmento {
     observados_entregados: bool,
     desvanecidos_entregados: bool,
     cierre_entregado: bool,
+    /// EL PADRON DEL BARRIDO LOCAL, guardado ANTES de saber si hace falta.
+    ///
+    /// Quien contesta si hace falta es `sweep.open`, y para entonces el recorrido ya
+    /// termino: guardarlo solo cuando se lo pide llega tarde por un barrido entero. Se
+    /// llena siempre al cerrar el barrido local y cuesta lo mismo que la lista de rutas
+    /// que ese barrido ya tenia entera en memoria.
+    padron: Option<Vec<(RutaRelativa, Option<HashVerificado>)>>,
+    /// Lo que contesto `sweep.open`. `false` es el caso comun —agente y Savia coinciden—
+    /// y `true` significa que Savia sabe de documentos que el agente no reporta ni como
+    /// presentes ni como ausentes.
+    padron_requerido: bool,
+    padron_entregado: bool,
     intentos: u32,
 }
 
@@ -380,6 +410,9 @@ impl Colas {
             id,
             raiz: raiz.clone(),
             origen: OrigenDeSegmento::Barrido { total, barrido },
+            padron: None,
+            padron_requerido: false,
+            padron_entregado: false,
             hechos: BTreeMap::new(),
             orden: Vec::new(),
             abierto: true,
@@ -398,6 +431,28 @@ impl Colas {
         if let Some(s) = self.segmentos.iter_mut().find(|s| s.id == segmento) {
             s.abierto = false;
             s.cierre = Some(cierre);
+        }
+    }
+
+    /// EL PADRON DEL BARRIDO QUE ACABA DE TERMINAR. Se registra SIEMPRE, sin saber
+    /// todavia si Savia lo va a pedir.
+    ///
+    /// **NO SALE DEL INVENTARIO, SALE DE LA ENUMERACION**, y no es un matiz. Un archivo
+    /// deshidratado que el agente ve por primera vez no se lee y no deja fila
+    /// —`Paso::nada(Nodo::Omitido)`, cero efectos—, asi que un padron derivado del
+    /// inventario lo omitiria y Savia retiraria un archivo que esta perfectamente ahi.
+    /// La lista de lo presente la tiene el recorrido, no la creencia.
+    ///
+    /// Sin `entradas`, o con el barrido interrumpido, no se registra nada: un padron
+    /// parcial presentado como el universo de lo presente retira todo lo que el
+    /// recorrido no llego a mirar.
+    pub fn registrar_padron(
+        &mut self,
+        segmento: SegmentoId,
+        entradas: Vec<(RutaRelativa, Option<HashVerificado>)>,
+    ) {
+        if let Some(s) = self.segmentos.iter_mut().find(|s| s.id == segmento) {
+            s.padron = Some(entradas);
         }
     }
 
@@ -423,6 +478,11 @@ impl Colas {
             id,
             raiz: raiz.clone(),
             origen: OrigenDeSegmento::Eventos,
+            // Un segmento de eventos no abre barrido, asi que nadie le puede pedir el
+            // padron: estos tres se quedan como nacen.
+            padron: None,
+            padron_requerido: false,
+            padron_entregado: false,
             hechos: BTreeMap::new(),
             orden: Vec::new(),
             abierto: true,
@@ -563,6 +623,26 @@ impl Colas {
                     entradas,
                 });
             }
+        }
+        // EL PADRON, Y SU LUGAR ES ESTE: despues de los hechos e **inmediatamente antes
+        // del cierre**, porque la diferencia de conjuntos se aplica en `sweep.close`.
+        // Despues del cierre llega tarde y no la aplica nadie.
+        if es_barrido
+            && s.padron_requerido
+            && !s.padron_entregado
+            && let (Some(sweep), Some(padron)) = (s.sweep.clone(), s.padron.as_ref())
+        {
+            return Some(Trabajo::EnviarPadron {
+                id: TrabajoId::PadronDe(s.id),
+                raiz: s.raiz.clone(),
+                sweep,
+                // **NO PASA POR `lote()`**, y ahi esta la diferencia entre demorar y
+                // mentir. Un lote de hechos truncado demora: lo que quedo afuera sale en
+                // la vuelta siguiente. Un PADRON truncado AFIRMA «esto es todo lo que
+                // veo», y Savia retira todo lo que no figure. La unica cota legitima
+                // seria el limite real del servidor, que el protocolo no declara.
+                entradas: padron.clone(),
+            });
         }
         if es_barrido
             && !s.cierre_entregado
@@ -705,6 +785,18 @@ impl Colas {
             // con la alerta puesta es mejor que perder la baja, y `drenar` no gira porque
             // corta cuando el trabajo se repite.
             TrabajoId::DesvanecidosDe(_) => self.sumar_intento(trabajo),
+            // **EL UNICO TRABAJO QUE SE PUEDE PERDER SIN PERDER NADA**, y por eso no se
+            // reintenta como una baja. Un padron que no llega deja el desfase sin
+            // corregir, y el proximo `sweep.open` lo vuelve a detectar y lo vuelve a
+            // pedir: el mecanismo que produjo el trabajo es el mismo que repara su
+            // perdida. Bloquear el segmento en cambio SI cuesta —el cierre no sale, el
+            // barrido queda abierto del otro lado, y la cuarentena nunca recibe el
+            // barrido completo que exige—.
+            TrabajoId::PadronDe(sid) => {
+                if let Some(s) = self.segmentos.iter_mut().find(|s| s.id == *sid) {
+                    s.padron_entregado = true;
+                }
+            }
             // El barrido ya no existe del otro lado. Reintentar da la misma respuesta para
             // siempre y bloquea todos los segmentos posteriores de la raiz.
             TrabajoId::CierreDe(sid) => {
@@ -737,6 +829,11 @@ impl Colas {
                     s.desvanecidos_entregados = true;
                 }
             }
+            TrabajoId::PadronDe(sid) => {
+                if let Some(s) = self.segmentos.iter_mut().find(|s| s.id == *sid) {
+                    s.padron_entregado = true;
+                }
+            }
             TrabajoId::CierreDe(sid) => {
                 if let Some(s) = self.segmentos.iter_mut().find(|s| s.id == *sid) {
                     s.cierre_entregado = true;
@@ -752,15 +849,28 @@ impl Colas {
     fn entregado(&mut self, trabajo: &TrabajoId, recibido: Recibido) -> Vec<Confirmacion> {
         let mut out = Vec::new();
         match (trabajo, recibido) {
-            (TrabajoId::AperturaDe(sid), Recibido::Barrido(sweep)) => {
+            (
+                TrabajoId::AperturaDe(sid),
+                Recibido::Barrido {
+                    sweep,
+                    padron_requerido,
+                },
+            ) => {
                 if let Some(s) = self.segmentos.iter_mut().find(|s| s.id == *sid) {
                     s.apertura_entregada = true;
+                    s.padron_requerido = padron_requerido;
                     // Se PERSISTE el `sweepId`: si el proceso muere entre el
                     // `sweep.open` y el `sweep.close`, sin esto el cierre no tiene a que
                     // referirse y el barrido queda abierto del otro lado para siempre —
                     // con lo que la cuarentena nunca recibe el barrido completo que
                     // exige y ninguna ausencia se resuelve jamas.
                     s.sweep = Some(sweep);
+                    s.intentos = 0;
+                }
+            }
+            (TrabajoId::PadronDe(sid), Recibido::Nada) => {
+                if let Some(s) = self.segmentos.iter_mut().find(|s| s.id == *sid) {
+                    s.padron_entregado = true;
                     s.intentos = 0;
                 }
             }
@@ -851,6 +961,7 @@ impl Colas {
             TrabajoId::AperturaDe(s)
             | TrabajoId::ObservadosDe(s)
             | TrabajoId::DesvanecidosDe(s)
+            | TrabajoId::PadronDe(s)
             | TrabajoId::CierreDe(s) => {
                 if let Some(x) = self.segmentos.iter_mut().find(|x| x.id == *s) {
                     x.intentos += 1;
@@ -903,6 +1014,7 @@ impl Colas {
             TrabajoId::AperturaDe(s)
             | TrabajoId::ObservadosDe(s)
             | TrabajoId::DesvanecidosDe(s)
+            | TrabajoId::PadronDe(s)
             | TrabajoId::CierreDe(s) => self
                 .segmentos
                 .iter()

@@ -223,3 +223,117 @@ fn la_divergencia_vuelve_en_el_hash_verificado() {
         "y devuelve LA AUTORIDAD, que es con lo que el agente corrige su inventario"
     );
 }
+
+#[test]
+#[ignore = "necesita `node apps/folder-agent/sim/server.ts` corriendo en 4477"]
+fn un_agente_que_perdio_su_inventario_recupera_el_desfase_por_el_padron() {
+    // IMPORTA PORQUE: es el agujero entero del canal, de punta a punta y sobre sockets.
+    // Un barrido incremental NO REPORTA LO QUE SIGUE IGUAL, asi que un agente que llega
+    // sin memoria no reporta esos archivos ni presentes ni ausentes — y un documento
+    // borrado mientras estuvo caido se queda vigente en Savia PARA SIEMPRE. Las 42
+    // pruebas contra puertos falsos verifican que el agente ARMA bien el padron, y el
+    // ejercicio del simulador que Savia lo APLICA bien; esta es la unica que verifica que
+    // las dos mitades se encuentran.
+    //
+    // CUATRO ARCHIVOS Y SE BORRA UNO a proposito: 1/4 = 25%, por debajo del corte por
+    // volumen del banco (30%). Con dos archivos la diferencia seria del 50% y el test
+    // estaria probando el corte en vez del padron.
+    let dir = std::env::temp_dir().join(format!(
+        "savia-folder-padron-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    let nonce = dir.file_name().unwrap().to_string_lossy().to_string();
+    for i in 0..4 {
+        std::fs::write(dir.join(format!("f{i}.txt")), format!("el {i} de {nonce}")).unwrap();
+    }
+
+    let plataforma = PlataformaLocal::nueva().unwrap();
+    let ruta = std::fs::canonicalize(&dir).unwrap();
+    let raiz = RaizId::nueva(format!("padron-{nonce}"));
+    let cliente = Cliente::nuevo(
+        BaseDeApi::nueva(BASE).unwrap(),
+        Credencial::SinAutenticar,
+        tiempos(),
+    );
+    let politica = Politica::con_asentamiento(ASENTAMIENTO).unwrap();
+    let nuevo_almacen = || {
+        let mut a = Almacen::nuevo(ParametrosDeCola {
+            max_intentos: None,
+            max_entradas_por_lote: None,
+        });
+        a.enrolar(RaizRegistrada {
+            id: raiz.clone(),
+            huella: plataforma.huella_de_raiz(&ruta).unwrap(),
+            ruta_absoluta: ruta.clone(),
+            sensibilidad: SensibilidadAMayusculas::NoDistingue,
+        });
+        a
+    };
+    let vuelta = |n: u32, almacen: &mut Almacen| -> Vec<String> {
+        std::thread::sleep(ASENTAMIENTO);
+        ciclo::barrer(
+            &raiz,
+            BarridoId::nuevo(format!("b{n}")),
+            &plataforma,
+            almacen,
+            &politica,
+        );
+        let mut traza = Vec::new();
+        ciclo::drenar(&raiz, &plataforma, almacen, &cliente, &mut traza);
+        traza
+    };
+
+    // 1 · el agente sano: dos vueltas y Savia tiene los cuatro.
+    let mut sano = nuevo_almacen();
+    vuelta(1, &mut sano);
+    let t2 = vuelta(2, &mut sano);
+    assert!(
+        t2.iter().any(|l| l.starts_with("presence.observed x4")),
+        "los cuatro llegaron a Savia: {t2:?}"
+    );
+    assert!(
+        !t2.iter().any(|l| l.starts_with("presence.roster")),
+        "y coincidiendo NO se manda ningun padron: {t2:?}"
+    );
+
+    // 2 · el agente se cae, y mientras esta caido se borra un archivo.
+    drop(sano);
+    std::fs::remove_file(dir.join("f2.txt")).unwrap();
+
+    // 3 · vuelve SIN inventario. Savia compara su cuenta contra el `total` y pide el
+    //     padron; el agente manda las TRES rutas que ve.
+    let mut amnesico = nuevo_almacen();
+    let t3 = vuelta(3, &mut amnesico);
+    assert!(
+        t3.iter().any(|l| l.starts_with("sweep.open total=0")),
+        "arranca creyendo la raiz vacia: {t3:?}"
+    );
+    assert!(
+        t3.iter().any(|l| l == "sweep.open -> PADRON REQUERIDO"),
+        "y Savia lo nota, porque el numero ya viajaba: {t3:?}"
+    );
+    assert!(
+        t3.iter().any(|l| l.starts_with("presence.roster x3")),
+        "manda las tres que VE, no las cuatro que Savia cree: {t3:?}"
+    );
+
+    // 4 · la diferencia entro a cuarentena, no a retiro. Recien pasada la ventana y con
+    //     otro barrido COMPLETO encima, `f2.txt` se retira.
+    assert!(
+        !t3.iter().any(|l| l.starts_with("  retirados")),
+        "una desaparicion sigue siendo una hipotesis aunque la descubra una diferencia \
+         de conjuntos: {t3:?}"
+    );
+    std::thread::sleep(Duration::from_millis(5_200));
+    let t4 = vuelta(4, &mut amnesico);
+    assert!(
+        t4.iter().any(|l| l == "  retirados: f2.txt"),
+        "el documento que iba a quedar vigente para siempre se retiro: {t4:?}"
+    );
+
+    std::fs::remove_dir_all(&dir).ok();
+}

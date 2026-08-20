@@ -72,7 +72,14 @@ fn confirmar_todo(a: &mut Almacen) {
             return;
         };
         let (id, recibido) = match *t {
-            Trabajo::AbrirBarrido { id, .. } => (id, Recibido::Barrido(SweepId("sweep-1".into()))),
+            Trabajo::AbrirBarrido { id, .. } => (
+                id,
+                Recibido::Barrido {
+                    sweep: SweepId("sweep-1".into()),
+                    padron_requerido: false,
+                },
+            ),
+            Trabajo::EnviarPadron { id, .. } => (id, Recibido::Nada),
             Trabajo::Observar { id, entradas, .. } => {
                 let vs = entradas
                     .into_iter()
@@ -321,7 +328,10 @@ fn lo_que_el_veneno_retiene_queda_contado_y_nombrado() {
     };
     c.resolver(
         &id,
-        Desenlace::Entregado(Recibido::Barrido(SweepId("s".into()))),
+        Desenlace::Entregado(Recibido::Barrido {
+            sweep: SweepId("s".into()),
+            padron_requerido: false,
+        }),
     );
     let Proximo::Trabajo(t) = c.siguiente(&raiz) else {
         panic!("falta el observado")
@@ -455,7 +465,10 @@ fn cola_hasta_el_cierre(raiz: &RaizId) -> Colas {
     };
     c.resolver(
         &id,
-        Desenlace::Entregado(Recibido::Barrido(SweepId("s".into()))),
+        Desenlace::Entregado(Recibido::Barrido {
+            sweep: SweepId("s".into()),
+            padron_requerido: false,
+        }),
     );
     let Proximo::Trabajo(t) = c.siguiente(raiz) else {
         panic!("falta el observado")
@@ -570,7 +583,10 @@ fn un_rechazo_sobre_los_bytes_no_re_sube_el_archivo_en_cada_vuelta() {
     };
     c.resolver(
         &id,
-        Desenlace::Entregado(Recibido::Barrido(SweepId("s".into()))),
+        Desenlace::Entregado(Recibido::Barrido {
+            sweep: SweepId("s".into()),
+            padron_requerido: false,
+        }),
     );
     let Proximo::Trabajo(t) = c.siguiente(&raiz) else {
         panic!()
@@ -651,8 +667,12 @@ fn un_ack_perdido_se_re_observa_en_el_proximo_barrido() {
         let (id, desenlace) = match *t {
             Trabajo::AbrirBarrido { id, .. } => (
                 id,
-                Desenlace::Entregado(Recibido::Barrido(SweepId("s".into()))),
+                Desenlace::Entregado(Recibido::Barrido {
+                    sweep: SweepId("s".into()),
+                    padron_requerido: false,
+                }),
             ),
+            Trabajo::EnviarPadron { id, .. } => (id, Desenlace::Entregado(Recibido::Nada)),
             Trabajo::Observar { id, entradas, .. } => {
                 let vs = entradas
                     .into_iter()

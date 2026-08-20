@@ -71,8 +71,15 @@ fn confirmar_todo(a: &mut Almacen) {
         let (id, recibido) = match *t {
             Trabajo::AbrirBarrido { id, .. } => (
                 id,
-                Recibido::Barrido(savia_folder_nucleo::colas::SweepId("sweep-1".into())),
+                Recibido::Barrido {
+                    sweep: savia_folder_nucleo::colas::SweepId("sweep-1".into()),
+                    padron_requerido: false,
+                },
             ),
+            // El servidor de mentira acusa recibo del padron como el de verdad: sin
+            // cuerpo. Ningun test de este archivo lo dispara —ninguno pide el padron—
+            // pero el driver hace de servidor y un servidor lo contesta.
+            Trabajo::EnviarPadron { id, .. } => (id, Recibido::Nada),
             Trabajo::Observar { id, entradas, .. } => {
                 let vs = entradas
                     .into_iter()
@@ -153,14 +160,16 @@ fn un_movimiento_no_reporta_baja_ni_cuesta_una_enumeracion_por_archivo() {
             Trabajo::AbrirBarrido { id, .. }
             | Trabajo::Observar { id, .. }
             | Trabajo::Desvanecer { id, .. }
+            | Trabajo::EnviarPadron { id, .. }
             | Trabajo::CerrarBarrido { id, .. }
             | Trabajo::Subir { id, .. }
             | Trabajo::ConfirmarSubida { id, .. } => id.clone(),
         };
         let recibido = match &*t {
-            Trabajo::AbrirBarrido { .. } => {
-                Recibido::Barrido(savia_folder_nucleo::colas::SweepId("s".into()))
-            }
+            Trabajo::AbrirBarrido { .. } => Recibido::Barrido {
+                sweep: savia_folder_nucleo::colas::SweepId("s".into()),
+                padron_requerido: false,
+            },
             Trabajo::Observar { entradas, .. } => Recibido::Decisiones(
                 entradas
                     .iter()
@@ -607,14 +616,16 @@ fn el_orden_desaparecio_aparecio_se_conserva_por_raiz() {
             Trabajo::AbrirBarrido { id, .. }
             | Trabajo::Observar { id, .. }
             | Trabajo::Desvanecer { id, .. }
+            | Trabajo::EnviarPadron { id, .. }
             | Trabajo::CerrarBarrido { id, .. }
             | Trabajo::Subir { id, .. }
             | Trabajo::ConfirmarSubida { id, .. } => id.clone(),
         };
         let recibido = match &*t {
-            Trabajo::AbrirBarrido { .. } => {
-                Recibido::Barrido(savia_folder_nucleo::colas::SweepId("s".into()))
-            }
+            Trabajo::AbrirBarrido { .. } => Recibido::Barrido {
+                sweep: savia_folder_nucleo::colas::SweepId("s".into()),
+                padron_requerido: false,
+            },
             Trabajo::Observar { entradas, .. } => {
                 for (ruta, _) in entradas {
                     orden.push(format!("aparecio {}", ruta.como_str()));
@@ -750,9 +761,10 @@ fn los_hechos_van_antes_que_los_bytes() {
     };
     c.resolver(
         &id,
-        Desenlace::Entregado(Recibido::Barrido(savia_folder_nucleo::colas::SweepId(
-            "s".into(),
-        ))),
+        Desenlace::Entregado(Recibido::Barrido {
+            sweep: savia_folder_nucleo::colas::SweepId("s".into()),
+            padron_requerido: false,
+        }),
     );
 
     let Proximo::Trabajo(t) = c.siguiente(&raiz) else {
@@ -1404,4 +1416,309 @@ fn un_hecho_por_senal_como_maximo() {
         &politica(),
     );
     assert!(matches!(paso.hecho, Some(Hecho::Aparecio(_))));
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 12 · EL PADRON — lo que el agente VE, cuando Savia dice que no coinciden
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// Drena la raiz haciendo de servidor y devuelve el ORDEN en que salieron los trabajos.
+/// `padron_requerido` es lo que ese servidor contesta al `sweep.open`.
+fn drenar_anotando(a: &mut Almacen, padron_requerido: bool) -> Vec<String> {
+    use savia_folder_nucleo::colas::Desenlace;
+    let mut orden = Vec::new();
+    while let Proximo::Trabajo(t) = a.siguiente(&raiz()) {
+        let id = match &*t {
+            Trabajo::AbrirBarrido { id, .. }
+            | Trabajo::Observar { id, .. }
+            | Trabajo::Desvanecer { id, .. }
+            | Trabajo::EnviarPadron { id, .. }
+            | Trabajo::CerrarBarrido { id, .. }
+            | Trabajo::Subir { id, .. }
+            | Trabajo::ConfirmarSubida { id, .. } => id.clone(),
+        };
+        let recibido = match &*t {
+            Trabajo::AbrirBarrido { .. } => {
+                orden.push("abrir".to_string());
+                Recibido::Barrido {
+                    sweep: savia_folder_nucleo::colas::SweepId("s".into()),
+                    padron_requerido,
+                }
+            }
+            Trabajo::Observar { entradas, .. } => {
+                orden.push(format!("observar x{}", entradas.len()));
+                Recibido::Decisiones(
+                    entradas
+                        .iter()
+                        .map(|(ruta, af)| Veredicto {
+                            ruta: ruta.clone(),
+                            afirmado: *af,
+                            decision: Decision::Known {
+                                verificado: HashVerificado::rehidratar_del_inventario(*af.bytes()),
+                            },
+                        })
+                        .collect(),
+                )
+            }
+            Trabajo::Desvanecer { entradas, .. } => {
+                orden.push(format!("desvanecer x{}", entradas.len()));
+                Recibido::Nada
+            }
+            Trabajo::EnviarPadron { entradas, .. } => {
+                orden.push(format!(
+                    "padron x{} ({} sin hash)",
+                    entradas.len(),
+                    entradas.iter().filter(|(_, h)| h.is_none()).count()
+                ));
+                Recibido::Nada
+            }
+            Trabajo::CerrarBarrido { .. } => {
+                orden.push("cerrar".to_string());
+                Recibido::Retirados(Vec::new())
+            }
+            _ => Recibido::Nada,
+        };
+        a.resolver(&raiz(), &id, Desenlace::Entregado(recibido));
+    }
+    orden
+}
+
+/// La primera vuelta solo registra CANDIDATOS: un archivo recien visto no esta asentado,
+/// asi que no hay aparicion hasta el barrido siguiente. Todos los tests de aca abajo
+/// necesitan un segmento con hechos de verdad, y este es el camino corto.
+fn dejar_asentado(p: &Falsa, a: &mut Almacen) {
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+    ciclo::barrer(&raiz(), BarridoId::nuevo("b1"), p, a, &politica());
+    drenar_anotando(a, false);
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+}
+
+#[test]
+fn el_padron_sale_entre_las_bajas_y_el_cierre() {
+    // IMPORTA PORQUE: la diferencia de conjuntos se aplica en `sweep.close`. Un padron
+    // que sale DESPUES del cierre no lo lee nadie, y el desfase que lo motivo sigue ahi
+    // — con la diferencia de que ahora los dos lados creen que se resolvio.
+    let p = Falsa::como_macos();
+    p.poner("a.txt", b"el a", 100, Some(1));
+    p.poner("b.txt", b"el b", 100, Some(2));
+    let mut a = almacen();
+    dejar_asentado(&p, &mut a);
+    ciclo::barrer(&raiz(), BarridoId::nuevo("b2"), &p, &mut a, &politica());
+
+    let orden = drenar_anotando(&mut a, true);
+    assert!(
+        orden.contains(&"observar x2".to_string()),
+        "el segmento lleva hechos de verdad, o el test no prueba ningun orden: {orden:?}"
+    );
+    let i_padron = orden.iter().position(|x| x.starts_with("padron"));
+    let i_observar = orden.iter().position(|x| x.starts_with("observar"));
+    let i_cierre = orden.iter().position(|x| x == "cerrar");
+    assert!(
+        i_padron.is_some(),
+        "con la bandera puesta el padron SALE: {orden:?}"
+    );
+    assert!(
+        i_observar < i_padron && i_padron < i_cierre,
+        "los hechos, despues el padron, y el cierre ultimo: {orden:?}"
+    );
+}
+
+#[test]
+fn sin_bandera_el_padron_no_sale_y_no_cuesta_una_llamada() {
+    // IMPORTA PORQUE: coincidir es el caso NORMAL. Mandar el arbol entero en cada barrido
+    // convierte un protocolo incremental en uno que retransmite el inventario completo
+    // cada vez, y el ahorro de las dos colas era la razon entera del diseno.
+    let p = Falsa::como_macos();
+    p.poner("a.txt", b"el a", 100, Some(1));
+    let mut a = almacen();
+    dejar_asentado(&p, &mut a);
+    ciclo::barrer(&raiz(), BarridoId::nuevo("b2"), &p, &mut a, &politica());
+
+    let orden = drenar_anotando(&mut a, false);
+    assert!(
+        orden.contains(&"observar x1".to_string()),
+        "hubo barrido con hechos: {orden:?}"
+    );
+    assert!(
+        !orden.iter().any(|x| x.starts_with("padron")),
+        "y sin desfase no se manda nada: {orden:?}"
+    );
+}
+
+#[test]
+fn un_deshidratado_sin_fila_previa_entra_al_padron() {
+    // IMPORTA PORQUE: **el padron NO se puede derivar del inventario**, y este es el caso
+    // que lo prueba. Un archivo de nube que el agente ve por primera vez sale por
+    // `Nodo::Omitido` con CERO efectos: no se lee, y no deja fila. Un padron armado desde
+    // las filas lo omitiria, omitir es decir «no esta», y Savia retiraria un archivo que
+    // esta perfectamente ahi. En macOS leerlo para probar que existe significa descargar
+    // el drive entero, asi que «leelo y listo» no es una salida.
+    let p = Falsa::como_macos();
+    p.poner("local.txt", b"el local", 100, Some(1));
+    p.poner_deshidratado("nube.pptx", 100, Some(2));
+    let mut a = almacen();
+    dejar_asentado(&p, &mut a);
+    // Segunda vuelta: `local.txt` aparece y queda con hash VERIFICADO.
+    ciclo::barrer(&raiz(), BarridoId::nuevo("b2"), &p, &mut a, &politica());
+    drenar_anotando(&mut a, false);
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+
+    let resumen = ciclo::barrer(&raiz(), BarridoId::nuevo("b3"), &p, &mut a, &politica());
+    assert_eq!(
+        resumen.omitidos_por_deshidratacion, 1,
+        "el de nube no se leyo"
+    );
+    assert!(
+        a.inventario().asiento(&raiz(), &r("nube.pptx")).is_none(),
+        "y NO dejo fila: es exactamente por eso que el inventario no alcanza"
+    );
+
+    let orden = drenar_anotando(&mut a, true);
+    assert!(
+        orden.contains(&"padron x2 (1 sin hash)".to_string()),
+        "las DOS rutas viajan: la local con su hash confirmado, y el deshidratado SIN \
+         hash —presente con hash desconocido, que no es lo mismo que ausente—: {orden:?}"
+    );
+}
+
+#[test]
+fn un_recorrido_interrumpido_no_registra_padron() {
+    // IMPORTA PORQUE: un padron parcial presentado como el universo de lo presente retira
+    // TODO lo que el recorrido no llego a mirar. Savia tambien lo exige —solo aplica la
+    // diferencia sobre un `sweep.close(complete)`— y sostenerlo de los dos lados es a
+    // proposito: asi ninguno de los dos solo puede convertir un disco a medio montar en
+    // un borrado masivo.
+    use savia_folder_nucleo::plataforma::{
+        ErrorDeEntrada, EvidenciaDeRaiz, ResultadoDeEnumeracion,
+    };
+    let p = Falsa::como_macos();
+    p.poner("a.txt", b"el a", 100, Some(1));
+    let mut a = almacen();
+    dejar_asentado(&p, &mut a);
+    p.forzar_evidencia(EvidenciaDeRaiz {
+        enumeracion: ResultadoDeEnumeracion::Listada {
+            entradas: Vec::new(),
+            errores: vec![ErrorDeEntrada {
+                ruta: None,
+                errno: 13,
+            }],
+        },
+        volumen: Some(Falsa::huella_del_banco().volumen),
+        directorio: Some(Falsa::huella_del_banco().directorio),
+    });
+    let resumen = ciclo::barrer(&raiz(), BarridoId::nuevo("b2"), &p, &mut a, &politica());
+    assert_eq!(resumen.cierre, Some(EstadoDelBarrido::Interrumpido));
+
+    let orden = drenar_anotando(&mut a, true);
+    assert!(
+        !orden.iter().any(|x| x.starts_with("padron")),
+        "la bandera esta puesta y el padron IGUAL no sale: {orden:?}"
+    );
+}
+
+#[test]
+fn el_padron_no_se_trunca_por_el_limite_de_lote() {
+    // IMPORTA PORQUE: truncar un lote de HECHOS demora —lo que quedo afuera sale en la
+    // vuelta siguiente—; truncar un PADRON miente. El padron afirma «esto es todo lo que
+    // veo», asi que la mitad que no viajo se lee del otro lado como ausente y se retira.
+    // Son dos cosas distintas y el mismo numero no puede gobernar las dos.
+    //
+    // El test afirma SOLO sobre el padron a proposito. `max_entradas_por_lote` en `Some`
+    // tiene un defecto propio y anterior a esto —`lote()` trunca, se entregan `n`, y
+    // `observados_entregados` marca el segmento como listo, con lo que el resto de los
+    // hechos no sale nunca—, y nadie lo pone en `Some` en todo el crate. Apoyarse en ese
+    // camino seria fijar un bug.
+    let p = Falsa::como_macos();
+    for i in 0..5u128 {
+        p.poner(
+            &format!("f{i}.txt"),
+            format!("el {i}").as_bytes(),
+            100,
+            Some(i + 1),
+        );
+    }
+    let mut a = Almacen::nuevo(ParametrosDeCola {
+        max_intentos: None,
+        max_entradas_por_lote: Some(2),
+    });
+    a.enrolar(registrada());
+    dejar_asentado(&p, &mut a);
+    ciclo::barrer(&raiz(), BarridoId::nuevo("b2"), &p, &mut a, &politica());
+
+    let orden = drenar_anotando(&mut a, true);
+    let linea = orden
+        .iter()
+        .find(|x| x.starts_with("padron"))
+        .expect("el padron salio");
+    assert!(
+        linea.starts_with("padron x5"),
+        "las cinco rutas viajan aunque el limite de lote sea dos: {orden:?}"
+    );
+}
+
+#[test]
+fn un_padron_ambiguo_no_bloquea_el_cierre() {
+    // IMPORTA PORQUE: es el UNICO trabajo cuya perdida repara el mecanismo que lo
+    // produjo. Si no llega, el proximo `sweep.open` vuelve a detectar el desfase y vuelve
+    // a pedirlo. Bloquear el segmento en cambio SI cuesta: el cierre no sale, el barrido
+    // queda abierto del otro lado, y la cuarentena nunca recibe el barrido completo que
+    // exige para resolver una sola ausencia.
+    use savia_folder_nucleo::colas::Desenlace;
+    let p = Falsa::como_macos();
+    p.poner("a.txt", b"el a", 100, Some(1));
+    let mut a = almacen();
+    dejar_asentado(&p, &mut a);
+    ciclo::barrer(&raiz(), BarridoId::nuevo("b2"), &p, &mut a, &politica());
+
+    let mut vio_padron = false;
+    let mut vio_cierre = false;
+    let mut vueltas = 0;
+    while let Proximo::Trabajo(t) = a.siguiente(&raiz()) {
+        vueltas += 1;
+        assert!(vueltas < 20, "no gira: el padron ambiguo sale de la cola");
+        let (id, desenlace) = match &*t {
+            Trabajo::AbrirBarrido { id, .. } => (
+                id.clone(),
+                Desenlace::Entregado(Recibido::Barrido {
+                    sweep: savia_folder_nucleo::colas::SweepId("s".into()),
+                    padron_requerido: true,
+                }),
+            ),
+            // El padron se pierde en la ambiguedad, una vez y otra y otra.
+            Trabajo::EnviarPadron { id, .. } => {
+                vio_padron = true;
+                (id.clone(), Desenlace::Ambiguo)
+            }
+            Trabajo::CerrarBarrido { id, .. } => {
+                vio_cierre = true;
+                (
+                    id.clone(),
+                    Desenlace::Entregado(Recibido::Retirados(Vec::new())),
+                )
+            }
+            Trabajo::Observar { id, entradas, .. } => (
+                id.clone(),
+                Desenlace::Entregado(Recibido::Decisiones(
+                    entradas
+                        .iter()
+                        .map(|(ruta, af)| Veredicto {
+                            ruta: ruta.clone(),
+                            afirmado: *af,
+                            decision: Decision::Known {
+                                verificado: HashVerificado::rehidratar_del_inventario(*af.bytes()),
+                            },
+                        })
+                        .collect(),
+                )),
+            ),
+            Trabajo::Desvanecer { id, .. }
+            | Trabajo::Subir { id, .. }
+            | Trabajo::ConfirmarSubida { id, .. } => {
+                (id.clone(), Desenlace::Entregado(Recibido::Nada))
+            }
+        };
+        a.resolver(&raiz(), &id, desenlace);
+    }
+    assert!(vio_padron, "el padron se pidio");
+    assert!(vio_cierre, "y el cierre salio igual");
 }
