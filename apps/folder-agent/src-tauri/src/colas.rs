@@ -37,18 +37,20 @@ use std::collections::BTreeMap;
 
 // ═══════════════════════════════ Identidades ════════════════════════════════
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(
+    serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug,
+)]
 pub struct SegmentoId(pub u64);
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct SweepId(pub String);
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct PermisoId(pub String);
 
 /// De que es este segmento. Los dos mecanismos del ciclo producen hechos, pero **solo
 /// uno produce evidencia sobre la raiz**.
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum OrigenDeSegmento {
     /// Un barrido: lleva `sweep.open`/`sweep.close` y el denominador que el corte por
     /// volumen necesita.
@@ -62,7 +64,7 @@ pub enum OrigenDeSegmento {
 
 // ═══════════════════════════ El permiso prefirmado ══════════════════════════
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct RangoDeTamano {
     pub minimo: u64,
     pub maximo: u64,
@@ -74,7 +76,7 @@ impl RangoDeTamano {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct Permiso {
     pub id: PermisoId,
     pub destino: String,
@@ -191,7 +193,7 @@ pub enum Proximo {
 /// Se modela como enum y no como `bool` porque la detencion tiene que poder decir POR
 /// QUE en el panel, y el dia que haya un segundo motivo el `match` obliga a decidir que
 /// se le muestra al usuario.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
 pub enum MotivoDeDetencion {
     Credenciales,
 }
@@ -278,7 +280,7 @@ pub enum Confirmacion {
 
 // ══════════════════════════════ Cola muerta ═════════════════════════════════
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct EntradaMuerta {
     pub id: u64,
     pub raiz: RaizId,
@@ -304,7 +306,7 @@ pub struct EntradaMuerta {
 
 // ══════════════════════════════ El segmento ═════════════════════════════════
 
-#[derive(Clone, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 struct Segmento {
     id: SegmentoId,
     raiz: RaizId,
@@ -336,7 +338,7 @@ struct Segmento {
     intentos: u32,
 }
 
-#[derive(Clone, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 struct BytePendiente {
     id: u64,
     raiz: RaizId,
@@ -351,7 +353,7 @@ struct BytePendiente {
 // ═══════════════════════════════ Las colas ══════════════════════════════════
 
 /// Los numeros de este modulo, todos sin valor por omision.
-#[derive(Clone, Copy, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, Debug)]
 pub struct ParametrosDeCola {
     /// Ver `parametros::MAX_INTENTOS`: decide cuando la raiz se muestra DEGRADADA,
     /// **nunca cuando se descarta un hecho**.
@@ -361,11 +363,13 @@ pub struct ParametrosDeCola {
     pub max_entradas_por_lote: Option<usize>,
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Colas {
     parametros: ParametrosDeCola,
     segmentos: Vec<Segmento>,
     bytes: Vec<BytePendiente>,
     muertas: Vec<EntradaMuerta>,
+    #[serde(with = "crate::dominio::mapa_como_lista")]
     envenenadas: BTreeMap<(RaizId, RutaRelativa), u64>,
     detenido: Option<MotivoDeDetencion>,
     proximo_id: u64,

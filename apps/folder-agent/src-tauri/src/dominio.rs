@@ -18,6 +18,37 @@
 
 use std::time::Duration;
 
+/// **UN MAPA CON CLAVE DE TUPLA NO CABE EN UN OBJETO JSON**, que solo admite claves de
+/// texto. Los dos mapas del estado que van con clave compuesta —`(raiz, ruta)`— se
+/// guardan como LISTA DE PARES.
+///
+/// Se elige esto y no un formato binario que si admita claves arbitrarias porque el
+/// deposito ya usa `serde_json`, que el crate tenia: sumar otro formato seria una
+/// dependencia mas para no escribir doce lineas. El orden no se pierde — el destino es un
+/// `BTreeMap`, asi que la lista puede volver en cualquier orden y el mapa queda igual.
+pub mod mapa_como_lista {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::collections::BTreeMap;
+
+    pub fn serialize<K, V, S>(m: &BTreeMap<K, V>, s: S) -> Result<S::Ok, S::Error>
+    where
+        K: Serialize,
+        V: Serialize,
+        S: Serializer,
+    {
+        s.collect_seq(m.iter())
+    }
+
+    pub fn deserialize<'de, K, V, D>(d: D) -> Result<BTreeMap<K, V>, D::Error>
+    where
+        K: Deserialize<'de> + Ord,
+        V: Deserialize<'de>,
+        D: Deserializer<'de>,
+    {
+        Ok(Vec::<(K, V)>::deserialize(d)?.into_iter().collect())
+    }
+}
+
 // ───────────────────────────── Identidades ──────────────────────────────────
 
 /// Espejo local de `RootId` (GLOSARIO P32). Se acuna al enrolar y **NO ES UNA RUTA**.
@@ -25,7 +56,9 @@ use std::time::Duration;
 /// compila, y a partir de ahi mover la raiz cambia la identidad de todo lo que hay
 /// adentro — que es el desastre que `RutaRelativa` existe para evitar, reintroducido un
 /// nivel mas arriba.
-#[derive(Clone, PartialEq, Eq, Hash, Debug, PartialOrd, Ord)]
+#[derive(
+    serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq, Hash, Debug, PartialOrd, Ord,
+)]
 pub struct RaizId(String);
 
 impl RaizId {
@@ -43,7 +76,9 @@ impl RaizId {
 /// rutas absolutas **todos** los archivos parecen desaparecer a la vez. Con relativas,
 /// mover la raiz entera es UN solo hecho — y por la decision 7 ni siquiera eso, porque
 /// reelegirla da el mismo `RootId`.
-#[derive(Clone, PartialEq, Eq, Hash, Debug, PartialOrd, Ord)]
+#[derive(
+    serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq, Hash, Debug, PartialOrd, Ord,
+)]
 pub struct RutaRelativa(String);
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -185,10 +220,12 @@ fn compone(base: char, marca: char) -> Option<char> {
 /// La decision 9 deja la sensibilidad a mayusculas del lado del agente porque es el
 /// unico que sabe si su sistema de archivos las distingue. Plegarla en un tipo aparte
 /// convierte esa rama en un DATO en vez de un `if` repartido por todo el modulo.
-#[derive(Clone, PartialEq, Eq, Hash, Debug, PartialOrd, Ord)]
+#[derive(
+    serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq, Hash, Debug, PartialOrd, Ord,
+)]
 pub struct ClaveDeRuta(String);
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SensibilidadAMayusculas {
     Distingue,
     NoDistingue,
@@ -207,7 +244,7 @@ pub fn clave_de_ruta(p: &RutaRelativa, s: SensibilidadAMayusculas) -> ClaveDeRut
 ///
 /// Vive aca, donde todos lo alcanzan, porque afirmar es gratis y cualquiera lo puede
 /// hacer. Su gemelo verificado esta abajo con las puertas contadas.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct HashAfirmado([u8; 32]);
 
 /// Lo que ESTE lado confirmo: la respuesta `known`, o el `verifiedHash` que devuelve
@@ -224,7 +261,7 @@ pub struct HashAfirmado([u8; 32]);
 /// unico la privacidad de modulo no alcanza para prohibir el cuarto camino, asi que lo
 /// prohibe una prueba que falla si aparece.
 #[must_use = "el verificado es la autoridad: corregi el inventario con este, nunca con el afirmado"]
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct HashVerificado([u8; 32]);
 
 impl HashAfirmado {
@@ -290,7 +327,7 @@ pub fn de_hex(s: &str) -> Option<[u8; 32]> {
 /// tolerancia», y la tolerancia es politica de quien compara, no de quien mide. FAT
 /// tiene granularidad de dos segundos y las unidades de red truncan distinto:
 /// normalizar aca borra la evidencia de cual de los dos casos es.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Mtime {
     pub segundos: i64,
     pub nanos: u32,
@@ -314,12 +351,12 @@ impl Mtime {
 /// **SIN `Hash` y SIN `Ord`, y esa ausencia es el invariante**: no puede ser la clave de
 /// un mapa. Si lo fuera, indexar el inventario por el compilaria, y a partir de ahi dos
 /// archivos distintos con el id reciclado colapsan en una fila.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
 pub struct IdDeArchivoDelSO(pub u128);
 
 /// Lo que un `stat` deja ver, y NADA MAS. No lleva contenido a proposito: esta tripleta
 /// decide si vale la pena leer bytes, asi que no puede necesitarlos.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Observacion {
     pub tamano: u64,
     pub mtime: Mtime,
@@ -345,7 +382,9 @@ pub struct Observacion {
 /// Que hoy `CLOCK_MONOTONIC` en Darwin si avance durante el sueno no cambia nada: la
 /// garantia tiene que ser NUESTRA y estar escrita aca, no ser un detalle de
 /// implementacion de std que ya cambio una vez.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(
+    serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug,
+)]
 pub struct Instante(u64);
 
 impl Instante {
@@ -373,7 +412,9 @@ pub trait Reloj: Send + Sync {
 /// El barrido es la UNIDAD sobre la que se puede decir «completo» o «interrumpido». Sin
 /// borde, «desaparecieron 40» no se compara contra nada y el corte por volumen no
 /// existe.
-#[derive(Clone, PartialEq, Eq, Hash, Debug, PartialOrd, Ord)]
+#[derive(
+    serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq, Hash, Debug, PartialOrd, Ord,
+)]
 pub struct BarridoId(String);
 
 impl BarridoId {
@@ -385,7 +426,7 @@ impl BarridoId {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
 pub enum EstadoDelBarrido {
     /// Lo unico que le sirve a la cuarentena: prueba a la vez que la raiz esta viva y
     /// que los archivos siguen sin estar.

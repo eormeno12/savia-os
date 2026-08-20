@@ -6,6 +6,7 @@ pub mod hash;
 pub mod inventario;
 pub mod maquina;
 pub mod parametros;
+pub mod persistencia;
 pub mod plataforma;
 pub mod protocolo;
 pub mod salvaguardas;

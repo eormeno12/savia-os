@@ -42,7 +42,7 @@ use std::collections::BTreeMap;
 
 /// De donde viene el hash que la fila guarda. La distincion no es de trazabilidad: es
 /// lo que decide si esa ruta puede producir una baja reportable.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
 pub enum EstadoDeHash {
     /// El agente lo computo leyendo bytes locales. Savia todavia no dijo nada.
     Afirmado(HashAfirmado),
@@ -92,7 +92,7 @@ impl EstadoDeHash {
 }
 
 /// LOS DOS ESTADOS SON EXCLUYENTES Y POR ESO ES UN ENUM.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
 pub enum EstadoDeFila {
     Presente {
         observacion: Observacion,
@@ -133,7 +133,7 @@ pub struct Asiento {
 
 /// Una fila completa. La maquina no la ve —ve un `Asiento`—: `alta_en` y `vista_en` son
 /// contabilidad del recorrido, no insumo de la decision.
-#[derive(Clone, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct Entrada {
     pub ruta: RutaRelativa,
     pub estado: EstadoDeFila,
@@ -320,8 +320,10 @@ pub enum EfectoDeInventario {
 /// que el enrolamiento sea idempotente por
 /// `(dispositivo, identidadDeVolumen, idDelDirectorio)`. Eso es un requisito que este
 /// modulo IMPONE al enrolamiento, no una dependencia que hereda.
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct InventarioEnMemoria {
     raices: BTreeMap<RaizId, RaizRegistrada>,
+    #[serde(with = "crate::dominio::mapa_como_lista")]
     filas: BTreeMap<(RaizId, ClaveDeRuta), Entrada>,
 }
 

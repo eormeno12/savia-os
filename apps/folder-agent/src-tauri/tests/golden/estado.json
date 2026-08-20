@@ -1,0 +1,317 @@
+{
+  "inventario": {
+    "raices": {
+      "root-1": {
+        "id": "root-1",
+        "huella": {
+          "volumen": {
+            "Uuid": [
+              7,
+              7,
+              7,
+              7,
+              7,
+              7,
+              7,
+              7,
+              7,
+              7,
+              7,
+              7,
+              7,
+              7,
+              7,
+              7
+            ]
+          },
+          "directorio": 1
+        },
+        "ruta_absoluta": "/no/se/toca",
+        "sensibilidad": "Distingue"
+      }
+    },
+    "filas": [
+      [
+        [
+          "root-1",
+          "contrato.docx"
+        ],
+        {
+          "ruta": "contrato.docx",
+          "estado": {
+            "Presente": {
+              "observacion": {
+                "tamano": 17,
+                "mtime": {
+                  "segundos": 1700000000,
+                  "nanos": 0
+                },
+                "id_de_archivo": 1
+              },
+              "hash": {
+                "Afirmado": [
+                  119,
+                  45,
+                  67,
+                  69,
+                  140,
+                  164,
+                  63,
+                  8,
+                  212,
+                  206,
+                  159,
+                  218,
+                  183,
+                  178,
+                  88,
+                  234,
+                  30,
+                  88,
+                  30,
+                  88,
+                  240,
+                  185,
+                  139,
+                  19,
+                  217,
+                  4,
+                  183,
+                  34,
+                  188,
+                  243,
+                  142,
+                  39
+                ]
+              }
+            }
+          },
+          "candidato": null,
+          "alta_en": "b2",
+          "vista_en": "b2",
+          "en_duda": false
+        }
+      ],
+      [
+        [
+          "root-1",
+          "sub/informe.xlsx"
+        ],
+        {
+          "ruta": "sub/informe.xlsx",
+          "estado": {
+            "Presente": {
+              "observacion": {
+                "tamano": 13,
+                "mtime": {
+                  "segundos": 1700000000,
+                  "nanos": 0
+                },
+                "id_de_archivo": 2
+              },
+              "hash": {
+                "Afirmado": [
+                  49,
+                  175,
+                  252,
+                  100,
+                  110,
+                  54,
+                  29,
+                  118,
+                  173,
+                  20,
+                  170,
+                  147,
+                  28,
+                  153,
+                  219,
+                  180,
+                  57,
+                  246,
+                  32,
+                  40,
+                  255,
+                  43,
+                  186,
+                  25,
+                  64,
+                  18,
+                  85,
+                  127,
+                  74,
+                  0,
+                  146,
+                  68
+                ]
+              }
+            }
+          },
+          "candidato": null,
+          "alta_en": "b2",
+          "vista_en": "b2",
+          "en_duda": false
+        }
+      ]
+    ]
+  },
+  "colas": {
+    "parametros": {
+      "max_intentos": null,
+      "max_entradas_por_lote": null
+    },
+    "segmentos": [
+      {
+        "id": 1,
+        "raiz": "root-1",
+        "origen": {
+          "Barrido": {
+            "total": 0,
+            "barrido": "b1"
+          }
+        },
+        "hechos": {},
+        "orden": [],
+        "abierto": false,
+        "cierre": "Completo",
+        "sweep": null,
+        "apertura_entregada": false,
+        "observados_entregados": false,
+        "desvanecidos_entregados": false,
+        "cierre_entregado": false,
+        "padron": [
+          [
+            "contrato.docx",
+            null
+          ],
+          [
+            "sub/informe.xlsx",
+            null
+          ]
+        ],
+        "padron_requerido": false,
+        "padron_entregado": false,
+        "intentos": 0
+      },
+      {
+        "id": 2,
+        "raiz": "root-1",
+        "origen": {
+          "Barrido": {
+            "total": 0,
+            "barrido": "b2"
+          }
+        },
+        "hechos": {
+          "contrato.docx": {
+            "Aparecio": {
+              "ruta": "contrato.docx",
+              "hash": [
+                119,
+                45,
+                67,
+                69,
+                140,
+                164,
+                63,
+                8,
+                212,
+                206,
+                159,
+                218,
+                183,
+                178,
+                88,
+                234,
+                30,
+                88,
+                30,
+                88,
+                240,
+                185,
+                139,
+                19,
+                217,
+                4,
+                183,
+                34,
+                188,
+                243,
+                142,
+                39
+              ]
+            }
+          },
+          "sub/informe.xlsx": {
+            "Aparecio": {
+              "ruta": "sub/informe.xlsx",
+              "hash": [
+                49,
+                175,
+                252,
+                100,
+                110,
+                54,
+                29,
+                118,
+                173,
+                20,
+                170,
+                147,
+                28,
+                153,
+                219,
+                180,
+                57,
+                246,
+                32,
+                40,
+                255,
+                43,
+                186,
+                25,
+                64,
+                18,
+                85,
+                127,
+                74,
+                0,
+                146,
+                68
+              ]
+            }
+          }
+        },
+        "orden": [
+          "contrato.docx",
+          "sub/informe.xlsx"
+        ],
+        "abierto": false,
+        "cierre": "Completo",
+        "sweep": null,
+        "apertura_entregada": false,
+        "observados_entregados": false,
+        "desvanecidos_entregados": false,
+        "cierre_entregado": false,
+        "padron": [
+          [
+            "contrato.docx",
+            null
+          ],
+          [
+            "sub/informe.xlsx",
+            null
+          ]
+        ],
+        "padron_requerido": false,
+        "padron_entregado": false,
+        "intentos": 0
+      }
+    ],
+    "bytes": [],
+    "muertas": [],
+    "envenenadas": [],
+    "detenido": null,
+    "proximo_id": 3
+  }
+}

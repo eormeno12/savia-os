@@ -142,7 +142,7 @@ pub const fn se_puede_abrir(h: Hidratacion) -> bool {
 // ══════════════════════ 1a · Asentamiento (agente) ══════════════════════════
 
 /// La observacion que TODAVIA NO SE REPORTO y cuyo intervalo esta corriendo.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Candidato {
     pub observacion: Observacion,
     /// Cuando se vio ESTA tripleta por primera vez. **No es el `mtime`**: el `mtime` lo
@@ -433,13 +433,13 @@ pub fn correlacionar(
 /// Lo unico que puede entrar a la cola de hechos. El vocabulario es cerrado: aparecio ·
 /// desaparecio. No hay un tercer verbo, y no puede haberlo — «se edito» y «se movio»
 /// son conclusiones, y las saca Savia.
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum Hecho {
     Aparecio(Aparicion),
     Desaparecio(Desaparicion),
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct Aparicion {
     ruta: RutaRelativa,
     hash: crate::dominio::HashAfirmado,
@@ -451,7 +451,7 @@ pub struct Aparicion {
 /// convencion, y cualquier camino nuevo —un reintento de la cola muerta, el replay del
 /// cursor durable de macOS, un handler de eventos apurado— podria emitir una baja sin
 /// pasar por la puerta. El bug no se ve hasta que un disco se desmonta.
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct Desaparicion {
     ruta: RutaRelativa,
     ultimo_hash: HashVerificado,

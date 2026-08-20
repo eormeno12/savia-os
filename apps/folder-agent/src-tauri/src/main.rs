@@ -22,12 +22,13 @@ use savia_folder_nucleo::dominio::{BarridoId, RaizId, SensibilidadAMayusculas};
 // LA PLATAFORMA SE ELIGE POR `cfg`, Y NO ES ADORNO: con `Macos` cableado, este
 // binario NO CRUZABA a Windows y el guardian que lo cross-chequea no podia existir.
 // La biblioteca si cruzaba —verificado— asi que el hueco era del demo, no del nucleo.
+use savia_folder_nucleo::persistencia::Deposito;
 #[cfg(target_os = "macos")]
 use savia_folder_nucleo::plataforma::Macos as PlataformaLocal;
 #[cfg(target_os = "windows")]
 use savia_folder_nucleo::plataforma::Windows as PlataformaLocal;
 use savia_folder_nucleo::plataforma::{Plataforma, RaizRegistrada};
-use savia_folder_nucleo::protocolo::{BaseDeApi, Cliente, Credencial, Tiempos};
+use savia_folder_nucleo::protocolo::{BaseDeApi, Cliente, Credencial, Reclamo, Secreto, Tiempos};
 use savia_folder_nucleo::salvaguardas::Politica;
 
 /// Parametros del BANCO. Chicos para que una corrida termine en segundos.
@@ -38,6 +39,11 @@ mod banco {
     pub const ASENTAMIENTO: Duration = Duration::from_millis(300);
     pub const TIEMPO_DE_CONEXION: Duration = Duration::from_secs(5);
     pub const TIEMPO_POR_LLAMADA: Duration = Duration::from_secs(30);
+    /// Cuantas veces el demo pregunta si ya lo aprobaron, y cada cuanto. **Parametros del
+    /// demo**: la app de bandeja espera indefinidamente, porque la persona puede tardar
+    /// lo que quiera en abrir su cuenta.
+    pub const INTENTOS_DE_VINCULACION: u32 = 30;
+    pub const ESPERA_DE_VINCULACION: Duration = Duration::from_secs(2);
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -74,22 +80,70 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let politica = Politica::con_asentamiento(banco::ASENTAMIENTO)
         .expect("el banco provee un intervalo no nulo a proposito");
-    let mut almacen = Almacen::nuevo(ParametrosDeCola {
-        // Los dos en `None`: ver `parametros.rs`. Ninguno descarta nada.
-        max_intentos: None,
-        max_entradas_por_lote: None,
-    });
-    almacen.enrolar(registrada);
+
+    // ── EL DEPOSITO ──────────────────────────────────────────────────────────
+    //
+    // **NUNCA ADENTRO DE UNA RAIZ VIGILADA**, y quien lo puede verificar es este archivo
+    // porque es el unico que conoce las dos rutas. Un deposito adentro de la carpeta se
+    // observa a si mismo: cada escritura produce un evento, que produce un barrido, que
+    // produce una escritura.
+    let deposito_ruta = std::env::temp_dir().join("savia-folder-agent.redb");
+    if deposito_ruta.starts_with(&ruta_absoluta) {
+        return Err(format!(
+            "el deposito ({}) no puede vivir adentro de la raiz vigilada ({})",
+            deposito_ruta.display(),
+            ruta_absoluta.display()
+        )
+        .into());
+    }
+    let deposito = Deposito::abrir(&deposito_ruta).map_err(|e| e.to_string())?;
+
+    // UN DEPOSITO ILEGIBLE PARA EL ARRANQUE. No se absorbe como «empiezo de cero»: sin
+    // lapidas, lo borrado mientras el agente estuvo apagado no lo ve faltar nadie.
+    let rescatado = deposito.cargar().map_err(|e| e.to_string())?;
+    let (mut almacen, credencial_guardada) = match rescatado {
+        Some(r) => {
+            println!("deposito  {} (recuperado)", deposito_ruta.display());
+            (r.almacen, r.credencial)
+        }
+        None => {
+            println!("deposito  {} (nuevo)", deposito_ruta.display());
+            let mut a = Almacen::nuevo(ParametrosDeCola {
+                // Los dos en `None`: ver `parametros.rs`. Ninguno descarta nada.
+                max_intentos: None,
+                max_entradas_por_lote: None,
+            });
+            a.enrolar(registrada);
+            (a, None)
+        }
+    };
+
+    let tiempos = Tiempos {
+        conexion: banco::TIEMPO_DE_CONEXION,
+        por_llamada: banco::TIEMPO_POR_LLAMADA,
+        envio_de_cuerpo: None,
+    };
+
+    // ── LA CREDENCIAL ────────────────────────────────────────────────────────
+    let credencial = match credencial_guardada {
+        Some(s) => {
+            println!("token     recuperado del deposito\n");
+            Some(s)
+        }
+        None => vincular(&base, tiempos)?,
+    };
+    let Some(token) = credencial else {
+        // Se guarda igual: puede haber estado que valga la pena conservar.
+        deposito
+            .guardar(&almacen, None)
+            .map_err(|e| e.to_string())?;
+        return Ok(());
+    };
 
     let cliente = Cliente::nuevo(
         BaseDeApi::nueva(&base)?,
-        // El token de dispositivo no existe todavia y el simulador ignora headers.
-        Credencial::SinAutenticar,
-        Tiempos {
-            conexion: banco::TIEMPO_DE_CONEXION,
-            por_llamada: banco::TIEMPO_POR_LLAMADA,
-            envio_de_cuerpo: None,
-        },
+        Credencial::TokenDeDispositivo(token.clone()),
+        tiempos,
     );
 
     println!("raiz  {}", ruta_absoluta.display());
@@ -128,6 +182,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("   {t}");
         }
         println!("   drenaje: {d:?}\n");
+
+        // **EL PUNTO DE CONTROL VA ACA**, donde un barrido TERMINO algo — no por
+        // archivo. Escribe las dos mitades juntas, asi que un corte las rebobina al mismo
+        // punto y el barrido siguiente vuelve a derivar lo perdido.
+        deposito
+            .guardar(&almacen, Some(&token))
+            .map_err(|e| e.to_string())?;
     }
 
     if let Some(m) = almacen.colas().detenido() {
@@ -151,4 +212,43 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
     Ok(())
+}
+
+/// EL PASO 2 DEL ENROLAMIENTO, y este demo **no lo puede completar solo**: aprobar es un
+/// acto de la persona desde su cuenta, y ni `Cliente` ni este binario tienen con que
+/// hacerlo. Lo que se hace es lo que hara la app de bandeja: mostrar el codigo y esperar.
+fn vincular(base: &str, tiempos: Tiempos) -> Result<Option<Secreto>, Box<dyn std::error::Error>> {
+    let sin_vincular = Cliente::nuevo(BaseDeApi::nueva(base)?, Credencial::SinAutenticar, tiempos);
+    let v = sin_vincular.enrolar().map_err(|e| format!("{e:?}"))?;
+    println!("\n  ┌─────────────────────────────────────────────┐");
+    println!("  │  codigo de vinculacion:   {}              │", v.codigo);
+    println!("  └─────────────────────────────────────────────┘");
+    println!("  aprobalo desde tu cuenta. Contra el simulador:\n");
+    println!(
+        r#"    curl -s -XPOST {base}/enroll/approve -d '{{"code":"{}","userId":"vos"}}'"#,
+        v.codigo
+    );
+
+    for intento in 1..=banco::INTENTOS_DE_VINCULACION {
+        match sin_vincular.reclamar(&v).map_err(|e| format!("{e:?}"))? {
+            Reclamo::Aprobado { token, usuario } => {
+                println!("  vinculado a {usuario}\n");
+                return Ok(Some(token));
+            }
+            Reclamo::Pendiente => {
+                println!("  esperando aprobacion... ({intento})");
+                std::thread::sleep(banco::ESPERA_DE_VINCULACION);
+            }
+            Reclamo::Denegado => {
+                println!("  la vinculacion fue DENEGADA");
+                return Ok(None);
+            }
+            Reclamo::Vencido => {
+                println!("  el codigo VENCIO: volve a arrancar para pedir otro");
+                return Ok(None);
+            }
+        }
+    }
+    println!("  nadie aprobo el codigo. Sin token no se habla con la API.");
+    Ok(None)
 }

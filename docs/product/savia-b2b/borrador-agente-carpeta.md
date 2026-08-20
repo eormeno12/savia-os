@@ -141,8 +141,10 @@ preferencia: es un requisito que el inventario le IMPONE al enrolamiento, porque
 idempotencia reelegir la misma carpeta acuña un `RootId` nuevo y duplica todos sus
 documentos.
 
-**Y hoy el token no sobrevive al proceso**, porque no hay persistencia. Cada corrida
-re-enrola. Es el mismo hueco de la sección de estado, visto desde acá.
+**El token sobrevive al proceso**: se guarda en el mismo depósito y en la misma
+transacción que el estado. Guardar sin credencial la **borra**, que es lo que hace falta
+después de una revocación — si el token revocado sobreviviera, el próximo arranque
+volvería a chocar contra un `401` en vez de pedir enrolamiento.
 
 ### El panel
 
@@ -579,8 +581,8 @@ esperar a nada. **Se hizo, y eso partió el agente en dos mitades muy distintas.
 
 ### El núcleo existe, y corre
 
-`apps/folder-agent/src-tauri/` — **6.649 líneas de Rust en 18 módulos, con 79 pruebas**:
-74 en proceso sobre la máquina, las salvaguardas, las colas y los guardianes, y **5 que
+`apps/folder-agent/src-tauri/` — **19 módulos de Rust con 86 pruebas**: 81 en proceso
+sobre la máquina, las salvaguardas, las colas, el depósito y los guardianes, y **5 que
 hablan HTTP de verdad** contra `sim/server.ts`, el servidor simulado, que a su vez lleva
 26 afirmaciones propias. Cubre el árbol de decisión completo con sus diez salidas, el
 inventario, las cinco salvaguardas, las dos colas con su orden y su compactación, el
@@ -620,17 +622,39 @@ pero ya no es cierto que no haya con qué vincularse.
 
 ### Y dos huecos que no son de interfaz
 
-- **La persistencia no existe.** El inventario vive en memoria y muere con el proceso. El
-  diseño pedía SQLite; lo que ese diseño compra y hoy **no** se paga es la durabilidad, y
-  lo que compra y **sí** se paga es la atomicidad — el estado y la cola viven en el mismo
-  `Almacen` y se escriben en una sola llamada, así que no hay forma de hacer una sin la
-  otra.
 - **No hay observador de eventos del sistema de archivos.** El tipo `OrigenDeSenal`
   distingue evento de barrido y el árbol de decisión ya trata el caso —una ruta que falta
   sin barrido abierto agenda uno en vez de reportar una baja—, pero no hay nada que
   produzca esos eventos: ni FSEvents ni `ReadDirectoryChangesW`.
 
-Ninguno de los dos cambia una decisión de este documento. Los dos son trabajo.
+Eso no cambia ninguna decisión de este documento. Es trabajo.
+
+### La persistencia, y por qué no es SQLite
+
+**El estado sobrevive al proceso.** El inventario, las dos colas y el token de dispositivo
+se guardan juntos, y se ve corriendo el binario dos veces: la primera pide código de
+vinculación y reporta los dos archivos (`apariciones=2`); la segunda dice «token
+recuperado del depósito» y reporta **cero**, porque ya los conoce.
+
+**El diseño pedía SQLite y el disparador para cambiarlo está medido.** `rusqlite` con
+`bundled` compila `sqlite3.c` con `cc`, y eso rompe
+`cargo check --target x86_64-pc-windows-msvc` desde un Mac — no hay headers de MSVC. Ese
+cross-check es lo único que sostiene que `plataforma/windows.rs` compila, así que el
+precio de SQLite era quedarse sin él. **`redb` es Rust puro, cruza limpio a los dos
+targets, y su única dependencia transitiva es `libc`**, que el crate ya tenía.
+
+**Se escribe el estado entero en puntos de control, no un delta por archivo**, y es una
+decisión de corrección antes que de rendimiento: un corte de luz rebobina **las dos
+mitades al mismo punto**, que es el invariante que la atomicidad existe para sostener; el
+barrido siguiente vuelve a derivar los hechos perdidos porque las filas que los habrían
+silenciado se rebobinaron con ellos. El costo hay que decirlo: es O(corpus) por punto de
+control, así que van donde un barrido *termina* algo. El día que moleste, el camino es una
+fila por archivo — y `EfectoDeInventario` ya nombra exactamente qué filas tocó cada paso.
+
+**Y un depósito ilegible detiene el arranque en vez de parecer vacío.** Absorberlo como
+«empiezo de cero» es la falla silenciosa peor que hay en este canal: sin lápidas, lo
+borrado mientras el agente estuvo apagado no lo ve faltar ningún barrido, y esos
+documentos quedan vigentes para siempre.
 
 ## Qué se reusa del sistema de diseño, y qué no
 

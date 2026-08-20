@@ -12,13 +12,18 @@
 //! `&mut self` EN TODA ESCRITURA es la disciplina de un solo escritor, impuesta por el
 //! compilador en vez de por un mutex que se puede omitir.
 //!
-//! DONDE ESTA LA TRANSACCION HOY, DICHO SIN ADORNOS: en que las dos mitades viven en la
-//! misma estructura y se escriben en la misma llamada. Con `rusqlite` eso pasa a ser un
-//! `BEGIN IMMEDIATE` —diferida no, porque una diferida puede fallar con `SQLITE_BUSY`
-//! recien en el commit, despues de haber hecho el trabajo— y las dos mitades tienen que
-//! seguir en el MISMO archivo: es la atomicidad lo que compra el derecho a relajar la
-//! durabilidad a `synchronous = NORMAL`. Si la cola se mudara a otro archivo habria que
-//! ir a `FULL` y a dos fases, que es exactamente la razon por la que no se muda.
+//! DONDE ESTA LA TRANSACCION, DICHO SIN ADORNOS: en que las dos mitades viven en la misma
+//! estructura y se escriben en la misma llamada. En disco eso se sostiene con una sola
+//! transaccion de `redb` que escribe **las dos juntas** (ver `persistencia.rs`); si la
+//! cola se guardara aparte harian falta dos fases, que es exactamente la razon por la que
+//! no se guarda aparte.
+//!
+//! **EL DISENO DECIA SQLITE Y NO ES SQLITE, y el disparador esta medido**: `rusqlite` con
+//! `bundled` compila `sqlite3.c` con `cc`, y eso rompe
+//! `cargo check --target x86_64-pc-windows-msvc` desde un Mac —no hay headers de MSVC—.
+//! Ese cross-check es lo unico que sostiene que `plataforma/windows.rs` compila, asi que
+//! el precio de SQLite era quedarse sin el. `redb` es Rust puro, cruza limpio, y su unica
+//! dependencia transitiva es `libc`, que el crate ya tenia.
 #![forbid(unsafe_code)]
 
 use crate::colas::{
@@ -35,7 +40,46 @@ pub struct Almacen {
     colas: Colas,
 }
 
+/// **LA UNIDAD QUE SE PERSISTE, Y ES UNA SOLA A PROPOSITO.** Las dos mitades salen y
+/// entran juntas porque separarlas reintroduce en disco justo la mentira que este modulo
+/// existe para impedir: un estado que dice «Savia sabe esto» y una cola que no tiene el
+/// hecho.
+///
+/// Los campos son PRIVADOS, asi que fuera de este modulo no se puede armar un `Estado`
+/// con mitades que no se correspondan.
+#[derive(serde::Serialize)]
+pub struct EstadoParaGuardar<'a> {
+    inventario: &'a InventarioEnMemoria,
+    colas: &'a Colas,
+}
+
+#[derive(serde::Deserialize)]
+pub struct EstadoLeido {
+    inventario: InventarioEnMemoria,
+    colas: Colas,
+}
+
 impl Almacen {
+    /// Por REFERENCIA y no por clon: el estado de un corpus grande no se copia entero
+    /// cada vez que se hace un punto de control.
+    pub fn para_guardar(&self) -> EstadoParaGuardar<'_> {
+        EstadoParaGuardar {
+            inventario: &self.inventario,
+            colas: &self.colas,
+        }
+    }
+
+    /// **NO VALIDA NADA, Y NO PUEDE**: lo que entra es lo que salio de una sola
+    /// transaccion, asi que las dos mitades ya se corresponden por construccion. Si
+    /// alguna vez se guardaran por separado, aca haria falta una reconciliacion — que es
+    /// otra razon para no guardarlas por separado.
+    pub fn desde(estado: EstadoLeido) -> Self {
+        Self {
+            inventario: estado.inventario,
+            colas: estado.colas,
+        }
+    }
+
     pub fn nuevo(parametros: ParametrosDeCola) -> Self {
         Self {
             inventario: InventarioEnMemoria::nuevo(),

@@ -121,7 +121,7 @@ pub struct CursorDurable {
 /// **NO DERIVA `PartialEq`, Y ESA ES LA MITAD DEL PUNTO.** Dos `NoPublicada`
 /// compararian iguales y la salvaguarda de la raiz viva aceptaria un suplente. La
 /// comparacion es explicita y de TRES valores.
-#[derive(Clone, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub enum IdDeVolumen {
     /// Lo que corresponde: `ATTR_VOL_UUID` en macOS, el GUID de
     /// `GetVolumeNameForVolumeMountPointW` en Windows.
@@ -176,7 +176,7 @@ impl IdDeVolumen {
 /// —el volumen no monto y quedo un directorio vacio de suplente en el mismo path, que
 /// tiene otro inodo— y la id de volumen atrapa el caso en que dos volumenes distintos
 /// repiten numero de inodo, que es raro pero que un restore produce.
-#[derive(Clone, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct HuellaDeRaiz {
     pub volumen: IdDeVolumen,
     pub directorio: IdDeArchivoDelSO,
@@ -195,7 +195,7 @@ impl HuellaDeRaiz {
 }
 
 /// Lo acunado al ENROLAR. La identidad son los dos ids; la ruta es procedencia.
-#[derive(Clone, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct RaizRegistrada {
     pub id: RaizId,
     pub huella: HuellaDeRaiz,
