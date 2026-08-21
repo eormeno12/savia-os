@@ -590,23 +590,33 @@ esperar a nada. **Se hizo, y eso partió el agente en dos mitades muy distintas.
 
 ### El núcleo existe, y corre
 
-`apps/folder-agent/src-tauri/` — **19 módulos de Rust con 86 pruebas**: 81 en proceso
-sobre la máquina, las salvaguardas, las colas, el depósito y los guardianes, y **5 que
-hablan HTTP de verdad** contra `sim/server.ts`, el servidor simulado, que a su vez lleva
-26 afirmaciones propias. Cubre el árbol de decisión completo con sus diez salidas, el
+`apps/folder-agent/src-tauri/` — **20 módulos de Rust con 104 pruebas**: 98 en proceso
+sobre la máquina, las salvaguardas, las colas, el depósito, el panel y los guardianes, y
+**6 que hablan HTTP de verdad** contra `sim/server.ts`, el servidor simulado. Cubre el árbol de decisión completo con sus diez salidas, el
 inventario, las cinco salvaguardas, las dos colas con su orden y su compactación, el
 cliente con las siete llamadas, y **el enrolamiento con sus tres**.
 
-Y la cadena la corre `turbo lint`: los seis peldaños —`fmt` → `clippy` → cross-check de
-Windows → las pruebas → el ejercicio → el banco— en 25 s.
+Y la cadena la corre `turbo lint`, ahora de nueve peldaños: `fmt` → `clippy` →
+cross-check de Windows → las pruebas → el ejercicio → el banco → la copia de tokens → el
+ícono → el contraste. Los tres últimos son del panel y **todos verifican por omisión y
+solo escriben con una variable de entorno**, así que tocar `savia-mark.tsx` o un token sin
+regenerar pone el `lint` en rojo.
 
 Del tramo de plataforma, **macOS es la única implementación real** —`mach_continuous_time`
 para el reloj que avanza durante la suspensión, y `SF_DATALESS` por `lstat` para
 detectar la deshidratación sin materializar—. Windows tiene la firma completa y el cuerpo
-en `unimplemented!()`, acreditado con `cargo check --target x86_64-pc-windows-msvc`, que
-compila limpio: la firma es correcta aunque no haga nada.
+en `unimplemented!()`, acreditado con `cargo check --lib --target x86_64-pc-windows-msvc`,
+que compila limpio: la firma es correcta aunque no haga nada.
 
-### La bandeja existe como derivación y como maqueta, no como ícono
+**Es `--lib` y no `--all-targets`, y el motivo hay que dejarlo escrito.** Desde que Tauri
+es dependencia, su script de build compila un *recurso de Windows* con `llvm-rc` cuando el
+objetivo es Windows, y cruzando desde una Mac ese programa no está — el guardián se caía
+con `NotAttempted("llvm-rc")`, un fallo del script y no del código. `build.rs` saltea
+`tauri_build` al cruzar, y lo que se cruza es el núcleo, que es de lo único que hablaba la
+garantía. **El binario de la bandeja no cruza a Windows en una Mac**; ese se compila
+nativo el día que haya CI de Windows.
+
+### La bandeja existe: ícono, popover y derivación
 
 **`panel::vista(almacén, plataforma, tope) → Vista`**, y es lo único de la interfaz que
 está construido. Deriva y no guarda: no tiene estado propio, no muta nada y no habla con
@@ -641,38 +651,68 @@ exige (`congeladaAlEntrar` se leía al cerrar, y `presence.vanished` ya había c
 antes en ese mismo barrido), y un congelamiento nuevo por diferencia de padrón lo
 consumía el descuento del anterior. Los dos hacían que el estado durara cero barridos.
 
-La maqueta es `apps/folder-agent/panel/` — HTML, CSS y una vista de ~140 líneas sobre
-`@savia-os/design-tokens/tokens.css`, con los seis estados uno al lado del otro. **Los
+`apps/folder-agent/panel/` es a la vez la **hoja de contacto** —seis bandejas una al lado
+de la otra, para poder mirarlas— y el **popover real**: los dos comparten `panel.js`, una
+vista de ~140 líneas sobre `@savia-os/design-tokens/tokens.css`, así que lo que se revisa
+en la hoja es literalmente lo que se dibuja en la barra. **Los
 datos no están escritos a mano**: salen de `panel::vista` corriendo de verdad sobre el
 almacén y viven en `panel/ejemplo.json` con un golden que se pone rojo si la forma cambia
 —porque un campo renombrado no rompe la interfaz, la hace dibujar vacío—.
 
 ### Lo demás de lo que se ve no existe
 
-`src-tauri/` es un nombre que anticipa el runtime: **Tauri ni siquiera es dependencia.**
-El crate depende de `libc`, `redb`, `sha2`, `serde` y `serde_json`, y de nada más. No hay
-ícono de bandeja, ni popover de verdad, ni ventana de preferencias, ni selector de
-directorio: hay una derivación y una maqueta, y entre eso y un ítem en la barra del
-sistema está todo el *chrome*. Hoy el agente es un binario de línea de comandos que toma
-una ruta y una URL:
+**`src-tauri/` ya no es un nombre que anticipa el runtime: Tauri es dependencia y hay una
+app.** El crate tiene dos binarios —`folder-agent`, el de línea de comandos, y `bandeja`,
+la app de escritorio— y `src/bin/bandeja/` es **el único directorio que conoce Tauri**. Lo
+comprueba un guardián que camina todo `src/` menos ese directorio y falla si el núcleo
+nombra `tauri`, `objc2`, `block2` o `webview`; está acreditado rompiéndolo por los dos
+lados, el import prohibido y el recorrido que no baja a los subdirectorios. Esa separación
+es lo que deja que el núcleo se siga cruzando a Windows y que las pruebas corran sin
+levantar una ventana.
 
-```
-node apps/folder-agent/sim/server.ts        # en otra terminal
-cargo run -- <ruta-de-la-raíz> [http://127.0.0.1:4477]
-```
+La app: **ícono en la barra con la marca de Savia** —rasterizada desde `savia-mark.tsx`,
+no escalada desde el ícono grande— y un **popover de verdad**, con lo que macOS exige para
+uno y no es opcional. Dos cosas que costaron encontrar y conviene no volver a descubrir:
 
-**Del enrolamiento existe el paso 2 y nada más.** El agente pide un código, lo muestra,
-espera a que una persona lo apruebe y reclama su token; el token viaja en
-`Authorization: Bearer` en las siete llamadas, un `401` detiene el dispositivo entero, y
-la revocación desde la cuenta lo apaga — todo eso está construido contra el simulador y
-acreditado, incluido que **el cliente no tiene con qué aprobarse a sí mismo**.
+- **El popover es un `NSPanel` no-activador, no una ventana.** Una app `Accessory` no
+  retiene el foco en una ventana común: el sistema le da la llave y se la saca en el mismo
+  frame, y el popover se cerraba solo. `NSWindowStyleMaskNonActivatingPanel` es la
+  respuesta, y **solo la acepta un `NSPanel`**, así que hay que reclasificar la instancia.
+- **La posición se calcula en puntos de Cocoa, no con la API portátil.** Lo que Tauri
+  llama «físico» es *puntos × la escala de ese objeto*, así que con un Retina y un externo
+  los espacios **se superponen** y la búsqueda de monitor elige mal con toda razón. Y la Y
+  del rectángulo del ícono es inservible: `tray-icon 0.24` la calcula restando **píxeles**
+  (`CGDisplayPixelsHigh`) a **puntos**, así que con la principal en Retina sale de otra
+  pantalla. Por lo mismo `tauri-plugin-positioner` tampoco servía: hereda los dos defectos.
 
-Lo que no existe son los otros cuatro pasos: **sin instalador, sin permisos de disco, sin
-selector de carpeta y sin primer barrido con progreso**. Y el token no sobrevive al
-proceso, porque no hay persistencia. Sigue siendo cierto que no hay nada que instalar —
-pero ya no es cierto que no haya con qué vincularse.
+Lo que el popover puede pedirle al núcleo de Tauri son **dos permisos** —escuchar y dejar
+de escuchar eventos— declarados en `capabilities/`. Sin ese archivo el webview no tiene
+*ninguno*: los comandos propios siguen andando y todo lo demás falla en silencio, que es
+por qué el panel pintaba una vez y nunca más.
 
-### Y dos huecos que no son de interfaz
+**Del enrolamiento existe el paso 2, y solo desde la línea de comandos.** El agente pide
+un código, lo muestra, espera a que una persona lo apruebe y reclama su token; el token
+sobrevive al proceso en el depósito, viaja en `Authorization: Bearer` en las siete
+llamadas, un `401` detiene el dispositivo entero, y la revocación desde la cuenta lo apaga
+— todo construido contra el simulador y acreditado, incluido que **el cliente no tiene con
+qué aprobarse a sí mismo**. Lo que no existe es la interfaz: el botón «Vincular» del panel
+está **sin atar a propósito** —un botón que no responde dice la verdad; uno que responde
+sin hacer nada, no— y hoy vincular es correr el binario de línea de comandos y aprobar por
+fuera.
+
+**De editar las carpetas existe el motor y no la pantalla.** Varias raíces en el bucle de
+trabajo, `desenrolar` —que conserva las filas y suelta la cola—, el selector nativo de
+directorio, y el `RaizId` **derivado de la huella**, que es lo que vuelve cierta la
+decisión 7: hasta ahora se acuñaba `"root-1"` a mano, así que sacar una carpeta y volver a
+agregarla habría estrenado una raíz nueva y resubido todo. Los comandos existen y compilan;
+nada los llama todavía. Los pasos del onboarding están especificados aparte, en
+[`onboarding-agente-carpeta.md`](onboarding-agente-carpeta.md).
+
+**Y sigue faltando todo esto:** instalador y firma, permisos de disco de macOS, el primer
+barrido con progreso, y la ventana de preferencias. Sin instalador no hay forma de ponerlo
+en otra máquina — lo que hay es un `.app` copiado a mano.
+
+### Y tres huecos que no son de interfaz
 
 - **No hay observador de eventos del sistema de archivos.** El tipo `OrigenDeSenal`
   distingue evento de barrido y el árbol de decisión ya trata el caso —una ruta que falta
