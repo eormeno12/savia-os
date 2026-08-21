@@ -183,6 +183,51 @@ pub struct HuellaDeRaiz {
 }
 
 impl HuellaDeRaiz {
+    /// **EL `RaizId` SE DERIVA DE LA HUELLA, Y ESO ES LO QUE HACE CIERTA LA DECISION 7.**
+    ///
+    /// «Reelegir la raiz movida da el MISMO `RaizId`» estaba escrito en tres lugares como
+    /// propiedad y en ninguno como codigo: el demo acunaba `"root-1"` a mano, que alcanza
+    /// con una sola carpeta y deja de alcanzar en cuanto hay dos. Sin esta derivacion,
+    /// sacar una carpeta y volver a agregarla estrena una raiz nueva — y entonces nada
+    /// matchea y **se resube todo**, que es exactamente lo que la decision promete que no
+    /// pasa.
+    ///
+    /// **Se deriva de los dos ids y NUNCA de la ruta**, por lo mismo: la ruta es
+    /// procedencia y cambia cuando la persona mueve la carpeta. Y va hasheada porque el
+    /// `RaizId` viaja a Savia en las siete llamadas: el `st_dev` y el numero de inodo de
+    /// una maquina no son secretos graves, pero tampoco hay ninguna razon para mandarlos.
+    ///
+    /// **`NoPublicada` deriva igual, y hay que saberlo.** Un volumen sin identidad
+    /// (SMB, NFS) da huellas que solo se distinguen por el id de directorio; dos montajes
+    /// distintos del mismo servidor con el mismo inodo colisionarian. No se inventa un
+    /// sustituto —la salvaguarda 2 se apoya en que la falta de identidad se SEPA— asi que
+    /// la colision se acepta y se nombra acá.
+    pub fn raiz_id(&self) -> RaizId {
+        use sha2::{Digest, Sha256};
+        let mut h = Sha256::new();
+        match &self.volumen {
+            IdDeVolumen::Uuid(b) => {
+                h.update([1u8]);
+                h.update(b);
+            }
+            IdDeVolumen::NumeroDeDispositivo(n) => {
+                h.update([2u8]);
+                h.update(n.to_be_bytes());
+            }
+            IdDeVolumen::NoPublicada { fstype } => {
+                h.update([3u8]);
+                h.update(fstype.as_bytes());
+            }
+        }
+        h.update(self.directorio.0.to_be_bytes());
+        let d = h.finalize();
+        let mut s = String::with_capacity(32);
+        for b in &d[..16] {
+            s.push_str(&format!("{b:02x}"));
+        }
+        RaizId::nueva(s)
+    }
+
     /// `NoCoincide` si difiere la id de directorio (decisivo). `Coincide` solo si
     /// ademas coincide el volumen. Si el volumen es `Indeterminada`, el resultado es
     /// `Indeterminada` — **nunca `Coincide`**.

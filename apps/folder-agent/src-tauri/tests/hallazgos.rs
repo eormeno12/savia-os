@@ -1003,3 +1003,115 @@ fn un_archivo_que_no_entra_en_el_permiso_no_envenena_su_ruta() {
         "y la ruta sigue pudiendo reportar lo que le pase despues"
     );
 }
+
+// ═══════════════════ DEJAR DE MIRAR UNA CARPETA ═════════════════════════════
+//
+// Las tres garantias de `Almacen::desenrolar`, y cada una es una forma distinta de que
+// «quitar» mienta.
+
+#[test]
+fn quitar_una_carpeta_no_borra_lo_que_ya_subio() {
+    // IMPORTA PORQUE: se le prometio a la persona que sacar una carpeta y volver a
+    // agregarla NO resube nada. Eso no es una promesa de producto: se apoya en que las
+    // filas del inventario —incluidas las lapidas— sobrevivan al desenrolamiento. Si
+    // `desenrolar` las borrara, «la saque un rato» se convertiria en «resubi todo», y el
+    // sintoma llegaria semanas despues como una factura de transferencia.
+    let p = Falsa::como_macos();
+    p.poner("x.txt", b"contenido", 100, Some(1));
+    let mut a = almacen();
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+    ciclo::barrer(&raiz(), BarridoId::nuevo("b1"), &p, &mut a, &politica());
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+    ciclo::barrer(&raiz(), BarridoId::nuevo("b2"), &p, &mut a, &politica());
+    confirmar_todo(&mut a);
+    let antes = a.inventario().entradas(&raiz()).len();
+    assert!(antes > 0, "el banco tiene que haber dejado filas");
+
+    assert!(a.desenrolar(&raiz()).is_some(), "estaba enrolada");
+    assert!(
+        a.inventario().raices().is_empty(),
+        "la carpeta sale de la lista"
+    );
+    assert_eq!(
+        a.inventario().entradas(&raiz()).len(),
+        antes,
+        "pero sus filas siguen enteras, que es lo que hace que al volver matchee"
+    );
+
+    // Y al reenrolarla vuelve a estar, con su inventario intacto.
+    a.enrolar(registrada());
+    assert_eq!(a.inventario().raices().len(), 1);
+    assert_eq!(a.inventario().entradas(&raiz()).len(), antes);
+}
+
+#[test]
+fn quitar_una_carpeta_deja_de_subir_lo_que_tenia_encolado() {
+    // IMPORTA PORQUE: las filas sobreviven a proposito, pero lo ENCOLADO no puede. Son
+    // cosas que el agente todavia no le dijo a Savia sobre una carpeta que la persona
+    // acaba de sacar de la lista; drenarlas despues es hacer exactamente lo que pidio que
+    // dejara de hacer, y encima despues de que el panel ya no la muestra.
+    let p = Falsa::como_macos();
+    p.poner("x.txt", b"contenido", 100, Some(1));
+    let mut a = almacen();
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+    ciclo::barrer(&raiz(), BarridoId::nuevo("b1"), &p, &mut a, &politica());
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+    ciclo::barrer(&raiz(), BarridoId::nuevo("b2"), &p, &mut a, &politica());
+    assert!(
+        a.colas().hechos_pendientes(&raiz()) > 0,
+        "el banco tiene que haber encolado algo"
+    );
+
+    a.desenrolar(&raiz());
+    assert_eq!(
+        a.colas().hechos_pendientes(&raiz()),
+        0,
+        "nada de esa raiz queda esperando para salir"
+    );
+}
+
+#[test]
+fn quitar_una_carpeta_que_no_estaba_no_hace_nada() {
+    // IMPORTA PORQUE: `None` y `Some(0)` son distintos y la interfaz los va a mostrar
+    // distinto. `None` es «esa carpeta no estaba en la lista» —un id viejo, un doble
+    // clic— y `Some(0)` es «estaba, y no tenia nada pendiente». Colapsarlos obliga al
+    // panel a inventar cual paso.
+    let mut a = almacen();
+    assert!(a.desenrolar(&RaizId::nueva("no-existe")).is_none());
+    assert_eq!(
+        a.inventario().raices().len(),
+        1,
+        "y no toco la que si estaba"
+    );
+    assert_eq!(
+        a.desenrolar(&raiz()),
+        Some(0),
+        "estaba, y sin nada encolado"
+    );
+}
+
+#[test]
+fn reelegir_la_misma_carpeta_da_la_misma_id() {
+    // IMPORTA PORQUE: es la decision 7 —«reelegir la raiz movida da el MISMO RootId»—
+    // que estaba escrita en tres lugares como propiedad y en ninguno como codigo. El
+    // demo acunaba `"root-1"` a mano. Si la id se estrenara en cada eleccion, nada de lo
+    // anterior matchea: se resube todo y las lapidas quedan huerfanas.
+    let h = Falsa::huella_del_banco();
+    assert_eq!(h.raiz_id(), h.raiz_id(), "es una funcion de la huella");
+
+    // Y la ruta NO entra en la derivacion: mover la carpeta no estrena raiz.
+    let a = RaizRegistrada {
+        id: h.raiz_id(),
+        huella: h,
+        ruta_absoluta: std::path::PathBuf::from("/antes"),
+        sensibilidad: SensibilidadAMayusculas::Distingue,
+    };
+    let h2 = Falsa::huella_del_banco();
+    let b = RaizRegistrada {
+        id: h2.raiz_id(),
+        huella: h2,
+        ruta_absoluta: std::path::PathBuf::from("/despues/de/moverla"),
+        sensibilidad: SensibilidadAMayusculas::Distingue,
+    };
+    assert_eq!(a.id, b.id, "la ruta es procedencia, no identidad");
+}

@@ -1075,6 +1075,35 @@ impl Colas {
         }
     }
 
+    /// Suelta TODO lo pendiente de una raiz: segmentos, bytes, muertas, envenenadas y la
+    /// marca de congelada. Devuelve cuantos trabajos se soltaron, para poder decirlo.
+    ///
+    /// **Es la otra mitad de `desenrolar`, y sin ella «quitar» seguiria subiendo.** Las
+    /// filas del inventario sobreviven a proposito; lo ENCOLADO no puede: son cosas que el
+    /// agente todavia no le dijo a Savia sobre una carpeta que la persona acaba de sacar
+    /// de la lista. Drenarlas despues seria hacer exactamente lo que pidio que dejara de
+    /// hacer.
+    ///
+    /// **NO CIERRA EL BARRIDO ABIERTO, Y POR ESO NO SE LLAMA CON UNO ABIERTO.** Un
+    /// segmento abierto tiene un `sweepId` que Savia esta esperando cerrar; soltarlo aca
+    /// deja ese barrido colgado del otro lado. Quien llama es el bucle de trabajo, entre
+    /// vuelta y vuelta, que es el unico momento en que se sabe que no hay ninguno abierto.
+    /// El `debug_assert` lo fija: si alguna vez se llama desde otro lado, revienta en las
+    /// pruebas y no en produccion.
+    pub fn olvidar(&mut self, raiz: &RaizId) -> usize {
+        debug_assert!(
+            !self.barriendo(raiz),
+            "olvidar() con un barrido abierto deja el `sweepId` colgado en Savia"
+        );
+        let antes = self.segmentos.len() + self.bytes.len() + self.muertas.len();
+        self.segmentos.retain(|s| s.raiz != *raiz);
+        self.bytes.retain(|b| b.raiz != *raiz);
+        self.muertas.retain(|m| m.raiz != *raiz);
+        self.envenenadas.retain(|(r, _), _| r != raiz);
+        self.congeladas.remove(raiz);
+        antes - (self.segmentos.len() + self.bytes.len() + self.muertas.len())
+    }
+
     pub fn cola_muerta(&self) -> &[EntradaMuerta] {
         &self.muertas
     }

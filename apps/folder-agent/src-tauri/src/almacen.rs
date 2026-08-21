@@ -101,6 +101,26 @@ impl Almacen {
         self.inventario.enrolar(r);
     }
 
+    /// **DEJAR DE MIRAR: las dos mitades, o ninguna.** Saca la raiz del registro y suelta
+    /// todo lo que tenia encolado, en una sola llamada, por la misma razon que `aplicar`
+    /// escribe inventario y cola juntos: una mitad sin la otra deja al agente subiendo
+    /// archivos de una carpeta que ya no esta en la lista, o mostrando una carpeta que ya
+    /// no tiene cola.
+    ///
+    /// Lo que NO hace: dar de baja nada en Savia. Ver
+    /// `docs/product/savia-b2b/onboarding-agente-carpeta.md` — «Retirar todo» necesita un
+    /// llamado que todavia no existe, porque el corte por volumen es de Savia y no puede
+    /// distinguir una baja pedida de un disco que monto mal.
+    ///
+    /// Devuelve `None` si la raiz no estaba enrolada, y `Some(n)` con los trabajos
+    /// soltados si estaba.
+    pub fn desenrolar(&mut self, raiz: &crate::dominio::RaizId) -> Option<usize> {
+        if !self.inventario.desenrolar(raiz) {
+            return None;
+        }
+        Some(self.colas.olvidar(raiz))
+    }
+
     /// **EL COMMIT.** Aplica los efectos del `Paso` y encola su hecho, juntos. No existe
     /// forma de hacer una mitad sin la otra: son una sola afirmacion —«Savia sabe
     /// esto»— escrita en dos lugares.

@@ -345,6 +345,20 @@ impl InventarioEnMemoria {
         self.raices.insert(r.id.clone(), r);
     }
 
+    /// Saca la raiz del registro **y DEJA SUS FILAS DONDE ESTAN**. Devuelve si estaba.
+    ///
+    /// **Que las filas sobrevivan es la decision, no un descuido.** «Dejar de mirar» se
+    /// prometio reversible —volver a agregar la carpeta no resube nada— y eso no es una
+    /// promesa de producto: es una consecuencia. Reelegir la carpeta da el MISMO `RaizId`
+    /// (decision 7), asi que al reenrolar el inventario de esa raiz se vuelve a encontrar
+    /// entero. Borrar las filas aca convertiria «la saque un rato» en «resubi todo».
+    ///
+    /// Mientras esta desenrolada nadie recorre sus filas: el bucle de trabajo itera
+    /// `raices()` y el panel tambien. Quedan en el deposito, inertes, esperando.
+    pub fn desenrolar(&mut self, raiz: &RaizId) -> bool {
+        self.raices.remove(raiz).is_some()
+    }
+
     fn clave(&self, raiz: &RaizId, ruta: &RutaRelativa) -> ClaveDeRuta {
         let s = self
             .raices
