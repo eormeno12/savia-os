@@ -391,3 +391,101 @@ fn el_put_prefirmado_no_lleva_la_credencial() {
          del servidor, asi que el token se le estaria entregando a quien conteste."
     );
 }
+
+/// Todo lo que hay bajo `src/`, menos `src/bin/`. Se camina en vez de listarse a mano
+/// para que un modulo nuevo quede cubierto sin que nadie se acuerde de agregarlo — que es
+/// exactamente el caso en que un guardian de lista se vuelve decorativo.
+fn fuentes_fuera_del_binario_de_ventana() -> Vec<(String, String)> {
+    fn caminar(dir: &PathBuf, prefijo: &str, salida: &mut Vec<(String, String)>) {
+        let mut entradas: Vec<_> = std::fs::read_dir(dir)
+            .unwrap_or_else(|e| panic!("no se pudo leer {}: {e}", dir.display()))
+            .filter_map(Result::ok)
+            .collect();
+        entradas.sort_by_key(std::fs::DirEntry::file_name);
+        for e in entradas {
+            let nombre = e.file_name().to_string_lossy().into_owned();
+            let rel = if prefijo.is_empty() {
+                nombre.clone()
+            } else {
+                format!("{prefijo}/{nombre}")
+            };
+            if e.path().is_dir() {
+                // **`bin/` ES LA UNICA EXCEPCION, Y ES EL PUNTO DE TODO ESTO.**
+                if nombre == "bin" {
+                    continue;
+                }
+                caminar(&e.path(), &rel, salida);
+            } else if nombre.ends_with(".rs") {
+                salida.push((
+                    rel,
+                    std::fs::read_to_string(e.path()).expect("fuente legible"),
+                ));
+            }
+        }
+    }
+    let raiz = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
+    let mut v = Vec::new();
+    caminar(&raiz, "", &mut v);
+    v
+}
+
+#[test]
+fn el_nucleo_no_conoce_la_ventana() {
+    // IMPORTA PORQUE: es la garantia que sostiene otras dos, y las dos se rompen en
+    // silencio. **Una:** `pnpm nucleo:windows` cruza `--lib` a `x86_64-pc-windows-msvc`
+    // para comprobar que el nucleo no se ata a macOS; el dia que `lib.rs` importe `objc2`
+    // ese cruce deja de significar nada, porque lo que falle va a ser el cruce y no el
+    // codigo. **Dos:** las pruebas corren sin levantar una ventana ni un runtime de
+    // eventos, y por eso son deterministas y rapidas — un `tauri::` adentro del nucleo
+    // arrastra ese runtime a `cargo test`.
+    //
+    // Lo afirme en dos comentarios («Un guardian lo comprueba») antes de que existiera.
+    // Ahora existe.
+    const PROHIBIDOS: [&str; 4] = ["tauri", "objc2", "block2", "webview"];
+
+    let fuentes = fuentes_fuera_del_binario_de_ventana();
+
+    // **SIN ESTO EL GUARDIAN PUEDE PASAR SIN MIRAR NADA**, y el primer intento de esta
+    // comprobacion era exactamente eso: un piso de «al menos 12 fuentes». La raiz de
+    // `src/` ya tiene 13 archivos sueltos, asi que el piso se cumplia **aunque el
+    // caminado no bajara a ningun subdirectorio** — o sea sin mirar `plataforma/macos.rs`,
+    // que es el unico lugar del nucleo donde `objc2` podria aparecer de verdad. Se
+    // acredito rompiendolo y no murio.
+    //
+    // Lo que se comprueba ahora es la propiedad que importa: **que el caminado BAJE a
+    // cada subdirectorio de `src/`**, menos `bin/`. Se deriva del disco en vez de
+    // escribirse a mano, asi que un modulo nuevo en su propia carpeta queda cubierto sin
+    // que nadie se acuerde.
+    let esperados: Vec<String> =
+        std::fs::read_dir(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src"))
+            .expect("src/ legible")
+            .filter_map(Result::ok)
+            .filter(|e| e.path().is_dir() && e.file_name() != "bin")
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
+    for dir in &esperados {
+        assert!(
+            fuentes
+                .iter()
+                .any(|(rel, _)| rel.starts_with(&format!("{dir}/"))),
+            "el guardian no bajo a src/{dir}/: esta mirando menos de lo que dice"
+        );
+    }
+    assert!(
+        fuentes.iter().any(|(rel, _)| !rel.contains('/')),
+        "el guardian no vio ni un fuente en la raiz de src/"
+    );
+
+    for (archivo, src) in &fuentes {
+        // Los comentarios de este crate NOMBRAN a Tauri a cada rato —explicando
+        // justamente por que no esta— asi que se miran solo si sobreviven al recorte.
+        let codigo = sin_comentarios(src);
+        for prohibido in PROHIBIDOS {
+            assert!(
+                !codigo.contains(prohibido),
+                "src/{archivo} nombra `{prohibido}`: el runtime de ventana vive en \
+                 `src/bin/bandeja/` y en ningun otro lado"
+            );
+        }
+    }
+}

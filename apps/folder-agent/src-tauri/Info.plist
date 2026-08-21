@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SE FUSIONA con el Info.plist que genera Tauri. Solo va lo que Tauri no pone.
+
+  `LSUIElement` es lo que declara «esto no es una app, es un agente»: sin dock, sin
+  Cmd+Tab, sin menu propio en la barra. En el codigo ya esta `ActivationPolicy::Accessory`
+  y hace lo mismo, PERO TARDE: entre que el proceso arranca y que corre el `setup`, macOS
+  ya decidio mostrarlo, y se ve el icono aparecer y desaparecer en el Dock. Declararlo acá
+  lo resuelve antes de que el proceso exista.
+
+  Los dos se quedan a proposito: el plist cubre la app empaquetada y la politica en codigo
+  cubre `cargo run --bin bandeja`, que no tiene plist ninguno.
+-->
+<plist version="1.0">
+  <dict>
+    <key>LSUIElement</key>
+    <true/>
+  </dict>
+</plist>

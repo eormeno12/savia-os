@@ -36,7 +36,7 @@
    el borrador.
    ──────────────────────────────────────────────────────────────────────────── */
 
-@import url("../../../packages/design-tokens/css/tokens.css");
+@import url("./tokens.css");
 
 /* ═══════════════════════ EL MAPA DE LA SUPERFICIE ═════════════════════════ */
 
@@ -73,8 +73,17 @@
      900px de ancho. Sobre 340px se come la esquina y la bandeja parece una
      pastilla. El token existe, el que no aplica es el otro. */
   border-radius: var(--savia-radius-chip);
-  box-shadow: var(--savia-shadow-float-dark);
 }
+
+/* LA SOMBRA DEL POPOVER ES LA DEL SISTEMA, Y NO `--savia-shadow-float-dark`.
+   Una sombra de CSS se dibuja ADENTRO de la ventana, asi que en el popover queda
+   recortada contra su propio borde — el sintoma era «la sombra se ve cortada». La
+   unica que puede caer afuera es la que dibuja macOS, que la deriva del canal alfa
+   de la ventana transparente. Por eso `shadow: true` en `tauri.conf.json` y por eso
+   `ajustar_alto` la invalida en cada cambio de tamaño: el sistema la cachea.
+
+   El token sigue siendo el correcto para una tarjeta flotante DENTRO de una pagina
+   —donde hay lienzo alrededor—; lo que no aplica es acá. */
 
 /* LA PROFUNDIDAD SOBRE OSCURO ES UN HALO, NO UNA SOMBRA INTERNA NI PARTICULAS.
    Un solo radial de lima al 8%, difuminado: es lo que el sistema pide para las
@@ -178,7 +187,6 @@
 [data-estado="fallo"] {
   --tono: var(--savia-color-danger-soft);
 }
-
 /* El barrido es lo unico que esta PASANDO, asi que es lo unico que se mueve. */
 [data-estado="barriendo"] .punto {
   animation: latido 1.6s var(--savia-easing-savia) infinite;

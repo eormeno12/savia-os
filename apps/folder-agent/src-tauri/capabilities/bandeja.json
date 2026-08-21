@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "bandeja",
+  "description": "Lo unico que el popover puede pedirle al nucleo de Tauri, y son DOS. Sin este archivo el webview no tiene NINGUN permiso de core —los comandos propios siguen andando, y por eso el panel pintaba una vez y nunca mas: `listen` fallaba en silencio y el aviso del hilo de trabajo no llegaba nunca. El tamaño NO esta en la lista a proposito: lo cambia `ajustar_alto`, que es un comando propio, asi que el panel puede pedir un alto pero no mover ni redimensionar la ventana.",
+  "windows": [
+    "bandeja"
+  ],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten"
+  ]
+}

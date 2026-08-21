@@ -7,7 +7,7 @@
 //! Uso:
 //! ```text
 //!   node apps/folder-agent/sim/server.ts        # en otra terminal
-//!   cargo run -- <ruta-de-la-raiz> [http://127.0.0.1:4477]
+//!   cargo run --bin folder-agent --features demo -- <ruta-de-la-raiz> [http://127.0.0.1:4477]
 //! ```
 //!
 //! **LOS NUMEROS DE ESTE ARCHIVO SON PARAMETROS DEL BANCO, NO DEL PRODUCTO**, igual que

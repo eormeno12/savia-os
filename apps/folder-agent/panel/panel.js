@@ -98,8 +98,8 @@ function bloqueDeCarpeta(c) {
 export function bandeja(vista) {
   const e = CARPETA[vista.estado];
   if (!e) throw new Error(`estado agregado desconocido: ${vista.estado}`);
-  // El aviso de credenciales manda sobre el pie: mientras no se vuelva a vincular,
-  // «Pausar» no tiene nada que pausar.
+  // El aviso de credenciales manda sobre el pie: mientras no se vuelva a vincular, la
+  // unica accion que sirve es volver a vincular.
   const detenido = vista.detenido === "credenciales";
 
   // ── QUE DICE LA CABECERA, Y EN QUE ORDEN ─────────────────────────────────
@@ -150,12 +150,14 @@ export function bandeja(vista) {
       <div class="carpetas">${vista.carpetas.map(bloqueDeCarpeta).join("")}</div>
       <footer class="pie">
         ${
+          // Las acciones se NOMBRAN acá con \`data-accion\` y se ATAN afuera. Este
+          // modulo lo comparten el popover de Tauri y la hoja de contacto del
+          // navegador, y solo uno de los dos tiene un backend al que pedirle algo.
           detenido
-            ? `<button class="accion">Ajustes</button>
-               <button class="accion accion--afirmativa">Volver a vincular</button>`
-            : `<button class="accion">Pausar</button>
-               <button class="accion">Abrir carpeta</button>
-               <button class="accion separador">Ajustes</button>`
+            ? `<button class="accion" data-accion="salir">Salir</button>
+               <button class="accion accion--afirmativa" data-accion="vincular">Volver a vincular</button>`
+            : `<button class="accion" data-accion="abrir">Abrir carpeta</button>
+               <button class="accion separador" data-accion="salir">Salir</button>`
         }
       </footer>
     </div>`;

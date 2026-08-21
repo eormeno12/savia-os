@@ -9,12 +9,17 @@
     "sim:ejercicio": "node sim/ejercicio.ts",
     "nucleo:fmt": "cargo fmt --manifest-path src-tauri/Cargo.toml --check",
     "nucleo:clippy": "cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings",
-    "nucleo:windows": "cargo check --manifest-path src-tauri/Cargo.toml --all-targets --target x86_64-pc-windows-msvc",
+    "nucleo:windows": "cargo check --manifest-path src-tauri/Cargo.toml --lib --no-default-features --target x86_64-pc-windows-msvc",
     "nucleo:test": "cargo test --manifest-path src-tauri/Cargo.toml",
     "nucleo:banco": "node sim/banco.ts",
     "nucleo:build": "cargo build --manifest-path src-tauri/Cargo.toml",
     "nucleo:lint": "pnpm nucleo:fmt && pnpm nucleo:clippy && pnpm nucleo:windows",
-    "lint": "pnpm nucleo:lint && pnpm nucleo:test && pnpm sim:ejercicio && pnpm nucleo:banco && pnpm panel:contraste",
-    "panel:contraste": "node scripts/contraste.mjs"
+    "lint": "pnpm nucleo:lint && pnpm nucleo:test && pnpm sim:ejercicio && pnpm nucleo:banco && pnpm panel:tokens && pnpm panel:icono && pnpm panel:contraste",
+    "panel:contraste": "node scripts/contraste.mjs",
+    "panel:tokens": "node scripts/tokens.mjs",
+    "panel:icono": "node scripts/icono.mjs"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.4"
   }
 }

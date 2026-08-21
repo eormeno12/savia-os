@@ -1,22 +1,52 @@
-# El nucleo del agente de carpeta. TODAVIA NO ES TAURI: `tauri` no es dependencia y no
-# lo va a ser en este tramo. La carpeta se llama `src-tauri` porque el `package.json` de
-# `@savia-os/folder-agent` ya la nombra asi, y cambiarla despues cuesta menos que
-# desincronizar hoy los dos lados. Cuando llegue la UI, este mismo crate queda de
-# biblioteca y el binario de Tauri lo consume; por eso hay `lib.rs` ademas de `main.rs`.
+# El nucleo del agente de carpeta, y **ya es Tauri** — pero solo el binario de la
+# bandeja. `lib.rs` sigue sin conocerlo: la separacion que este archivo anticipaba
+# ("este mismo crate queda de biblioteca y el binario de Tauri lo consume") es la que
+# hay ahora, y es lo que deja que el nucleo se siga cross-chequeando contra Windows y
+# que las 99 pruebas corran sin levantar una ventana.
+#
+# DOS BINARIOS, A PROPOSITO:
+#  · `folder-agent` — el de linea de comandos. Corre el ciclo entero y no abre nada.
+#                     Es lo que usan el demo y el banco.
+#  · `bandeja`      — la app de escritorio: icono en la barra y popover.
+#
+# Que sean dos y no uno con un `--gui` es lo que hace que `cargo test` no arrastre el
+# runtime de la ventana, y que el dia que Tauri rompa algo se sepa cual de los dos.
 [package]
 name = "savia-folder-nucleo"
 version = "0.0.0"
 edition = "2024"
 rust-version = "1.97"
 publish = false
+# CUAL DE LOS DOS EMPAQUETA TAURI. `folder-agent` es el de linea de comandos y no abre
+# ninguna ventana: empaquetarlo daria un `.app` que arranca, no muestra nada y se queda.
+default-run = "bandeja"
 
 [lib]
 name = "savia_folder_nucleo"
 path = "src/lib.rs"
 
+# **`required-features = ["demo"]`, Y NO ESTA EN `default`.** Sin esto el empaquetador
+# de Tauri mete ESTE binario adentro del `.app` junto con la bandeja — se comprobo:
+# `Savia.app/Contents/MacOS/` tenia los dos—, o sea que el instalador le entregaba a cada
+# persona la herramienta de demo, la que imprime el codigo de vinculacion en la consola y
+# acepta una ruta cruda por argumento. Peso muerto en el mejor caso.
+#
+# El sintoma por el que se descubrio fue otro: `tauri build --target
+# universal-apple-darwin` fallaba con «folder-agent does not exist», porque el paso de
+# `lipo` solo corre para el binario principal.
+#
+# Correrlo: `cargo run --bin folder-agent --features demo -- <ruta> [base]`.
 [[bin]]
 name = "folder-agent"
 path = "src/main.rs"
+required-features = ["demo"]
+
+# `required-features` no es decoracion: sin eso, `--no-default-features` intentaria
+# compilar este binario sin Tauri y el error seria un muro de «unresolved import».
+[[bin]]
+name = "bandeja"
+path = "src/bin/bandeja/main.rs"
+required-features = ["ventana"]
 
 # CUATRO DEPENDENCIAS, Y CADA UNA TIENE UN TRABAJO QUE NO SE PUEDE HACER A MANO SIN
 # ARRIESGAR CORRECCION:
@@ -52,3 +82,105 @@ redb = "2"
 sha2 = "0.10"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+# SOLO PARA EL BINARIO `bandeja`. El nucleo no lo nombra en ningun lado —lo comprueba
+# `el_nucleo_no_conoce_la_ventana` en `tests/guardianes.rs`, caminando todo `src/` menos
+# `src/bin/`— y esa es la unica razon por la que `nucleo:windows` sigue cruzando y las
+# pruebas siguen sin levantar una ventana.
+#
+# `tray-icon` porque es un agente de bandeja y no una app con ventana principal.
+#
+# `macos-private-api` es la que habilita el fondo TRANSPARENTE de la ventana, y hace
+# falta por la decision de diseno: la bandeja se pinta a si misma con esquinas
+# redondeadas —el popover hereda el material de la barra y no puede apoyarse en el fondo
+# del sistema para decir nada—, y sin transparencia las cuatro esquinas quedan blancas.
+#
+# EL PRECIO ESTA NOMBRADO: una app que usa API privada de macOS **no entra a la App
+# Store**. Para este agente no cambia nada —se distribuye con instalador y firma propia,
+# ver «Que falta»— pero el dia que alguien quiera publicarlo ahi, esta linea es lo
+# primero que hay que sacar, y lo que se pierde son las esquinas.
+#
+# `image-png` habilita `Image::from_bytes`, que es como el binario carga el icono de la
+# bandeja: los 44x44 exactos que sale de `scripts/icono.mjs`, sin pasar por el `.icns` de
+# la app. Sin esta feature hay que usar `default_window_icon()`, que devuelve el icono
+# grande escalado — dos remuestreos y un icono borroso en la barra.
+# **TODAS OPCIONALES, BAJO LA FEATURE `ventana`, Y ESO ES LO QUE HACE MECANICA LA
+# GARANTIA.** El guardian de texto (`el_nucleo_no_conoce_la_ventana`) comprueba que el
+# nucleo no las NOMBRE; esto comprueba algo mas fuerte: que el nucleo COMPILE con ellas
+# fuera del grafo. `pnpm nucleo:windows` cruza con `--no-default-features`.
+#
+# El disparador fue concreto: `tauri-plugin-updater` arrastra `ring`, que compila C, y
+# cruzar C a Windows desde una Mac no se puede. Con las deps opcionales el cruce ni las
+# ve — y de paso queda dicho en el grafo de Cargo, no solo en un test, que el nucleo no
+# depende de nada de esto.
+tauri = { version = "2", features = [
+  "tray-icon",
+  "macos-private-api",
+  "image-png",
+], optional = true }
+# El selector nativo de directorio. Ver `agregar_carpeta`: el dialogo tiene que ser del
+# sistema, que ademas es lo que en macOS concede el acceso a esa carpeta.
+tauri-plugin-dialog = { version = "2", optional = true }
+# Arrancar al iniciar sesion, por `LaunchAgent`. Se REGISTRA y no se enciende.
+tauri-plugin-autostart = { version = "2", optional = true }
+# El actualizador. La clave publica va en `tauri.conf.json`; la privada nunca en el repo.
+tauri-plugin-updater = { version = "2", optional = true }
+# SOLO PARA `src/bin/bandeja/macos.rs`, Y **NO AGREGAN NADA AL ARBOL**: `tao` y `wry` ya
+# los traen, asi que acá solo se declaran las clases que hacen falta. Lo que compran es
+# lo unico que la API portable de Tauri no puede dar en macOS: reclasificar la ventana a
+# `NSPanel` para ponerle `NSWindowStyleMaskNonActivatingPanel`, y trabajar en puntos de
+# Cocoa —el unico espacio de coordenadas global del sistema— en vez de en los «fisicos»
+# de Tauri, que estan escalados por objeto y se superponen entre pantallas de distinto
+# DPI. El encabezado de `macos.rs` tiene la medicion.
+#
+# LO QUE NO ESTA: `tauri-nspanel`, que hace exactamente esto. No esta publicado en
+# crates.io —seria una dependencia de git sin version— y su rama `v2` arrastra el stack
+# viejo `cocoa`/`objc`. Lo que usamos de el son ~90 lineas y estan citadas en `macos.rs`.
+[target.'cfg(target_os = "macos")'.dependencies]
+block2 = "0.6"
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", features = [
+  "block2",
+  "NSEvent",
+  "NSGraphics",
+  "NSPanel",
+  "NSResponder",
+  "NSRunningApplication",
+  "NSScreen",
+  "NSWindow",
+  "NSWorkspace",
+] }
+objc2-foundation = "0.3"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+# ── LA FEATURE QUE SEPARA EL NUCLEO DE LA VENTANA ───────────────────────────────
+#
+# **Esto es la version MECANICA de una garantia que ya tenia un guardian de texto.**
+# `el_nucleo_no_conoce_la_ventana` (en `tests/guardianes.rs`) comprueba que el nucleo no
+# NOMBRE a Tauri; esto comprueba algo mas fuerte y mas barato: que el nucleo COMPILE con
+# Tauri **fuera del grafo de Cargo**. `pnpm nucleo:windows` cruza con
+# `--lib --no-default-features`.
+#
+# **El disparador fue concreto y vale escribirlo.** Al agregar `tauri-plugin-updater`, el
+# cruce a Windows se rompio: arrastra `ring`, que compila C, y cruzar C a Windows desde
+# una Mac no se puede. El sintoma —`fatal error: 'assert.h' file not found`— no se parece
+# en nada a su causa, que es «el nucleo ahora depende del actualizador».
+#
+# **Las de macOS NO estan aca, y no es un olvido.** `objc2` y compañia viven en
+# `[target.'cfg(target_os = "macos")'.dependencies]`, y el Cargo Book nombra eso como la
+# OTRA forma de tener una dependencia condicional: cruzando a Windows esa seccion no
+# aplica y ya no estan en el grafo. Meterlas ademas en la feature seria una segunda
+# condicion que no agrega nada y que hay que mantener sincronizada.
+[features]
+default = ["ventana"]
+ventana = [
+  "dep:tauri",
+  "dep:tauri-plugin-dialog",
+  "dep:tauri-plugin-autostart",
+  "dep:tauri-plugin-updater",
+]
+# El binario de demo. **Fuera de `default` a proposito**: ver el `[[bin]]` de arriba.
+# No agrega ninguna dependencia — lo unico que hace es que ese binario exista.
+demo = []

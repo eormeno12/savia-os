@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>Savia</title>
+    <link rel="stylesheet" href="panel.css" />
+    <style>
+      /* EL POPOVER DE VERDAD. `index.html` es la hoja de contacto —seis bandejas al
+         lado de la otra para poder mirarlas— y esto es UNA, sola, del tamaño real.
+
+         El `body` va TRANSPARENTE: la ventana de Tauri lo es (`macos-private-api`), y
+         eso es lo que deja que las esquinas redondeadas de `.bandeja` se recorten
+         contra la barra en vez de contra un rectángulo blanco. */
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { background: transparent; overflow: hidden; }
+      /* SIN PADDING: los 6px estaban para que respirara la sombra de CSS, que ya no
+         existe. La sombra ahora es la del sistema y cae afuera de la ventana. */
+      body { padding: 0; }
+      .bandeja { width: 100%; }
+      /* Nada de esto es seleccionable ni arrastrable: es chrome, no un documento. */
+      body { user-select: none; -webkit-user-select: none; cursor: default; }
+      /* Mientras no llegó la primera foto no se dibuja NADA. Un esqueleto gris acá
+         sería indistinguible de una bandeja vacía de verdad. */
+      #raiz:empty::after {
+        content: "";
+        display: block;
+        height: 120px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="raiz"></div>
+    <script type="module" src="./bandeja.js"></script>
+  </body>
+</html>
