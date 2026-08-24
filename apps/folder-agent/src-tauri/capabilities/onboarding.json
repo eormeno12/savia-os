@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "onboarding",
+  "description": "Lo que la ventana de onboarding puede pedirle al núcleo de Tauri. Mismo criterio que `bandeja.json`: separado por ventana y por categoría (security/capabilities.mdx:49, learn/Security/capabilities-for-windows-and-platforms.mdx). `core:event:allow-listen`/`allow-unlisten` son los mismos dos permisos que ya usa el popover — la pantalla 4 escucha `resultado-carpeta` y la 5 escucha `cambio`, igual que `bandeja.js` ya escucha `cambio` hoy. `dialog:allow-open` está de más en la práctica: `elegir_carpeta_con_advertencia` (comandos_onboarding.rs) llama `app.dialog().file().pick_folder(...)` DESDE RUST, dentro de un comando propio — y los comandos propios no necesitan capability, ver el comentario de `bandeja.json` sobre por qué `agregar_carpeta` ya hace exactamente esto hoy sin ningún permiso de `dialog:*`. Se deja igual, a modo defensivo: es un identificador válido del schema del plugin, no cuesta nada tenerlo de más, y si el día de mañana el JS de esta ventana necesita invocar el diálogo directo (sin pasar por un comando propio), ya está habilitado.",
+  "windows": [
+    "onboarding"
+  ],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "dialog:allow-open"
+  ]
+}

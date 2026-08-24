@@ -16,6 +16,8 @@
 //! muestra «Sin acceso» — el mismo camino que recorre un token revocado de verdad. O sea
 //! que el estado no hay que fabricarlo: el agente lo alcanza solo.
 
+mod comandos_archivo;
+mod comandos_onboarding;
 #[cfg(target_os = "macos")]
 mod macos;
 
@@ -58,6 +60,10 @@ mod demo {
 struct Compartido {
     almacen: Mutex<Almacen>,
     plataforma: Arc<PlataformaLocal>,
+    /// La base de la API. Los comandos de `comandos_onboarding` la necesitan para armar
+    /// su propio `Cliente` de vinculación (sin token) — el mismo `String` que `main()`
+    /// ya calcula para el `Cliente` del hilo de fondo.
+    base: String,
     /// **LAS RAICES YA NO ESTAN ACA.** Estan en el inventario, que es el unico que las
     /// sabe y el unico que las persiste. Cuando eran una sola, tenerla al lado alcanzaba;
     /// con varias, dos listas es una que se desincroniza.
@@ -67,6 +73,12 @@ struct Compartido {
     /// un barrido abierto. El comando encola y el hilo de trabajo lo hace en su punto
     /// seguro.
     por_quitar: Mutex<Vec<RaizId>>,
+    /// El `Secreto` que el onboarding acaba de obtener (`comandos_onboarding::sondear_vinculacion`,
+    /// caso `Aprobado`), esperando a que el hilo de trabajo lo recoja. Mismo patrón que
+    /// `por_quitar`: un comando no puede persistir el token él mismo —el `Deposito` vive
+    /// en `trabajar()`, no en `Compartido`— así que deja el `Secreto` acá y el hilo de
+    /// trabajo lo vacía en su punto seguro, junto con `por_quitar`.
+    token_pendiente: Mutex<Option<Secreto>>,
 }
 
 /// **NINGUN COMANDO APAGA AL AGENTE A MEDIAS.** El panel puede mirar (`vista`), abrir
@@ -151,17 +163,6 @@ fn agregar_carpeta(app: tauri::AppHandle, estado: State<'_, Arc<Compartido>>) {
         }
         let _ = app.emit("cambio", ());
     });
-}
-
-/// Encola una raiz para sacarla. **No la saca acá**: ver `Compartido::por_quitar`.
-///
-/// «Dejar de mirar», y nada mas. No da de baja nada en Savia — para eso falta un llamado
-/// que no existe todavia, ver `docs/product/savia-b2b/onboarding-agente-carpeta.md`.
-#[tauri::command]
-fn quitar_carpeta(estado: State<'_, Arc<Compartido>>, id: String) {
-    if let Ok(mut cola) = estado.por_quitar.lock() {
-        cola.push(RaizId::nueva(id));
-    }
 }
 
 /// **EL ALTO LO PIDE EL PANEL Y LO APLICA RUST**, y no `setSize` desde JavaScript. Ver
@@ -264,7 +265,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let compartido = Arc::new(Compartido {
         almacen: Mutex::new(almacen),
         plataforma: plataforma.clone(),
+        base: base.clone(),
         por_quitar: Mutex::new(Vec::new()),
+        token_pendiente: Mutex::new(None),
     });
 
     tauri::Builder::default()
@@ -300,13 +303,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             b.build()
         })
         .manage(Arc::clone(&compartido))
+        .manage(comandos_onboarding::EstadoDeVinculacion(Mutex::new(None)))
+        .manage(comandos_onboarding::CandidataPendiente(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
             vista,
             salir,
             abrir_carpeta,
             agregar_carpeta,
-            quitar_carpeta,
-            ajustar_alto
+            ajustar_alto,
+            comandos_archivo::desvincular,
+            comandos_archivo::abrir_archivo,
+            comandos_onboarding::iniciar_vinculacion,
+            comandos_onboarding::sondear_vinculacion,
+            comandos_onboarding::permiso_de_disco_concedido,
+            #[cfg(target_os = "macos")]
+            comandos_onboarding::abrir_ajustes_de_privacidad,
+            comandos_onboarding::elegir_carpeta_con_advertencia,
+            comandos_onboarding::reemplazar_carpeta,
+            comandos_onboarding::terminar_onboarding
         ])
         .setup(move |app| {
             // **UN AGENTE DE BANDEJA NO VA AL DOCK NI AL CONMUTADOR DE APPS.** Sin esto
@@ -485,11 +499,16 @@ fn trabajar(
         por_llamada: demo::TIEMPO_POR_LLAMADA,
         envio_de_cuerpo: None,
     };
+    let base_de_api = BaseDeApi::nueva(base)?;
+    // `token` y `cliente` dejan de ser fijos por toda la vida del hilo: el onboarding
+    // puede dejar un `Secreto` nuevo en `Compartido::token_pendiente` en cualquier
+    // momento, y hay que reconstruir el `Cliente` con la credencial que trae.
+    let mut token = token;
     let credencial = match &token {
         Some(s) => Credencial::TokenDeDispositivo(s.clone()),
         None => Credencial::SinAutenticar,
     };
-    let cliente = Cliente::nuevo(BaseDeApi::nueva(base)?, credencial, tiempos);
+    let mut cliente = Cliente::nuevo(base_de_api.clone(), credencial, tiempos);
 
     let mut n: u64 = 0;
     loop {
@@ -517,6 +536,22 @@ fn trabajar(
                 }
             }
 
+            // Mismo punto seguro que arriba, mismo motivo de fondo: es donde el hilo de
+            // trabajo sabe con certeza que no hay nada a medio actualizar. Ver
+            // `Compartido::token_pendiente` y el punto 5 de la integración documentado
+            // en `comandos_onboarding.rs`.
+            if let Ok(mut buzon) = c.token_pendiente.lock()
+                && let Some(nuevo) = buzon.take()
+            {
+                token = Some(nuevo);
+                let credencial = match &token {
+                    Some(s) => Credencial::TokenDeDispositivo(s.clone()),
+                    None => Credencial::SinAutenticar,
+                };
+                cliente = Cliente::nuevo(base_de_api.clone(), credencial, tiempos);
+                println!("  token     recibido del onboarding");
+            }
+
             // **UNA VUELTA POR RAIZ, Y EL ORDEN NO IMPORTA.** El inventario y las
             // salvaguardas siempre estuvieron modelados por raiz (decision 3), asi que
             // esto no es un cambio de diseño: es que el bucle deje de tener UNA clavada.
@@ -529,6 +564,14 @@ fn trabajar(
                 .map(|r| r.id)
                 .collect();
             let mut traza = Vec::new();
+            // **`barrer`, no `barrer_reportando`, todavia.** El canal de progreso que la
+            // Fase 7 construyo esta probado y listo (`ciclo::barrer_reportando`,
+            // `tests/progreso.rs`), pero conectarlo a un evento real necesita decidir CADA
+            // cuanto emitir — miles de archivos no pueden ser miles de `app.emit` — y ese
+            // numero nadie lo midio todavia. Inventarlo violaria la misma disciplina que
+            // ya dejo `Carpeta::progreso` en `None` (Fase 4) y `UMBRAL_DE_ARCHIVOS_PARA_ADVERTIR`
+            // en `None` (Fase 6): mejor un canal que existe y no se usa que uno que se usa
+            // con un umbral que nadie respalda.
             for raiz in &raices {
                 ciclo::barrer(
                     raiz,

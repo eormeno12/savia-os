@@ -1,36 +1,18 @@
 // ────────────────────────────────────────────────────────────────────────────
-// LA VISTA · toma lo que `panel::vista` serializo y lo dibuja. NADA MAS.
+// LA VISTA · toma lo que `panel::vista` serializó + el estado de navegación LOCAL
+// (`ui`) y los dibuja. Fase 5: el panel real, sobre papel claro — no el onboarding.
 //
-// **No deriva, no infiere y no completa.** Si un estado no viene, no se dibuja un
-// estado por omision: se rompe, que es lo que se quiere. La derivacion entera vive
-// en `src-tauri/src/panel.rs` y esta acreditada por `tests/panel.rs`; duplicar acá
-// media regla es garantizar que las dos mitades se separen.
+// **`vista` sigue sin derivarse: viene tal cual de Rust.** Lo único que este
+// archivo agrega es `ui` (`subview`, `carpetaId`, `toast`), y esos tres campos
+// NO sacan nada del núcleo — son navegación pura (list → menu → confirmUnlink →
+// doneUnlink → files) que `bandeja.js` gobierna y le pasa acá para dibujar. Ver
+// el comentario de cabecera de `bandeja.js` para el porqué de que viva allá.
 //
-// Los textos SI viven acá: son la unica cosa de la bandeja que es idioma y no
-// dominio, y el nucleo no habla ningun idioma — devuelve `sincronizado`, no
-// «Sincronizado».
+// Los textos viven en `textos.js` — el único archivo con frases en español. Este
+// módulo pide una clave, nunca inventa una palabra.
 // ────────────────────────────────────────────────────────────────────────────
 
-const CARPETA = {
-  sincronizado: { rotulo: "Sincronizado" },
-  barriendo: { rotulo: "Barriendo" },
-  congelado: { rotulo: "Congelado" },
-  carpetaAusente: { rotulo: "Carpeta ausente" },
-};
-
-// El motivo cambia la frase entera, no un adjetivo: uno pide reconectar y el otro
-// pide una decision.
-const MOTIVO = {
-  noSeAlcanza: "No se alcanza. Reconectá el disco y sigue solo.",
-  otraCarpeta: "Hay otra carpeta en esa ruta. Savia no toca nada hasta que lo revises.",
-};
-
-const ARCHIVO = {
-  indexado: { rotulo: "indexado", icono: '<span class="tilde">✓</span>' },
-  procesando: { rotulo: "procesando", icono: '<span class="pista"></span>' },
-  retirado: { rotulo: "retirado", icono: "" },
-  fallo: { rotulo: "no se pudo leer", icono: '<span aria-hidden="true">⚠</span>' },
-};
+import { TEXTOS } from "./textos.js";
 
 const esc = (s) =>
   String(s).replace(
@@ -38,127 +20,327 @@ const esc = (s) =>
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c],
   );
 
-const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
+// El tono del badge por estado de carpeta — mismo mapeo que el mockup
+// (`folderToneKind`), pero leído del vocabulario del núcleo y no adivinado.
+const TONO_DE_ESTADO = {
+  sincronizado: "success",
+  barriendo: "info",
+  carpetaAusente: "danger",
+  congelado: "warning",
+};
+
+// El estado de FILA (indexado/procesando/fallo/retirado) traducido a la clave
+// de `textos.js.folders.archivos.estado` — que a su vez ES `panel.archivo`
+// (D7: una sola palabra por estado en toda la app; ver el comentario en textos.js).
+const CLAVE_DE_FILA = {
+  indexado: "guardado",
+  procesando: "guardando",
+  fallo: "noGuardado",
+  retirado: "oculto",
+};
 
 /**
- * El resumen de la cabecera. Cuenta lo que hay, nunca lo que se supone.
- *
- * **`indexados` NO es «cuantos archivos hay».** Es cuantos estan EN SAVIA, que es otra
- * cosa: un archivo en vuelo o uno que fallo se ven en la lista y no cuentan acá. Decir
- * «2 archivos» con tres filas debajo no es un redondeo, es una cuenta equivocada — asi
- * que cuando no coinciden se dicen los dos numeros y adonde estan los dos.
+ * El nombre "amigable" de una carpeta: los últimos dos tramos de la ruta
+ * absoluta, como en el mockup («Proyectos/Cliente X»). No hay directorio de
+ * inicio disponible en el webview para acortar con `~`, así que la ruta
+ * completa se muestra aparte, truncada, como línea secundaria.
  */
-function detalle(vista) {
-  const carpetas = vista.carpetas.length;
-  const ausentes = vista.carpetas.filter((c) => c.estado === "carpetaAusente").length;
-  if (ausentes > 0) {
-    return `${plural(ausentes, "carpeta", "carpetas")} sin alcanzar de ${carpetas}`;
+function nombreAmigable(rutaAbsoluta) {
+  const partes = String(rutaAbsoluta).split("/").filter(Boolean);
+  return partes.length ? partes.slice(-2).join("/") : rutaAbsoluta;
+}
+
+function iconoArchivo(estado) {
+  switch (estado) {
+    case "indexado":
+      return '<svg class="archivo-fila__icono" width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12.5L9.5 18L20 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    case "procesando":
+      return '<svg class="archivo-fila__icono" width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M12 8V12.5L15 14.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+    case "fallo":
+      return '<svg class="archivo-fila__icono" width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5V13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="16.2" r="1" fill="currentColor"/></svg>';
+    case "retirado":
+      // La lápida: sin mockup de referencia (el mockup no ejercita este estado
+      // en la vista de archivos), así que es un ícono mínimo propio — una
+      // marca neutra, ni check ni error, coherente con "ya no está".
+      return '<svg class="archivo-fila__icono" width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 12H18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+    default:
+      throw new Error(`estado de archivo desconocido: ${estado}`);
   }
-  const enSavia = vista.carpetas.reduce((n, c) => n + c.indexados, 0);
-  const seguidos = vista.carpetas.reduce((n, c) => n + c.filas.length + c.ocultas, 0);
-  const donde = plural(carpetas, "carpeta", "carpetas");
-  return enSavia === seguidos
-    ? `${plural(enSavia, "archivo", "archivos")} en ${donde}`
-    : `${enSavia} de ${seguidos} archivos en Savia · ${donde}`;
 }
 
-function filaDeArchivo(f) {
-  const a = ARCHIVO[f.estado];
-  if (!a) throw new Error(`estado de archivo desconocido: ${f.estado}`);
-  return `
-    <li class="archivo" data-archivo="${esc(f.estado)}">
-      <span class="archivo__nombre" title="${esc(f.ruta)}">${esc(f.ruta)}</span>
-      <span class="archivo__estado">${a.icono}${esc(a.rotulo)}</span>
-    </li>`;
+/**
+ * D3, ya resuelto en el núcleo: el motivo de UN archivo en `Fallo`.
+ * `rechazadoPorSavia` no lleva línea de motivo aparte — el rótulo "No se pudo
+ * guardar" ya lo dice todo. `desconocido` tampoco: el diseño la deja sin
+ * subtítulo a propósito (ver el comentario en `textos.js`).
+ */
+function motivoDeFallo(fila) {
+  if (fila.motivo === "noSePudoAbrir") return TEXTOS.folders.archivos.motivo.noSePudoAbrir;
+  if (fila.motivo === "tipoNoCompatible") return TEXTOS.folders.archivos.motivo.tipoNoCompatible;
+  return null;
 }
 
-function bloqueDeCarpeta(c) {
-  const e = CARPETA[c.estado];
-  if (!e) throw new Error(`estado de carpeta desconocido: ${c.estado}`);
-  const ausente = c.estado === "carpetaAusente";
-  const cuerpo = ausente
-    ? `<p class="vacio">${esc(MOTIVO[c.porque] ?? "")}</p>`
-    : `<ul class="archivos">${c.filas.map(filaDeArchivo).join("")}</ul>` +
-      // EL «Y N MAS» NUNCA SE OMITE CUANDO HAY OCULTAS. Una lista truncada sin el
-      // numero se lee como la lista entera.
-      (c.ocultas > 0
-        ? `<p class="mas">y ${plural(c.ocultas, "archivo más", "archivos más")}</p>`
-        : "");
-  return `
-    <section class="carpeta" data-estado="${esc(c.estado)}">
-      <header class="carpeta__cabecera">
-        <span class="punto"></span>
-        <span class="carpeta__ruta"><span>${esc(c.rutaAbsoluta)}</span></span>
-        <span class="carpeta__estado">${esc(e.rotulo)}</span>
-      </header>
-      ${cuerpo}
-    </section>`;
+function badgeHtml(carpeta) {
+  const tono = TONO_DE_ESTADO[carpeta.estado];
+  if (!tono) throw new Error(`estado de carpeta desconocido: ${carpeta.estado}`);
+  const texto = TEXTOS.panel.estado[carpeta.estado];
+  let extra = "";
+  // `carpeta.progreso` HOY siempre es `null` (ver el doc de `Carpeta::progreso`
+  // en panel.rs) — así que "no mostrar nada" es el camino normal, y esta rama
+  // queda escrita mirando hacia adelante, sin ejercitar todavía. La frase es
+  // literal y no sale de `textos.js`: esa clave no existe aún porque el campo
+  // nunca tuvo un valor real que la pidiera — anotado para cuando la Fase 7
+  // llene `progreso` de verdad.
+  if (carpeta.estado === "barriendo" && carpeta.progreso) {
+    const { procesados, total } = carpeta.progreso;
+    extra = `<span class="carpeta-card__progreso">${esc(procesados)} de ${esc(total)} documentos</span>`;
+  }
+  return `<span class="badge" data-tono="${esc(tono)}">${esc(texto)}</span>${extra}`;
 }
 
-export function bandeja(vista) {
-  const e = CARPETA[vista.estado];
-  if (!e) throw new Error(`estado agregado desconocido: ${vista.estado}`);
-  // El aviso de credenciales manda sobre el pie: mientras no se vuelva a vincular, la
-  // unica accion que sirve es volver a vincular.
-  const detenido = vista.detenido === "credenciales";
-
-  // ── QUE DICE LA CABECERA, Y EN QUE ORDEN ─────────────────────────────────
-  //
-  // El agregado es el peor estado de las CARPETAS, y hay dos cosas que no son estados
-  // de carpeta y pesan mas que cualquiera de los cuatro. Las dos llegan como campos
-  // aparte de `Vista` justamente para que la precedencia se decida acá:
-  //
-  //   detenido  >  fallos  >  agregado
-  //
-  // `detenido` primero: con el token revocado todas las carpetas pueden estar
-  // perfectas —su ultima foto sigue siendo «sincronizada», y lo es— pero nada entra.
-  // `fallos` despues: una carpeta con un archivo ilegible TAMBIEN sigue sincronizada,
-  // y su ultimo barrido cerro completo. Las dos veces la frase verdadera sobre las
-  // carpetas es la respuesta tranquilizadora, y el agregado es lo unico visible con el
-  // panel cerrado.
-  //
-  // **EL ROTULO CAMBIA CON EL TONO, NUNCA SOLO EL TONO.** Teñir de rojo un punto que
-  // dice «Sincronizado» pone al color a contradecir a la palabra, que es el modo exacto
-  // en que un estado deja de ser accesible: quien no distingue el rojo lee «todo bien».
-  const cabecera = detenido
-    ? { tono: "detenido", rotulo: "Sin acceso", detalle: "Nada entra a Savia desde este equipo" }
-    : vista.fallos > 0
-      ? {
-          tono: "fallo",
-          rotulo: `${plural(vista.fallos, "archivo", "archivos")} sin leer`,
-          detalle: detalle(vista),
-        }
-      : { tono: vista.estado, rotulo: e.rotulo, detalle: detalle(vista) };
-
+function tarjetaDeCarpeta(carpeta) {
+  const nombre = nombreAmigable(carpeta.rutaAbsoluta);
+  const ausente = carpeta.estado === "carpetaAusente";
+  const congelada = carpeta.estado === "congelado";
+  const motivo = ausente
+    ? TEXTOS.panel.motivo.carpetaAusente
+    : congelada
+      ? TEXTOS.panel.motivo.congelado
+      : null;
   return `
-    <div class="bandeja">
-      <header class="cabecera" data-estado="${esc(cabecera.tono)}">
-        <span class="punto punto--grande"></span>
-        <span class="cabecera__texto">
-          <span class="cabecera__estado">${esc(cabecera.rotulo)}</span>
-          <span class="cabecera__detalle">${esc(cabecera.detalle)}</span>
-        </span>
-      </header>
+    <div class="carpeta-card" data-nav="files" data-carpeta="${esc(carpeta.id)}" role="button" tabindex="0">
+      <div class="carpeta-card__cabecera">
+        <div class="carpeta-card__identidad">
+          <div class="carpeta-card__nombre">${esc(nombre)}</div>
+          <div class="carpeta-card__ruta" title="${esc(carpeta.rutaAbsoluta)}"><span>${esc(carpeta.rutaAbsoluta)}</span></div>
+        </div>
+        <button class="carpeta-card__menu-btn" type="button" data-nav="menu" data-carpeta="${esc(carpeta.id)}" aria-label="Más opciones">⋯</button>
+      </div>
+      <div class="carpeta-card__docs">${esc(TEXTOS.panel.documentos.enSavia(carpeta.indexados))}</div>
+      <div class="carpeta-card__badges">${badgeHtml(carpeta)}</div>
       ${
-        detenido
-          ? `<div class="aviso">
-               <span class="aviso__icono">⚠</span>
-               <span><strong>Savia no está entrando.</strong> El acceso de este equipo dejó de valer.</span>
-             </div>`
+        motivo
+          ? `<div class="carpeta-card__motivo" data-tono="${ausente ? "danger" : "warning"}">${esc(motivo)}</div>`
           : ""
       }
-      <div class="carpetas">${vista.carpetas.map(bloqueDeCarpeta).join("")}</div>
-      <footer class="pie">
-        ${
-          // Las acciones se NOMBRAN acá con \`data-accion\` y se ATAN afuera. Este
-          // modulo lo comparten el popover de Tauri y la hoja de contacto del
-          // navegador, y solo uno de los dos tiene un backend al que pedirle algo.
-          detenido
-            ? `<button class="accion" data-accion="salir">Salir</button>
-               <button class="accion accion--afirmativa" data-accion="vincular">Volver a vincular</button>`
-            : `<button class="accion" data-accion="abrir">Abrir carpeta</button>
-               <button class="accion separador" data-accion="salir">Salir</button>`
-        }
-      </footer>
+      <div class="carpeta-card__hint">${esc(TEXTOS.folders.tocarParaVerArchivos)}</div>
     </div>`;
+}
+
+function bloqueAgregarCarpeta(activo) {
+  const t = TEXTOS.folders.agregarCarpeta;
+  if (activo) {
+    // Sin carpetas todavía (lista vacía, o recién se dejó de mirar la única
+    // que había): acá sí hace falta poder agregar, así que el bloque es un
+    // botón de verdad y se ata a `agregar_carpeta`.
+    return `
+      <button class="agregar-carpeta agregar-carpeta--activo" type="button" data-accion="agregarCarpeta">
+        <div class="agregar-carpeta__titulo">${esc(t.titulo)}</div>
+        <div class="agregar-carpeta__subtitulo">${esc(t.subtitulo)}</div>
+      </button>`;
+  }
+  // D4: el núcleo aguanta más de una carpeta, la interfaz muestra una sola —
+  // así que con una carpeta ya en la lista, este bloque es informativo, no
+  // interactivo (igual que en el mockup: opacidad reducida, sin `onClick`).
+  return `
+    <div class="agregar-carpeta" aria-disabled="true">
+      <div class="agregar-carpeta__titulo">${esc(t.titulo)}</div>
+      <div class="agregar-carpeta__subtitulo">${esc(t.subtitulo)}</div>
+    </div>`;
+}
+
+/**
+ * El aviso de credenciales revocadas. No está en el mockup del rediseño —
+ * D2 solo saca "Pausar" de las manos de la persona, no toca `detenido` — así
+ * que esto se trae literal de la bandeja de hoy (`textos.js.panel.legado`),
+ * adaptado a superficie clara. Vive arriba de la lista porque pesa más que
+ * cualquier estado de carpeta: con el token revocado, nada entra, aunque las
+ * carpetas se vean perfectas.
+ */
+function bannerDetenido() {
+  const t = TEXTOS.panel.legado.detenido;
+  const a = TEXTOS.panel.legado.acciones;
+  return `
+    <div class="aviso-detenido">
+      <div class="aviso-detenido__cabecera">
+        <span class="aviso-detenido__icono" aria-hidden="true">⚠</span>
+        <span class="aviso-detenido__rotulo">${esc(t.rotulo)}</span>
+      </div>
+      <div class="aviso-detenido__detalle">${esc(t.detalle)}</div>
+      <div class="aviso-detenido__cuerpo"><strong>${esc(t.avisoTitulo)}</strong> ${esc(t.avisoCuerpo)}</div>
+      <div class="aviso-detenido__acciones">
+        <button class="btn btn--secundario" type="button" data-accion="salir">${esc(a.salir)}</button>
+        <!-- "vincular" todavía no tiene comando (ver bandeja.js: COMANDOS no lo
+             lista) — el botón se dibuja igual y NO se ata: un botón que no
+             responde dice la verdad; uno que responde sin hacer nada, no. -->
+        <button class="btn btn--primario" type="button" data-accion="vincular">${esc(a.volverAVincular)}</button>
+      </div>
+    </div>`;
+}
+
+// ── Subvista: list ──────────────────────────────────────────────────────────
+function vistaLista(vista) {
+  const banner = vista.detenido === "credenciales" ? bannerDetenido() : "";
+  const carpetas = vista.carpetas;
+  const cuerpo = carpetas.length
+    ? `${carpetas.map(tarjetaDeCarpeta).join("")}${bloqueAgregarCarpeta(false)}`
+    : bloqueAgregarCarpeta(true);
+  return `
+    ${banner}
+    <div class="carpetas-lista">
+      <div class="carpetas-lista__titulo">${esc(TEXTOS.folders.titulo)}</div>
+      ${cuerpo}
+    </div>
+    <button class="pie-salir" type="button" data-accion="salir">${esc(TEXTOS.panel.legado.acciones.salir)}</button>`;
+}
+
+// ── Subvista: menu (⋯) ──────────────────────────────────────────────────────
+function vistaMenu(vista, carpetaId) {
+  const c = vista.carpetas.find((x) => x.id === carpetaId);
+  // Defensivo: sin una carpeta que identificar no hay menú que mostrar — se
+  // cae a la lista en vez de inventar un título vacío.
+  if (!c) return vistaLista(vista);
+  const nombre = nombreAmigable(c.rutaAbsoluta);
+  const finder = TEXTOS.folders.menu.finder;
+  const dejar = TEXTOS.folders.menu.dejarDeMirar;
+  return `
+    <div class="menu">
+      <div class="menu__titulo">«${esc(nombre)}»</div>
+      <div class="menu__opciones">
+        <button class="menu__opcion" type="button" data-accion="abrirCarpeta" data-carpeta="${esc(c.id)}">
+          <span class="menu__opcion-icono" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M3 6.5C3 5.67 3.67 5 4.5 5H9.5L11 7H19.5C20.33 7 21 7.67 21 8.5V17.5C21 18.33 20.33 19 19.5 19H4.5C3.67 19 3 18.33 3 17.5V6.5Z" stroke="currentColor" stroke-width="1.5"/></svg></span>
+          <span class="menu__opcion-textos">
+            <span class="menu__opcion-titulo">${esc(finder.abrir)}</span>
+            <span class="menu__opcion-subtitulo">${esc(finder.abrirSubtitulo)}</span>
+          </span>
+        </button>
+        <button class="menu__opcion" type="button" data-nav="confirmUnlink" data-carpeta="${esc(c.id)}">
+          <span class="menu__opcion-icono menu__opcion-icono--danger" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M8 8L16 16M9 4H15M9 20H15M4 9V15M20 9V15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+          <span class="menu__opcion-textos">
+            <span class="menu__opcion-titulo menu__opcion-titulo--danger">${esc(dejar.titulo)}</span>
+            <span class="menu__opcion-subtitulo">${esc(dejar.subtitulo)}</span>
+          </span>
+        </button>
+      </div>
+      <button class="menu__cancelar" type="button" data-nav="list">${esc(TEXTOS.folders.menu.cancelar)}</button>
+    </div>`;
+}
+
+// ── Subvista: confirmUnlink ─────────────────────────────────────────────────
+function vistaConfirmUnlink(vista, carpetaId) {
+  const c = vista.carpetas.find((x) => x.id === carpetaId);
+  if (!c) return vistaLista(vista);
+  const nombre = nombreAmigable(c.rutaAbsoluta);
+  const t = TEXTOS.folders.confirmarDejarDeMirar;
+  return `
+    <div class="confirmar">
+      <div class="confirmar__titulo">${esc(t.titulo(nombre))}</div>
+      <div class="confirmar__cuerpo">${esc(t.cuerpo(c.indexados))}</div>
+      <div class="confirmar__acciones">
+        <button class="btn btn--secundario" type="button" data-nav="list">${esc(t.cancelar)}</button>
+        <button class="btn btn--peligro" type="button" data-accion="desvincular" data-carpeta="${esc(c.id)}">${esc(t.aceptar)}</button>
+      </div>
+    </div>`;
+}
+
+// ── Subvista: doneUnlink ────────────────────────────────────────────────────
+// No necesita datos de la carpeta — ya se desvinculó y ya no está en `vista`.
+function vistaDoneUnlink() {
+  const t = TEXTOS.folders.dejarDeMirarHecho;
+  return `
+    <div class="hecho">
+      <div class="hecho__cabecera">
+        <span class="hecho__icono" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 12.5L9.5 18L20 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <div class="hecho__textos">
+          <div class="hecho__titulo">${esc(t.titulo)}</div>
+          <div class="hecho__cuerpo">${esc(t.cuerpo)}</div>
+        </div>
+      </div>
+      <button class="btn btn--secundario hecho__volver" type="button" data-nav="list">${esc(t.volver)}</button>
+    </div>`;
+}
+
+function filaDeArchivo(fila, carpetaId) {
+  const clave = CLAVE_DE_FILA[fila.estado];
+  if (!clave) throw new Error(`estado de archivo desconocido: ${fila.estado}`);
+  const rotulo = TEXTOS.folders.archivos.estado[clave];
+  const esGuardado = fila.estado === "indexado";
+  const esFallo = fila.estado === "fallo";
+  const motivo = esFallo ? motivoDeFallo(fila) : null;
+  const atributos = esGuardado
+    ? ` data-accion="abrirArchivo" data-raiz="${esc(carpetaId)}" data-ruta="${esc(fila.ruta)}" data-nombre="${esc(fila.ruta)}"`
+    : "";
+  return `
+    <div class="archivo-fila${esGuardado ? " archivo-fila--clicable" : ""}" data-estado="${esc(fila.estado)}"${esGuardado ? ' role="button" tabindex="0"' : ""}${atributos}>
+      <div class="archivo-fila__linea">
+        <span class="archivo-fila__identidad">
+          ${iconoArchivo(fila.estado)}
+          <span class="archivo-fila__nombre">${esc(fila.ruta)}</span>
+        </span>
+        <span class="archivo-fila__estado">${esc(rotulo)}</span>
+      </div>
+      ${motivo ? `<div class="archivo-fila__motivo">${esc(motivo)}</div>` : ""}
+    </div>`;
+}
+
+// ── Subvista: files ──────────────────────────────────────────────────────────
+function vistaArchivos(vista, carpetaId) {
+  const c = vista.carpetas.find((x) => x.id === carpetaId);
+  if (!c) return vistaLista(vista);
+  const nombre = nombreAmigable(c.rutaAbsoluta);
+  return `
+    <div class="archivos-vista">
+      <div class="archivos-vista__cabecera">
+        <button class="archivos-vista__atras" type="button" data-nav="list" aria-label="Volver">←</button>
+        <div class="archivos-vista__nombre" title="${esc(c.rutaAbsoluta)}">${esc(nombre)}</div>
+      </div>
+      <div class="archivos-vista__badges">${badgeHtml(c)}</div>
+      <div class="archivos-vista__divisor"></div>
+      <div class="archivos-vista__lista">
+        ${
+          c.filas.length
+            ? c.filas.map((f) => filaDeArchivo(f, c.id)).join("")
+            : `<div class="archivos-vista__vacio">Sin archivos todavía.</div>`
+        }
+        ${
+          // El "y N más" nunca se omite cuando hay ocultas — mismo principio
+          // que la bandeja de hoy: una lista truncada sin el número se lee
+          // como la lista entera.
+          c.ocultas > 0 ? `<div class="archivos-vista__mas">y ${esc(c.ocultas)} más</div>` : ""
+        }
+      </div>
+      <div class="archivos-vista__pie">${esc(TEXTOS.folders.archivos.tocarParaAbrir)}</div>
+    </div>`;
+}
+
+/**
+ * El punto de entrada. `ui` es navegación local, gobernada por `bandeja.js`:
+ *   - `ui.subview`: "list" | "menu" | "confirmUnlink" | "doneUnlink" | "files"
+ *   - `ui.carpetaId`: qué carpeta está en foco (menu / confirmUnlink / files)
+ *   - `ui.toast`: mensaje efímero, o `null`
+ */
+export function bandeja(vista, ui = {}) {
+  const subview = ui.subview ?? "list";
+  let inner;
+  switch (subview) {
+    case "list":
+      inner = vistaLista(vista);
+      break;
+    case "menu":
+      inner = vistaMenu(vista, ui.carpetaId);
+      break;
+    case "confirmUnlink":
+      inner = vistaConfirmUnlink(vista, ui.carpetaId);
+      break;
+    case "doneUnlink":
+      inner = vistaDoneUnlink();
+      break;
+    case "files":
+      inner = vistaArchivos(vista, ui.carpetaId);
+      break;
+    default:
+      throw new Error(`subvista desconocida: ${subview}`);
+  }
+  const toast = ui.toast ? `<div class="toast">${esc(ui.toast)}</div>` : "";
+  return `<div class="bandeja">${inner}${toast}</div>`;
 }

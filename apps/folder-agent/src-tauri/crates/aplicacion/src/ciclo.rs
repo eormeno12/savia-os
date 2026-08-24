@@ -36,7 +36,12 @@ use savia_folder_protocolo::{CanalDeSavia, FalloDeProtocolo};
 /// Y las dos que faltaban son justo las que hay que ver: `RaizAusente` es la salvaguarda
 /// disparandose —«se desmonto el disco y no reporte ni una baja»— y `BajaNoReportable`
 /// OLVIDA una fila. Las dos terminaban sin dejar rastro.
-#[derive(Default, Debug)]
+/// `PartialEq` esta para UNA cosa y conviene decir cual: que un test pueda afirmar que
+/// `barrer_reportando` y `barrer` devuelven el MISMO resumen sobre el mismo escenario. Sin
+/// el, esa comparacion se escribe campo por campo, y un campo nuevo del resumen entraria
+/// sin que la comparacion lo mire — que es exactamente la clase de agujero que el resto de
+/// este archivo se esfuerza en cerrar.
+#[derive(Default, Debug, PartialEq, Eq)]
 pub struct ResumenDelBarrido {
     pub enumeradas: usize,
     pub apariciones: u64,
@@ -87,12 +92,70 @@ pub struct ResumenDelBarrido {
 /// Una vuelta sobre una raiz. **No transmite nada**: solo llena el almacen. El drenaje es
 /// aparte a proposito — el contrato con la cola dice que ninguna baja se transmite con
 /// un barrido abierto de esa raiz.
+///
+/// **La firma no se toca.** La usan mecanicamente las tres bancadas de `tests/` y el hilo
+/// de trabajo del host; quien quiera mirar el avance archivo por archivo tiene
+/// `barrer_reportando`, que es esta misma vuelta con un testigo enchufado.
 pub fn barrer(
     raiz: &RaizId,
     barrido: BarridoId,
     plataforma: &dyn Plataforma,
     almacen: &mut Almacen,
     politica: &Politica,
+) -> ResumenDelBarrido {
+    barrer_interno(raiz, barrido, plataforma, almacen, politica, None)
+}
+
+/// La MISMA vuelta que `barrer`, con un testigo que se llama **una vez por archivo
+/// iterado** con `(procesados, total)`. `total` es el conjunto enumerado y se conoce ANTES
+/// del primer archivo, asi que la primera llamada ya trae el denominador completo: una
+/// barra de progreso no tiene que adivinar contra que crece.
+///
+/// El resumen que devuelve es identico al de `barrer` sobre el mismo escenario — el
+/// testigo MIRA, no participa.
+///
+/// # El throttle es de quien llama, y no es un detalle de estilo
+///
+/// La Fase 7 del plan pide que «el canal se prueba con un barrido de miles sin que el
+/// panel se trabe», y esta funcion sola no lo puede cumplir: se llama **por cada archivo**,
+/// asi que enchufarla derecho a un `app.emit(...)` sobre una raiz de decenas de miles
+/// significa decenas de miles de eventos IPC — la cola del webview se llena, el panel se
+/// pone a repintar en vez de a responder, y el sintoma es justo el que la fase pide evitar.
+///
+/// **Aca adentro no hay ningun «cada N archivos», y esa ausencia es deliberada**: N seria
+/// un numero que decide comportamiento y que nadie midio. Quien conecta el testigo —la
+/// integracion en `bandeja/main.rs`, o el frontend juntando repintados— es quien tiene el
+/// costo real del canal a la vista y por lo tanto el unico que puede elegir el corte:
+/// emitir por tiempo transcurrido, por porcentaje cambiado, o coalescer del lado del
+/// webview. Esta funcion entrega el dato crudo y completo.
+pub fn barrer_reportando(
+    raiz: &RaizId,
+    barrido: BarridoId,
+    plataforma: &dyn Plataforma,
+    almacen: &mut Almacen,
+    politica: &Politica,
+    on_progreso: &mut dyn FnMut(usize, usize),
+) -> ResumenDelBarrido {
+    barrer_interno(
+        raiz,
+        barrido,
+        plataforma,
+        almacen,
+        politica,
+        Some(on_progreso),
+    )
+}
+
+/// El cuerpo, uno solo. Las dos puertas publicas se distinguen SOLO en el ultimo
+/// parametro: si hubiera dos cuerpos, la que nadie mira en el banco se desviaria de la
+/// otra y el desvio no lo notaria nadie hasta produccion.
+fn barrer_interno(
+    raiz: &RaizId,
+    barrido: BarridoId,
+    plataforma: &dyn Plataforma,
+    almacen: &mut Almacen,
+    politica: &Politica,
+    mut on_progreso: Option<&mut dyn FnMut(usize, usize)>,
 ) -> ResumenDelBarrido {
     let mut resumen = ResumenDelBarrido::default();
     let Some(registrada) = almacen.inventario().raiz(raiz) else {
@@ -110,7 +173,17 @@ pub fn barrer(
         ),
         ResultadoDeEnumeracion::Fallo(_) => (Vec::new(), false),
     };
-    resumen.enumeradas = rutas.len();
+    // EL DENOMINADOR DEL TESTIGO QUEDA FIJADO ACA, ANTES DEL PRIMER ARCHIVO. Es lo que
+    // hace que `barrer_reportando` pueda decir «1 de 40.000» ya en su primera llamada, en
+    // vez de un total que crece solo: `rutas` es el conjunto entero que este barrido va a
+    // recorrer, y no cambia adentro del lazo.
+    //
+    // **NO ES EL `_total` DE `abrir_barrido`**, que es otra cosa y se descarta tres lineas
+    // mas arriba: aquel es el tamano del INVENTARIO —el denominador del corte por volumen,
+    // lo unico conocido al abrir— y este es el tamano de lo ENUMERADO. Que difieran es el
+    // caso normal, y es justamente lo que el barrido va a resolver.
+    let total_enumerado = rutas.len();
+    resumen.enumeradas = total_enumerado;
 
     let mut indice = IndiceDeContenido::nuevo();
     // EL PADRON SE JUNTA ACA Y NO SE DERIVA DEL INVENTARIO DESPUES, porque la lista de
@@ -121,7 +194,7 @@ pub fn barrer(
     let mut padron: Vec<(RutaRelativa, Option<HashVerificado>)> = Vec::new();
     let reloj = RelojDePlataforma(plataforma);
 
-    for ruta in &rutas {
+    for (procesados, ruta) in rutas.iter().enumerate() {
         // ANTES de decidir: ¿esta ruta sostenia contenido al empezar el paso? Es lo unico
         // que distingue «reaparecio donde antes no estaba» de «se edito lo que ya
         // estaba», y hay que leerlo aca porque despues de `comprometer` el inventario ya
@@ -194,6 +267,13 @@ pub fn barrer(
                     savia_folder_contrato::inventario::EstadoDeFila::Ausente { .. } => None,
                 });
             padron.push((ruta.clone(), confirmado));
+        }
+        // AL FINAL DE LA ITERACION Y NO AL PRINCIPIO: `procesados` cuenta archivos
+        // TERMINADOS, asi que la primera llamada dice «1 de N» y la ultima «N de N». Con
+        // el aviso al principio, un barrido de N archivos nunca alcanzaria su propio total
+        // y la barra se quedaria a un archivo del final para siempre.
+        if let Some(avisar) = on_progreso.as_deref_mut() {
+            avisar(procesados + 1, total_enumerado);
         }
     }
 

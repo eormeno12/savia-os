@@ -65,6 +65,11 @@ savia-folder-protocolo = { path = "crates/protocolo" }
 # root de quien la invoca (`src/bin/bandeja/main.rs`) — no alcanza con que sea
 # dependencia transitiva de las crates de arriba.
 serde_json = "1"
+# Igual que `serde_json` arriba: los DTOs de `comandos_onboarding.rs`
+# (`VinculacionParaLaPantalla`, `ReclamoParaLaPantalla`, `ResultadoDeEleccion`) derivan
+# `serde::Serialize`, y un derive-macro necesita el nombre `serde` resoluble en el
+# propio crate — no alcanza con que llegue transitivo por `contrato`/`protocolo`.
+serde = { version = "1", features = ["derive"] }
 
 # SOLO PARA EL BINARIO `bandeja`. Ninguna crate de biblioteca lo nombra —lo comprueba
 # `el_nucleo_no_conoce_la_ventana` en `crates/guardianes/tests/guardianes.rs`, caminando

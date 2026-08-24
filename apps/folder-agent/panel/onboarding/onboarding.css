@@ -1,0 +1,660 @@
+/* ────────────────────────────────────────────────────────────────────────────
+   EL ONBOARDING · Fase 6, las seis pantallas (Q1–Q6).
+
+   Todo el color sale de `tokens.css` — ninguno se hardcodea acá, ni siquiera
+   los que el mockup escribe en hex literal.
+
+   ── POR QUÉ NO HAY UNA "TARJETA" FLOTANDO CON SU PROPIA SOMBRA ──────────────
+
+   El mockup (`onboarding-mockup.dc.html`) dibuja cada pantalla como una tarjeta
+   blanca de 560–640px con sus propias esquinas redondeadas, sombra y una barra
+   falsa de tres puntos (rojo/amarillo/verde) simulando ser una ventana — porque
+   el mockup ENTERO vive adentro de un lienzo de presentación de Claude Design,
+   no adentro de una ventana real.
+
+   Acá SÍ hay una ventana real (D6): `tauri.conf.json` declara `onboarding` como
+   ventana normal de macOS, CON barra de título — o sea que el sistema operativo
+   ya dibuja las tres luces, el borde y la sombra. Reproducirlas adentro sería
+   una ventana pintada dentro de otra ventana. Lo que queda de cada pantalla del
+   mockup es su CONTENIDO: el fondo (tinta en Q1, papel en el resto), el
+   padding, la tipografía y los componentes — sin el chrome falso.
+
+   ── EL LIMA SOLO EXISTE SOBRE OSCURO ─────────────────────────────────────────
+
+   Q1 es la única pantalla sobre tinta, y es la única con un botón lima. Las
+   otras cinco son papel/blanco con botones tinta — la misma regla que
+   `panel.css` ya aplica al panel real, y por lo mismo: lima sobre papel es
+   1.05:1 de contraste, ilegible.
+
+   ── POR QUÉ ACÁ ADENTRO Y NO EN `apps/folder-agent/onboarding/` ─────────────
+
+   `tauri.conf.json` sirve el frontend desde UN solo `frontendDist`
+   (`../panel`, sin tocar). Poner esta carpeta afuera de `panel/` hubiera
+   exigido subir el `frontendDist` a `apps/folder-agent/` entera para que la
+   ventana de onboarding la alcance — y esa carpeta también contiene
+   `src-tauri/target/`, que son binarios de compilación de varios gigabytes.
+   Tauri, en modo sin `devUrl`, EMBEBE el árbol completo de `frontendDist` en
+   el bundle: apuntarlo ahí habría empaquetado el `target/` entero. Anidar acá
+   adentro deja `frontendDist` intacto y resuelve la URL de la ventana
+   (`onboarding/onboarding.html`, relativa a `panel/`) sin tocar nada de lo
+   que ya sirve `bandeja.html`.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+@import url("../tokens.css");
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  font-family: var(--savia-font-body);
+  color: var(--savia-color-fg);
+  background: var(--savia-color-bg);
+  -webkit-font-smoothing: antialiased;
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#raiz {
+  min-height: 100vh;
+}
+
+/* ═══════════════════════════ La pantalla, en general ═══════════════════════ */
+
+.pantalla {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--savia-color-bg-panel);
+}
+
+.pantalla--oscura {
+  background: var(--savia-color-ink-solid);
+  color: var(--savia-color-ink-contrast);
+}
+
+.pantalla__contenido {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 48px 56px 40px;
+  overflow: auto;
+  position: relative;
+}
+
+.pantalla__cuerpo {
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.pantalla__resplandor {
+  position: absolute;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: var(--savia-color-lime-solid);
+  filter: blur(120px);
+  opacity: 0.1;
+  top: -100px;
+  right: -80px;
+  pointer-events: none;
+}
+
+/* ═══════════════════════════════ Texto compartido ═══════════════════════════ */
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--savia-color-fg-muted);
+  margin-bottom: 10px;
+}
+
+.pantalla--oscura .eyebrow {
+  color: var(--savia-color-ink-contrast);
+  opacity: 0.55;
+  margin-bottom: 18px;
+}
+
+.titulo {
+  font-weight: 300;
+  font-size: 26px;
+  line-height: 1.15;
+  color: var(--savia-color-fg);
+}
+
+.pantalla--oscura .titulo {
+  font-size: 32px;
+  color: var(--savia-color-ink-contrast);
+  max-width: 22ch;
+}
+
+.cuerpo {
+  font-size: 14px;
+  color: var(--savia-color-fg-muted);
+  line-height: 1.6;
+  margin-top: 10px;
+  max-width: 46ch;
+}
+
+.pantalla--oscura .cuerpo {
+  color: var(--savia-color-ink-contrast);
+  opacity: 0.85;
+}
+
+/* ══════════════════════════════════ Botones ═════════════════════════════════ */
+
+.boton {
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  border: none;
+  border-radius: 14px;
+  padding: 12px 22px;
+  cursor: pointer;
+}
+
+.boton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.boton--primario {
+  background: var(--savia-color-ink-solid);
+  color: var(--savia-color-ink-contrast);
+}
+
+.pantalla--oscura .boton--primario {
+  background: var(--savia-color-lime-solid);
+  color: var(--savia-color-lime-contrast);
+}
+
+.boton--secundario {
+  background: var(--savia-color-bg-panel);
+  color: var(--savia-color-fg);
+  border: 1px solid var(--savia-color-border);
+}
+
+.boton--chica {
+  font-size: 12.5px;
+  padding: 9px 16px;
+  border-radius: 10px;
+}
+
+.boton--fantasma {
+  background: none;
+  border: none;
+  color: var(--savia-color-fg-muted);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.encabezado-de-paso {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+/* ══════════════════════════════════ Q1 ══════════════════════════════════════ */
+
+.q1__hechos {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-top: 34px;
+}
+
+.q1__hecho {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.q1__numero {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  border-radius: 6px;
+  background: var(--savia-color-lime-muted);
+  color: var(--savia-color-signal-lime);
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.q1__texto {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--savia-color-ink-contrast);
+  opacity: 0.85;
+}
+
+.q1__pie {
+  margin-top: auto;
+  padding-top: 32px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ══════════════════════════════════ Q2 ══════════════════════════════════════ */
+
+.q2__panel {
+  background: var(--savia-color-bg-subtle);
+  border-radius: 24px;
+  padding: 28px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.q2__codigo {
+  transition: opacity var(--savia-duration-soft) var(--savia-easing-savia);
+}
+
+.q2__codigo--apagado {
+  opacity: 0.35;
+}
+
+.q2__codigo-etiqueta {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--savia-color-fg-muted);
+  margin-bottom: 8px;
+}
+
+.q2__codigo-valor {
+  font-size: 40px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--savia-color-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.q2__vence {
+  font-size: 13px;
+  color: var(--savia-color-fg-muted);
+  margin-top: 8px;
+}
+
+.q2__separador {
+  height: 1px;
+  background: var(--savia-color-border);
+}
+
+.estado-con-icono {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.estado-con-icono__icono {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.estado-con-icono__icono--punto {
+  width: 10px;
+  height: 10px;
+  margin-top: 6px;
+  background: var(--savia-color-fg-muted);
+  border-radius: 50%;
+}
+
+.tono-exito {
+  background: var(--savia-color-success-muted);
+  color: var(--savia-color-success-fg);
+}
+.tono-aviso {
+  background: var(--savia-color-warning-muted);
+  color: var(--savia-color-warning-fg);
+}
+.tono-peligro {
+  background: var(--savia-color-danger-muted);
+  color: var(--savia-color-danger-fg);
+}
+.tono-info {
+  background: var(--savia-color-info-muted);
+  color: var(--savia-color-info-fg);
+}
+.tono-neutral {
+  background: var(--savia-color-bg-subtle);
+  color: var(--savia-color-fg-muted);
+}
+
+.estado-con-icono__titulo {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--savia-color-fg);
+}
+
+.estado-con-icono__cuerpo {
+  font-size: 14px;
+  color: var(--savia-color-fg-muted);
+  line-height: 1.6;
+  margin-top: 6px;
+  max-width: 36ch;
+}
+
+.estado-con-icono__cuerpo strong {
+  color: var(--savia-color-fg);
+}
+
+.estado-con-icono__accion {
+  margin-top: 16px;
+}
+
+/* ══════════════════════════════════ Q3 ══════════════════════════════════════ */
+
+.q3 {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.q3__cabecera {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.q3__icono {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--savia-color-bg-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.q3__estado {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.q3__punto {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--savia-color-fg-muted);
+  transition: background var(--savia-duration-soft) var(--savia-easing-savia);
+}
+
+.q3__punto--detectado {
+  background: var(--savia-color-success-solid);
+}
+
+.q3__estado-texto {
+  font-size: 13px;
+  color: var(--savia-color-fg-muted);
+}
+
+/* ══════════════════════════════════ Q4 ══════════════════════════════════════ */
+
+.q4__bullets {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.q4__bullet {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.q4__numero {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  border-radius: 6px;
+  background: var(--savia-color-bg-subtle);
+  color: var(--savia-color-fg);
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.q4__bullet-texto {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--savia-color-fg);
+  max-width: 44ch;
+}
+
+.q4__accion {
+  margin-top: 28px;
+}
+
+.q4__nota {
+  font-size: 11px;
+  color: var(--savia-color-fg-muted);
+  margin-top: 20px;
+}
+
+.q4__resultado {
+  border-radius: 18px;
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.q4__resultado-titulo {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.q4__resultado-cuerpo {
+  font-size: 13.5px;
+  line-height: 1.55;
+  max-width: 48ch;
+  color: var(--savia-color-fg);
+  opacity: 0.85;
+}
+
+.q4__resultado-acciones {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+/* ══════════════════════════════════ Q5 ══════════════════════════════════════ */
+
+.q5__progreso {
+  margin-top: 22px;
+}
+
+.q5__cifra {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--savia-color-fg);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.q5__subiendo {
+  font-size: 13px;
+  color: var(--savia-color-fg-muted);
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.q5__aviso {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+  background: var(--savia-color-bg-subtle);
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+
+.q5__aviso-texto {
+  font-size: 12.5px;
+  color: var(--savia-color-fg-muted);
+}
+
+.q5__seccion {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--savia-color-fg-muted);
+  margin-top: 22px;
+}
+
+.q5__lista {
+  flex: 1;
+  overflow: auto;
+  margin-top: 6px;
+}
+
+.fila-archivo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--savia-color-border-subtle);
+}
+
+.fila-archivo__nombre-grupo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.fila-archivo__nombre {
+  font-size: 13px;
+  color: var(--savia-color-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fila-archivo__estado {
+  font-size: 12px;
+  color: var(--savia-color-fg-muted);
+  flex-shrink: 0;
+}
+
+.fila-archivo__estado--fallo {
+  color: var(--savia-color-danger-fg);
+}
+
+.q5__vacio {
+  font-size: 13px;
+  color: var(--savia-color-fg-muted);
+  padding: 24px 0;
+}
+
+/* Ver el comentario de `t.continuar` en `textos.js`: sin esto la pantalla no
+   tenía forma de llegar a Q6. `flex-shrink: 0` para que `.q5__lista` (que
+   sí crece) no lo empuje fuera de la vista cuando hay muchas filas. */
+.q5__pie {
+  flex-shrink: 0;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--savia-color-border-subtle);
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ══════════════════════════════════ Q6 ══════════════════════════════════════ */
+
+.q6 {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: left;
+}
+
+.q6__intro {
+  width: 100%;
+}
+
+.q6__vista-previa {
+  margin-top: 30px;
+  width: 100%;
+  max-width: 290px;
+  background: var(--savia-color-bg-panel);
+  border: 1px solid var(--savia-color-border);
+  border-radius: 16px;
+  box-shadow: var(--savia-shadow-soft);
+  padding: 18px;
+}
+
+.q6__vista-previa-titulo {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--savia-color-fg);
+  margin-bottom: 12px;
+}
+
+.q6__vista-previa-fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.q6__vista-previa-nombre {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--savia-color-fg);
+}
+
+.q6__vista-previa-detalle {
+  font-size: 11px;
+  color: var(--savia-color-fg-muted);
+  margin-top: 2px;
+}
+
+.insignia {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 9px;
+  border-radius: 8px;
+}
+
+.q6__pie {
+  margin-top: 28px;
+}
