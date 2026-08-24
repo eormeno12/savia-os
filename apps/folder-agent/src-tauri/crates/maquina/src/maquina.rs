@@ -48,7 +48,7 @@ use savia_folder_contrato::dominio::{
     BarridoId, EstadoDelBarrido, HashVerificado, Instante, RaizId, Reloj, RutaRelativa,
 };
 use savia_folder_contrato::inventario::{
-    EfectoDeInventario, EstadoDeFila, EstadoDeHash, Inventario, estrena_contenido,
+    EfectoDeInventario, EstadoDeFila, EstadoDeHash, Inventario, MotivoDeFallo, estrena_contenido,
 };
 use savia_folder_contrato::plataforma::{FalloDeLectura, Ficha, MotivoIndeterminado, Plataforma};
 // `misma_observacion` es la UNICA funcion de `salvaguardas` que vive en `contrato` (junto
@@ -119,6 +119,12 @@ pub enum Nodo {
     /// La ruta se fue y Savia nunca confirmo un hash para ella: no hay documento que
     /// retirar. La fila se olvida y no viaja nada.
     BajaNoReportable,
+    /// Un error de lectura LOCAL, terminal — no una espera. Hoy, solo
+    /// `FalloDeLectura::PermisoDenegado`: las otras tres variantes de `FalloDeLectura`
+    /// (fuera de `HidratacionRequerida`, que tiene su propio `Omitido`) siguen cayendo
+    /// en `Esperando` porque cada una tiene su propia razon para ser transitoria. Ver
+    /// `MotivoDeFallo` en `contrato::inventario`.
+    Fallo(MotivoDeFallo),
 }
 
 /// Una decision no se puede tirar al piso.
@@ -330,6 +336,24 @@ pub fn decidir(
                 },
                 Asentamiento::Asentado => match plataforma.hashear(&registrada, &senal.ruta) {
                     Err(FalloDeLectura::HidratacionRequerida) => Paso::nada(Nodo::Omitido),
+                    // TERMINAL, Y ES LA UNICA DE LAS CUATRO RESTANTES. Un permiso
+                    // denegado es una barrera categorica (POSIX/ACL/TCC): esperar mas
+                    // no la mueve, a diferencia de `ErrorDeEntradaSalida` (puede ser un
+                    // hipo de red) o `YaNoEsta` (la carrera stat/open — declararla
+                    // terminal robaria el camino correcto, que ya la resuelve sola en
+                    // la vuelta siguiente via `Ficha::NoExiste`). No cuenta reintentos:
+                    // sale en el primer intento, igual que `HidratacionRequerida` ya
+                    // sale arriba. Se autocura sola: este brazo no toca `candidato`, asi
+                    // que la proxima vuelta reintenta `hashear` sin esperar un intervalo
+                    // nuevo, y el primer exito limpia `fallo` en `ConfirmarPresencia`.
+                    Err(FalloDeLectura::PermisoDenegado) => Paso {
+                        nodo: Nodo::Fallo(MotivoDeFallo::NoSePudoAbrir),
+                        hecho: None,
+                        efectos: vec![EfectoDeInventario::MarcarFallo {
+                            ruta: senal.ruta.clone(),
+                            motivo: MotivoDeFallo::NoSePudoAbrir,
+                        }],
+                    },
                     Err(_) => {
                         // Un error de lectura NO produce hecho, y no descarta el
                         // candidato: vuelve a esperar. Que el archivo se haya ido entre

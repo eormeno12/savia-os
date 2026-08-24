@@ -24,17 +24,19 @@ fn sin_comentarios(src: &str) -> String {
 }
 
 #[test]
-fn el_resumen_del_barrido_cuenta_los_diez_nodos() {
+fn el_resumen_del_barrido_cuenta_los_once_nodos() {
     // IMPORTA PORQUE: el doc de `Nodo` dice que la rama va en la salida «porque es lo que
     // el panel muestra por raiz». Durante toda la vida del crate el resumen conto SEIS de
     // diez y las otras cuatro caian en una rama comodin — entre ellas `RaizAusente`, que
     // es la salvaguarda disparandose («se desmonto el disco y no reporte ni una baja»), y
     // `BajaNoReportable`, que OLVIDA una fila. Las dos terminaban sin dejar rastro.
+    // `Fallo` (D3, Fase 3) es el undecimo, y es la razon por la que este test sigue vivo:
+    // una variante nueva SIGUE necesitando su propia linea para no repetir la historia.
     //
     // La rama comodin es lo que lo hizo posible y lo que lo volveria a hacer posible: con
     // ella, una variante nueva de `Nodo` entra al arbol y desaparece del panel en
     // silencio.
-    const NODOS: [&str; 10] = [
+    const NODOS: [&str; 11] = [
         "Aparecio",
         "Desaparecio",
         "Omitido",
@@ -45,6 +47,7 @@ fn el_resumen_del_barrido_cuenta_los_diez_nodos() {
         "RaizAusente",
         "BajaNoReportable",
         "AgendaBarrido",
+        "Fallo",
     ];
     let src = sin_comentarios(&fuente("ciclo.rs"));
     let i = src

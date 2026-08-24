@@ -6,7 +6,9 @@
 //! nada levantado.
 
 use savia_folder_aplicacion::ciclo;
-use savia_folder_aplicacion::panel::{self, EstadoDeArchivo, EstadoDeCarpeta, Motivo};
+use savia_folder_aplicacion::panel::{
+    self, EstadoDeArchivo, EstadoDeCarpeta, Motivo, MotivoDeArchivoFallido,
+};
 use savia_folder_contrato::colas::{Decision, SweepId, Veredicto};
 use savia_folder_contrato::dominio::{
     BarridoId, HashVerificado, IdDeArchivoDelSO, RaizId, SensibilidadAMayusculas,
@@ -431,7 +433,7 @@ fn la_ruta_envenenada_pisa_al_indexado() {
     let v = panel::vista(&a, &p, TOPE);
     assert_eq!(
         v.carpetas[0].filas[0].estado,
-        EstadoDeArchivo::Fallo,
+        EstadoDeArchivo::Fallo(MotivoDeArchivoFallido::RechazadoPorSavia),
         "la fila sigue diciendo `Presente/Confirmado` —verdadero sobre el pasado— y el panel mostraria `indexado` sobre un archivo que hace tres barridos que no entra"
     );
     assert_eq!(

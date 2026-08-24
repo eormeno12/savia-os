@@ -12,8 +12,10 @@ use savia_folder_contrato::dominio::{
     BarridoId, EstadoDelBarrido, HashVerificado, Instante, RaizId, Reloj, RutaRelativa,
     SensibilidadAMayusculas,
 };
-use savia_folder_contrato::inventario::Inventario;
-use savia_folder_contrato::plataforma::{Plataforma, RaizRegistrada, RelojDePlataforma};
+use savia_folder_contrato::inventario::{Inventario, MotivoDeFallo};
+use savia_folder_contrato::plataforma::{
+    FalloDeLectura, Plataforma, RaizRegistrada, RelojDePlataforma,
+};
 use savia_folder_estado::almacen::Almacen;
 use savia_folder_estado::colas::{ParametrosDeCola, Proximo, Recibido, Trabajo, aparicion};
 use savia_folder_maquina::maquina::{self, Nodo, OrigenDeSenal, Senal};
@@ -1820,5 +1822,61 @@ fn una_mudanza_descubierta_al_cerrar_queda_contada() {
     assert!(
         resumen.movimientos + resumen.retenidas_por_movimiento > 0,
         "y la mudanza queda contada, la vea el recorrido o la descubra el cierre: {resumen:?}"
+    );
+}
+
+#[test]
+fn un_permiso_denegado_es_terminal_y_se_autocura() {
+    // IMPORTA PORQUE: D3 (Fase 3) agrega `MotivoDeFallo`, y `PermisoDenegado` es la UNICA
+    // variante de `FalloDeLectura` que hoy se vuelve terminal — las otras tres esperan
+    // (ver el comentario "TERMINAL, Y ES LA UNICA DE LAS CUATRO RESTANTES" en
+    // `maquina::hashear`). Esta prueba fija DOS cosas a la vez: que el primer intento
+    // fallido queda anotado hasta en el inventario (no solo contado en el resumen), y que
+    // la PROXIMA lectura exitosa lo limpia sola — sin que nadie mande un comando
+    // "reintentar". Sin la segunda mitad, un permiso que Finder arregla solo (el usuario
+    // vuelve a compartir la carpeta) dejaria la fila marcada `Fallo` para siempre.
+    let p = Falsa::como_macos();
+    p.poner("cerrado.pdf", b"contenido", 100, Some(1));
+    p.poner_no_legible("cerrado.pdf", FalloDeLectura::PermisoDenegado);
+    let mut a = almacen();
+
+    // Settle en dos vueltas, como el resto del banco: la primera anota el candidato, la
+    // segunda lo asienta y recien ahi se intenta `hashear`.
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+    ciclo::barrer(&raiz(), BarridoId::nuevo("b1"), &p, &mut a, &politica());
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+    let resumen = ciclo::barrer(&raiz(), BarridoId::nuevo("b2"), &p, &mut a, &politica());
+
+    assert_eq!(
+        resumen.fallos_locales, 1,
+        "el permiso denegado tiene que contarse en el resumen: {resumen:?}"
+    );
+    let asiento = a
+        .inventario()
+        .asiento(&raiz(), &r("cerrado.pdf"))
+        .expect("la fila existe: `hashear` ya se intento");
+    assert_eq!(
+        asiento.fallo,
+        Some(MotivoDeFallo::NoSePudoAbrir),
+        "el inventario anota el motivo — es lo que despues traduce `panel::vista`"
+    );
+
+    // Se resuelve el permiso (el usuario re-comparte la carpeta, o similar) y llega la
+    // vuelta siguiente SIN que nadie le haya pedido nada al agente.
+    p.quitar_no_legible("cerrado.pdf");
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+    let resumen2 = ciclo::barrer(&raiz(), BarridoId::nuevo("b3"), &p, &mut a, &politica());
+
+    assert_eq!(
+        resumen2.fallos_locales, 0,
+        "la proxima vuelta ya no lo cuenta: {resumen2:?}"
+    );
+    let asiento2 = a
+        .inventario()
+        .asiento(&raiz(), &r("cerrado.pdf"))
+        .expect("la fila sigue existiendo");
+    assert_eq!(
+        asiento2.fallo, None,
+        "AUTO-CURA: el primer exito limpia `fallo` solo, en `ConfirmarPresencia`"
     );
 }

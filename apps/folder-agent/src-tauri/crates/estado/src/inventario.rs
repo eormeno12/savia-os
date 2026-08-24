@@ -136,6 +136,7 @@ impl InventarioEnMemoria {
                                 alta_en: b.clone(),
                                 vista_en: b,
                                 en_duda: false,
+                                fallo: None,
                             },
                         );
                     }
@@ -189,6 +190,11 @@ impl InventarioEnMemoria {
                         if cambio_de_contenido {
                             e.en_duda = false;
                         }
+                        // LA LECTURA QUE SI FUNCIONO ES LA UNICA CURA. Si esta ruta
+                        // llegaba de un `Nodo::Fallo` (permiso denegado en la vuelta
+                        // anterior), este exito la saca sin que nadie tenga que
+                        // intervenir manualmente.
+                        e.fallo = None;
                     }
                     None => {
                         self.filas.insert(
@@ -203,6 +209,7 @@ impl InventarioEnMemoria {
                                 alta_en: b.clone(),
                                 vista_en: b,
                                 en_duda: false,
+                                fallo: None,
                             },
                         );
                     }
@@ -230,6 +237,11 @@ impl InventarioEnMemoria {
                 fila.ruta = a.clone();
                 fila.candidato = None;
                 fila.vista_en = b;
+                // EL ORIGEN PUEDE LLEVAR UN `fallo` VIEJO de un contenido que ya no es el
+                // que se esta moviendo — la ruta destino recien matcheo por hash, o sea
+                // que en su ubicacion nueva SI se pudo leer. Sin esta linea, un archivo
+                // sano heredaria un "no se pudo abrir" fantasma de la ruta que dejo atras.
+                fila.fallo = None;
                 self.filas.insert((raiz.clone(), self.clave(raiz, a)), fila);
             }
             EfectoDeInventario::MarcarAusente {
@@ -245,6 +257,9 @@ impl InventarioEnMemoria {
                     };
                     e.candidato = None;
                     e.vista_en = b;
+                    // Una lapida no es "no se pudo abrir": se fue. El motivo de la
+                    // ultima lectura, si lo habia, ya no describe nada presente.
+                    e.fallo = None;
                 }
             }
             EfectoDeInventario::CorregirHash { ruta, verificado } => {
@@ -265,6 +280,15 @@ impl InventarioEnMemoria {
                 if let Some(e) = self.filas.get_mut(&k) {
                     e.en_duda = true;
                 }
+            }
+            EfectoDeInventario::MarcarFallo { ruta, motivo } => {
+                let k = (raiz.clone(), self.clave(raiz, ruta));
+                if let Some(e) = self.filas.get_mut(&k) {
+                    e.fallo = Some(*motivo);
+                }
+                // Sin rama `None => insert`: `Asentamiento::Asentado` nunca se alcanza
+                // sobre un candidato `None` (`politica::salvaguardas::asentar`), asi que
+                // la fila ya existe siempre que este efecto se aplique.
             }
         }
     }
@@ -310,6 +334,7 @@ impl Inventario for InventarioEnMemoria {
             fila: if es_aceptada(e) { Some(e.estado) } else { None },
             candidato: e.candidato,
             en_duda: e.en_duda,
+            fallo: e.fallo,
         })
     }
 

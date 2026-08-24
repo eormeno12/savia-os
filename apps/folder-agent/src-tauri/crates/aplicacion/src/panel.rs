@@ -22,7 +22,7 @@
 //! Las dos son huecos del canal, no del panel, y estan anotados en el borrador.
 
 use savia_folder_contrato::dominio::{RaizId, RutaRelativa};
-use savia_folder_contrato::inventario::{EstadoDeFila, EstadoDeHash, Inventario};
+use savia_folder_contrato::inventario::{EstadoDeFila, EstadoDeHash, Inventario, MotivoDeFallo};
 use savia_folder_contrato::plataforma::Plataforma;
 use savia_folder_estado::almacen::Almacen;
 use savia_folder_estado::colas::MotivoDeDetencion;
@@ -64,12 +64,19 @@ pub enum Motivo {
 
 /// Lo que se dice de UN archivo. Cuatro casos, y cada uno sale de un hecho que el agente
 /// tiene — ninguno se infiere de la extension ni del nombre.
+///
+/// **Serializa "adyacente" (`tag = "estado", content = "motivo"`), no externo.** Con el
+/// tag por omision, `Fallo(m)` saldria como `{"fallo": m}` y las demas variantes como
+/// string plano: `panel.js` lee `f.estado` como string SIEMPRE (`ARCHIVO[f.estado]`), asi
+/// que una forma mixta le rompe la busqueda justo en el caso que mas importa mostrar. Con
+/// `content = "motivo"` y `#[serde(flatten)]` en `Fila::estado`, `estado` es string en
+/// las cuatro variantes y el motivo viaja aparte, presente solo cuando hay uno.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(tag = "estado", content = "motivo", rename_all = "camelCase")]
 pub enum EstadoDeArchivo {
-    /// La ruta se envenerio: fallo tantas veces que la cola la aparto para que no
-    /// bloquee al resto. **Es el unico que pide una persona.**
-    Fallo,
+    /// La ruta se envenerio, o el agente encontro un fallo local terminal leyendola.
+    /// **Es el unico que pide una persona**, y el motivo dice por que.
+    Fallo(MotivoDeArchivoFallido),
     /// El agente tiene un hash local y Savia todavia no lo confirmo.
     Procesando,
     /// Savia confirmo el hash: contesto `known`, o el `upload.completed` lo devolvio
@@ -85,7 +92,7 @@ impl EstadoDeArchivo {
     /// algo, no los primeros alfabeticamente.
     fn prioridad(self) -> u8 {
         match self {
-            EstadoDeArchivo::Fallo => 0,
+            EstadoDeArchivo::Fallo(_) => 0,
             EstadoDeArchivo::Procesando => 1,
             EstadoDeArchivo::Retirado => 2,
             EstadoDeArchivo::Indexado => 3,
@@ -93,9 +100,37 @@ impl EstadoDeArchivo {
     }
 }
 
+/// Por que una fila esta en `Fallo`, traducido a lo que le importa a una persona.
+/// `MotivoDeFallo` (en `contrato::inventario`) habla de lo que el agente vio en el disco;
+/// esto le agrega el motivo que solo la cola conoce (`RechazadoPorSavia`) y traduce los
+/// locales — dos vocabularios, igual que `Motivo` mas arriba.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum MotivoDeArchivoFallido {
+    /// La cola la aparto: fallo tantas veces subiendo que se envenero. **Es el unico que
+    /// hoy se produce** — el veneno pisa cualquier motivo local (ver `de_una_carpeta`).
+    RechazadoPorSavia,
+    /// El agente no pudo abrir el archivo para leerlo (permiso denegado).
+    NoSePudoAbrir,
+    /// Declarado, no construido hoy: no hay hecho local que produzca este motivo. Ver
+    /// `MotivoDeFallo::TipoNoCompatible`.
+    TipoNoCompatible,
+    /// Declarado, no construido hoy. Ver `MotivoDeFallo::Desconocido`.
+    Desconocido,
+}
+
+fn traducir_motivo(m: MotivoDeFallo) -> MotivoDeArchivoFallido {
+    match m {
+        MotivoDeFallo::NoSePudoAbrir => MotivoDeArchivoFallido::NoSePudoAbrir,
+        MotivoDeFallo::TipoNoCompatible => MotivoDeArchivoFallido::TipoNoCompatible,
+        MotivoDeFallo::Desconocido => MotivoDeArchivoFallido::Desconocido,
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub struct Fila {
     pub ruta: String,
+    #[serde(flatten)]
     pub estado: EstadoDeArchivo,
 }
 
@@ -246,10 +281,14 @@ fn de_una_carpeta(
         .into_iter()
         .map(|e| Fila {
             estado: if envenenadas.contains(&e.ruta) {
-                // EL VENENO PISA AL ESTADO DE LA FILA. Un archivo que Savia confirmo
-                // hace un mes y hoy no se puede leer es un problema, y su fila dice
-                // `Indexado`: verdadero sobre el pasado y mudo sobre lo que pasa ahora.
-                EstadoDeArchivo::Fallo
+                // EL VENENO PISA AL ESTADO DE LA FILA, incluso sobre un `e.fallo` local:
+                // un archivo que Savia confirmo hace un mes y hoy no se puede leer es un
+                // problema, y su fila dice `Indexado`: verdadero sobre el pasado y mudo
+                // sobre lo que pasa ahora. Si ademas la cola lo envenero, eso es lo que
+                // se muestra.
+                EstadoDeArchivo::Fallo(MotivoDeArchivoFallido::RechazadoPorSavia)
+            } else if let Some(motivo) = e.fallo {
+                EstadoDeArchivo::Fallo(traducir_motivo(motivo))
             } else {
                 match e.estado {
                     EstadoDeFila::Ausente { .. } => EstadoDeArchivo::Retirado,
@@ -273,7 +312,7 @@ fn de_una_carpeta(
         .count();
     let fallos = filas
         .iter()
-        .filter(|f| f.estado == EstadoDeArchivo::Fallo)
+        .filter(|f| matches!(f.estado, EstadoDeArchivo::Fallo(_)))
         .count();
 
     // `sort_by` y no `sort_unstable_by`: dentro de la misma prioridad el orden que

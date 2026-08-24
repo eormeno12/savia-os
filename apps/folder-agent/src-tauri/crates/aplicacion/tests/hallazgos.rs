@@ -12,6 +12,7 @@
 //! lo que sigue termina en `assert_eq!(bajas, 1)`.
 
 use savia_folder_aplicacion::ciclo;
+use savia_folder_aplicacion::panel::{self, EstadoDeCarpeta};
 use savia_folder_contrato::colas::{
     Decision, Permiso, PermisoId, RangoDeTamano, SweepId, Veredicto,
 };
@@ -38,6 +39,8 @@ use std::time::Duration;
 
 /// El intervalo del BANCO, no del producto. `parametros::ASENTAMIENTO` sigue en `None`.
 const ASENTAMIENTO_DEL_BANCO: Duration = Duration::from_secs(30);
+/// El tope del BANCO, no del producto. `parametros::MAX_FILAS_DEL_PANEL` sigue en `None`.
+const TOPE_DEL_PANEL: usize = 50;
 
 fn raiz() -> RaizId {
     RaizId::nueva("root-1")
@@ -1119,4 +1122,191 @@ fn reelegir_la_misma_carpeta_da_la_misma_id() {
         sensibilidad: SensibilidadAMayusculas::Distingue,
     };
     assert_eq!(a.id, b.id, "la ruta es procedencia, no identidad");
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 10 · LA ARISTA DE D1 (FASE 3): DESVINCULAR NO ARRASTRA COLA, Y REAGREGAR SI CORTA
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn quitar_una_carpeta_con_trabajo_en_vuelo_no_deja_nada_pendiente() {
+    // IMPORTA PORQUE: el plan (D1, Fase 3) pide un test de que desvincular **no** manda
+    // el padron vacio — o sea, que no congele la raiz por el camino corto que alguien va
+    // a querer tomar para "avisarle a Savia que la carpeta se fue". `Colas::olvidar` ya
+    // suelta TODO — segmentos, bytes, muertas, envenenadas y `congeladas.remove(raiz)` —
+    // pero un escenario sin nada pendiente no prueba nada de verdad: hace falta dejar un
+    // trabajo A MEDIO CAMINO — Savia ya contesto que hace falta el padron y todavia no se
+    // le mando — para que `desenrolar` tenga algo real que soltar.
+    let p = Falsa::como_macos();
+    p.poner("x.txt", b"contenido", 100, Some(1));
+    let mut a = almacen();
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+    ciclo::barrer(&raiz(), BarridoId::nuevo("b1"), &p, &mut a, &politica());
+
+    // Se drena a mano: Savia contesta que hace falta el padron...
+    let Proximo::Trabajo(t) = a.siguiente(&raiz()) else {
+        panic!("falta la apertura")
+    };
+    let Trabajo::AbrirBarrido { id, .. } = *t else {
+        panic!("el primero es sweep.open")
+    };
+    a.resolver(
+        &raiz(),
+        &id,
+        Desenlace::Entregado(Recibido::Barrido {
+            sweep: SweepId("s-1".into()),
+            padron_requerido: true,
+        }),
+    );
+
+    // ...y ACA se corta la mano: no hay observados que entregar todavia (recien es el
+    // primer barrido, y `x.txt` es un candidato sin asentar), asi que el proximo trabajo
+    // es DIRECTO el padron — y todavia no salio.
+    let Proximo::Trabajo(t) = a.siguiente(&raiz()) else {
+        panic!("falta el padron")
+    };
+    assert!(
+        matches!(*t, Trabajo::EnviarPadron { .. }),
+        "el escenario tiene que dejar el padron a medio camino para que la prueba proteja algo: {t:?}"
+    );
+
+    // Y ACA la persona pide "dejar de mirar esta carpeta", con el padron todavia colgado.
+    assert!(a.desenrolar(&raiz()).is_some(), "estaba enrolada");
+    assert_eq!(
+        a.colas().hechos_pendientes(&raiz()),
+        0,
+        "nada de esa raiz queda esperando para salir, ni el padron a medio camino"
+    );
+    assert!(
+        !a.colas().congelada(&raiz()),
+        "nadie le mando a Savia un padron vacio que la hubiera congelado"
+    );
+    assert!(
+        a.colas().rutas_envenenadas(&raiz()).is_empty(),
+        "y tampoco quedo ninguna ruta envenenada colgando"
+    );
+
+    // Se vuelve a agregar la MISMA carpeta...
+    a.enrolar(registrada());
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+    ciclo::barrer(&raiz(), BarridoId::nuevo("b3"), &p, &mut a, &politica());
+
+    // ...y el barrido nuevo abre LIMPIO: lo proximo es `sweep.open`, no el padron colgado
+    // del segmento que se solto.
+    assert!(
+        matches!(
+            a.siguiente(&raiz()),
+            Proximo::Trabajo(t) if matches!(*t, Trabajo::AbrirBarrido { .. })
+        ),
+        "el barrido nuevo no puede arrastrar nada del segmento que `olvidar` ya solto"
+    );
+}
+
+#[test]
+fn reagregar_una_carpeta_que_perdio_casi_todo_dispara_el_corte_por_volumen() {
+    // IMPORTA PORQUE: es la "arista honesta" que el plan nombra en D1 — mientras la
+    // carpeta no se mira, Savia no se entera de lo que cambia adentro, y si en el medio
+    // se borraron MUCHOS archivos la primera revision, al volver a agregarla, puede
+    // disparar el corte por volumen y la carpeta queda "En pausa" — la salvaguarda
+    // haciendo exactamente su trabajo. **El agente no decide congelar** — eso es
+    // `FRACCION_DEL_CORTE`, un parametro de SAVIA que sigue en `None` porque no es del
+    // agente — asi que esta prueba no calcula ningun corte: prueba el ROUND-TRIP. Cuando
+    // el SERVIDOR contesta `congelada: true`, el agente lo recibe y lo aplica hasta el
+    // panel, que es el nivel que una persona ve — no solo el de `colas` por dentro.
+    let p = Falsa::como_macos();
+    for n in 1..=5u128 {
+        p.poner(
+            &format!("archivo-{n}.txt"),
+            format!("contenido {n}").as_bytes(),
+            100,
+            Some(n),
+        );
+    }
+    let mut a = almacen();
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+    barrer_y_confirmar(&p, &mut a, 1);
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+    barrer_y_confirmar(&p, &mut a, 2);
+    for n in 1..=5u128 {
+        assert!(
+            matches!(
+                estado_de_hash(&a, &format!("archivo-{n}.txt")),
+                Some(EstadoDeHash::Confirmado(_))
+            ),
+            "los cinco tienen que arrancar CONFIRMADOS para que su baja pueda viajar despues"
+        );
+    }
+
+    // Se deja de mirar la carpeta...
+    assert!(a.desenrolar(&raiz()).is_some(), "estaba enrolada");
+
+    // ...y mientras nadie mira, se borra la mayoria de lo que tenia adentro.
+    p.sacar("archivo-2.txt");
+    p.sacar("archivo-3.txt");
+    p.sacar("archivo-4.txt");
+    p.sacar("archivo-5.txt");
+
+    // Se vuelve a agregar la MISMA carpeta...
+    a.enrolar(registrada());
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+    let resumen = ciclo::barrer(&raiz(), BarridoId::nuevo("b3"), &p, &mut a, &politica());
+    assert_eq!(
+        resumen.bajas, 4,
+        "la primera revision reconcilia: encuentra que cuatro de cinco ya no estan: {resumen:?}"
+    );
+
+    // ...y se cierra ESE barrido con Savia contestando que congelo la raiz.
+    let mut vio_cierre = false;
+    while let Proximo::Trabajo(t) = a.siguiente(&raiz()) {
+        let (id, recibido) = match *t {
+            Trabajo::AbrirBarrido { id, .. } => (
+                id,
+                Recibido::Barrido {
+                    sweep: SweepId("sweep-3".into()),
+                    padron_requerido: false,
+                },
+            ),
+            Trabajo::Observar { id, .. } => (id, Recibido::Decisiones(Vec::new())),
+            Trabajo::Desvanecer { id, .. } => (id, Recibido::Nada),
+            Trabajo::EnviarPadron { id, .. } => (id, Recibido::Nada),
+            Trabajo::CerrarBarrido { id, .. } => {
+                vio_cierre = true;
+                (
+                    id,
+                    Recibido::Retirados {
+                        rutas: Vec::new(),
+                        congelada: true,
+                    },
+                )
+            }
+            Trabajo::Subir { id, .. } => (id, Recibido::Nada),
+            Trabajo::ConfirmarSubida { id, .. } => (
+                id,
+                Recibido::Verificado(HashVerificado::rehidratar_del_inventario([9u8; 32])),
+            ),
+        };
+        a.resolver(&raiz(), &id, Desenlace::Entregado(recibido));
+    }
+    assert!(
+        vio_cierre,
+        "el cierre tiene que salir para que Savia tenga donde contestar `congelada`"
+    );
+
+    // La garantia de punta a punta: la cola lo sabe...
+    assert!(
+        a.colas().congelada(&raiz()),
+        "el agente tiene que guardar lo que Savia contesto"
+    );
+    // ...y el panel — lo que una persona ve — tambien, que es la garantia real de D1.
+    let v = panel::vista(&a, &p, TOPE_DEL_PANEL);
+    assert_eq!(
+        v.estado,
+        EstadoDeCarpeta::Congelado,
+        "el agregado tiene que decir Congelado"
+    );
+    assert_eq!(
+        v.carpetas[0].estado,
+        EstadoDeCarpeta::Congelado,
+        "y la carpeta puntual tambien, no solo el agregado del dispositivo"
+    );
 }

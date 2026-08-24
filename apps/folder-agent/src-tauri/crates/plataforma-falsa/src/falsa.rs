@@ -40,6 +40,7 @@ struct Contadores {
 pub struct Falsa {
     arbol: Mutex<BTreeMap<RutaRelativa, ArchivoFalso>>,
     ilegibles: Mutex<BTreeMap<RutaRelativa, MotivoIndeterminado>>,
+    no_legibles: Mutex<BTreeMap<RutaRelativa, FalloDeLectura>>,
     reloj: Mutex<u64>,
     evidencia: Mutex<Option<EvidenciaDeRaiz>>,
     granularidad: Mutex<Duration>,
@@ -56,6 +57,7 @@ impl Falsa {
         Self {
             arbol: Mutex::new(BTreeMap::new()),
             ilegibles: Mutex::new(BTreeMap::new()),
+            no_legibles: Mutex::new(BTreeMap::new()),
             reloj: Mutex::new(0),
             evidencia: Mutex::new(None),
             // Cero por omision: sin granularidad declarada, dos `mtime` distintos son
@@ -141,6 +143,22 @@ impl Falsa {
     pub fn poner_ilegible(&self, ruta: &str, motivo: MotivoIndeterminado) {
         let r = RutaRelativa::canonica(ruta).expect("ruta del banco");
         self.ilegibles.lock().unwrap().insert(r, motivo);
+    }
+
+    /// Una ruta que existe, se enumera, y falla al leerla (`hashear`/`leer_para_subir`).
+    /// Es el gemelo de `poner_ilegible` un piso mas abajo: `poner_ilegible` afecta la
+    /// FICHA (`ficha()`, lo que ve el barrido); esto afecta la LECTURA — el unico camino
+    /// hoy para ejercer `MotivoDeFallo::NoSePudoAbrir` sin un permiso real de SO.
+    pub fn poner_no_legible(&self, ruta: &str, motivo: FalloDeLectura) {
+        let r = RutaRelativa::canonica(ruta).expect("ruta del banco");
+        self.no_legibles.lock().unwrap().insert(r, motivo);
+    }
+
+    /// El auto-cura del banco: la proxima `hashear()` sobre esta ruta vuelve a leer el
+    /// arbol de verdad.
+    pub fn quitar_no_legible(&self, ruta: &str) {
+        let r = RutaRelativa::canonica(ruta).expect("ruta del banco");
+        self.no_legibles.lock().unwrap().remove(&r);
     }
 
     /// Mueve el reloj a mano, **incluyendo saltos que imitan una suspension**. Es lo que
@@ -277,6 +295,9 @@ impl Plataforma for Falsa {
         // despues, un arbol que se colara hasta aca sobre un deshidratado quedaria sin
         // contar y el invariante «cero lecturas» pasaria verde estando roto.
         self.contadores.lock().unwrap().lecturas += 1;
+        if let Some(motivo) = self.no_legibles.lock().unwrap().get(ruta) {
+            return Err(*motivo);
+        }
         let arbol = self.arbol.lock().unwrap();
         let a = arbol.get(ruta).ok_or(FalloDeLectura::YaNoEsta)?;
         if a.hidratacion != Hidratacion::Materializado

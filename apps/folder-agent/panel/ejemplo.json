@@ -149,6 +149,7 @@
             "filas": [
               {
                 "estado": "fallo",
+                "motivo": "rechazadoPorSavia",
                 "ruta": "contrato-marco.docx"
               },
               {

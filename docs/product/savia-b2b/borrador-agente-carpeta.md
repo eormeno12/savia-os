@@ -712,7 +712,7 @@ nada los llama todavía. Los pasos del onboarding están especificados aparte, e
 barrido con progreso, y la ventana de preferencias. Sin instalador no hay forma de ponerlo
 en otra máquina — lo que hay es un `.app` copiado a mano.
 
-### Y tres huecos que no son de interfaz
+### Y cuatro huecos que no son de interfaz
 
 - **No hay observador de eventos del sistema de archivos.** El tipo `OrigenDeSenal`
   distingue evento de barrido y el árbol de decisión ya trata el caso —una ruta que falta
@@ -728,7 +728,19 @@ en otra máquina — lo que hay es un `.app` copiado a mano.
   `en espera` del boceto —«formato que todavía no leemos»— no es derivable. La única
   forma de mostrarlo sería que el agente adivine por extensión qué formatos lee Savia:
   duplicar del lado del escritorio una decisión que es del servidor y que cambia sin que
-  el agente se entere. Es un hueco del alambre, no del panel.
+  el agente se entere. Es un hueco del alambre, no del panel. Por la misma razón, el
+  motivo detrás de un `Fallo` por archivo tampoco viaja completo: `MotivoDeFallo` arranca
+  con las dos variantes que el agente sí puede decidir local —`NoSePudoAbrir`,
+  `TipoNoCompatible`— y una `Desconocido` que es, hoy, la única que un rechazo de Savia
+  puede producir, y que el diseño pinta sin subtítulo.
+
+- **Dejar de mirar una carpeta no oculta lo que Savia ya guardó de ella.** El boceto lo
+  planteaba como una acción doble —dejar de mirar *y* ocultar los documentos, reversible
+  después—, pero se manda solo la primera mitad: Savia deja de mirar la carpeta, y los
+  documentos que ya guardó siguen en la memoria de la organización. El octavo llamado que
+  la segunda mitad le hubiera pedido a `apps/api` no se escribe: el retiro es reversible
+  por diseño (`Ingestion.retiredAt`), así que si algún día hace falta de verdad, se agrega
+  sin tocar la pantalla ni esta decisión.
 
 Eso no cambia ninguna decisión de este documento. Es trabajo.
 

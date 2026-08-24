@@ -28,9 +28,10 @@ use savia_folder_maquina::maquina::{self, Nodo, OrigenDeSenal, Senal};
 use savia_folder_politica::salvaguardas::{IndiceDeContenido, Politica, PorQueNoSeReporta};
 use savia_folder_protocolo::{CanalDeSavia, FalloDeProtocolo};
 
-/// **EL RESUMEN CUENTA LOS DIEZ NODOS, NO SEIS.** El doc de `Nodo` dice que la rama va
+/// **EL RESUMEN CUENTA LOS ONCE NODOS, NO SEIS.** El doc de `Nodo` dice que la rama va
 /// en la salida «porque es lo que el panel muestra por raiz»; mientras cuatro variantes
-/// caian en un `_ => {}`, el panel no las podia mostrar.
+/// caian en un `_ => {}`, el panel no las podia mostrar. `Nodo::Fallo` (D3, fase 3) es
+/// la undecima: no cambia el argumento, solo la cuenta.
 ///
 /// Y las dos que faltaban son justo las que hay que ver: `RaizAusente` es la salvaguarda
 /// disparandose —«se desmonto el disco y no reporte ni una baja»— y `BajaNoReportable`
@@ -77,6 +78,9 @@ pub struct ResumenDelBarrido {
     /// `Nodo::Omitido` mucho antes de poder ser una ausencia candidata, asi que el motivo
     /// nunca llega al cierre.
     pub retenidas_por_deshidratacion: u64,
+    /// `Nodo::Fallo` — lecturas locales terminales (hoy, solo un permiso denegado). Ver
+    /// `MotivoDeFallo` en `contrato::inventario`.
+    pub fallos_locales: u64,
     pub cierre: Option<EstadoDelBarrido>,
 }
 
@@ -155,6 +159,7 @@ pub fn barrer(
             Nodo::RaizAusente => resumen.raiz_no_viva += 1,
             Nodo::BajaNoReportable => resumen.sin_documento_que_retirar += 1,
             Nodo::AgendaBarrido => resumen.agendados += 1,
+            Nodo::Fallo(_) => resumen.fallos_locales += 1,
             // SIN RAMA COMODIN A PROPOSITO: con `_ => {}` una variante nueva de `Nodo`
             // entra al arbol y desaparece del resumen sin que nada avise. Asi el
             // compilador obliga a decidir que se hace con ella.

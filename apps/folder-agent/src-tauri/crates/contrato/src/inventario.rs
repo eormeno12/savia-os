@@ -102,6 +102,39 @@ impl EstadoDeHash {
     }
 }
 
+/// Por que la ULTIMA lectura local de una ruta fallo — la mitad de D3 que es del AGENTE,
+/// no de Savia. `presence.decision` contesta `known` o `upload`, nunca "por que no": los
+/// motivos que dependen de esa respuesta esperan al mismo trabajo de servidor que "dejar
+/// de mirar" (D1). Estos tres no: el agente sabe la extension y sabe si `hashear` fallo,
+/// asi que se deciden sin el servidor.
+///
+/// Es una anotacion LOCAL sobre el `Asiento`, ortogonal a `fila` — igual que `en_duda`,
+/// y por la misma razon: no cambia lo que Savia sabe, y un evento posterior (una lectura
+/// que SI funciona) la limpia sola. Ver `maquina::decidir` para el unico lugar que hoy
+/// construye `NoSePudoAbrir`, y `aplicacion::panel::MotivoDeArchivoFallido` para el
+/// vocabulario que la vista le muestra a una persona (que agrega un cuarto caso, el
+/// rechazo del servidor, que este enum no puede nombrar porque `contrato` no ve `colas`).
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
+#[serde(rename_all = "camelCase")]
+pub enum MotivoDeFallo {
+    /// `hashear` fallo con `FalloDeLectura::PermisoDenegado` — la unica variante de
+    /// lectura local que se vuelve terminal HOY. Es una barrera categorica (POSIX/ACL/
+    /// TCC): esperar mas no la mueve, a diferencia de un `ErrorDeEntradaSalida` (puede
+    /// ser un hipo de red) o un `YaNoEsta` (la carrera stat/open, que el propio recorrido
+    /// resuelve solo en la vuelta siguiente). Ver el `match` en `maquina::decidir`.
+    NoSePudoAbrir,
+    /// La extension no esta en lo que Savia procesa. **HOY INALCANZABLE, y a proposito**:
+    /// contra que lista comparar es una decision de SAVIA, no del agente, y nadie la
+    /// midio — inventar una seria precision falsa. Mismo patron que
+    /// `PorQueNoSeReporta::Deshidratado` (`politica::salvaguardas`): declarado,
+    /// documentado, nada lo construye.
+    TipoNoCompatible,
+    /// Ninguno de los anteriores. Es el que el diseno visual pinta sin subtitulo, y hoy
+    /// tambien inalcanzable: no hay otra fuente local de fallo, y los motivos que solo
+    /// Savia conoce esperan al mismo trabajo de servidor que D1.
+    Desconocido,
+}
+
 /// LOS DOS ESTADOS SON EXCLUYENTES Y POR ESO ES UN ENUM.
 #[derive(serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
 pub enum EstadoDeFila {
@@ -140,6 +173,9 @@ pub struct Asiento {
     /// tiene mecanismo: la tripleta no cambio, asi que la rama NOOP corta el paso y esa
     /// ruta queda muda para siempre.
     pub en_duda: bool,
+    /// Ver `MotivoDeFallo`. Se limpia solo en `ConfirmarPresencia`: la proxima lectura
+    /// que SI funciona es la unica cura, sin intervencion manual.
+    pub fallo: Option<MotivoDeFallo>,
 }
 
 /// Una fila completa. La maquina no la ve —ve un `Asiento`—: `alta_en` y `vista_en` son
@@ -166,6 +202,14 @@ pub struct Entrada {
     pub vista_en: BarridoId,
     /// Ver `Asiento::en_duda`.
     pub en_duda: bool,
+    /// Ver `MotivoDeFallo`. `#[serde(default)]` a proposito: un deposito ya persistido de
+    /// antes de esta version no tiene esta clave, y su ausencia significa exactamente
+    /// `None` — nadie fallo una lectura local que este campo no existia para registrar.
+    /// `skip_serializing_if` para que un deposito donde nadie fallo nunca (el caso de HOY,
+    /// entero) serialice byte-identico al formato anterior: la garantia de
+    /// `el_formato_en_disco_esta_fijado` no se toca.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fallo: Option<MotivoDeFallo>,
 }
 
 /// **«ESTA RUTA ESTRENA CONTENIDO»**, y es la definicion operativa de *reaparecer* que la
@@ -300,5 +344,12 @@ pub enum EfectoDeInventario {
     /// normal»— no tiene quien la cumpla.
     MarcarHashEnDuda {
         ruta: RutaRelativa,
+    },
+    /// Un error de LECTURA LOCAL, no de Savia. **No toca `estado` ni `candidato`**: no
+    /// hay hecho que cambiar, y el candidato sigue corriendo el mismo reloj, asi que el
+    /// proximo barrido reintenta `hashear` sin esperar un intervalo nuevo.
+    MarcarFallo {
+        ruta: RutaRelativa,
+        motivo: MotivoDeFallo,
     },
 }
