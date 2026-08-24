@@ -2894,23 +2894,128 @@ dependencies = [
 ]
 
 [[package]]
-name = "savia-folder-nucleo"
+name = "savia-folder-aplicacion"
+version = "0.0.0"
+dependencies = [
+ "savia-folder-contrato",
+ "savia-folder-estado",
+ "savia-folder-maquina",
+ "savia-folder-plataforma-falsa",
+ "savia-folder-politica",
+ "savia-folder-protocolo",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "savia-folder-contrato"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "sha2",
+]
+
+[[package]]
+name = "savia-folder-estado"
+version = "0.0.0"
+dependencies = [
+ "savia-folder-contrato",
+ "savia-folder-maquina",
+ "savia-folder-politica",
+ "serde",
+]
+
+[[package]]
+name = "savia-folder-guardianes"
+version = "0.0.0"
+
+[[package]]
+name = "savia-folder-host"
 version = "0.0.0"
 dependencies = [
  "block2",
- "libc",
  "objc2",
  "objc2-app-kit",
  "objc2-foundation",
- "redb",
- "serde",
+ "savia-folder-aplicacion",
+ "savia-folder-contrato",
+ "savia-folder-estado",
+ "savia-folder-persistencia",
+ "savia-folder-plataforma-adaptadores",
+ "savia-folder-politica",
+ "savia-folder-protocolo",
  "serde_json",
- "sha2",
  "tauri",
  "tauri-build",
  "tauri-plugin-autostart",
  "tauri-plugin-dialog",
  "tauri-plugin-updater",
+]
+
+[[package]]
+name = "savia-folder-maquina"
+version = "0.0.0"
+dependencies = [
+ "savia-folder-contrato",
+ "savia-folder-politica",
+]
+
+[[package]]
+name = "savia-folder-persistencia"
+version = "0.0.0"
+dependencies = [
+ "redb",
+ "savia-folder-aplicacion",
+ "savia-folder-contrato",
+ "savia-folder-estado",
+ "savia-folder-plataforma-falsa",
+ "savia-folder-politica",
+ "serde_json",
+]
+
+[[package]]
+name = "savia-folder-plataforma-adaptadores"
+version = "0.0.0"
+dependencies = [
+ "libc",
+ "savia-folder-contrato",
+]
+
+[[package]]
+name = "savia-folder-plataforma-falsa"
+version = "0.0.0"
+dependencies = [
+ "savia-folder-contrato",
+]
+
+[[package]]
+name = "savia-folder-politica"
+version = "0.0.0"
+dependencies = [
+ "savia-folder-contrato",
+ "serde",
+]
+
+[[package]]
+name = "savia-folder-protocolo"
+version = "0.0.0"
+dependencies = [
+ "savia-folder-contrato",
+ "savia-folder-politica",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "savia-folder-pruebas-integracion"
+version = "0.0.0"
+dependencies = [
+ "savia-folder-aplicacion",
+ "savia-folder-contrato",
+ "savia-folder-estado",
+ "savia-folder-plataforma-adaptadores",
+ "savia-folder-politica",
+ "savia-folder-protocolo",
 ]
 
 [[package]]

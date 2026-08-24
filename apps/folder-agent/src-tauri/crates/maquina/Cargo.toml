@@ -1,0 +1,19 @@
+# La maquina de decision: `decidir`, `cerrar_barrido`, `Paso`/`Cierre`/`Nodo`. Se queda
+# entera — no se reparte entre contrato y estado — porque `estado -> maquina` es la
+# direccion correcta de Clean Architecture (el adaptador depende del interactor, no al
+# reves). Ver docs/product/savia-b2b/plan-rediseno-agente.md §2 "Como se llego a este
+# corte, y por que eso importa".
+[package]
+name = "savia-folder-maquina"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97"
+publish = false
+
+[lib]
+name = "savia_folder_maquina"
+path = "src/lib.rs"
+
+[dependencies]
+savia-folder-contrato = { path = "../contrato" }
+savia-folder-politica = { path = "../politica" }

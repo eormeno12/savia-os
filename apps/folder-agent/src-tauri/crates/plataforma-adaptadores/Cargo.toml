@@ -1,0 +1,19 @@
+# Los dos adaptadores REALES de `Plataforma`: `Macos` y `Windows`. `libc` es solo para
+# macOS —los syscalls SF_DATALESS/mach_continuous_time/setiopolicy_np— y por eso va bajo
+# `[target.'cfg(target_os = "macos")'.dependencies]` y no en `[dependencies]`.
+[package]
+name = "savia-folder-plataforma-adaptadores"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97"
+publish = false
+
+[lib]
+name = "savia_folder_plataforma_adaptadores"
+path = "src/lib.rs"
+
+[dependencies]
+savia-folder-contrato = { path = "../contrato" }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+libc = "0.2"

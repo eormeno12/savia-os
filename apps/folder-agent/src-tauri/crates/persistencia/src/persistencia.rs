@@ -1,0 +1,205 @@
+//! LA PERSISTENCIA. `redb`, una sola transaccion por punto de control, y **el I/O vive
+//! aca** — `inventario.rs` esta en la lista de modulos PUROS y el guardian lo verifica.
+//!
+//! # Por que no es SQLite, teniendo el diseno escrito que lo pedia
+//!
+//! `rusqlite` con `bundled` compila `sqlite3.c` con `cc`, y eso rompe
+//! `cargo check --target x86_64-pc-windows-msvc` desde un Mac: no hay headers de MSVC
+//! (`fatal error: 'stdlib.h' file not found`). Ese cross-check es lo unico que sostiene
+//! que `plataforma/windows.rs` compila —los cuerpos estan en `unimplemented!()`, asi que
+//! sin el no queda nada verificando ni las firmas—, y cambiarlo por SQLite era pagarlo
+//! con eso. `redb` es Rust puro, cruza limpio a los dos targets, y su unica dependencia
+//! transitiva es `libc`, que el crate ya tenia.
+//!
+//! # Punto de control, no delta
+//!
+//! Se escribe el estado ENTERO, y no un delta por efecto. Es una decision de correccion
+//! antes que de rendimiento: **un corte de luz rebobina las dos mitades al mismo punto**,
+//! que es exactamente el invariante que `almacen.rs` existe para sostener. El barrido
+//! siguiente vuelve a derivar los hechos perdidos, porque las filas que los habrian
+//! silenciado se rebobinaron con ellos.
+//!
+//! **Y EL COSTO HAY QUE DECIRLO**: escribir todo cuesta O(corpus) por punto de control,
+//! asi que los puntos de control van donde un barrido TERMINA algo —al cerrar y al
+//! drenar—, nunca por archivo. Un corpus de 50.000 archivos son unos pocos MB por
+//! escritura y un puñado de escrituras por barrido; el dia que eso moleste, el camino es
+//! una fila por archivo en su propia tabla, y `EfectoDeInventario` ya nombra exactamente
+//! que filas toco cada paso. No se hace ahora porque duplicaria en este modulo la
+//! semantica que hoy vive solo en `InventarioEnMemoria`.
+//!
+//! # El formato es un contrato
+//!
+//! Los tipos del dominio derivan `serde` y se guardan como JSON. Que el formato salga de
+//! los tipos y no de un espejo escrito a mano es barato, pero deja una trampa: renombrar
+//! un campo cambia el formato en disco SIN QUE NADA AVISE, y un agente actualizado no lee
+//! lo que escribio el anterior. Lo que cierra esa trampa es el golden de
+//! `tests/persistencia.rs`, que fija los bytes de un estado representativo — igual que
+//! `alambre.rs` fija el cable.
+#![forbid(unsafe_code)]
+
+use redb::{Database, TableDefinition};
+use savia_folder_contrato::protocolo::Secreto;
+use savia_folder_estado::almacen::{Almacen, EstadoLeido};
+use std::path::Path;
+
+/// **LA VERSION DEL FORMATO, Y SE COMPARA CON `!=` Y NO CON `<`.** Un agente viejo que
+/// abra un deposito nuevo tiene que negarse igual que uno nuevo con un deposito viejo:
+/// leer con la version equivocada no es un error que se pueda absorber, es una fila que
+/// se interpreta mal en silencio.
+pub const FORMATO: u32 = 2;
+
+// ── Historia del formato ────────────────────────────────────────────────────
+//
+//   1 → 2   `Colas` gana `congeladas`: las raices cuyo ultimo `sweep.close` vino con
+//           `frozen`. **No lleva migracion, y la razon es que el 1 no existe en ningun
+//           disco fuera de este repo** — el agente no se instalo en ninguna maquina
+//           todavia (no hay instalador ni firma). Un deposito 1 solo puede ser el de una
+//           corrida de desarrollo, y para ese caso `FormatoAjeno` es la respuesta
+//           correcta: se borra y se vuelve a barrer.
+//
+//           **Esta excusa se agota el dia que el agente se instale en la primera
+//           maquina.** A partir de ahi, subir este numero sin escribir la conversion
+//           significa que alguien pierde sus lapidas.
+
+const TABLA: TableDefinition<&str, &[u8]> = TableDefinition::new("almacen");
+const K_FORMATO: &str = "formato";
+const K_ESTADO: &str = "estado";
+const K_CREDENCIAL: &str = "credencial";
+
+#[derive(Debug)]
+pub enum FalloDePersistencia {
+    /// El archivo no se pudo abrir, leer o escribir.
+    Disco(String),
+    /// Hay deposito, pero de otra version del formato.
+    FormatoAjeno { encontrado: u32, esperado: u32 },
+    /// El deposito existe y lo que hay adentro no tiene la forma esperada. **No se
+    /// absorbe como «arranco de cero»**: un deposito ilegible puede ser un bug de
+    /// formato, y tratarlo como vacio significa reportar todo el corpus como nuevo y
+    /// olvidar las lapidas de todo lo que se borro.
+    Corrupto(String),
+}
+
+impl std::fmt::Display for FalloDePersistencia {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Disco(d) => write!(f, "no se pudo usar el deposito: {d}"),
+            Self::FormatoAjeno {
+                encontrado,
+                esperado,
+            } => write!(
+                f,
+                "el deposito es de formato {encontrado} y este agente habla {esperado}"
+            ),
+            Self::Corrupto(d) => write!(f, "el deposito no se pudo interpretar: {d}"),
+        }
+    }
+}
+
+/// Lo que hay que reconstruir al arrancar: el estado, y la credencial si ya se enrolo.
+pub struct Rescatado {
+    pub almacen: Almacen,
+    pub credencial: Option<Secreto>,
+}
+
+pub struct Deposito {
+    db: Database,
+}
+
+impl Deposito {
+    /// **NUNCA ADENTRO DE UNA RAIZ VIGILADA**, y quien elige la ruta es el llamador. Este
+    /// modulo no la puede verificar —no conoce las raices— asi que lo impone `main`, que
+    /// la arma en el directorio de datos de la app. Un deposito adentro de una carpeta
+    /// vigilada se observa a si mismo: cada escritura produce un evento, que produce un
+    /// barrido, que produce una escritura.
+    pub fn abrir(ruta: &Path) -> Result<Self, FalloDePersistencia> {
+        let db = Database::create(ruta).map_err(|e| FalloDePersistencia::Disco(e.to_string()))?;
+        Ok(Self { db })
+    }
+
+    /// **UNA SOLA TRANSACCION PARA LAS TRES CLAVES.** El estado, la cola y la credencial
+    /// entran o no entran juntos: es la misma regla de `almacen.rs`, sostenida en disco.
+    pub fn guardar(
+        &self,
+        almacen: &Almacen,
+        credencial: Option<&Secreto>,
+    ) -> Result<(), FalloDePersistencia> {
+        let estado = serde_json::to_vec(&almacen.para_guardar())
+            .map_err(|e| FalloDePersistencia::Corrupto(e.to_string()))?;
+        let t = self
+            .db
+            .begin_write()
+            .map_err(|e| FalloDePersistencia::Disco(e.to_string()))?;
+        {
+            let mut tabla = t
+                .open_table(TABLA)
+                .map_err(|e| FalloDePersistencia::Disco(e.to_string()))?;
+            let disco = |e: redb::StorageError| FalloDePersistencia::Disco(e.to_string());
+            tabla
+                .insert(K_FORMATO, &FORMATO.to_be_bytes()[..])
+                .map_err(disco)?;
+            tabla.insert(K_ESTADO, &estado[..]).map_err(disco)?;
+            match credencial {
+                Some(s) => tabla.insert(K_CREDENCIAL, s.0.as_bytes()).map_err(disco)?,
+                // SE BORRA, no se deja lo viejo. Guardar sin credencial despues de una
+                // revocacion tiene que dejar el deposito sin credencial: si el token
+                // revocado sobreviviera, el proximo arranque volveria a chocar contra un
+                // 401 en vez de pedir enrolamiento.
+                None => tabla.remove(K_CREDENCIAL).map_err(disco)?,
+            };
+        }
+        t.commit()
+            .map_err(|e| FalloDePersistencia::Disco(e.to_string()))
+    }
+
+    /// `Ok(None)` es «deposito vacio», que es lo normal en la primera corrida. Un
+    /// deposito con contenido que no se entiende es `Err`, nunca `None`.
+    pub fn cargar(&self) -> Result<Option<Rescatado>, FalloDePersistencia> {
+        let t = self
+            .db
+            .begin_read()
+            .map_err(|e| FalloDePersistencia::Disco(e.to_string()))?;
+        let tabla = match t.open_table(TABLA) {
+            Ok(t) => t,
+            // Tabla inexistente = deposito recien creado.
+            Err(redb::TableError::TableDoesNotExist(_)) => return Ok(None),
+            Err(e) => return Err(FalloDePersistencia::Disco(e.to_string())),
+        };
+        let disco = |e: redb::StorageError| FalloDePersistencia::Disco(e.to_string());
+
+        let Some(v) = tabla.get(K_FORMATO).map_err(disco)? else {
+            return Ok(None);
+        };
+        let bytes: [u8; 4] = v
+            .value()
+            .try_into()
+            .map_err(|_| FalloDePersistencia::Corrupto("version de formato ilegible".into()))?;
+        let encontrado = u32::from_be_bytes(bytes);
+        if encontrado != FORMATO {
+            return Err(FalloDePersistencia::FormatoAjeno {
+                encontrado,
+                esperado: FORMATO,
+            });
+        }
+
+        let Some(v) = tabla.get(K_ESTADO).map_err(disco)? else {
+            return Err(FalloDePersistencia::Corrupto(
+                "hay version de formato y no hay estado".into(),
+            ));
+        };
+        let estado: EstadoLeido = serde_json::from_slice(v.value())
+            .map_err(|e| FalloDePersistencia::Corrupto(e.to_string()))?;
+
+        let credencial = match tabla.get(K_CREDENCIAL).map_err(disco)? {
+            Some(v) => Some(Secreto(
+                String::from_utf8(v.value().to_vec())
+                    .map_err(|e| FalloDePersistencia::Corrupto(e.to_string()))?,
+            )),
+            None => None,
+        };
+
+        Ok(Some(Rescatado {
+            almacen: Almacen::desde(estado),
+            credencial,
+        }))
+    }
+}

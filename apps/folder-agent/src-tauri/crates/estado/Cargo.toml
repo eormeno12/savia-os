@@ -1,0 +1,19 @@
+# La implementacion con estado: InventarioEnMemoria, Colas, Almacen. El unico crate
+# ademas de `aplicacion` que alcanza `maquina` — es la mitad estado del par
+# estado/consulta que `ciclo.rs` compone.
+[package]
+name = "savia-folder-estado"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97"
+publish = false
+
+[lib]
+name = "savia_folder_estado"
+path = "src/lib.rs"
+
+[dependencies]
+savia-folder-contrato = { path = "../contrato" }
+savia-folder-maquina = { path = "../maquina" }
+savia-folder-politica = { path = "../politica" }
+serde = { version = "1", features = ["derive"] }

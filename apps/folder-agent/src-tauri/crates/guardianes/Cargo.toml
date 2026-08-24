@@ -1,0 +1,12 @@
+# Los guardianes de texto que abarcan el workspace entero — lo que ninguna reasignacion
+# por crate puede resolver (un conteo global, un barrido de dieciocho archivos en nueve
+# crates, un chequeo de cobertura de recorrido). Sin [lib]: solo corre `cargo test`.
+# Camina las crates hermanas por ruta relativa desde su propio CARGO_MANIFEST_DIR — la
+# misma tecnica que `fuentes_fuera_del_binario_de_ventana` ya usaba, con un nivel mas de
+# indireccion. Ver docs/product/savia-b2b/plan-rediseno-agente.md §2.
+[package]
+name = "savia-folder-guardianes"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97"
+publish = false

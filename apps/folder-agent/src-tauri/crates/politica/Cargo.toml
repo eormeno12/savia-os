@@ -1,0 +1,16 @@
+# Las salvaguardas (menos Candidato/misma_observacion, que quedaron en contrato como
+# vocabulario puro). Ver docs/product/savia-b2b/plan-rediseno-agente.md §2 "El corte".
+[package]
+name = "savia-folder-politica"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97"
+publish = false
+
+[lib]
+name = "savia_folder_politica"
+path = "src/lib.rs"
+
+[dependencies]
+savia-folder-contrato = { path = "../contrato" }
+serde = { version = "1", features = ["derive"] }

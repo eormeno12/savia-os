@@ -230,7 +230,7 @@ fuera de `textos.js`**. El núcleo Rust no cambia — ya emite enums, y lo debe 
 
 ---
 
-## 2 · La arquitectura: de un crate a seis
+## 2 · La arquitectura: de un crate a doce
 
 ### Por qué ahora
 
@@ -239,7 +239,7 @@ El `Cargo.toml` ya lo tenía escrito: *«Cuando el núcleo se parta —`contrato
 dependencias y estos guardianes se pueden borrar.»*
 
 No es una idea mía: es el plan del propio proyecto, esperando el momento. El momento es un
-refactor grande con 104 tests verdes de red.
+refactor grande con 98 tests verdes de red.
 
 Y hay dos violaciones concretas del principio de inversión de dependencias que el corte
 arregla **de oficio**:
@@ -250,41 +250,134 @@ arregla **de oficio**:
    el módulo que contiene las implementaciones. El grafo no impide que mañana alguien escriba
    `plataforma::Macos` adentro del ciclo.
 2. **El protocolo no tiene puerto.** `ciclo::drenar(…, cliente: &Cliente, …)` recibe el
-   cliente HTTP **concreto**. El caso de uso depende del transporte.
+   cliente HTTP **concreto**. El caso de uso depende del transporte — y **se queda así**: ver
+   más abajo por qué invertirlo no es fase 1.
+
+### Cómo se llegó a este corte, y por qué eso importa
+
+La primera versión de este corte —seis crates, diseñada agrupando por *nombre* de módulo—
+tenía un ciclo real: `Paso` y `Cierre` (que esa versión mandaba a `contrato`) llevan campos
+tipados con `Hecho`, `Desaparicion` y `PorQueNoSeReporta`, los tres definidos en
+`salvaguardas.rs`, que la misma versión asignaba a una crate que depende de `contrato`. Cargo
+lo hubiera rechazado en el primer `cargo check`. La encontró un agente al que se le pidió
+específicamente **refutar** el diseño, no aprobarlo — junto con seis problemas más que
+hubieran impedido compilar (`redb`/`serde_json`/`serde` faltantes en cuatro crates, el host
+sin dos de sus dependencias directas, un test de `persistencia` que en secreto necesitaba
+`ciclo::barrer`). Ninguno de los siete lo encontró la primera pasada de diseño.
+
+El arreglo no fue parchear caso por caso: fue notar que la arista que motivaba el ciclo
+(`almacen → maquina`) **nunca estuvo invertida**. `maquina` es un servicio de dominio sin
+estado (cero campos, cero `&mut self`, medido); `almacen` es el adaptador que lo persiste.
+Adaptador-depende-de-caso-de-uso es la dirección correcta en arquitectura limpia. Dejando
+`Paso`/`Cierre`/`Nodo` donde ya están —en `maquina`, que ya depende de `politica`— el ciclo
+desaparece sin tocar una sola firma, y la única arista nueva es `estado → maquina`, que no
+cierra nada porque `maquina` no depende de `estado` ni transitiva ni directamente (verificado
+leyendo el archivo completo).
+
+Ese arreglo pasó otra vez por las mismas cuatro lentes de refutación. Sobrevivió la
+estructura; lo que quedó fueron omisiones de manifiesto (`serde` faltante en `aplicacion`,
+tres plugins de Tauri faltantes en el host) y un problema de diseño más chico, resuelto abajo:
+varios guardianes de `tests/guardianes.rs` verifican una propiedad que abarca **más de una
+crate a la vez**, y ninguna reasignación por crate alcanza para esos.
 
 ### El corte
 
 ```
-apps/folder-agent/crates/
-├── contrato/       dominio · parámetros · hash · LOS PUERTOS        583 líneas   0 deps
-├── inventario/     inventario · colas · almacén · persistencia     2321         → contrato
-├── plataforma/     macos · windows                                  990         → contrato
-├── protocolo/      cliente · alambre · transporte                  1193         → contrato
-├── ciclo/          ciclo · máquina · salvaguardas                  1600         → contrato, inventario
-├── vista/          panel                                            310         → contrato, inventario
-└── plataforma-falsa/  el doble de prueba                            311         → contrato   [dev-only]
+apps/folder-agent/src-tauri/
+├── Cargo.toml              [package] savia-folder-host + [workspace] members=["crates/*"]
+├── crates/
+│   ├── contrato/            dominio · hash · parámetros · el vocabulario de plataforma,
+│   │                        protocolo, colas e inventario · LOS DOS PUERTOS      1233 líneas   0 deps propios (serde, sha2)
+│   ├── politica/             salvaguardas (menos Candidato/misma_observacion)     495           → contrato
+│   ├── maquina/               maquina.rs completo — Paso/Cierre/Nodo NO bajan     556           → contrato, politica
+│   ├── estado/                inventario(impl) · colas(impl) · almacén           1682           → contrato, politica, maquina
+│   ├── protocolo/              cliente · alambre · transporte                    1100           → contrato, politica
+│   ├── plataforma-adaptadores/  macos · windows (SO real)                         540           → contrato
+│   ├── plataforma-falsa/         el doble de prueba                               311           → contrato   [dev-only]
+│   ├── persistencia/              redb + serde_json                               205           → contrato, estado
+│   ├── aplicacion/                 ciclo · panel — el único que compone           817           → contrato, politica, estado, maquina, protocolo
+│   ├── guardianes/                  guardianes de texto que abarcan el workspace    —           → (solo tests, ve las 11 crates hermanas)
+│   └── pruebas-integracion/          contra_el_simulador · el resto de persistencia 800          → todo lo de arriba menos guardianes
+└── src/ · build.rs · tauri.conf.json · capabilities/ · icons/   (sin mover — el binario)
 ```
 
-**Los puertos van en `contrato`, el más adentro.** `Plataforma` se muda ahí y nace `Servidor`,
-el trait que `Cliente` implementa. Con eso el grafo dice, y ya no hace falta un guardián de
-texto que lo diga:
+`savia-folder-host` (el paquete que hoy es `src-tauri/`, con `bin/bandeja` y la CLI) depende
+de **siete** de las once: `contrato`, `aplicacion`, `persistencia`, `protocolo`,
+`plataforma-adaptadores`, `estado` y `politica` — los dos últimos porque los binarios
+instancian `Almacen` y `Politica` directo, no solo a través de `aplicacion`.
 
-- **`ciclo` no alcanza `plataforma` ni `protocolo`.** Es la misma regla que en el pipeline de
-  TypeScript hace que `adapters` y `emission` nunca se vean: el caso de uso conoce puertos, no
-  implementaciones. Y el que compone es el binario, como allá compone `orchestration`.
-- **`plataforma` y `protocolo` no se ven entre sí**, ni ven `inventario`.
-- **El código de producción no puede usar `Falsa`**, porque está en una crate que solo es
-  `[dev-dependencies]`. Hoy eso lo sostiene la disciplina; después lo sostiene Cargo.
-- **`contrato` sigue en cero dependencias de runtime**, verificable de un vistazo.
+**Los puertos van en `contrato`, el más adentro.** `Plataforma` e `Inventario` se mudan ahí.
+Con eso el grafo dice, y ya no hace falta un guardián de texto que lo diga:
 
-`src/main.rs` (254 líneas, la CLI de demostración) ya está detrás de `required-features =
-["demo"]` y ahí se queda, como `bin` del workspace.
+- **`maquina` y `aplicación` no alcanzan `plataforma-adaptadores` ni `plataforma-falsa`.**
+  Reciben `&dyn Plataforma` (el puerto) por parámetro, nunca construyen un adaptador.
+- **`estado` y `protocolo` no se ven entre sí.** Los seis tipos de alambre que antes forzaban
+  `protocolo → colas` bajaron a `contrato`; `estado` no tiene ninguna arista hacia `protocolo`.
+- **El código de producción no puede usar `Falsa`**: ninguna crate que no sea `[dev-dependencies]`
+  la declara. Hoy eso lo sostiene la disciplina; después lo sostiene Cargo.
+- **`contrato` no es cero-deps como `packages/ir`** —a diferencia de TypeScript, Rust necesita
+  `serde` para derivar (De)Serialize y `sha2` porque `HuellaDeRaiz::raiz_id` lo llama— pero
+  juega el mismo ROL: vocabulario puro, cero lógica de adaptador o de caso de uso.
+
+`src/main.rs` (la CLI de demostración) y `src/bin/bandeja/` siguen detrás de
+`required-features`, sin moverse, como los dos `[[bin]]` del paquete host.
+
+### Los tests de `tests/guardianes.rs`, uno por uno
+
+Diecinueve tests llaman a `fuente(archivo)`. Trece tocan un solo archivo que cae entero en
+una sola crate — esos se mudan tal cual al `tests/` de esa crate, con la ruta corregida.
+Ejemplo: `el_puerto_de_inventario_no_tiene_metodos_de_escritura` lee `inventario.rs` buscando
+`trait Inventario` — ese trait vive en `contrato`, así que el test se muda a
+`contrato/tests/`, sin tocar su cuerpo.
+
+Dos verifican una propiedad **por archivo**, pero sus archivos caen en crates distintas —
+`los_modulos_puros_no_tocan_el_mundo` (`maquina.rs`→`maquina`, `salvaguardas.rs`→`politica`,
+`inventario.rs`→`estado`) y `ningun_numero_inventado_en_los_modulos_de_decision`
+(`maquina.rs`, `salvaguardas.rs`). Estos se **parten en N copias**, una por crate, cada una
+mirando solo su propio archivo — no hay conocimiento cruzado que compartir, así que partir no
+pierde nada.
+
+Tres verifican una propiedad **del workspace entero**, y ninguna reasignación por crate
+alcanza:
+
+- `el_hash_verificado_solo_se_acuna_en_las_puertas_nombradas` — tiene que confirmar que
+  `HashVerificado::acunar` no aparece en OCHO archivos que hoy están en un crate y mañana en
+  seis, y que aparece **exactamente dos veces** en el que sí puede llamarlo. Un conteo global
+  no se puede partir en copias locales sin perder la palabra «exactamente».
+- `sin_emoji_en_los_fuentes` — barre dieciocho archivos que terminan repartidos en nueve
+  crates distintas.
+- La mitad viva de `el_nucleo_no_conoce_la_ventana` — la prohibición de `tauri`/`objc2`/
+  `block2` como *dependencia* la impone ahora el propio Cargo (si una crate no las declara, no
+  puede usarlas: compila o no compila) y esa mitad **se borra**, es exactamente el antipatrón
+  que el propio archivo señala en otra parte — pero la prohibición de la *palabra* `webview` en
+  comentarios y el chequeo de que el recorrido bajó a cada subcarpeta no son propiedades que
+  Cargo imponga solo, y siguen necesitando ver todo el árbol.
+
+Esos tres van a una **crate nueva y chica, `savia-folder-guardianes`**: sin `[lib]`, solo
+`[[test]]`, cero dependencias propias. Camina las carpetas hermanas por ruta relativa desde su
+propio `CARGO_MANIFEST_DIR` — la misma técnica que `fuentes_fuera_del_binario_de_ventana` ya
+usa hoy, con un nivel más de indirección. No es simetría: es la única forma de no fragmentar
+una garantía que es, por naturaleza, sobre el todo y no sobre una parte.
 
 ### Lo que el corte NO hace
 
-No cambia comportamiento. **El criterio de aceptación de esa fase es que el diff sea
-movimientos de archivo más arreglos de ruta, y que los 104 tests pasen sin que se toque un
-solo `assert`.** Un test que haya que editar para que pase es un hallazgo, no un ajuste.
+No cambia comportamiento. **El criterio de aceptación de esta fase es que el diff sea
+movimientos de archivo, arreglos de ruta y declaraciones de dependencia en `Cargo.toml` — y
+que los 98 tests pasen sin que se toque un solo `assert`.** Un test que haya que editar para
+que pase es un hallazgo, no un ajuste; una relajación de visibilidad (`pub(crate)` → `pub`)
+cuenta como cambio de comportamiento, no como movimiento, y por eso no está en este corte.
+
+**Dos aristas se quedan tal como están, documentadas, porque romperlas no es un movimiento:**
+
+- `aplicacion → protocolo` con `Cliente` **concreto**, no un trait. `protocolo/mod.rs`
+  documenta que evitar un puerto ahí fue deliberado —un doble no atrapa problemas de
+  transporte, y `contra_el_simulador.rs` existe justo para eso—. Invertirla exige un puerto de
+  canal nuevo que el banco también pueda implementar: fase 2.
+- `protocolo → contrato` para llamar `HashVerificado::acunar`, que hoy es `pub(crate)`. En
+  crates separadas eso tiene que relajarse a `pub`, y el guardián que hoy verifica «las
+  puertas son exactamente dos» con un `grep` de un solo archivo pasa a necesitar el `grep`
+  multi-crate que ya vive en `savia-folder-guardianes`. Preservar la restricción con un
+  tipo-testigo es un cambio de firma: fase 2.
 
 ### La alternativa más barata, y por qué no
 
@@ -350,8 +443,8 @@ es donde equivocarse sale caro y no lo detecta un test que todavía no existe.
 | # | Fase | Agente | Modelo | Depende de |
 |---|---|---|---|---|
 | 0 | Commitear lo que hay | — (yo) | — | — |
-| 1 | El corte en crates | `general-purpose` | **Sonnet** | 0 |
-| 2 | Los puertos (`Plataforma` se muda, nace `Servidor`) | `general-purpose` | **Opus** | 1 |
+| 1 | El corte en crates (arquitectura ya cerrada en §2) | `general-purpose` | **Sonnet** | 0 |
+| 2 | Las dos aristas que fase 1 dejó documentadas | `general-purpose` | **Opus** | 1 |
 | 3 | Los huecos de protocolo (D1, D3) | `general-purpose` | **Opus** | 2 |
 | 4 | La vista crece (nombres, progreso, conteo, motivo) | `general-purpose` | **Sonnet** | 3 |
 | 5 | El panel nuevo (tinta → papel) | `general-purpose` | **Sonnet** | 4 |
@@ -368,16 +461,29 @@ fase, en contexto limpio. Es para lo que está.
 
 ### El detalle de cada fase
 
-**Fase 1 · El corte.** Sonnet. Crear las siete crates, mover los `.rs`, arreglar rutas, mover
-los tests a la crate que corresponde. Aceptación: `pnpm lint` verde y el diff no contiene ni
+**Fase 1 · El corte.** Sonnet. La arquitectura de §2 ya pasó por dos rondas de diseño y cuatro
+lentes de refutación adversarial cada una — no queda por decidir, queda por ejecutar: crear
+las once crates (`contrato`, `politica`, `maquina`, `estado`, `protocolo`,
+`plataforma-adaptadores`, `plataforma-falsa`, `persistencia`, `aplicacion`, `guardianes`,
+`pruebas-integracion`) más el paquete host, partir los cinco archivos que cruzan una frontera
+(`inventario.rs`, `colas.rs`, `salvaguardas.rs`, `plataforma/mod.rs`, `protocolo/mod.rs`),
+repartir los 19 tests de `tests/guardianes.rs` según la tabla de §2 (13 copiados tal cual, 2
+partidos por crate, 3 movidos a `guardianes/`), y declarar cada `Cargo.toml` con las
+dependencias externas que §2 ya nombra. Aceptación: `pnpm lint` verde y el diff no contiene ni
 un `assert` cambiado. Es la fase con el criterio más nítido de todo el plan, y por eso es la
-que menos necesita Opus.
+que menos necesita Opus — pero es también la más grande en volumen de archivos, así que el
+agente debe verificar la aciclicidad del grafo real (`cargo tree` por crate) antes de dar la
+fase por cerrada, no solo confiar en la tabla del documento.
 
-**Fase 2 · Los puertos.** Opus. Mudar `Plataforma` a `contrato`, definir `Servidor`,
-`Cliente` lo implementa, `drenar` pasa a `&dyn Servidor`. Aceptación: `ciclo/Cargo.toml` **no
-nombra** `plataforma` ni `protocolo`, y los guardianes de texto que eso vuelve redundantes se
-borran en el mismo commit —quedarse con guardianes que ya no pueden fallar es peor que no
-tenerlos.
+**Fase 2 · Las dos aristas pendientes.** Opus. Las dos que §2 deja documentadas y no rompe en
+fase 1: (a) un puerto de canal (`CanalDeSavia` o similar) que `Cliente` implemente, para que
+`aplicacion` deje de recibir `&Cliente` concreto — sin perder la cobertura de fallas de
+transporte que `contra_el_simulador.rs` existe para probar, así que el banco también tiene que
+poder implementar el puerto; (b) un tipo-testigo o trait sellado que reemplace la privacidad
+de módulo que sostenía «`HashVerificado::acunar` tiene exactamente dos puertas», ahora que
+`acunar` es `pub` entre crates. Aceptación: `aplicacion/Cargo.toml` sigue dependiendo de
+`protocolo` (esa arista no desaparece, cambia de forma), pero el guardián en
+`guardianes/tests/` verifica la restricción por tipos y no por conteo de texto.
 
 **Fase 3 · El protocolo.** Opus. `MotivoDeFallo` en el núcleo con las variantes locales;
 «Dejar de mirar» con el copy de §1.7; el octavo llamado **documentado, no construido**,

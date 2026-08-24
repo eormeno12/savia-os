@@ -1,8 +1,10 @@
-# El nucleo del agente de carpeta, y **ya es Tauri** — pero solo el binario de la
-# bandeja. `lib.rs` sigue sin conocerlo: la separacion que este archivo anticipaba
-# ("este mismo crate queda de biblioteca y el binario de Tauri lo consume") es la que
-# hay ahora, y es lo que deja que el nucleo se siga cross-chequeando contra Windows y
-# que las 99 pruebas corran sin levantar una ventana.
+# El paquete HOST del workspace: el `[package]` de raiz, con `[workspace] members =
+# ["crates/*"]` — ver docs/product/savia-b2b/plan-rediseno-agente.md §2 "El corte". El
+# nucleo del agente vive repartido en las crates de `crates/`; esto es solo los dos
+# binarios y el `build.rs` de Tauri. Depende de siete de las once crates: `contrato`,
+# `aplicacion`, `persistencia`, `protocolo`, `plataforma-adaptadores`, `estado` y
+# `politica` — los dos ultimos porque los binarios instancian `Almacen` y `Politica`
+# directo, no solo a traves de `aplicacion`.
 #
 # DOS BINARIOS, A PROPOSITO:
 #  · `folder-agent` — el de linea de comandos. Corre el ciclo entero y no abre nada.
@@ -12,7 +14,7 @@
 # Que sean dos y no uno con un `--gui` es lo que hace que `cargo test` no arrastre el
 # runtime de la ventana, y que el dia que Tauri rompa algo se sepa cual de los dos.
 [package]
-name = "savia-folder-nucleo"
+name = "savia-folder-host"
 version = "0.0.0"
 edition = "2024"
 rust-version = "1.97"
@@ -21,9 +23,8 @@ publish = false
 # ninguna ventana: empaquetarlo daria un `.app` que arranca, no muestra nada y se queda.
 default-run = "bandeja"
 
-[lib]
-name = "savia_folder_nucleo"
-path = "src/lib.rs"
+[workspace]
+members = ["crates/*"]
 
 # **`required-features = ["demo"]`, Y NO ESTA EN `default`.** Sin esto el empaquetador
 # de Tauri mete ESTE binario adentro del `.app` junto con la bandeja — se comprobo:
@@ -48,45 +49,28 @@ name = "bandeja"
 path = "src/bin/bandeja/main.rs"
 required-features = ["ventana"]
 
-# CUATRO DEPENDENCIAS, Y CADA UNA TIENE UN TRABAJO QUE NO SE PUEDE HACER A MANO SIN
-# ARRIESGAR CORRECCION:
-#
-#  · `libc`       — los syscalls de macOS que el nucleo necesita SIN abrir el archivo:
-#                   `SF_DATALESS` en `st_flags`, `mach_continuous_time` y
-#                   `setiopolicy_np`. Cero deps transitivas.
-#  · `sha2`       — el hash de los bytes. Escribirlo a mano es 60 lineas conocidas y un
-#                   riesgo que no compra nada: si difiere en un bit del `createHash` de
-#                   Node, el dedupe previo a la transferencia deja de funcionar y el
-#                   sintoma es «todo sale upload», que parece un problema de servidor.
-#  · `serde`      — las formas del alambre. A mano se pierden `#[serde(flatten)]` para
-#  · `serde_json`   `{path, decision}` y el sobre `untagged` que prueba `{error}` ANTES
-#                   del valor, que es lo unico que impide leer un 200 con error como
-#                   exito.
-#
-# LO QUE NO ESTA, Y POR QUE:
-#  · `ureq`/`reqwest` — el transporte de ESTE tramo habla HTTP plano contra el simulador
-#    en 127.0.0.1. Un cliente a mano sobre `TcpStream` son ~90 lineas confinadas a
-#    `protocolo/transporte.rs`. DISPARADOR NOMBRADO PARA CAMBIARLO: el dia que haya un
-#    permiso prefirmado real (https, redirecciones, `Content-Length` derivado del
-#    archivo), se cambia por `ureq` con `rustls` y la edicion es de un archivo.
-#  · `rusqlite`  — el inventario y las colas son hoy de memoria. La transaccion comun
-#    que el diseno exige («estado y cola son una sola escritura») esta impuesta por la
-#    forma —un unico `&mut Almacen` y un solo metodo que escribe las dos mitades— y NO
-#    por durabilidad. DISPARADOR NOMBRADO: el dia que el agente tenga que sobrevivir a
-#    un reinicio, entra `rusqlite` con `bundled`, WAL y `synchronous=NORMAL`, y las dos
-#    mitades siguen en el MISMO archivo, que es lo que hace legal ese `NORMAL`.
-#  · `unicode-normalization` — ver `dominio::RutaRelativa::canonica`.
+# SIETE DEPENDENCIAS DE WORKSPACE, una por cada crate que los dos binarios alcanzan
+# directo. `main.rs` y `src/bin/bandeja/main.rs` instancian `Almacen` y `Politica`
+# directo —no solo a traves de `aplicacion`— asi que `estado` y `politica` estan aca
+# ademas de las cinco que se derivan de leer `ciclo`/`panel`.
 [dependencies]
-libc = "0.2"
-redb = "2"
-sha2 = "0.10"
-serde = { version = "1", features = ["derive"] }
+savia-folder-aplicacion = { path = "crates/aplicacion" }
+savia-folder-contrato = { path = "crates/contrato" }
+savia-folder-estado = { path = "crates/estado" }
+savia-folder-persistencia = { path = "crates/persistencia" }
+savia-folder-plataforma-adaptadores = { path = "crates/plataforma-adaptadores" }
+savia-folder-politica = { path = "crates/politica" }
+savia-folder-protocolo = { path = "crates/protocolo" }
+# `tauri::generate_context!()` expande a codigo que espera `serde_json` en el crate
+# root de quien la invoca (`src/bin/bandeja/main.rs`) — no alcanza con que sea
+# dependencia transitiva de las crates de arriba.
 serde_json = "1"
 
-# SOLO PARA EL BINARIO `bandeja`. El nucleo no lo nombra en ningun lado —lo comprueba
-# `el_nucleo_no_conoce_la_ventana` en `tests/guardianes.rs`, caminando todo `src/` menos
-# `src/bin/`— y esa es la unica razon por la que `nucleo:windows` sigue cruzando y las
-# pruebas siguen sin levantar una ventana.
+# SOLO PARA EL BINARIO `bandeja`. Ninguna crate de biblioteca lo nombra —lo comprueba
+# `el_nucleo_no_conoce_la_ventana` en `crates/guardianes/tests/guardianes.rs`, caminando
+# el `src/` de las nueve crates mas `src/main.rs` de este paquete— y esa es la unica
+# razon por la que `nucleo:windows` sigue cruzando y las pruebas siguen sin levantar una
+# ventana.
 #
 # `tray-icon` porque es un agente de bandeja y no una app con ventana principal.
 #
@@ -105,9 +89,10 @@ serde_json = "1"
 # la app. Sin esta feature hay que usar `default_window_icon()`, que devuelve el icono
 # grande escalado — dos remuestreos y un icono borroso en la barra.
 # **TODAS OPCIONALES, BAJO LA FEATURE `ventana`, Y ESO ES LO QUE HACE MECANICA LA
-# GARANTIA.** El guardian de texto (`el_nucleo_no_conoce_la_ventana`) comprueba que el
-# nucleo no las NOMBRE; esto comprueba algo mas fuerte: que el nucleo COMPILE con ellas
-# fuera del grafo. `pnpm nucleo:windows` cruza con `--no-default-features`.
+# GARANTIA.** El guardian de texto (`el_nucleo_no_conoce_la_ventana`) comprueba que
+# ninguna crate de biblioteca las NOMBRE; esto comprueba algo mas fuerte: que este
+# paquete COMPILE con ellas fuera del grafo. `pnpm nucleo:windows` cruza con
+# `--no-default-features`.
 #
 # El disparador fue concreto: `tauri-plugin-updater` arrastra `ring`, que compila C, y
 # cruzar C a Windows desde una Mac no se puede. Con las deps opcionales el cruce ni las
@@ -158,10 +143,11 @@ tauri-build = { version = "2", features = [] }
 # ── LA FEATURE QUE SEPARA EL NUCLEO DE LA VENTANA ───────────────────────────────
 #
 # **Esto es la version MECANICA de una garantia que ya tenia un guardian de texto.**
-# `el_nucleo_no_conoce_la_ventana` (en `tests/guardianes.rs`) comprueba que el nucleo no
-# NOMBRE a Tauri; esto comprueba algo mas fuerte y mas barato: que el nucleo COMPILE con
-# Tauri **fuera del grafo de Cargo**. `pnpm nucleo:windows` cruza con
-# `--lib --no-default-features`.
+# `el_nucleo_no_conoce_la_ventana` (en `crates/guardianes/tests/guardianes.rs`) comprueba
+# que ninguna crate de biblioteca NOMBRE a Tauri; esto comprueba algo mas fuerte y mas
+# barato: que este paquete COMPILE con Tauri **fuera del grafo de Cargo**. `pnpm
+# nucleo:windows` cruza con `--no-default-features` (ahora sobre `--workspace`, ya que
+# cada crate resuelve su propio grafo).
 #
 # **El disparador fue concreto y vale escribirlo.** Al agregar `tauri-plugin-updater`, el
 # cruce a Windows se rompio: arrastra `ring`, que compila C, y cruzar C a Windows desde

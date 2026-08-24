@@ -1,0 +1,20 @@
+# El cliente HTTP contra la API de Savia: `Cliente`, `alambre` (las formas JSON del
+# canal), `transporte` (el TcpStream a mano). Las formas de VOCABULARIO del protocolo
+# (Secreto, Credencial, Reclamo, BarridoAbierto...) quedaron en `contrato::protocolo`;
+# esta crate es la puerta que las usa.
+[package]
+name = "savia-folder-protocolo"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97"
+publish = false
+
+[lib]
+name = "savia_folder_protocolo"
+path = "src/lib.rs"
+
+[dependencies]
+savia-folder-contrato = { path = "../contrato" }
+savia-folder-politica = { path = "../politica" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

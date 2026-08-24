@@ -19,19 +19,20 @@
 #[cfg(target_os = "macos")]
 mod macos;
 
-use savia_folder_nucleo::almacen::Almacen;
-use savia_folder_nucleo::ciclo;
-use savia_folder_nucleo::colas::ParametrosDeCola;
-use savia_folder_nucleo::dominio::{BarridoId, RaizId, SensibilidadAMayusculas};
-use savia_folder_nucleo::panel;
-use savia_folder_nucleo::persistencia::Deposito;
+use savia_folder_aplicacion::ciclo;
+use savia_folder_aplicacion::panel;
+use savia_folder_contrato::dominio::{BarridoId, RaizId, SensibilidadAMayusculas};
+use savia_folder_contrato::plataforma::{Plataforma, RaizRegistrada};
+use savia_folder_contrato::protocolo::{Credencial, Secreto};
+use savia_folder_estado::almacen::Almacen;
+use savia_folder_estado::colas::ParametrosDeCola;
+use savia_folder_persistencia::persistencia::Deposito;
 #[cfg(target_os = "macos")]
-use savia_folder_nucleo::plataforma::Macos as PlataformaLocal;
+use savia_folder_plataforma_adaptadores::macos::Macos as PlataformaLocal;
 #[cfg(target_os = "windows")]
-use savia_folder_nucleo::plataforma::Windows as PlataformaLocal;
-use savia_folder_nucleo::plataforma::{Plataforma, RaizRegistrada};
-use savia_folder_nucleo::protocolo::{BaseDeApi, Cliente, Credencial, Secreto, Tiempos};
-use savia_folder_nucleo::salvaguardas::Politica;
+use savia_folder_plataforma_adaptadores::windows::Windows as PlataformaLocal;
+use savia_folder_politica::salvaguardas::Politica;
+use savia_folder_protocolo::{BaseDeApi, Cliente, Tiempos};
 use std::sync::{Arc, Mutex};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager, State, WebviewWindow};

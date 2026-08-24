@@ -1,0 +1,17 @@
+# Las pruebas que cruzan de punta a punta contra el simulador (`sim/server.ts`): el
+# protocolo real, la plataforma real (no la falsa) y el ciclo completo. Sin [lib]: solo
+# corre `cargo test`.
+[package]
+name = "savia-folder-pruebas-integracion"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97"
+publish = false
+
+[dev-dependencies]
+savia-folder-aplicacion = { path = "../aplicacion" }
+savia-folder-contrato = { path = "../contrato" }
+savia-folder-estado = { path = "../estado" }
+savia-folder-plataforma-adaptadores = { path = "../plataforma-adaptadores" }
+savia-folder-politica = { path = "../politica" }
+savia-folder-protocolo = { path = "../protocolo" }

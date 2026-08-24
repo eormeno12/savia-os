@@ -1,0 +1,25 @@
+# `ciclo` (el lazo: barrer/drenar) y `panel` (la bandeja). El unico crate que compone a
+# la vez plataforma, almacen y protocolo — la misma forma que `@savia-os/orchestration`
+# tiene en el pipeline de ingesta.
+[package]
+name = "savia-folder-aplicacion"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97"
+publish = false
+
+[lib]
+name = "savia_folder_aplicacion"
+path = "src/lib.rs"
+
+[dependencies]
+savia-folder-contrato = { path = "../contrato" }
+savia-folder-estado = { path = "../estado" }
+savia-folder-maquina = { path = "../maquina" }
+savia-folder-politica = { path = "../politica" }
+savia-folder-protocolo = { path = "../protocolo" }
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+savia-folder-plataforma-falsa = { path = "../plataforma-falsa" }
+serde_json = "1"

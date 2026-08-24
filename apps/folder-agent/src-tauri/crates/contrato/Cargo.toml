@@ -1,0 +1,22 @@
+# El vocabulario: dominio, hash, parametros, y la parte de plataforma/inventario/colas/
+# protocolo/salvaguardas que es forma pura, sin logica de caso de uso. Los dos puertos
+# (`Plataforma`, `Inventario`) viven aca — es la crate mas adentro del corte.
+# Ver docs/product/savia-b2b/plan-rediseno-agente.md §2 "El corte".
+#
+# NO es cero-deps como packages/ir: a diferencia de TypeScript, Rust necesita `serde`
+# para derivar (De)Serialize y `sha2` porque `HuellaDeRaiz::raiz_id` lo llama. Juega el
+# mismo ROL igual: vocabulario puro, cero logica de adaptador o de caso de uso.
+[package]
+name = "savia-folder-contrato"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97"
+publish = false
+
+[lib]
+name = "savia_folder_contrato"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+sha2 = "0.10"

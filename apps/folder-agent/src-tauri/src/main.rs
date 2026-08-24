@@ -15,21 +15,22 @@
 //! cuatro del canal siguen en `None` en `parametros.rs`, y este binario los provee
 //! explicitamente porque `Politica` no tiene `Default` y no deja saltearlo.
 
-use savia_folder_nucleo::almacen::Almacen;
-use savia_folder_nucleo::ciclo;
-use savia_folder_nucleo::colas::ParametrosDeCola;
-use savia_folder_nucleo::dominio::{BarridoId, RaizId, SensibilidadAMayusculas};
+use savia_folder_aplicacion::ciclo;
+use savia_folder_contrato::dominio::{BarridoId, RaizId, SensibilidadAMayusculas};
 // LA PLATAFORMA SE ELIGE POR `cfg`, Y NO ES ADORNO: con `Macos` cableado, este
 // binario NO CRUZABA a Windows y el guardian que lo cross-chequea no podia existir.
 // La biblioteca si cruzaba —verificado— asi que el hueco era del demo, no del nucleo.
-use savia_folder_nucleo::persistencia::Deposito;
+use savia_folder_contrato::plataforma::{Plataforma, RaizRegistrada};
+use savia_folder_contrato::protocolo::{Credencial, Reclamo, Secreto};
+use savia_folder_estado::almacen::Almacen;
+use savia_folder_estado::colas::ParametrosDeCola;
+use savia_folder_persistencia::persistencia::Deposito;
 #[cfg(target_os = "macos")]
-use savia_folder_nucleo::plataforma::Macos as PlataformaLocal;
+use savia_folder_plataforma_adaptadores::macos::Macos as PlataformaLocal;
 #[cfg(target_os = "windows")]
-use savia_folder_nucleo::plataforma::Windows as PlataformaLocal;
-use savia_folder_nucleo::plataforma::{Plataforma, RaizRegistrada};
-use savia_folder_nucleo::protocolo::{BaseDeApi, Cliente, Credencial, Reclamo, Secreto, Tiempos};
-use savia_folder_nucleo::salvaguardas::Politica;
+use savia_folder_plataforma_adaptadores::windows::Windows as PlataformaLocal;
+use savia_folder_politica::salvaguardas::Politica;
+use savia_folder_protocolo::{BaseDeApi, Cliente, Tiempos};
 
 /// Parametros del BANCO. Chicos para que una corrida termine en segundos.
 mod banco {

@@ -1,0 +1,16 @@
+# El doble de prueba de `Plataforma`. Ninguna crate de produccion la declara — la
+# disciplina que hoy sostiene "el codigo real no puede usar Falsa" pasa a sostenerla
+# Cargo: solo `pruebas-integracion` (y los `[dev-dependencies]` de las demas) la ven.
+[package]
+name = "savia-folder-plataforma-falsa"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97"
+publish = false
+
+[lib]
+name = "savia_folder_plataforma_falsa"
+path = "src/lib.rs"
+
+[dependencies]
+savia-folder-contrato = { path = "../contrato" }

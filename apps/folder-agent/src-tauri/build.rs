@@ -1,9 +1,12 @@
 //! **EL CRUCE A WINDOWS SE SALTEA `tauri_build`, Y ESO NO DEBILITA EL CHEQUEO.**
 //!
 //! `nucleo:windows` existe por una sola garantia: **el nucleo no se ata a macOS**. La
-//! comprueba compilando `lib.rs` —que no conoce Tauri en ningun lado— contra
-//! `x86_64-pc-windows-msvc`. El binario `bandeja` no entra en esa garantia: es
-//! justamente el archivo que SI conoce Tauri, y cruzarlo nunca fue el punto.
+//! comprueba cruzando `--workspace --exclude savia-folder-host --lib` contra
+//! `x86_64-pc-windows-msvc` — las nueve crates de biblioteca, ninguna de las cuales
+//! conoce Tauri. Ese `--exclude` es lo que hace que este `build.rs` (el de
+//! `savia-folder-host`, el paquete que SI conoce Tauri) ni siquiera corra durante el
+//! chequeo; lo de abajo protege el caso en que alguien cruce el paquete host entero a
+//! mano.
 //!
 //! Desde que Tauri es dependencia, `tauri_build::build()` compila un **recurso de
 //! Windows** cuando el objetivo es Windows, y para eso invoca `llvm-rc`. Cruzando desde
