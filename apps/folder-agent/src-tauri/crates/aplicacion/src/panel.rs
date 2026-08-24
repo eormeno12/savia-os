@@ -153,6 +153,25 @@ pub struct Carpeta {
     /// devolveria el tope en vez del total. Un contador que se topea es un contador que
     /// miente justo cuando mas hay que contar.
     pub fallos: usize,
+    /// El «128 de 412» del primer barrido (plan, Fase 4). **Hoy siempre `None`, y no es
+    /// un placeholder cualquiera: es la unica respuesta honesta.** El total que
+    /// `Almacen::abrir_barrido` guarda es `Inventario::vivos`, pensado para el corte por
+    /// volumen — se mide ANTES de abrir el barrido, y en el primer barrido de una carpeta
+    /// nueva vale cero, que es justo el caso que este campo tendria que mostrar. El total
+    /// real (`ResumenDelBarrido::enumeradas`, en `ciclo::barrer`) se conoce al abrir, pero
+    /// es el valor de retorno de una funcion: `Almacen` no lo guarda, y `panel::vista` no
+    /// tiene forma de leerlo sin inventar un numero. El campo queda reservado con la forma
+    /// que va a tener — lo llena el canal de progreso de la Fase 7, que lee directo del
+    /// recorrido en vez de por esta foto.
+    pub progreso: Option<Progreso>,
+}
+
+/// Ver `Carpeta::progreso`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Progreso {
+    pub procesados: usize,
+    pub total: usize,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
@@ -174,6 +193,10 @@ pub struct Vista {
     /// carpeta —seria falso— sino un hecho aparte, igual que `detenido`, y que la vista
     /// decida cual de los tres manda.
     pub fallos: usize,
+    /// «1.204 documentos en Savia» — la suma de `indexados` de todas las carpetas, igual
+    /// que `fallos` unas lineas arriba. Ya excluye lapidas y rutas envenenadas porque
+    /// `indexados` ya las excluye por carpeta.
+    pub indexados: usize,
     pub carpetas: Vec<Carpeta>,
 }
 
@@ -207,6 +230,7 @@ pub fn vista(almacen: &Almacen, plataforma: &dyn Plataforma, max_filas: usize) -
             MotivoDeDetencion::Credenciales => Detencion::Credenciales,
         }),
         fallos: carpetas.iter().map(|c| c.fallos).sum(),
+        indexados: carpetas.iter().map(|c| c.indexados).sum(),
         carpetas,
     }
 }
@@ -330,5 +354,8 @@ fn de_una_carpeta(
         ocultas,
         indexados,
         fallos,
+        // Ver el doc de `Carpeta::progreso`: hoy no hay ningun numero honesto que poner
+        // aca, asi que no se pone ninguno.
+        progreso: None,
     }
 }

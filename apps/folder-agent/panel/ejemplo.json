@@ -24,12 +24,14 @@
             "id": "root-1",
             "indexados": 2,
             "ocultas": 0,
+            "progreso": null,
             "rutaAbsoluta": "/Usuarios/nadie/Savia"
           }
         ],
         "detenido": null,
         "estado": "sincronizado",
-        "fallos": 0
+        "fallos": 0,
+        "indexados": 2
       }
     },
     {
@@ -56,12 +58,14 @@
             "id": "root-1",
             "indexados": 3,
             "ocultas": 0,
+            "progreso": null,
             "rutaAbsoluta": "/Usuarios/nadie/Savia"
           }
         ],
         "detenido": null,
         "estado": "barriendo",
-        "fallos": 0
+        "fallos": 0,
+        "indexados": 3
       }
     },
     {
@@ -88,12 +92,14 @@
             "id": "root-1",
             "indexados": 3,
             "ocultas": 0,
+            "progreso": null,
             "rutaAbsoluta": "/Usuarios/nadie/Savia"
           }
         ],
         "detenido": null,
         "estado": "congelado",
-        "fallos": 0
+        "fallos": 0,
+        "indexados": 3
       }
     },
     {
@@ -120,6 +126,7 @@
             "id": "root-1",
             "indexados": 3,
             "ocultas": 0,
+            "progreso": null,
             "rutaAbsoluta": "/Usuarios/nadie/Savia"
           },
           {
@@ -130,12 +137,14 @@
             "indexados": 0,
             "ocultas": 0,
             "porque": "otraCarpeta",
+            "progreso": null,
             "rutaAbsoluta": "/Volumes/Archivo"
           }
         ],
         "detenido": null,
         "estado": "carpetaAusente",
         "fallos": 0,
+        "indexados": 3,
         "porque": "otraCarpeta"
       }
     },
@@ -160,12 +169,14 @@
             "id": "root-1",
             "indexados": 2,
             "ocultas": 1,
+            "progreso": null,
             "rutaAbsoluta": "/Usuarios/nadie/Savia"
           }
         ],
         "detenido": null,
         "estado": "sincronizado",
-        "fallos": 1
+        "fallos": 1,
+        "indexados": 2
       }
     },
     {
@@ -192,12 +203,14 @@
             "id": "root-1",
             "indexados": 3,
             "ocultas": 0,
+            "progreso": null,
             "rutaAbsoluta": "/Usuarios/nadie/Savia"
           }
         ],
         "detenido": "credenciales",
         "estado": "sincronizado",
-        "fallos": 0
+        "fallos": 0,
+        "indexados": 3
       }
     }
   ]
