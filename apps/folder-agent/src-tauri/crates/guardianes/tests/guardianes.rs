@@ -51,8 +51,15 @@ fn el_hash_verificado_solo_se_acuna_en_las_puertas_nombradas() {
     // con ningun documento, para siempre— aparece meses despues y no se parece a su
     // causa.
     //
-    // Los ocho archivos originales de un solo crate son hoy once, repartidos en siete
-    // crates — `salvaguardas.rs`, `inventario.rs` y `colas.rs` cada uno partido en dos.
+    // Fase 2 reemplazo el `acunar(bytes)` generico por dos puertas nombradas a su
+    // escenario: `desde_coincidencia_known` (promueve el afirmado que el pedido YA
+    // llevaba) y `desde_hex_verificado` (parsea el hex que vino del alambre). Ninguna
+    // acepta un `[u8; 32]` inventado en el sitio de la llamada. El guardian verifica
+    // DOS cosas por cada puerta: que no aparece en ningun archivo ajeno, y que aparece
+    // EXACTAMENTE UNA VEZ en `savia-folder-protocolo`, que es la unica que la usa hoy.
+    //
+    // Los once archivos de abajo son los mismos que antes de fase 2 — el tipo-testigo
+    // no cambia el grafo de crates, solo las firmas de `dominio.rs`.
     let prohibidos: [(&str, &str); 11] = [
         ("maquina", "maquina.rs"),
         ("contrato", "salvaguardas.rs"),
@@ -66,22 +73,32 @@ fn el_hash_verificado_solo_se_acuna_en_las_puertas_nombradas() {
         ("contrato", "plataforma.rs"),
         ("plataforma-falsa", "falsa.rs"),
     ];
+    const PUERTAS: [&str; 2] = [
+        "HashVerificado::desde_coincidencia_known",
+        "HashVerificado::desde_hex_verificado",
+    ];
     for (crate_nombre, archivo) in prohibidos {
-        assert!(
-            !fuente(crate_nombre, archivo).contains("HashVerificado::acunar"),
-            "{crate_nombre}/{archivo} acuna un hash verificado. La puerta es `savia-folder-protocolo` (la respuesta `known` y `upload.completed`) y `rehidratar_del_inventario`"
+        let src = fuente(crate_nombre, archivo);
+        for puerta in PUERTAS {
+            assert!(
+                !src.contains(puerta),
+                "{crate_nombre}/{archivo} llama `{puerta}`. Las puertas son `savia-folder-protocolo` (la respuesta `known` y `upload.completed`) y `rehidratar_del_inventario`"
+            );
+        }
+    }
+    // Y las dos puertas legitimas siguen ahi, cada una llamada exactamente una vez: si
+    // alguien las duplica o las mueve, o si alguien borra una de las dos, el guardian
+    // de arriba pasaria verde sobre un sistema que ya no verifica lo que dice
+    // verificar. `dominio.rs`, donde viven las dos constructoras, no cuenta sus propios
+    // llamadores — cuenta quien las invoca, y eso es `savia-folder-protocolo`.
+    let protocolo = fuente("protocolo", "lib.rs");
+    for puerta in PUERTAS {
+        assert_eq!(
+            protocolo.matches(puerta).count(),
+            1,
+            "`{puerta}` tiene que aparecer exactamente una vez en `savia-folder-protocolo`"
         );
     }
-    // Y la puerta legitima sigue ahi: si alguien la borra, el guardian de arriba pasaria
-    // verde sobre un sistema que ya no verifica nada. `dominio.rs`, donde vive
-    // `HashVerificado::acunar`, no cuenta sus propios llamadores — cuenta quien la
-    // invoca, y eso es `savia-folder-protocolo` (antes `protocolo/mod.rs`).
-    let protocolo = fuente("protocolo", "lib.rs");
-    assert_eq!(
-        protocolo.matches("HashVerificado::acunar").count(),
-        2,
-        "las puertas de `savia-folder-protocolo` son exactamente dos: la respuesta `known` y `upload.completed`"
-    );
 }
 
 /// Todo `.rs` bajo `crates/*/src/`, mas `src/main.rs` del paquete host (`src/bin/` queda

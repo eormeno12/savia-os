@@ -255,11 +255,32 @@ pub struct HashAfirmado([u8; 32]);
 /// descuido de una linea, y el sintoma —una baja posterior que no matchea con ningun
 /// documento, para siempre— aparece meses despues y no se parece a su causa.
 ///
-/// Las tres puertas son `protocolo::acunar_known`, `protocolo::acunar_de_subida` y
-/// `rehidratar_del_inventario`. Que sean tres y no mas lo verifica un guardian de
-/// texto en `tests/guardianes.rs`, al estilo de `scripts/boundaries.mjs`: en un crate
-/// unico la privacidad de modulo no alcanza para prohibir el cuarto camino, asi que lo
-/// prohibe una prueba que falla si aparece.
+/// Las tres puertas son `desde_coincidencia_known` (la llama
+/// `protocolo::Cliente::reportar_observados`, cuando el servidor contesta `known`),
+/// `desde_hex_verificado` (la llama `protocolo::Cliente::confirmar_subida`, con el
+/// `verifiedHash` de `upload.completed`) y `rehidratar_del_inventario`. Que sean tres y
+/// no mas lo verifica un guardian de texto en `guardianes/tests/guardianes.rs`: Rust no
+/// tiene forma de decir "esta `pub fn` la llama el crate `protocolo` y ningun otro" —
+/// entre crates una funcion es `pub` (cualquiera la llama) o no es alcanzable, asi que
+/// lo que sostiene "exactamente estas puertas, exactamente asi de veces" sigue siendo
+/// una prueba que lee las fuentes, no el compilador.
+///
+/// **LO QUE ESTAS DOS FIRMAS SI CIERRAN POR TIPO, Y LO QUE NO:** ya no existe un
+/// `acunar(bytes)` generico, asi que desaparecio la forma de pasar un `[u8; 32]`
+/// inventado en el sitio de la llamada. `desde_coincidencia_known` exige tener primero
+/// un `HashAfirmado`, y `desde_hex_verificado` exige un string que primero pase por
+/// `de_hex` — la validacion de forma es en runtime, no algo que el tipo del parametro
+/// imponga por si solo. Ninguna de las dos impide que un llamador FABRIQUE esa
+/// evidencia a mano —`HashAfirmado::de_bytes([0; 32])` sigue siendo publica, porque
+/// afirmar es gratis por diseno—; lo que cierran es el atajo de una linea que iba
+/// directo de bytes crudos a "verificado".
+///
+/// **LA GRIETA QUE ESTO NO TAPA, DICHA DE FRENTE:** el tipo deriva `serde::Deserialize`,
+/// y el codigo que ese derive genera lee el campo privado sin pasar por ninguna de las
+/// tres puertas. Es una CUARTA via de construccion que ya existia con un solo crate y
+/// sigue existiendo con doce — ninguna firma de este archivo la cierra, porque cerrarla
+/// es un problema distinto (un `Deserialize` escrito a mano, o un newtype de
+/// deserializacion que si pase por una puerta) y no es lo que esta fase pide.
 #[must_use = "el verificado es la autoridad: corregi el inventario con este, nunca con el afirmado"]
 #[derive(serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct HashVerificado([u8; 32]);
@@ -277,22 +298,35 @@ impl HashAfirmado {
 }
 
 impl HashVerificado {
-    /// La unica constructora, y esta marcada. Los tres llamadores legitimos estan
-    /// nombrados en el doc de arriba.
+    /// LA PRIMERA PUERTA: una coincidencia `known`. El servidor solo puede contestar
+    /// eso si ESTE lado ya escribio el objeto y ya lo hasheo — la respuesta misma es la
+    /// verificacion. Por eso no toma bytes sueltos: toma el `HashAfirmado` que el
+    /// pedido YA llevaba, y promoverlo es lo unico que esta funcion hace.
     ///
-    /// `pub` y no `pub(crate)`: la relajacion es MECANICA, por el corte en crates —
-    /// `protocolo` (que llama esto dos veces) quedo en una crate distinta de `contrato` —
-    /// y no una relajacion de la garantia real. La garantia real («exactamente estas
-    /// puertas nombradas acunan un verificado») queda documentada como la arista
-    /// pendiente en `docs/product/savia-b2b/plan-rediseno-agente.md` §2, seccion «Lo que
-    /// el corte NO hace»: fase 2 la vuelve a cerrar con un tipo-testigo, no con
-    /// visibilidad de modulo.
-    pub fn acunar(b: [u8; 32]) -> Self {
-        Self(b)
+    /// La llama `protocolo::Cliente::reportar_observados`, una vez, cuando
+    /// `VeredictoDeAlambre::Known` llega.
+    pub fn desde_coincidencia_known(afirmado: HashAfirmado) -> Self {
+        Self(*afirmado.bytes())
     }
+
+    /// LA SEGUNDA PUERTA: el `verifiedHash` de `upload.completed`, todavia en hex
+    /// porque asi viaja el alambre. Parsear ACA adentro —y no en `protocolo`, con
+    /// `de_hex` mas un `acunar` generico— es lo que cierra el otro costado: no queda un
+    /// paso intermedio por `[u8; 32]` donde un llamador pueda meter bytes propios en
+    /// vez de los que efectivamente vinieron del servidor.
+    ///
+    /// La llama `protocolo::Cliente::confirmar_subida`, una vez, con
+    /// `r.verified_hash`.
+    pub fn desde_hex_verificado(hex: &str) -> Result<Self, HashHexInvalido> {
+        de_hex(hex).map(Self).ok_or(HashHexInvalido)
+    }
+
     /// La TERCERA puerta: el inventario que se relee del disco al arrancar. Se llama
     /// asi de largo para que un `grep` la encuentre y para que nadie la use por
-    /// comodidad.
+    /// comodidad. Sigue tomando bytes crudos a proposito, a diferencia de las dos de
+    /// arriba: lo que rehidrata ya paso por una de esas dos puertas en una corrida
+    /// anterior — exigirle un `HashAfirmado` o un hex de servidor en el arranque no
+    /// tendria con que llenarse.
     pub fn rehidratar_del_inventario(b: [u8; 32]) -> Self {
         Self(b)
     }
@@ -303,6 +337,13 @@ impl HashVerificado {
         a_hex(&self.0)
     }
 }
+
+/// El error de `desde_hex_verificado`: el string no tenia forma de sha256 hex (64
+/// caracteres hexadecimales). Sin datos adentro a proposito — `protocolo` ya tiene el
+/// string original en `r.verified_hash` cuando este error vuelve, asi que es ahi donde
+/// se arma el mensaje con el detalle, no aca.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct HashHexInvalido;
 
 pub fn a_hex(b: &[u8; 32]) -> String {
     let mut s = String::with_capacity(64);

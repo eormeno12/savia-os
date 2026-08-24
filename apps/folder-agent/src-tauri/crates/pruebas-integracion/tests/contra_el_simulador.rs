@@ -16,7 +16,10 @@
 //! no reconocia el `sweepId` envuelto en los marcadores de tamano, y el `Sobre` lo
 //! clasificaba como cuerpo malformado: o sea COLA MUERTA por un problema de red. Ningun
 //! doble de HTTP lo habria mostrado, que es la razon por la que el diseno de `protocolo`
-//! decide NO tener un `trait ClienteHttp`.
+//! decide NO tener un `trait ClienteHttp` que sirva de DOBLE para estas pruebas. Fase 2
+//! si agrega `CanalDeSavia` en `protocolo/src/lib.rs`, pero es un puerto de tipos para
+//! que `aplicacion` no nombre `Cliente` — no un doble de transporte, y este archivo lo
+//! sigue sin usar: construye `Cliente` real contra el socket real, como siempre.
 
 use savia_folder_aplicacion::ciclo;
 use savia_folder_contrato::dominio::{BarridoId, RaizId, SensibilidadAMayusculas};

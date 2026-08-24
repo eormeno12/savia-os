@@ -37,7 +37,7 @@ use savia_folder_contrato::colas::{
     Decision, Permiso, PermisoId, RangoDeTamano, SweepId, Veredicto,
 };
 use savia_folder_contrato::dominio::{
-    EstadoDelBarrido, HashAfirmado, HashVerificado, RaizId, RutaRelativa, de_hex,
+    EstadoDelBarrido, HashAfirmado, HashVerificado, RaizId, RutaRelativa,
 };
 use savia_folder_contrato::protocolo::{
     BarridoAbierto, CierreAplicado, Clase, Confirmacion, Credencial, Cuarentena, Reclamo, Secreto,
@@ -190,6 +190,59 @@ impl FalloDeProtocolo {
             _ => None,
         }
     }
+}
+
+// ──────────────────────────────── El puerto ──────────────────────────────────
+
+/// EL PUERTO QUE `aplicacion` NOMBRA EN VEZ DE `Cliente`. Las siete llamadas que
+/// `ciclo::ejecutar` hace contra el servidor — ni una más, ni una menos: `enrolar` y
+/// `reclamar` son del enrolamiento, corren ANTES del lazo y las siguen llamando
+/// `main.rs`/`bandeja/main.rs` contra el `Cliente` concreto.
+///
+/// **`Cliente` es hoy el único implementor real** — sigue hablando HTTP de verdad, y
+/// `contra_el_simulador.rs` lo sigue probando contra un socket real y no contra un
+/// doble de este trait (ver la nota en ese archivo). Este puerto no reemplaza esa
+/// cobertura: solo saca el NOMBRE del tipo concreto de la firma de `aplicacion`, para
+/// que un futuro doble de banco (`CanalDeSavia` sin red) pueda alimentar
+/// `ciclo::drenar` sin que `aplicacion` tenga que nombrarlo.
+///
+/// Object-safe a proposito: los siete metodos toman `&self` y no son genericos, asi
+/// que `&dyn CanalDeSavia` compila — la misma forma que `&dyn Plataforma` ya tiene en
+/// esta misma firma.
+pub trait CanalDeSavia {
+    fn abrir_barrido(&self, raiz: &RaizId, total: u64) -> Result<BarridoAbierto, FalloDeProtocolo>;
+
+    fn enviar_padron(
+        &self,
+        barrido: &SweepId,
+        entradas: &[(String, Option<String>)],
+    ) -> Result<u64, FalloDeProtocolo>;
+
+    fn reportar_observados(
+        &self,
+        raiz: &RaizId,
+        entradas: &[(RutaRelativa, HashAfirmado)],
+    ) -> Result<Vec<Veredicto>, FalloDeProtocolo>;
+
+    fn subir(&self, permiso: &Permiso, bytes: &[u8]) -> Result<Subido, FalloDeProtocolo>;
+
+    fn confirmar_subida_reanudada(
+        &self,
+        permiso: &PermisoId,
+    ) -> Result<Confirmacion, FalloDeProtocolo>;
+
+    fn reportar_desaparecidos(
+        &self,
+        raiz: &RaizId,
+        entradas: &[Desaparicion],
+        viva: &EstadoDeRaiz,
+    ) -> Result<Cuarentena, FalloDeProtocolo>;
+
+    fn cerrar_barrido(
+        &self,
+        barrido: &SweepId,
+        cierre: EstadoDelBarrido,
+    ) -> Result<CierreAplicado, FalloDeProtocolo>;
 }
 
 // ─────────────────────────────── El cliente ─────────────────────────────────
@@ -462,7 +515,7 @@ impl Cliente {
                 // direccionar un objeto que ese lado YA escribio y YA verifico, asi que
                 // la propia respuesta es la verificacion. Es una de las tres puertas.
                 VeredictoDeAlambre::Known => Decision::Known {
-                    verificado: HashVerificado::acunar(*afirmado.bytes()),
+                    verificado: HashVerificado::desde_coincidencia_known(*afirmado),
                 },
                 VeredictoDeAlambre::Upload { permit } => Decision::Upload {
                     permiso: Permiso {
@@ -555,12 +608,14 @@ impl Cliente {
             }
             Err(e) => return Err(e),
         };
-        let bytes = de_hex(&r.verified_hash).ok_or_else(|| FalloDeProtocolo::Cuerpo {
-            llamada: LLAMADA,
-            detalle: format!("verifiedHash no es sha256 hex: {}", r.verified_hash),
+        let verificado = HashVerificado::desde_hex_verificado(&r.verified_hash).map_err(|_| {
+            FalloDeProtocolo::Cuerpo {
+                llamada: LLAMADA,
+                detalle: format!("verifiedHash no es sha256 hex: {}", r.verified_hash),
+            }
         })?;
         Ok(Confirmacion {
-            verificado: HashVerificado::acunar(bytes),
+            verificado,
             divergio: r.diverged,
         })
     }
@@ -661,6 +716,62 @@ impl Cliente {
             retirados,
             congelada: r.frozen,
         })
+    }
+}
+
+/// Delegacion pura: cada metodo del trait llama al INHERENTE de `Cliente` del mismo
+/// nombre — la resolucion de metodos de Rust prioriza inherentes sobre trait para el
+/// tipo concreto, asi que `self.abrir_barrido(...)` aca adentro NO reentra a este
+/// mismo `impl`, cae directo al `pub fn abrir_barrido` de arriba. Es lo que permite no
+/// tocar ninguna de las siete firmas que ya existen y que `contra_el_simulador.rs` ya
+/// prueba.
+impl CanalDeSavia for Cliente {
+    fn abrir_barrido(&self, raiz: &RaizId, total: u64) -> Result<BarridoAbierto, FalloDeProtocolo> {
+        self.abrir_barrido(raiz, total)
+    }
+
+    fn enviar_padron(
+        &self,
+        barrido: &SweepId,
+        entradas: &[(String, Option<String>)],
+    ) -> Result<u64, FalloDeProtocolo> {
+        self.enviar_padron(barrido, entradas)
+    }
+
+    fn reportar_observados(
+        &self,
+        raiz: &RaizId,
+        entradas: &[(RutaRelativa, HashAfirmado)],
+    ) -> Result<Vec<Veredicto>, FalloDeProtocolo> {
+        self.reportar_observados(raiz, entradas)
+    }
+
+    fn subir(&self, permiso: &Permiso, bytes: &[u8]) -> Result<Subido, FalloDeProtocolo> {
+        self.subir(permiso, bytes)
+    }
+
+    fn confirmar_subida_reanudada(
+        &self,
+        permiso: &PermisoId,
+    ) -> Result<Confirmacion, FalloDeProtocolo> {
+        self.confirmar_subida_reanudada(permiso)
+    }
+
+    fn reportar_desaparecidos(
+        &self,
+        raiz: &RaizId,
+        entradas: &[Desaparicion],
+        viva: &EstadoDeRaiz,
+    ) -> Result<Cuarentena, FalloDeProtocolo> {
+        self.reportar_desaparecidos(raiz, entradas, viva)
+    }
+
+    fn cerrar_barrido(
+        &self,
+        barrido: &SweepId,
+        cierre: EstadoDelBarrido,
+    ) -> Result<CierreAplicado, FalloDeProtocolo> {
+        self.cerrar_barrido(barrido, cierre)
     }
 }
 

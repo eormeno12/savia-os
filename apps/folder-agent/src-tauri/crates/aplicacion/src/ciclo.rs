@@ -26,7 +26,7 @@ use savia_folder_estado::almacen::Almacen;
 use savia_folder_estado::colas::{Desenlace, Proximo, Recibido, Trabajo, TrabajoId};
 use savia_folder_maquina::maquina::{self, Nodo, OrigenDeSenal, Senal};
 use savia_folder_politica::salvaguardas::{IndiceDeContenido, Politica, PorQueNoSeReporta};
-use savia_folder_protocolo::{Cliente, FalloDeProtocolo};
+use savia_folder_protocolo::{CanalDeSavia, FalloDeProtocolo};
 
 /// **EL RESUMEN CUENTA LOS DIEZ NODOS, NO SEIS.** El doc de `Nodo` dice que la rama va
 /// en la salida «porque es lo que el panel muestra por raiz»; mientras cuatro variantes
@@ -266,7 +266,7 @@ pub fn drenar(
     raiz: &RaizId,
     plataforma: &dyn Plataforma,
     almacen: &mut Almacen,
-    cliente: &Cliente,
+    canal: &dyn CanalDeSavia,
     traza: &mut Vec<String>,
 ) -> ResultadoDelDrenaje {
     // EL LAZO NO PUEDE GIRAR EN VACIO, Y LA GARANTIA ES ESTRUCTURAL, NO UNA LISTA DE
@@ -289,7 +289,7 @@ pub fn drenar(
             traza.push("  (la cola no se movio: se corta el drenaje)".into());
             return ResultadoDelDrenaje::Vacia;
         }
-        let (id, desenlace) = ejecutar(raiz, plataforma, almacen, cliente, &trabajo, traza);
+        let (id, desenlace) = ejecutar(raiz, plataforma, almacen, canal, &trabajo, traza);
         // Si el trabajo no avanza —reintentable con la red caida— se corta el lazo en vez
         // de girar para siempre. El reintento con espera es del drenador de produccion, y
         // su curva entra por parametro; aca no se inventa ninguna.
@@ -309,7 +309,7 @@ fn ejecutar(
     raiz: &RaizId,
     plataforma: &dyn Plataforma,
     almacen: &mut Almacen,
-    cliente: &Cliente,
+    canal: &dyn CanalDeSavia,
     trabajo: &Trabajo,
     traza: &mut Vec<String>,
 ) -> (TrabajoId, Desenlace) {
@@ -319,7 +319,7 @@ fn ejecutar(
             // EL SERVIDOR COMPARA ESE `total` CONTRA SUS DOCUMENTOS VIVOS y contesta si
             // hace falta el padron. La bandera entra a la cola pegada al `sweepId`: es la
             // respuesta a ESTE `sweep.open` y a ninguno otro.
-            let r = cliente.abrir_barrido(raiz, *total);
+            let r = canal.abrir_barrido(raiz, *total);
             if let Ok(b) = &r
                 && b.padron_requerido
             {
@@ -338,7 +338,7 @@ fn ejecutar(
             (
                 id.clone(),
                 a_desenlace(
-                    cliente
+                    canal
                         .reportar_observados(raiz, entradas)
                         .map(Recibido::Decisiones),
                 ),
@@ -361,11 +361,7 @@ fn ejecutar(
                 .collect();
             (
                 id.clone(),
-                a_desenlace(
-                    cliente
-                        .enviar_padron(sweep, &payload)
-                        .map(|_| Recibido::Nada),
-                ),
+                a_desenlace(canal.enviar_padron(sweep, &payload).map(|_| Recibido::Nada)),
             )
         }
         Trabajo::Desvanecer { id, entradas, .. } => {
@@ -393,7 +389,7 @@ fn ejecutar(
             (
                 id.clone(),
                 a_desenlace(
-                    cliente
+                    canal
                         .reportar_desaparecidos(raiz, &bajas, &estado)
                         .map(|_| Recibido::Nada),
                 ),
@@ -403,7 +399,7 @@ fn ejecutar(
             id, sweep, cierre, ..
         } => {
             traza.push(format!("sweep.close {cierre:?}"));
-            let r = cliente.cerrar_barrido(sweep, *cierre);
+            let r = canal.cerrar_barrido(sweep, *cierre);
             // LO QUE SAVIA RETIRO VA A LA TRAZA. El agente no lo decide y no lo puede
             // discutir, pero es lo unico que le dice que un documento suyo dejo de estar
             // vigente — y sin eso el panel no tiene como mostrarlo.
@@ -445,7 +441,7 @@ fn ejecutar(
                 }
                 Ok(bytes) => {
                     traza.push(format!("PUT {} ({} bytes)", ruta.como_str(), bytes.len()));
-                    let d = match cliente.subir(permiso, &bytes) {
+                    let d = match canal.subir(permiso, &bytes) {
                         Ok(_) => Desenlace::Entregado(Recibido::Nada),
                         // EL TOPE DEL PERMISO NO ES UNA ALERTA PARA UNA PERSONA. Es la
                         // comprobacion previa diciendo que los bytes que hay en disco ya
@@ -470,7 +466,7 @@ fn ejecutar(
             // El testigo `Subido` no se puede fabricar, asi que la segunda fase se hace
             // con el id persistido. Es el precio de partir la subida en dos fases, y se
             // paga a proposito: un ACK perdido reintenta el ACK, no el archivo entero.
-            let r = cliente.confirmar_subida_reanudada(permiso);
+            let r = canal.confirmar_subida_reanudada(permiso);
             match r {
                 Ok(c) => {
                     if c.divergio {

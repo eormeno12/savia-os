@@ -10,3 +10,15 @@ version = "0.0.0"
 edition = "2024"
 rust-version = "1.97"
 publish = false
+
+# SOLO PARA `tests/canal_de_savia.rs`, el guardian de FASE 2(a) que prueba por tipos
+# —no por texto— que `ciclo::drenar` acepta cualquier `CanalDeSavia`, no el struct
+# `Cliente` por nombre. Los guardianes de `guardianes.rs` siguen sin dependencias: solo
+# leen fuentes con `std::fs`.
+[dev-dependencies]
+savia-folder-aplicacion = { path = "../aplicacion" }
+savia-folder-protocolo = { path = "../protocolo" }
+savia-folder-contrato = { path = "../contrato" }
+savia-folder-politica = { path = "../politica" }
+savia-folder-estado = { path = "../estado" }
+savia-folder-plataforma-falsa = { path = "../plataforma-falsa" }

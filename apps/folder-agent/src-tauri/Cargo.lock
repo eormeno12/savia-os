@@ -2928,6 +2928,14 @@ dependencies = [
 [[package]]
 name = "savia-folder-guardianes"
 version = "0.0.0"
+dependencies = [
+ "savia-folder-aplicacion",
+ "savia-folder-contrato",
+ "savia-folder-estado",
+ "savia-folder-plataforma-falsa",
+ "savia-folder-politica",
+ "savia-folder-protocolo",
+]
 
 [[package]]
 name = "savia-folder-host"
