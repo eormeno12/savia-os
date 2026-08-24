@@ -137,6 +137,12 @@ const panel = {
 
 // ── El onboarding — seis pantallas ──────────────────────────────────────────
 const onboarding = {
+  // El mismo "Atrás" vuelve en dos botones de volver distintos (Q2→Q1,
+  // Q4→Q3) — una sola clave, no dos copias de la misma palabra.
+  accesibilidad: {
+    atras: "Atrás",
+  },
+
   // 1 · Qué es esto
   q1: {
     eyebrow: "ANTES DE EMPEZAR",
@@ -187,6 +193,12 @@ const onboarding = {
   // 3 · Permiso de disco — dos contextos: la primera vez (adentro del
   // onboarding) y cuando vuelve a aparecer después, sola, sobre el panel.
   q3: {
+    // El nombre de carpeta que se muestra antes de que exista una carpeta
+    // elegida — es el sentinel documentado en `permiso_de_disco_concedido`
+    // (Rust): la carpeta contra la que efectivamente se prueba el permiso.
+    // Sigue siendo texto que la persona lee, así que vive acá y no como
+    // literal en `onboarding.js`.
+    carpetaCandidataPorDefecto: "Documentos",
     primeraVez: {
       titulo: (carpeta) => `Savia no puede leer ${carpeta}.`,
       cuerpo: "macOS pide permiso explícito para esta carpeta. Ábrelo en Ajustes del Sistema y activa Savia.",
@@ -282,6 +294,14 @@ const folders = {
   titulo: "Carpetas",
   tocarParaVerArchivos: "Toca la carpeta para ver sus archivos",
   agregarCarpeta: panel.agregarCarpeta,
+
+  // D7 alcanza también lo que anuncia un lector de pantalla, no solo el texto
+  // visible: los `aria-label` de navegación pura, sin texto al lado que ya
+  // los cargue, viven acá.
+  accesibilidad: {
+    masOpciones: "Más opciones",
+    volver: "Volver",
+  },
 
   // El menú «⋯» de una carpeta: abrir en Finder o dejar de mirarla.
   menu: {

@@ -114,7 +114,7 @@ function tarjetaDeCarpeta(carpeta) {
           <div class="carpeta-card__nombre">${esc(nombre)}</div>
           <div class="carpeta-card__ruta" title="${esc(carpeta.rutaAbsoluta)}"><span>${esc(carpeta.rutaAbsoluta)}</span></div>
         </div>
-        <button class="carpeta-card__menu-btn" type="button" data-nav="menu" data-carpeta="${esc(carpeta.id)}" aria-label="Más opciones">⋯</button>
+        <button class="carpeta-card__menu-btn" type="button" data-nav="menu" data-carpeta="${esc(carpeta.id)}" aria-label="${esc(TEXTOS.folders.accesibilidad.masOpciones)}">⋯</button>
       </div>
       <div class="carpeta-card__docs">${esc(TEXTOS.panel.documentos.enSavia(carpeta.indexados))}</div>
       <div class="carpeta-card__badges">${badgeHtml(carpeta)}</div>
@@ -291,7 +291,7 @@ function vistaArchivos(vista, carpetaId) {
   return `
     <div class="archivos-vista">
       <div class="archivos-vista__cabecera">
-        <button class="archivos-vista__atras" type="button" data-nav="list" aria-label="Volver">←</button>
+        <button class="archivos-vista__atras" type="button" data-nav="list" aria-label="${esc(TEXTOS.folders.accesibilidad.volver)}">←</button>
         <div class="archivos-vista__nombre" title="${esc(c.rutaAbsoluta)}">${esc(nombre)}</div>
       </div>
       <div class="archivos-vista__badges">${badgeHtml(c)}</div>

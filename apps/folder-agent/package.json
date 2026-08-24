@@ -14,10 +14,12 @@
     "nucleo:banco": "node sim/banco.ts",
     "nucleo:build": "cargo build --manifest-path src-tauri/Cargo.toml --workspace",
     "nucleo:lint": "pnpm nucleo:fmt && pnpm nucleo:clippy && pnpm nucleo:windows",
-    "lint": "pnpm nucleo:lint && pnpm nucleo:test && pnpm sim:ejercicio && pnpm nucleo:banco && pnpm panel:tokens && pnpm panel:icono && pnpm panel:contraste",
+    "lint": "pnpm nucleo:lint && pnpm nucleo:test && pnpm sim:ejercicio && pnpm nucleo:banco && pnpm panel:tokens && pnpm panel:icono && pnpm panel:contraste && pnpm panel:precedencia && pnpm panel:palabras",
     "panel:contraste": "node scripts/contraste.mjs",
     "panel:tokens": "node scripts/tokens.mjs",
-    "panel:icono": "node scripts/icono.mjs"
+    "panel:icono": "node scripts/icono.mjs",
+    "panel:precedencia": "node scripts/precedencia.mjs",
+    "panel:palabras": "node scripts/palabras.mjs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.11.4"

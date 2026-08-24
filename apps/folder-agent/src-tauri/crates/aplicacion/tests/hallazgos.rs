@@ -1138,8 +1138,97 @@ fn quitar_una_carpeta_con_trabajo_en_vuelo_no_deja_nada_pendiente() {
     // trabajo A MEDIO CAMINO — Savia ya contesto que hace falta el padron y todavia no se
     // le mando — para que `desenrolar` tenga algo real que soltar.
     let p = Falsa::como_macos();
-    p.poner("x.txt", b"contenido", 100, Some(1));
     let mut a = almacen();
+
+    // SEED: una ruta que Savia rechaza de una, para dejarla ENVENENADA antes de que
+    // empiece el escenario real de abajo. `x.txt` nunca envenena nada por si solo, asi
+    // que sin este paso `rutas_envenenadas().is_empty()` de mas abajo tambien queda
+    // vacia (Fase 8, verificado a mano).
+    p.poner("veneno.txt", b"algo", 50, Some(9));
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+    ciclo::barrer(
+        &raiz(),
+        BarridoId::nuevo("veneno-1"),
+        &p,
+        &mut a,
+        &politica(),
+    );
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+    ciclo::barrer(
+        &raiz(),
+        BarridoId::nuevo("veneno-2"),
+        &p,
+        &mut a,
+        &politica(),
+    );
+    while let Proximo::Trabajo(t) = a.siguiente(&raiz()) {
+        let (id, desenlace) = match *t {
+            Trabajo::AbrirBarrido { id, .. } => (
+                id,
+                Desenlace::Entregado(Recibido::Barrido {
+                    sweep: SweepId("veneno-sweep".into()),
+                    padron_requerido: false,
+                }),
+            ),
+            Trabajo::Observar { id, .. } => (
+                id,
+                Desenlace::Rechazado {
+                    status: 400,
+                    cuerpo: "entrada invalida".into(),
+                    culpables: Vec::new(),
+                },
+            ),
+            Trabajo::CerrarBarrido { id, .. } => (
+                id,
+                Desenlace::Entregado(Recibido::Retirados {
+                    rutas: Vec::new(),
+                    congelada: false,
+                }),
+            ),
+            otro => panic!("el seed de veneno no puede producir otro trabajo: {otro:?}"),
+        };
+        a.resolver(&raiz(), &id, desenlace);
+    }
+    assert!(
+        a.colas()
+            .rutas_envenenadas(&raiz())
+            .iter()
+            .any(|r| r.como_str() == "veneno.txt"),
+        "el seed tiene que dejar la ruta envenenada antes de empezar el escenario real"
+    );
+
+    // SEED: un barrido vacio que Savia cierra con `congelada: true`, para dejar la
+    // marca puesta ANTES de que empiece el escenario real de abajo. Sin este paso la
+    // aserion `!congelada` de mas abajo queda vacia -esta raiz nunca estuvo congelada
+    // en el resto del test-, y una mutacion que borrara `congeladas.remove(raiz)` en
+    // `olvidar` no la hace fallar (Fase 8, verificado a mano).
+    ciclo::barrer(&raiz(), BarridoId::nuevo("seed"), &p, &mut a, &politica());
+    while let Proximo::Trabajo(t) = a.siguiente(&raiz()) {
+        let (id, recibido) = match *t {
+            Trabajo::AbrirBarrido { id, .. } => (
+                id,
+                Recibido::Barrido {
+                    sweep: SweepId("seed-sweep".into()),
+                    padron_requerido: false,
+                },
+            ),
+            Trabajo::CerrarBarrido { id, .. } => (
+                id,
+                Recibido::Retirados {
+                    rutas: Vec::new(),
+                    congelada: true,
+                },
+            ),
+            otro => panic!("el seed no puede producir otro trabajo: {otro:?}"),
+        };
+        a.resolver(&raiz(), &id, Desenlace::Entregado(recibido));
+    }
+    assert!(
+        a.colas().congelada(&raiz()),
+        "el seed tiene que dejar la marca puesta antes de empezar el escenario real"
+    );
+
+    p.poner("x.txt", b"contenido", 100, Some(1));
     p.avanzar(ASENTAMIENTO_DEL_BANCO);
     ciclo::barrer(&raiz(), BarridoId::nuevo("b1"), &p, &mut a, &politica());
 
@@ -1179,7 +1268,7 @@ fn quitar_una_carpeta_con_trabajo_en_vuelo_no_deja_nada_pendiente() {
     );
     assert!(
         !a.colas().congelada(&raiz()),
-        "nadie le mando a Savia un padron vacio que la hubiera congelado"
+        "nadie le mando a Savia un padron vacio que la hubiera congelado, y la marca vieja del seed tampoco sobrevive"
     );
     assert!(
         a.colas().rutas_envenenadas(&raiz()).is_empty(),

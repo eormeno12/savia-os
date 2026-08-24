@@ -145,6 +145,15 @@ objc2-foundation = "0.3"
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
+# `savia-folder-plataforma-falsa` es el doble de prueba de `Plataforma` — ningun binario
+# de produccion la nombra. Hace falta aca porque `bin/bandeja/comandos_archivo.rs` prueba
+# `ruta_absoluta_valida` contra un `Almacen` armado con un barrido REAL (`ciclo::barrer`
+# sobre `Falsa`), no con datos inventados a mano: es el mismo patron que
+# `crates/aplicacion/tests/hallazgos.rs`, y solo asi la fila `Presente`/`Ausente` que el
+# test ve es la que la maquina de estados produce de verdad.
+[dev-dependencies]
+savia-folder-plataforma-falsa = { path = "crates/plataforma-falsa" }
+
 # ── LA FEATURE QUE SEPARA EL NUCLEO DE LA VENTANA ───────────────────────────────
 #
 # **Esto es la version MECANICA de una garantia que ya tenia un guardian de texto.**

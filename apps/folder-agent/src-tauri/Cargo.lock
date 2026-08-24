@@ -2950,6 +2950,7 @@ dependencies = [
  "savia-folder-estado",
  "savia-folder-persistencia",
  "savia-folder-plataforma-adaptadores",
+ "savia-folder-plataforma-falsa",
  "savia-folder-politica",
  "savia-folder-protocolo",
  "serde",

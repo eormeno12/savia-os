@@ -189,7 +189,7 @@ function vistaQ2() {
     <div class="pantalla__contenido">
       <div class="pantalla__cuerpo">
         <div class="encabezado-de-paso">
-          <button class="boton--fantasma" data-ir="q1" aria-label="Atrás">&larr;</button>
+          <button class="boton--fantasma" data-ir="q1" aria-label="${esc(TEXTOS.onboarding.accesibilidad.atras)}">&larr;</button>
           <div class="eyebrow" style="margin-bottom:0;">${esc(t.eyebrow)}</div>
         </div>
         <div class="cuerpo">${esc(t.cuerpo)}</div>
@@ -303,7 +303,7 @@ function vistaQ3() {
   // Sentinel documentado en `permiso_de_disco_concedido` (Rust): en Q3
   // todavía no hay una carpeta elegida, así que el nombre que se muestra es
   // el de la carpeta contra la que efectivamente se prueba el permiso.
-  const carpetaCandidata = "Documentos";
+  const carpetaCandidata = t.carpetaCandidataPorDefecto;
   return `
     <div class="pantalla__contenido">
       <div class="q3 pantalla__cuerpo">
@@ -333,7 +333,7 @@ function vistaQ4() {
     <div class="pantalla__contenido">
       <div class="pantalla__cuerpo">
         <div class="encabezado-de-paso">
-          <button class="boton--fantasma" data-ir="q3" aria-label="Atrás">&larr;</button>
+          <button class="boton--fantasma" data-ir="q3" aria-label="${esc(TEXTOS.onboarding.accesibilidad.atras)}">&larr;</button>
           <div class="eyebrow" style="margin-bottom:0;">${esc(t.eyebrow)}</div>
         </div>
         <div class="titulo" style="margin-top:8px;">${esc(t.titulo)}</div>
