@@ -176,7 +176,7 @@ fn el_suplente_se_dice_distinto_del_disco_que_no_esta() {
 }
 
 #[test]
-fn congelado_le_gana_a_barriendo() {
+fn congelado_le_gana_a_leyendo() {
     let p = Falsa::como_macos();
     p.poner("contrato.docx", b"uno", 100, Some(1));
     let mut a = almacen();
@@ -221,16 +221,67 @@ fn congelado_le_gana_a_barriendo() {
 }
 
 #[test]
-fn un_barrido_abierto_dice_barriendo() {
+fn un_barrido_abierto_dice_leyendo() {
     let p = Falsa::como_macos();
     p.poner("contrato.docx", b"uno", 100, Some(1));
     let mut a = almacen();
     barrer_y_confirmar(&p, &mut a, 1);
     a.abrir_barrido(&raiz(), BarridoId::nuevo("b2"));
 
+    assert_eq!(panel::vista(&a, &p, TOPE).estado, EstadoDeCarpeta::Leyendo);
+}
+
+#[test]
+fn una_carpeta_recien_agregada_no_dice_al_dia_sin_documentos() {
+    let p = Falsa::como_macos();
+    p.poner("contrato.docx", b"uno", 100, Some(1));
+    let mut a = almacen();
+    // El primero solo anota el candidato —el asentamiento pide verlo dos veces—, y el
+    // segundo se deja SIN DRENAR: la fila queda AFIRMADA (procesando), nunca confirmada.
+    // El recorrido local de los dos barridos ya cerro (`colas.barriendo` es `false`) para
+    // cuando esto termina — es la ventana real que ve una carpeta recien enrolada, entre
+    // que el recorrido termina y Savia confirma el primer archivo.
+    ciclo::barrer(&raiz(), BarridoId::nuevo("b1"), &p, &mut a, &politica());
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+    ciclo::barrer(&raiz(), BarridoId::nuevo("b2"), &p, &mut a, &politica());
+
+    let v = panel::vista(&a, &p, TOPE);
     assert_eq!(
-        panel::vista(&a, &p, TOPE).estado,
-        EstadoDeCarpeta::Barriendo
+        v.carpetas[0].indexados, 0,
+        "todavia no hay nada confirmado por Savia"
+    );
+    assert_eq!(
+        v.carpetas[0].filas[0].estado,
+        EstadoDeArchivo::Procesando,
+        "la fila individual ya dice que esta en vuelo"
+    );
+    assert_eq!(
+        v.carpetas[0].estado,
+        EstadoDeCarpeta::Actualizando,
+        "«Al dia» sobre CERO documentos confirmados es la frase equivocada, aunque el \
+         barrido local ya haya cerrado"
+    );
+}
+
+#[test]
+fn una_carpeta_recien_enrolada_sin_ningun_barrido_dice_leyendo() {
+    // Una ventana todavia mas temprana que la de arriba: ni siquiera hay un candidato.
+    // Dice Leyendo y no Actualizando — nada se leyo todavia, nada hay para actualizar.
+    let p = Falsa::como_macos();
+    p.poner("contrato.docx", b"uno", 100, Some(1));
+    let a = almacen();
+
+    let v = panel::vista(&a, &p, TOPE);
+    assert_eq!(
+        v.carpetas[0].filas.len(),
+        0,
+        "todavia no corrio ningun barrido: ni un candidato"
+    );
+    assert_eq!(
+        v.carpetas[0].estado,
+        EstadoDeCarpeta::Leyendo,
+        "una carpeta recien enrolada que TODAVIA no corrio ningun barrido no puede decir \
+         «al dia» — no se sabe nada todavia, y eso no es lo mismo que saber que no hay nada"
     );
 }
 
@@ -263,7 +314,14 @@ fn el_agregado_es_el_peor_y_no_el_mas_comun() {
     let p = Falsa::como_macos();
     p.poner("contrato.docx", b"uno", 100, Some(1));
     let mut a = almacen();
+    // DOS barridos asentados, no uno: con uno solo la fila queda `Procesando` (el
+    // asentamiento pide verla dos veces, ver `una_carpeta_recien_agregada_no_dice_al_dia_sin_documentos`)
+    // y la raiz "sana" de este test dejaria de ser `Sincronizado` — exactamente el
+    // escenario que este test NO quiere ejercitar, porque lo que prueba es la
+    // precedencia del agregado sobre DOS raices, no el asentamiento de una.
     barrer_y_confirmar(&p, &mut a, 1);
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+    barrer_y_confirmar(&p, &mut a, 2);
 
     // Una segunda raiz enrolada con OTRA huella. La falsa contesta la misma evidencia
     // para las dos —no sabe de raices—, pero `raiz_viva` compara contra la huella que
@@ -496,7 +554,7 @@ fn las_fotos_de_ejemplo_del_panel_estan_al_dia() {
     let escenarios = serde_json::json!({
         "escenarios": [
             { "nombre": "Al día", "vista": escenario_al_dia() },
-            { "nombre": "Barriendo", "vista": escenario_barriendo() },
+            { "nombre": "Leyendo", "vista": escenario_leyendo() },
             { "nombre": "Congelado", "vista": escenario_congelado() },
             { "nombre": "Carpeta ausente", "vista": escenario_ausente() },
             { "nombre": "Un archivo falló", "vista": escenario_con_fallo() },
@@ -555,7 +613,7 @@ fn escenario_al_dia() -> panel::Vista {
     panel::vista(&a, &p, 6)
 }
 
-fn escenario_barriendo() -> panel::Vista {
+fn escenario_leyendo() -> panel::Vista {
     let (p, mut a) = corpus_al_dia();
     a.abrir_barrido(&raiz(), BarridoId::nuevo("b3"));
     panel::vista(&a, &p, 6)

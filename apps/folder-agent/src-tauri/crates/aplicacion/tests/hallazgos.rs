@@ -17,7 +17,7 @@ use savia_folder_contrato::colas::{
     Decision, Permiso, PermisoId, RangoDeTamano, SweepId, Veredicto,
 };
 use savia_folder_contrato::dominio::{
-    BarridoId, EstadoDelBarrido, HashVerificado, Mtime, Observacion, RaizId, RutaRelativa,
+    BarridoId, EstadoDelBarrido, HashVerificado, Mtime, Observacion, RaizId,
     SensibilidadAMayusculas,
 };
 use savia_folder_contrato::inventario::{EstadoDeFila, EstadoDeHash, Inventario};
@@ -29,108 +29,18 @@ use savia_folder_estado::colas::{
     Colas, Desenlace, Encolado, ParametrosDeCola, Proximo, Recibido, Trabajo, aparicion,
 };
 use savia_folder_plataforma_falsa::falsa::Falsa;
-use savia_folder_politica::salvaguardas::{self, Politica};
-use savia_folder_protocolo::{BaseDeApi, Cliente, Tiempos};
-use std::io::{Read, Write};
-use std::net::TcpListener;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use savia_folder_politica::salvaguardas;
+use savia_folder_protocolo::{BaseDeApi, Cliente};
 use std::time::Duration;
 
-/// El intervalo del BANCO, no del producto. `parametros::ASENTAMIENTO` sigue en `None`.
-const ASENTAMIENTO_DEL_BANCO: Duration = Duration::from_secs(30);
 /// El tope del BANCO, no del producto. `parametros::MAX_FILAS_DEL_PANEL` sigue en `None`.
 const TOPE_DEL_PANEL: usize = 50;
 
-fn raiz() -> RaizId {
-    RaizId::nueva("root-1")
-}
-
-fn registrada() -> RaizRegistrada {
-    RaizRegistrada {
-        id: raiz(),
-        huella: Falsa::huella_del_banco(),
-        ruta_absoluta: std::path::PathBuf::from("/no/se/toca"),
-        sensibilidad: SensibilidadAMayusculas::Distingue,
-    }
-}
-
-fn politica() -> Politica {
-    Politica::con_asentamiento(ASENTAMIENTO_DEL_BANCO).expect("el banco lo provee")
-}
-
-fn almacen() -> Almacen {
-    let mut a = Almacen::nuevo(ParametrosDeCola {
-        max_intentos: None,
-        max_entradas_por_lote: None,
-    });
-    a.enrolar(registrada());
-    a
-}
-
-fn r(s: &str) -> RutaRelativa {
-    RutaRelativa::canonica(s).expect("ruta del banco")
-}
-
-/// Drena contra un servidor de mentira que contesta `known` a todo, para que las filas
-/// queden con hash VERIFICADO — lo unico que despues puede viajar en una baja.
-fn confirmar_todo(a: &mut Almacen) {
-    loop {
-        let Proximo::Trabajo(t) = a.siguiente(&raiz()) else {
-            return;
-        };
-        let (id, recibido) = match *t {
-            Trabajo::AbrirBarrido { id, .. } => (
-                id,
-                Recibido::Barrido {
-                    sweep: SweepId("sweep-1".into()),
-                    padron_requerido: false,
-                },
-            ),
-            Trabajo::EnviarPadron { id, .. } => (id, Recibido::Nada),
-            Trabajo::Observar { id, entradas, .. } => {
-                let vs = entradas
-                    .into_iter()
-                    .map(|(ruta, afirmado)| Veredicto {
-                        ruta,
-                        afirmado,
-                        decision: Decision::Known {
-                            verificado: HashVerificado::rehidratar_del_inventario(
-                                *afirmado.bytes(),
-                            ),
-                        },
-                    })
-                    .collect();
-                (id, Recibido::Decisiones(vs))
-            }
-            Trabajo::Desvanecer { id, .. } => (id, Recibido::Nada),
-            Trabajo::CerrarBarrido { id, .. } => (
-                id,
-                Recibido::Retirados {
-                    rutas: Vec::new(),
-                    congelada: false,
-                },
-            ),
-            Trabajo::Subir { id, .. } => (id, Recibido::Nada),
-            Trabajo::ConfirmarSubida { id, .. } => (
-                id,
-                Recibido::Verificado(HashVerificado::rehidratar_del_inventario([9u8; 32])),
-            ),
-        };
-        a.resolver(&raiz(), &id, Desenlace::Entregado(recibido));
-    }
-}
-
-fn barrer_y_confirmar(p: &Falsa, a: &mut Almacen, n: u32) {
-    ciclo::barrer(
-        &raiz(),
-        BarridoId::nuevo(format!("b{n}")),
-        p,
-        a,
-        &politica(),
-    );
-    confirmar_todo(a);
-}
+mod comun;
+use comun::{
+    ASENTAMIENTO_DEL_BANCO, Mini, almacen, barrer_y_confirmar, confirmar_todo, politica, r, raiz,
+    registrada, tiempos_del_banco,
+};
 
 fn estado_de_hash(a: &Almacen, ruta: &str) -> Option<EstadoDeHash> {
     a.inventario()
@@ -764,106 +674,6 @@ fn un_ack_perdido_se_re_observa_en_el_proximo_barrido() {
 // 8 · LA API NUNCA TOCA BYTES
 // ══════════════════════════════════════════════════════════════════════════════
 
-/// Un servidor de una linea: acepta conexiones hasta que lo paran, anota
-/// `METODO ruta` de cada pedido y contesta lo que diga `responder`.
-struct Mini {
-    puerto: u16,
-    vistos: Arc<Mutex<Vec<String>>>,
-    parar: Arc<AtomicBool>,
-    hilo: Option<std::thread::JoinHandle<()>>,
-}
-
-impl Mini {
-    fn nuevo(responder: impl Fn(&str) -> (u16, String) + Send + 'static) -> Self {
-        let l = TcpListener::bind("127.0.0.1:0").expect("puerto efimero");
-        let puerto = l.local_addr().unwrap().port();
-        l.set_nonblocking(true).unwrap();
-        let vistos = Arc::new(Mutex::new(Vec::new()));
-        let parar = Arc::new(AtomicBool::new(false));
-        let (v, s) = (vistos.clone(), parar.clone());
-        let hilo = std::thread::spawn(move || {
-            while !s.load(Ordering::Relaxed) {
-                match l.accept() {
-                    Ok((mut c, _)) => {
-                        // EL ACEPTADO HEREDA `O_NONBLOCK` DEL LISTENER en macOS, y sin
-                        // sacarselo el primer `read` devuelve `WouldBlock`, el lazo de
-                        // abajo termina con el pedido vacio, y el servidor cierra mientras
-                        // el cliente todavia escribe el cuerpo: `Broken pipe` intermitente
-                        // que no tiene nada que ver con lo que la prueba afirma.
-                        c.set_nonblocking(false).ok();
-                        c.set_read_timeout(Some(Duration::from_secs(2))).ok();
-                        let mut crudo = Vec::new();
-                        let mut buf = [0u8; 4096];
-                        while let Ok(n) = c.read(&mut buf) {
-                            if n == 0 {
-                                break;
-                            }
-                            crudo.extend_from_slice(&buf[..n]);
-                            let texto = String::from_utf8_lossy(&crudo).to_string();
-                            let Some((cab, cuerpo)) = texto.split_once("\r\n\r\n") else {
-                                continue;
-                            };
-                            let largo = cab
-                                .lines()
-                                .find(|l| l.to_ascii_lowercase().starts_with("content-length:"))
-                                .and_then(|l| l.split(':').nth(1))
-                                .and_then(|l| l.trim().parse::<usize>().ok())
-                                .unwrap_or(0);
-                            if cuerpo.len() >= largo {
-                                break;
-                            }
-                        }
-                        let texto = String::from_utf8_lossy(&crudo).to_string();
-                        let linea = texto.lines().next().unwrap_or("").to_string();
-                        let mut partes = linea.split_whitespace();
-                        let clave = format!(
-                            "{} {}",
-                            partes.next().unwrap_or(""),
-                            partes.next().unwrap_or("")
-                        );
-                        v.lock().unwrap().push(clave.clone());
-                        let (codigo, cuerpo) = responder(&clave);
-                        let _ = c.write_all(
-                            format!(
-                                "HTTP/1.1 {codigo} X\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{cuerpo}",
-                                cuerpo.len()
-                            )
-                            .as_bytes(),
-                        );
-                    }
-                    Err(_) => std::thread::sleep(Duration::from_millis(5)),
-                }
-            }
-        });
-        Self {
-            puerto,
-            vistos,
-            parar,
-            hilo: Some(hilo),
-        }
-    }
-    fn vistos(&self) -> Vec<String> {
-        self.vistos.lock().unwrap().clone()
-    }
-}
-
-impl Drop for Mini {
-    fn drop(&mut self) {
-        self.parar.store(true, Ordering::Relaxed);
-        if let Some(h) = self.hilo.take() {
-            let _ = h.join();
-        }
-    }
-}
-
-fn tiempos_del_banco() -> Tiempos {
-    Tiempos {
-        conexion: Duration::from_secs(2),
-        por_llamada: Duration::from_secs(2),
-        envio_de_cuerpo: None,
-    }
-}
-
 #[test]
 fn el_put_abre_el_socket_del_permiso_y_no_el_de_la_api() {
     // IMPORTA PORQUE: un permiso prefirmado REAL es siempre una URL absoluta a otro host.
@@ -1397,5 +1207,304 @@ fn reagregar_una_carpeta_que_perdio_casi_todo_dispara_el_corte_por_volumen() {
         v.carpetas[0].estado,
         EstadoDeCarpeta::Congelado,
         "y la carpeta puntual tambien, no solo el agregado del dispositivo"
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 11 · `.git`, `.DS_Store` Y CUALQUIER DOTFILE NUNCA SE ENUMERAN
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// Sin filtro, un `.git` adentro de la raiz vigilada terminaba con sus objetos sueltos
+/// y sus refs subidos a Savia como si fueran documentos — y `.DS_Store`, el metadata de
+/// Finder, igual. La convencion (Unix, git, rsync) es que un nombre que empieza con "."
+/// no es para mostrar; `nombre_excluido_por_convencion` en `contrato::dominio` la
+/// aplica en el unico lugar que enumera de verdad
+/// (`plataforma-adaptadores::macos::recorrer`), y `Falsa` la espeja para que este banco
+/// la ejerza sin disco real.
+#[test]
+fn un_git_y_un_ds_store_nunca_llegan_a_fila() {
+    let p = Falsa::como_macos();
+    p.poner("contrato.docx", b"uno", 100, Some(1));
+    p.poner(".DS_Store", b"metadata de finder", 100, Some(2));
+    p.poner(".git/HEAD", b"ref: refs/heads/main", 100, Some(3));
+    p.poner(
+        ".git/objects/ab/cdef0123456789",
+        b"blob suelto",
+        100,
+        Some(4),
+    );
+    p.poner("sub/.env", b"SECRETO=1", 100, Some(5));
+    let mut a = almacen();
+    barrer_y_confirmar(&p, &mut a, 1);
+
+    let rutas: Vec<String> = a
+        .inventario()
+        .entradas(&raiz())
+        .into_iter()
+        .map(|e| e.ruta.como_str().to_string())
+        .collect();
+    assert_eq!(
+        rutas,
+        vec!["contrato.docx".to_string()],
+        "el `.git`, el `.DS_Store` y el `.env` bajo un directorio con punto no tienen \
+         que dejar fila — solo el documento real"
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 12 · `detenido` SE LIMPIA, O "VOLVER A VINCULAR" APRUEBA Y NO CAMBIA NADA
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// `Colas::detenido` se ponia en `Some` con `Desenlace::Credenciales` y nada en el
+/// codebase lo volvia a `None` — ni el tiempo, ni un intento que salga bien, ni un token
+/// nuevo. `siguiente` lo mira ANTES que cualquier otra cosa, asi que una vez fijado
+/// bloqueaba la raiz para siempre: aprobar un codigo nuevo en "Volver a vincular" dejaba
+/// un `Secreto` valido en el cliente, pero el panel seguia mostrando "Sin acceso" porque
+/// nada le habia pedido a `Colas` que lo olvidara. `Colas::reanudar` es el unico camino
+/// de vuelta, y el hilo de trabajo lo llama justo cuando adopta el token nuevo (ver
+/// `bin/bandeja/main.rs`, el drenaje de `token_pendiente`).
+#[test]
+fn reanudar_saca_el_atasco_que_dejo_una_credencial_rechazada() {
+    let raiz = raiz();
+    let mut c = cola_hasta_el_cierre(&raiz);
+    let Proximo::Trabajo(t) = c.siguiente(&raiz) else {
+        panic!("falta el cierre")
+    };
+    let Trabajo::CerrarBarrido { id, .. } = *t else {
+        panic!("el tercero es sweep.close")
+    };
+    c.resolver(&id, Desenlace::Credenciales("401".into()));
+    assert!(
+        matches!(c.siguiente(&raiz), Proximo::Detenida(_)),
+        "una credencial rechazada tiene que detener la raiz"
+    );
+
+    c.reanudar();
+
+    assert!(
+        !matches!(c.siguiente(&raiz), Proximo::Detenida(_)),
+        "un token nuevo tiene que sacar el atasco — 'Volver a vincular' aprobado no puede \
+         seguir mostrando 'Sin acceso'"
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 13 · UN DISPOSITIVO DETENIDO NO ACUMULA UN BARRIDO POR VUELTA
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// Contesta 401 a `sweep.open` siempre. Los otros seis metodos son `unreachable!()`:
+/// con la apertura rechazada nunca hay hechos que observar ni cierre que pedir en ESTE
+/// escenario (la raiz del banco no tiene archivos), y una vez que `Colas::detenido`
+/// queda en `Some`, `siguiente` corta por `Proximo::Detenida` antes de volver a tocar
+/// el canal.
+struct CanalCredencialesRechazadas;
+
+impl savia_folder_protocolo::CanalDeSavia for CanalCredencialesRechazadas {
+    fn abrir_barrido(
+        &self,
+        _raiz: &RaizId,
+        _total: u64,
+    ) -> Result<
+        savia_folder_contrato::protocolo::BarridoAbierto,
+        savia_folder_protocolo::FalloDeProtocolo,
+    > {
+        Err(savia_folder_protocolo::FalloDeProtocolo::Estado {
+            llamada: "sweep.open",
+            codigo: 401,
+            cuerpo: "credenciales invalidas".into(),
+        })
+    }
+    fn enviar_padron(
+        &self,
+        _barrido: &SweepId,
+        _entradas: &[(String, Option<String>)],
+    ) -> Result<u64, savia_folder_protocolo::FalloDeProtocolo> {
+        unreachable!("con la apertura rechazada, nada pasa de `sweep.open`")
+    }
+    fn reportar_observados(
+        &self,
+        _raiz: &RaizId,
+        _entradas: &[(
+            savia_folder_contrato::dominio::RutaRelativa,
+            savia_folder_contrato::dominio::HashAfirmado,
+        )],
+    ) -> Result<Vec<Veredicto>, savia_folder_protocolo::FalloDeProtocolo> {
+        unreachable!("idem")
+    }
+    fn subir(
+        &self,
+        _permiso: &Permiso,
+        _bytes: &[u8],
+    ) -> Result<savia_folder_protocolo::Subido, savia_folder_protocolo::FalloDeProtocolo> {
+        unreachable!("idem")
+    }
+    fn confirmar_subida_reanudada(
+        &self,
+        _permiso: &PermisoId,
+    ) -> Result<
+        savia_folder_contrato::protocolo::Confirmacion,
+        savia_folder_protocolo::FalloDeProtocolo,
+    > {
+        unreachable!("idem")
+    }
+    fn reportar_desaparecidos(
+        &self,
+        _raiz: &RaizId,
+        _entradas: &[salvaguardas::Desaparicion],
+        _viva: &salvaguardas::EstadoDeRaiz,
+    ) -> Result<
+        savia_folder_contrato::protocolo::Cuarentena,
+        savia_folder_protocolo::FalloDeProtocolo,
+    > {
+        unreachable!("idem")
+    }
+    fn cerrar_barrido(
+        &self,
+        _barrido: &SweepId,
+        _cierre: EstadoDelBarrido,
+    ) -> Result<
+        savia_folder_contrato::protocolo::CierreAplicado,
+        savia_folder_protocolo::FalloDeProtocolo,
+    > {
+        unreachable!("con la apertura rechazada, el cierre nunca llega a pedirse")
+    }
+}
+
+/// Contesta EXITO a todo. Solo se usa DESPUES de `reanudar()`, para contar cuantas
+/// `sweep.open` hacen falta para vaciar la cola entera de esta raiz.
+struct CanalQueAceptaTodo {
+    aperturas: std::cell::Cell<u32>,
+}
+
+impl savia_folder_protocolo::CanalDeSavia for CanalQueAceptaTodo {
+    fn abrir_barrido(
+        &self,
+        _raiz: &RaizId,
+        _total: u64,
+    ) -> Result<
+        savia_folder_contrato::protocolo::BarridoAbierto,
+        savia_folder_protocolo::FalloDeProtocolo,
+    > {
+        self.aperturas.set(self.aperturas.get() + 1);
+        Ok(savia_folder_contrato::protocolo::BarridoAbierto {
+            sweep_id: SweepId(format!("sweep-{}", self.aperturas.get())),
+            padron_requerido: false,
+        })
+    }
+    fn enviar_padron(
+        &self,
+        _barrido: &SweepId,
+        _entradas: &[(String, Option<String>)],
+    ) -> Result<u64, savia_folder_protocolo::FalloDeProtocolo> {
+        unreachable!("la raiz del banco no tiene archivos: no hay padron que pedir")
+    }
+    fn reportar_observados(
+        &self,
+        _raiz: &RaizId,
+        _entradas: &[(
+            savia_folder_contrato::dominio::RutaRelativa,
+            savia_folder_contrato::dominio::HashAfirmado,
+        )],
+    ) -> Result<Vec<Veredicto>, savia_folder_protocolo::FalloDeProtocolo> {
+        unreachable!("sin archivos no hay observados que reportar")
+    }
+    fn subir(
+        &self,
+        _permiso: &Permiso,
+        _bytes: &[u8],
+    ) -> Result<savia_folder_protocolo::Subido, savia_folder_protocolo::FalloDeProtocolo> {
+        unreachable!("sin archivos no hay bytes que subir")
+    }
+    fn confirmar_subida_reanudada(
+        &self,
+        _permiso: &PermisoId,
+    ) -> Result<
+        savia_folder_contrato::protocolo::Confirmacion,
+        savia_folder_protocolo::FalloDeProtocolo,
+    > {
+        unreachable!("idem")
+    }
+    fn reportar_desaparecidos(
+        &self,
+        _raiz: &RaizId,
+        _entradas: &[salvaguardas::Desaparicion],
+        _viva: &salvaguardas::EstadoDeRaiz,
+    ) -> Result<
+        savia_folder_contrato::protocolo::Cuarentena,
+        savia_folder_protocolo::FalloDeProtocolo,
+    > {
+        unreachable!("sin archivos no hay bajas que reportar")
+    }
+    fn cerrar_barrido(
+        &self,
+        _barrido: &SweepId,
+        _cierre: EstadoDelBarrido,
+    ) -> Result<
+        savia_folder_contrato::protocolo::CierreAplicado,
+        savia_folder_protocolo::FalloDeProtocolo,
+    > {
+        Ok(savia_folder_contrato::protocolo::CierreAplicado {
+            retirados: Vec::new(),
+            congelada: false,
+        })
+    }
+}
+
+#[test]
+fn un_dispositivo_detenido_no_acumula_un_barrido_por_vuelta() {
+    // IMPORTA PORQUE: es el escenario medido en produccion, punta a punta — 25.410 de
+    // 33.604 segmentos acumulados, casi todos con `falta AbrirBarrido`, con el token
+    // muerto. `Colas::resolver` nunca corre sobre esa credencial rechazada —`siguiente`
+    // corta por `Proximo::Detenida` ANTES de eso, y `ciclo::barrer` sigue abriendo un
+    // barrido por vuelta igual, a proposito, para que el observador no se detenga— asi
+    // que es `abrir_barrido`, y no `resolver`, quien tiene que podar aca.
+    let p = Falsa::como_macos();
+    let mut a = almacen();
+    let canal_roto = CanalCredencialesRechazadas;
+
+    let mut pesos = Vec::new();
+    for n in 1..=20u32 {
+        ciclo::barrer(
+            &raiz(),
+            BarridoId::nuevo(format!("v{n:02}")),
+            &p,
+            &mut a,
+            &politica(),
+        );
+        p.avanzar(ASENTAMIENTO_DEL_BANCO);
+        let mut traza = Vec::new();
+        ciclo::drenar(&raiz(), &p, &mut a, &canal_roto, &mut traza);
+        pesos.push(serde_json::to_string(&a.para_guardar()).unwrap().len());
+    }
+    assert_eq!(
+        a.colas().detenido(),
+        Some(savia_folder_estado::colas::MotivoDeDetencion::Credenciales),
+        "la raiz tiene que seguir detenida al cabo de las veinte vueltas"
+    );
+    // Vuelta 10 contra vuelta 20: las dos caen bien adentro de la meseta y ninguna cruza
+    // el borde de digitos de `proximo_id` (que en este escenario pasa de un digito a dos
+    // entre la vuelta 8 y la 9) — ver el mismo razonamiento, medido, en
+    // `persistencia::diez_barridos_sin_drenar_no_pesan_mas_que_cuatro`.
+    assert_eq!(
+        pesos[9], pesos[19],
+        "detenido, el tamano tiene que quedar CONSTANTE desde temprano y no crecer uno \
+         por vuelta: {pesos:?}"
+    );
+
+    // Se adopta un token nuevo ("Volver a vincular" aprobado, o el reinicio de sesion).
+    a.reanudar();
+
+    // Y drenar la cola ENTERA tiene que abrir el barrido UNA sola vez, no veinte: los
+    // diecinueve anteriores ya quedaron superados durante la detencion, no colgados en
+    // la cola esperando su turno.
+    let canal_ok = CanalQueAceptaTodo {
+        aperturas: std::cell::Cell::new(0),
+    };
+    let mut traza = Vec::new();
+    ciclo::drenar(&raiz(), &p, &mut a, &canal_ok, &mut traza);
+    assert_eq!(
+        canal_ok.aperturas.get(),
+        1,
+        "solo el ULTIMO barrido sigue en pie: {traza:?}"
     );
 }

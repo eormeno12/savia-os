@@ -6,33 +6,22 @@
 //! de este crate—, porque una prueba que no dice que rompe si falla es una prueba que
 //! alguien borra cuando molesta.
 
-use savia_folder_aplicacion::ciclo;
-use savia_folder_contrato::colas::{Decision, SweepId, Veredicto};
-use savia_folder_contrato::dominio::{
-    BarridoId, EstadoDelBarrido, HashVerificado, RaizId, SensibilidadAMayusculas,
-};
-use savia_folder_contrato::plataforma::RaizRegistrada;
+use savia_folder_aplicacion::ciclo::{self, ResultadoDelDrenaje};
+use savia_folder_contrato::dominio::{BarridoId, EstadoDelBarrido};
+use savia_folder_contrato::protocolo::Credencial;
 use savia_folder_estado::almacen::Almacen;
-use savia_folder_estado::colas::{Desenlace, ParametrosDeCola, Proximo, Recibido, Trabajo};
 use savia_folder_plataforma_falsa::falsa::Falsa;
-use savia_folder_politica::salvaguardas::Politica;
-use std::time::Duration;
+use savia_folder_protocolo::{BaseDeApi, Cliente};
 
-/// El intervalo del BANCO, no del producto. `parametros::ASENTAMIENTO` sigue en `None`.
-const ASENTAMIENTO_DEL_BANCO: Duration = Duration::from_secs(30);
+mod comun;
+use comun::{
+    ASENTAMIENTO_DEL_BANCO, Mini, almacen, confirmar_todo, politica, raiz, tiempos_del_banco,
+};
 
 /// Cuantos archivos tiene el escenario. **No es un parametro de nada**: es el tamano del
 /// banco, y esta nombrado para que las afirmaciones de abajo comparen contra el mismo
 /// numero que el escenario planta en vez de contra un literal repetido.
 const ARCHIVOS: usize = 7;
-
-fn raiz() -> RaizId {
-    RaizId::nueva("root-1")
-}
-
-fn politica() -> Politica {
-    Politica::con_asentamiento(ASENTAMIENTO_DEL_BANCO).expect("el banco lo provee")
-}
 
 /// El MISMO escenario, dos veces. Cada llamada estrena su `Falsa` y su `Almacen`: las dos
 /// vueltas que se comparan tienen que partir de estados independientes pero identicos, o
@@ -47,69 +36,9 @@ fn escenario() -> (Falsa, Almacen) {
             Some(i as u128 + 1),
         );
     }
-    let mut a = Almacen::nuevo(ParametrosDeCola {
-        max_intentos: None,
-        max_entradas_por_lote: None,
-    });
-    a.enrolar(RaizRegistrada {
-        id: raiz(),
-        huella: Falsa::huella_del_banco(),
-        ruta_absoluta: std::path::PathBuf::from("/no/se/toca"),
-        sensibilidad: SensibilidadAMayusculas::Distingue,
-    });
+    let a = almacen();
     p.avanzar(ASENTAMIENTO_DEL_BANCO);
     (p, a)
-}
-
-/// El servidor de mentira: contesta `known` a todo y deja las filas con hash CONFIRMADO,
-/// que es lo unico que despues puede viajar en una baja. Sin esta vuelta, sacar un archivo
-/// no produce ninguna baja —no hay documento del otro lado que retirar— y el test del
-/// cierre estaria comparando dos resumenes vacios.
-fn confirmar_todo(a: &mut Almacen) {
-    loop {
-        let Proximo::Trabajo(t) = a.siguiente(&raiz()) else {
-            return;
-        };
-        let (id, recibido) = match *t {
-            Trabajo::AbrirBarrido { id, .. } => (
-                id,
-                Recibido::Barrido {
-                    sweep: SweepId("sweep-del-banco".into()),
-                    padron_requerido: false,
-                },
-            ),
-            Trabajo::EnviarPadron { id, .. } => (id, Recibido::Nada),
-            Trabajo::Observar { id, entradas, .. } => {
-                let vs = entradas
-                    .into_iter()
-                    .map(|(ruta, afirmado)| Veredicto {
-                        ruta,
-                        afirmado,
-                        decision: Decision::Known {
-                            verificado: HashVerificado::rehidratar_del_inventario(
-                                *afirmado.bytes(),
-                            ),
-                        },
-                    })
-                    .collect();
-                (id, Recibido::Decisiones(vs))
-            }
-            Trabajo::Desvanecer { id, .. } => (id, Recibido::Nada),
-            Trabajo::CerrarBarrido { id, .. } => (
-                id,
-                Recibido::Retirados {
-                    rutas: Vec::new(),
-                    congelada: false,
-                },
-            ),
-            Trabajo::Subir { id, .. } => (id, Recibido::Nada),
-            Trabajo::ConfirmarSubida { id, .. } => (
-                id,
-                Recibido::Verificado(HashVerificado::rehidratar_del_inventario([9u8; 32])),
-            ),
-        };
-        a.resolver(&raiz(), &id, Desenlace::Entregado(recibido));
-    }
 }
 
 #[test]
@@ -207,16 +136,7 @@ fn una_raiz_sin_archivos_no_avisa_nada() {
     // contrato es que el testigo NO se llama —no hay archivo iterado—, asi que quien
     // dibuje la barra nunca recibe un «0 de 0» que tenga que interpretar.
     let p = Falsa::como_macos();
-    let mut a = Almacen::nuevo(ParametrosDeCola {
-        max_intentos: None,
-        max_entradas_por_lote: None,
-    });
-    a.enrolar(RaizRegistrada {
-        id: raiz(),
-        huella: Falsa::huella_del_banco(),
-        ruta_absoluta: std::path::PathBuf::from("/no/se/toca"),
-        sensibilidad: SensibilidadAMayusculas::Distingue,
-    });
+    let mut a = almacen();
 
     let mut vistos: Vec<(usize, usize)> = Vec::new();
     let resumen = ciclo::barrer_reportando(
@@ -259,16 +179,7 @@ fn un_barrido_de_miles_avisa_una_vez_por_archivo_y_ni_una_de_mas() {
             Some(i as u128 + 1),
         );
     }
-    let mut a = Almacen::nuevo(ParametrosDeCola {
-        max_intentos: None,
-        max_entradas_por_lote: None,
-    });
-    a.enrolar(RaizRegistrada {
-        id: raiz(),
-        huella: Falsa::huella_del_banco(),
-        ruta_absoluta: std::path::PathBuf::from("/no/se/toca"),
-        sensibilidad: SensibilidadAMayusculas::Distingue,
-    });
+    let mut a = almacen();
     p.avanzar(ASENTAMIENTO_DEL_BANCO);
 
     // No se guarda la secuencia entera: se verifica en el momento. Un `Vec` de 5.000 pares
@@ -398,5 +309,269 @@ fn el_testigo_tampoco_mueve_la_vuelta_que_cierra_con_ausencias() {
         vistos[0].1,
         ARCHIVOS - 1,
         "el total de la segunda vuelta quedo pegado al de la primera"
+    );
+}
+
+// ═══════════════════ `drenar_reportando`: el mismo testigo, otro lazo ═══════════════════
+//
+// `drenar` no enumera nada por adelantado —a diferencia de `barrer`, el proximo trabajo
+// no se conoce hasta resolver el anterior—, asi que estos tests no comparten cuerpo con
+// los de arriba. Lo que SI comparten es el contrato: un testigo que mira y no participa,
+// y que un escenario identico produce el mismo resultado con o sin el.
+//
+// Los servidores de mentira son `comun::Mini` — extraido de `hallazgos.rs` porque
+// `CanalDeSavia::subir` devuelve un `Subido` con campos privados: solo el `Cliente` real
+// (adentro de `protocolo`) lo puede construir, asi que probar el tramo de bytes exige un
+// servidor de verdad del otro lado, no un `CanalDeSavia` fabricado a mano.
+
+fn servidor_de_bajas() -> Mini {
+    Mini::nuevo(|clave| match clave {
+        "POST /sweep/open" => (
+            200,
+            "{\"sweepId\":\"s-1\",\"padronRequerido\":false}".into(),
+        ),
+        "POST /presence/vanished" => (200, "{\"quarantined\":0,\"frozen\":false}".into()),
+        "POST /sweep/close" => (200, "{\"retired\":[],\"frozen\":false}".into()),
+        _ => (200, "{}".into()),
+    })
+}
+
+#[test]
+fn drenar_reportando_y_drenar_devuelven_el_mismo_resultado() {
+    // IMPORTA PORQUE: es el mismo contrato que `el_testigo_mira_y_no_participa` de
+    // arriba, pero del lado de `drenar` — el dia que la integracion cambie `drenar` por
+    // `drenar_reportando` adentro de `trabajar()`, esta prueba es la que garantiza que el
+    // agente entero sigue reportando exactamente las mismas bajas.
+    const SE_VA: &str = "carpeta/nota-3.md";
+
+    fn escenario_con_una_baja_encolada() -> (Falsa, Almacen) {
+        let (p, mut a) = escenario();
+        for n in 1..=2 {
+            ciclo::barrer(
+                &raiz(),
+                BarridoId::nuevo(format!("b{n}")),
+                &p,
+                &mut a,
+                &politica(),
+            );
+            confirmar_todo(&mut a);
+            p.avanzar(ASENTAMIENTO_DEL_BANCO);
+        }
+        p.sacar(SE_VA);
+        p.avanzar(ASENTAMIENTO_DEL_BANCO);
+        ciclo::barrer(&raiz(), BarridoId::nuevo("b3"), &p, &mut a, &politica());
+        (p, a)
+    }
+
+    let (_p1, mut a1) = escenario_con_una_baja_encolada();
+    let servidor1 = servidor_de_bajas();
+    let cliente1 = Cliente::nuevo(
+        BaseDeApi::nueva(&format!("http://127.0.0.1:{}", servidor1.puerto)).unwrap(),
+        Credencial::SinAutenticar,
+        tiempos_del_banco(),
+    );
+    let mut traza1 = Vec::new();
+    let resultado_sin = ciclo::drenar(&raiz(), &_p1, &mut a1, &cliente1, &mut traza1);
+
+    let (_p2, mut a2) = escenario_con_una_baja_encolada();
+    let servidor2 = servidor_de_bajas();
+    let cliente2 = Cliente::nuevo(
+        BaseDeApi::nueva(&format!("http://127.0.0.1:{}", servidor2.puerto)).unwrap(),
+        Credencial::SinAutenticar,
+        tiempos_del_banco(),
+    );
+    let mut traza2 = Vec::new();
+    let mut vistos: Vec<(usize, usize)> = Vec::new();
+    let resultado_con = ciclo::drenar_reportando(
+        &raiz(),
+        &_p2,
+        &mut a2,
+        &cliente2,
+        &mut traza2,
+        &mut |procesados, total| vistos.push((procesados, total)),
+    );
+
+    // **SIN ESTO EL TEST PUEDE PASAR SIN MIRAR NADA**: dos colas vacias tambien terminan
+    // igual. La afirmacion solo vale si el escenario de verdad tenia una baja para
+    // transmitir.
+    assert_eq!(
+        a1.colas().hechos_pendientes(&raiz()),
+        0,
+        "el escenario no drenó nada: la comparación de abajo no prueba nada"
+    );
+    assert_eq!(
+        resultado_sin, resultado_con,
+        "`drenar_reportando` devolvio otro resultado que `drenar` sobre el mismo escenario"
+    );
+    assert!(
+        !vistos.is_empty(),
+        "el testigo no se llamo ni una vez, asi que la comparacion de arriba no probo nada"
+    );
+    assert_eq!(
+        a2.colas().hechos_pendientes(&raiz()),
+        0,
+        "la vuelta con testigo dejo hechos sin drenar: el testigo desvio el lazo"
+    );
+}
+
+#[test]
+fn el_testigo_de_drenar_ve_bajar_hechos_pendientes_y_subir_bytes_pendientes() {
+    // IMPORTA PORQUE: a diferencia de `barrer_reportando`, `drenar_reportando` NO puede
+    // prometer un total constante — `Observar` recien descubre cuantos bytes hacen falta
+    // cuando Savia contesta. Esta prueba fija ese contrato: el total puede SUBIR a mitad
+    // de camino (cuando la respuesta trae decisiones `upload`), nunca es menor que lo ya
+    // procesado, y termina en «N de N» como cualquier otro cierre.
+    let (p, mut a) = escenario();
+    // El asentamiento pide ver cada archivo DOS veces: la primera solo anota el
+    // candidato (sin hecho), la segunda lo confirma y recien ahi encola el `Aparecio`.
+    ciclo::barrer(&raiz(), BarridoId::nuevo("b1"), &p, &mut a, &politica());
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+    ciclo::barrer(&raiz(), BarridoId::nuevo("b2"), &p, &mut a, &politica());
+
+    // Antes de drenar: ARCHIVOS altas encoladas, y todavia nadie le pidio bytes a nadie.
+    assert_eq!(a.colas().hechos_pendientes(&raiz()), ARCHIVOS as u64);
+    assert_eq!(a.colas().bytes_pendientes(&raiz()), 0);
+
+    let servidor = Mini::nuevo(|clave| match clave {
+        "POST /sweep/open" => (
+            200,
+            "{\"sweepId\":\"s-1\",\"padronRequerido\":false}".into(),
+        ),
+        "POST /presence/observed" => {
+            let decisiones = (0..ARCHIVOS)
+                .map(|i| {
+                    format!(
+                        "{{\"path\":\"carpeta/nota-{i}.md\",\"decision\":\"upload\",\"permit\":{{\"url\":\"/upload/p-{i}\",\"contentLengthRange\":[0,1024]}}}}"
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(",");
+            (200, format!("{{\"decisions\":[{decisiones}]}}"))
+        }
+        "POST /upload/completed" => (
+            200,
+            format!(
+                "{{\"verifiedHash\":\"{}\",\"diverged\":false}}",
+                "0".repeat(64)
+            ),
+        ),
+        "POST /sweep/close" => (200, "{\"retired\":[],\"frozen\":false}".into()),
+        // Los PUT de bytes van cada uno a su propio `/upload/p-N`: la API nunca los toca,
+        // y el fallback contesta 200 vacio a cualquiera de los siete.
+        _ => (200, String::new()),
+    });
+    let cliente = Cliente::nuevo(
+        BaseDeApi::nueva(&format!("http://127.0.0.1:{}", servidor.puerto)).unwrap(),
+        Credencial::SinAutenticar,
+        tiempos_del_banco(),
+    );
+    let mut traza = Vec::new();
+    let mut vistos: Vec<(usize, usize)> = Vec::new();
+    let resultado = ciclo::drenar_reportando(
+        &raiz(),
+        &p,
+        &mut a,
+        &cliente,
+        &mut traza,
+        &mut |procesados, total| vistos.push((procesados, total)),
+    );
+
+    assert!(
+        matches!(resultado, ResultadoDelDrenaje::Vacia),
+        "el drenaje no termino limpio: {resultado:?}, traza {traza:?}"
+    );
+    assert!(!vistos.is_empty(), "el testigo no se llamo ni una vez");
+    for (i, (procesados, total)) in vistos.iter().enumerate() {
+        assert_eq!(
+            *procesados,
+            i + 1,
+            "`procesados` no crece de a uno en la llamada {i}"
+        );
+        assert!(
+            *total >= *procesados,
+            "el total quedo por debajo de lo procesado en la llamada {i}: {total} < {procesados}"
+        );
+    }
+    assert!(
+        vistos.iter().any(|(_, t)| *t > vistos[0].1),
+        "el total nunca subio: si esto pasa, `Observar` dejo de descubrir bytes por subir \
+         y el escenario ya no prueba lo que dice probar"
+    );
+    assert_eq!(
+        vistos.last().copied().map(|(p, t)| p == t),
+        Some(true),
+        "el ultimo aviso no cerro en «N de N»"
+    );
+    assert_eq!(
+        a.colas().hechos_pendientes(&raiz()),
+        0,
+        "quedaron hechos sin drenar"
+    );
+    assert_eq!(
+        a.colas().bytes_pendientes(&raiz()),
+        0,
+        "quedaron bytes sin confirmar"
+    );
+}
+
+#[test]
+fn un_trabajo_reintentable_no_mueve_el_contador_de_drenar() {
+    // IMPORTA PORQUE: `procesados` cuenta trabajo que de verdad avanzo, no intentos. Un
+    // `Reintentable` en el medio del drenaje —la red cae justo al cerrar el barrido, con
+    // la apertura y la observacion ya entregadas— no puede sumar al contador: ese trabajo
+    // se va a repetir la proxima vuelta, y contarlo ahora mostraria progreso que todavia
+    // no paso.
+    let (p, mut a) = escenario();
+    ciclo::barrer(&raiz(), BarridoId::nuevo("b1"), &p, &mut a, &politica());
+    p.avanzar(ASENTAMIENTO_DEL_BANCO);
+    ciclo::barrer(&raiz(), BarridoId::nuevo("b2"), &p, &mut a, &politica());
+
+    let servidor = Mini::nuevo(|clave| match clave {
+        "POST /sweep/open" => (
+            200,
+            "{\"sweepId\":\"s-1\",\"padronRequerido\":false}".into(),
+        ),
+        "POST /presence/observed" => {
+            let decisiones = (0..ARCHIVOS)
+                .map(|i| format!("{{\"path\":\"carpeta/nota-{i}.md\",\"decision\":\"known\"}}"))
+                .collect::<Vec<_>>()
+                .join(",");
+            (200, format!("{{\"decisions\":[{decisiones}]}}"))
+        }
+        // EL FALLO ESTA ACA: el cierre —el ultimo trabajo del segmento— sale 500.
+        "POST /sweep/close" => (500, "{\"error\":\"caida simulada\"}".into()),
+        _ => (200, "{}".into()),
+    });
+    let cliente = Cliente::nuevo(
+        BaseDeApi::nueva(&format!("http://127.0.0.1:{}", servidor.puerto)).unwrap(),
+        Credencial::SinAutenticar,
+        tiempos_del_banco(),
+    );
+    let mut traza = Vec::new();
+    let mut vistos: Vec<(usize, usize)> = Vec::new();
+    let resultado = ciclo::drenar_reportando(
+        &raiz(),
+        &p,
+        &mut a,
+        &cliente,
+        &mut traza,
+        &mut |procesados, total| vistos.push((procesados, total)),
+    );
+
+    assert!(
+        matches!(resultado, ResultadoDelDrenaje::Vacia),
+        "un drenaje que corta por reintentable devuelve `Vacia`, no `{resultado:?}`"
+    );
+    assert_eq!(
+        vistos.len(),
+        2,
+        "el testigo tiene que haber sonado por AbrirBarrido y por Observar, y NINGUNA vez \
+         mas: {vistos:?}"
+    );
+    assert_eq!(
+        a.colas().hechos_pendientes(&raiz()),
+        ARCHIVOS as u64,
+        "el cierre que fallo no puede haber sacado los hechos de la cola: la proxima \
+         vuelta tiene que volver a encontrarlos"
     );
 }

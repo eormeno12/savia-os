@@ -292,6 +292,35 @@ pub enum FalloDeEnumeracion {
     NoEsDirectorio,
 }
 
+/// El error terminal de `Macos::nueva()`/`Windows::nueva()` — a diferencia de
+/// `FalloDeLectura`/`FalloDeEnumeracion`/`MotivoIndeterminado`, ningun llamador lo
+/// desarma: se boxea con `?` en el arranque y ahi termina. Vive aca, y no repetido en
+/// cada adaptador, porque las dos plataformas dan el mismo diagnostico —no hay base
+/// para el reloj monotonico que avanza durante la suspension— con mensajes distintos
+/// (`mach_timebase_info` en macOS, `QueryInterruptTimePrecise`/
+/// `QueryUnbiasedInterruptTimePrecise` en Windows). Antes cada adaptador definia su
+/// propio enum con el mismo nombre y el mismo unico caso — dos tipos distintos que
+/// nada obligaba a mantener en sincro, y asi fue como windows.rs perdio sus `impl
+/// Display`/`impl Error` una vez sin que nadie lo notara: el archivo no compilaba en
+/// ninguna maquina de desarrollo.
+#[derive(Debug)]
+pub enum ErrorDePlataforma {
+    /// El mensaje es dato, no una variante mas: cada plataforma pasa el suyo.
+    RelojSinBase { motivo: &'static str },
+}
+
+// A mano y no `thiserror`: son pocas lineas, y el crate no tiene ninguna dependencia de
+// proc-macro fuera de `serde`, que la necesita para las formas del cable.
+impl std::fmt::Display for ErrorDePlataforma {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ErrorDePlataforma::RelojSinBase { motivo } => f.write_str(motivo),
+        }
+    }
+}
+
+impl std::error::Error for ErrorDePlataforma {}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Clase {
     Archivo,

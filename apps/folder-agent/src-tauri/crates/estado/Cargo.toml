@@ -4,9 +4,9 @@
 [package]
 name = "savia-folder-estado"
 version = "0.0.0"
-edition = "2024"
-rust-version = "1.97"
-publish = false
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
 
 [lib]
 name = "savia_folder_estado"
@@ -16,4 +16,4 @@ path = "src/lib.rs"
 savia-folder-contrato = { path = "../contrato" }
 savia-folder-maquina = { path = "../maquina" }
 savia-folder-politica = { path = "../politica" }
-serde = { version = "1", features = ["derive"] }
+serde.workspace = true

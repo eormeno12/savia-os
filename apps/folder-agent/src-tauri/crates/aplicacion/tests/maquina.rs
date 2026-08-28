@@ -9,13 +9,10 @@
 use savia_folder_aplicacion::ciclo;
 use savia_folder_contrato::colas::{Decision, Permiso, PermisoId, RangoDeTamano, Veredicto};
 use savia_folder_contrato::dominio::{
-    BarridoId, EstadoDelBarrido, HashVerificado, Instante, RaizId, Reloj, RutaRelativa,
-    SensibilidadAMayusculas,
+    BarridoId, EstadoDelBarrido, HashVerificado, Instante, Reloj, RutaRelativa,
 };
 use savia_folder_contrato::inventario::{Inventario, MotivoDeFallo};
-use savia_folder_contrato::plataforma::{
-    FalloDeLectura, Plataforma, RaizRegistrada, RelojDePlataforma,
-};
+use savia_folder_contrato::plataforma::{FalloDeLectura, Plataforma, RelojDePlataforma};
 use savia_folder_estado::almacen::Almacen;
 use savia_folder_estado::colas::{ParametrosDeCola, Proximo, Recibido, Trabajo, aparicion};
 use savia_folder_maquina::maquina::{self, Nodo, OrigenDeSenal, Senal};
@@ -23,103 +20,11 @@ use savia_folder_plataforma_falsa::falsa::Falsa;
 use savia_folder_politica::salvaguardas::{self, Hecho, Politica};
 use std::time::Duration;
 
-/// El intervalo del BANCO, no del producto. `parametros::ASENTAMIENTO` sigue en `None`.
-const ASENTAMIENTO_DEL_BANCO: Duration = Duration::from_secs(30);
-
-fn raiz() -> RaizId {
-    RaizId::nueva("root-1")
-}
-
-fn registrada() -> RaizRegistrada {
-    RaizRegistrada {
-        id: raiz(),
-        huella: Falsa::huella_del_banco(),
-        ruta_absoluta: std::path::PathBuf::from("/no/se/toca"),
-        sensibilidad: SensibilidadAMayusculas::Distingue,
-    }
-}
-
-fn politica() -> Politica {
-    Politica::con_asentamiento(ASENTAMIENTO_DEL_BANCO).expect("el banco lo provee")
-}
-
-fn almacen() -> Almacen {
-    let mut a = Almacen::nuevo(ParametrosDeCola {
-        max_intentos: None,
-        max_entradas_por_lote: None,
-    });
-    a.enrolar(registrada());
-    a
-}
-
-fn r(s: &str) -> RutaRelativa {
-    RutaRelativa::canonica(s).expect("ruta del banco")
-}
-
-/// Barre y ademas CONFIRMA todo contra un servidor de mentira, para que las filas queden
-/// con hash verificado — que es lo unico que despues puede viajar en una baja.
-fn barrer_y_confirmar(p: &Falsa, a: &mut Almacen, n: u32) {
-    let barrido = BarridoId::nuevo(format!("b{n}"));
-    ciclo::barrer(&raiz(), barrido, p, a, &politica());
-    confirmar_todo(a);
-}
-
-fn confirmar_todo(a: &mut Almacen) {
-    loop {
-        let Proximo::Trabajo(t) = a.siguiente(&raiz()) else {
-            return;
-        };
-        let (id, recibido) = match *t {
-            Trabajo::AbrirBarrido { id, .. } => (
-                id,
-                Recibido::Barrido {
-                    sweep: savia_folder_contrato::colas::SweepId("sweep-1".into()),
-                    padron_requerido: false,
-                },
-            ),
-            // El servidor de mentira acusa recibo del padron como el de verdad: sin
-            // cuerpo. Ningun test de este archivo lo dispara —ninguno pide el padron—
-            // pero el driver hace de servidor y un servidor lo contesta.
-            Trabajo::EnviarPadron { id, .. } => (id, Recibido::Nada),
-            Trabajo::Observar { id, entradas, .. } => {
-                let vs = entradas
-                    .into_iter()
-                    .map(|(ruta, afirmado)| Veredicto {
-                        ruta,
-                        afirmado,
-                        // `known` es una de las tres puertas del verificado, y es
-                        // legitima: una coincidencia solo puede direccionar un objeto
-                        // que ese lado YA escribio y YA verifico.
-                        decision: Decision::Known {
-                            verificado: HashVerificado::rehidratar_del_inventario(
-                                *afirmado.bytes(),
-                            ),
-                        },
-                    })
-                    .collect();
-                (id, Recibido::Decisiones(vs))
-            }
-            Trabajo::Desvanecer { id, .. } => (id, Recibido::Nada),
-            Trabajo::CerrarBarrido { id, .. } => (
-                id,
-                Recibido::Retirados {
-                    rutas: Vec::new(),
-                    congelada: false,
-                },
-            ),
-            Trabajo::Subir { id, .. } => (id, Recibido::Nada),
-            Trabajo::ConfirmarSubida { id, .. } => (
-                id,
-                Recibido::Verificado(HashVerificado::rehidratar_del_inventario([9u8; 32])),
-            ),
-        };
-        a.resolver(
-            &raiz(),
-            &id,
-            savia_folder_estado::colas::Desenlace::Entregado(recibido),
-        );
-    }
-}
+mod comun;
+use comun::{
+    ASENTAMIENTO_DEL_BANCO, almacen, barrer_y_confirmar, confirmar_todo, politica, r, raiz,
+    registrada,
+};
 
 // ══════════════════════════════════════════════════════════════════════════════
 // 1 · UN MOVIMIENTO NO REPORTA BAJA
@@ -1878,5 +1783,362 @@ fn un_permiso_denegado_es_terminal_y_se_autocura() {
     assert_eq!(
         asiento2.fallo, None,
         "AUTO-CURA: el primer exito limpia `fallo` solo, en `ConfirmarPresencia`"
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 14 · PODAR SEGMENTOS TERMINADOS Y SUPERAR BARRIDOS QUE NUNCA ABRIERON
+// ══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn un_segmento_entregado_entero_se_va_de_la_cola() {
+    // IMPORTA PORQUE: sin podar, un segmento que ya entrego todo se queda en `segmentos`
+    // para siempre —uno por barrido, sano o no— y `hechos_pendientes` sigue contando un
+    // `Hecho` que Savia ya tiene. Hoy da 1; tiene que dar 0.
+    use savia_folder_estado::colas::{Colas, Desenlace};
+    let mut c = Colas::nuevas(ParametrosDeCola {
+        max_intentos: None,
+        max_entradas_por_lote: None,
+    });
+    let raiz = raiz();
+    let s = c.abrir_barrido(&raiz, BarridoId::nuevo("b1"), 1);
+    c.encolar(
+        &raiz,
+        aparicion(r("a.txt"), savia_folder_contrato::hash::sha256(b"a")),
+    );
+    c.cerrar_barrido(s, EstadoDelBarrido::Completo);
+
+    // Se drena entero: abrir, observar, cerrar.
+    let Proximo::Trabajo(t) = c.siguiente(&raiz) else {
+        panic!("falta la apertura")
+    };
+    let Trabajo::AbrirBarrido { id, .. } = *t else {
+        panic!("el primero es sweep.open")
+    };
+    c.resolver(
+        &id,
+        Desenlace::Entregado(Recibido::Barrido {
+            sweep: savia_folder_contrato::colas::SweepId("s".into()),
+            padron_requerido: false,
+        }),
+    );
+    let Proximo::Trabajo(t) = c.siguiente(&raiz) else {
+        panic!("falta el observado")
+    };
+    let Trabajo::Observar { id, entradas, .. } = *t else {
+        panic!("el segundo es presence.observed")
+    };
+    let (ruta, afirmado) = entradas[0].clone();
+    c.resolver(
+        &id,
+        Desenlace::Entregado(Recibido::Decisiones(vec![Veredicto {
+            ruta,
+            afirmado,
+            decision: Decision::Known {
+                verificado: HashVerificado::rehidratar_del_inventario(*afirmado.bytes()),
+            },
+        }])),
+    );
+    let Proximo::Trabajo(t) = c.siguiente(&raiz) else {
+        panic!("falta el cierre")
+    };
+    let Trabajo::CerrarBarrido { id, .. } = *t else {
+        panic!("el tercero es sweep.close")
+    };
+    c.resolver(
+        &id,
+        Desenlace::Entregado(Recibido::Retirados {
+            rutas: Vec::new(),
+            congelada: false,
+        }),
+    );
+
+    assert_eq!(
+        c.hechos_pendientes(&raiz),
+        0,
+        "el segmento entrego todo: no tiene por que seguir ocupando la cola"
+    );
+}
+
+#[test]
+fn un_segmento_de_eventos_con_hechos_sin_transmitir_no_se_poda() {
+    // IMPORTA PORQUE: es la trampa contra escribir el predicado con banderas. Un
+    // `Eventos` NACE con `cierre_entregado = true` —no emite marcadores— asi que podar
+    // por esa bandera lo borraria mientras todavia tiene un `Hecho` sin observar.
+    use savia_folder_estado::colas::Colas;
+    let mut c = Colas::nuevas(ParametrosDeCola {
+        max_intentos: None,
+        max_entradas_por_lote: None,
+    });
+    let raiz = raiz();
+    // Un evento suelto: nace un segmento `Eventos`, abierto.
+    c.encolar(
+        &raiz,
+        aparicion(r("suelto.txt"), savia_folder_contrato::hash::sha256(b"x")),
+    );
+    // Un barrido nuevo lo CIERRA (via `cerrar_segmento_de_eventos`), sin haberlo drenado.
+    c.abrir_barrido(&raiz, BarridoId::nuevo("b1"), 1);
+
+    assert_eq!(
+        c.hechos_pendientes(&raiz),
+        1,
+        "el `Eventos` cerrado todavia tiene un hecho sin observar: un predicado \
+         estructural no lo puede podar, aunque haya nacido con `cierre_entregado = true`"
+    );
+}
+
+#[test]
+fn un_barrido_con_el_sweep_open_ambiguo_no_se_queda_en_la_cola_para_siempre() {
+    // IMPORTA PORQUE: sin `sweepId` el marcador de cierre no se puede armar nunca —
+    // `trabajo_de` exige `sweep.is_some()`— asi que `siguiente` YA daba `Nada` antes del
+    // arreglo. Lo que no daba era `hechos_pendientes == 0`: el segmento quedaba
+    // parqueado para siempre con su `Hecho` todavia contado, aunque ya no tuviera nada
+    // que ofrecer.
+    use savia_folder_estado::colas::{Colas, Desenlace};
+    let mut c = Colas::nuevas(ParametrosDeCola {
+        max_intentos: None,
+        max_entradas_por_lote: None,
+    });
+    let raiz = raiz();
+    let s = c.abrir_barrido(&raiz, BarridoId::nuevo("b1"), 1);
+    c.encolar(
+        &raiz,
+        aparicion(r("a.txt"), savia_folder_contrato::hash::sha256(b"a")),
+    );
+    c.cerrar_barrido(s, EstadoDelBarrido::Completo);
+
+    let Proximo::Trabajo(t) = c.siguiente(&raiz) else {
+        panic!("falta la apertura")
+    };
+    let Trabajo::AbrirBarrido { id, .. } = *t else {
+        panic!("el primero es sweep.open")
+    };
+    c.resolver(&id, Desenlace::Ambiguo);
+
+    let Proximo::Trabajo(t) = c.siguiente(&raiz) else {
+        panic!("el hecho sigue viajando aunque el sweepId se haya perdido")
+    };
+    let Trabajo::Observar { id, entradas, .. } = *t else {
+        panic!("el segundo es presence.observed")
+    };
+    let (ruta, afirmado) = entradas[0].clone();
+    c.resolver(
+        &id,
+        Desenlace::Entregado(Recibido::Decisiones(vec![Veredicto {
+            ruta,
+            afirmado,
+            decision: Decision::Known {
+                verificado: HashVerificado::rehidratar_del_inventario(*afirmado.bytes()),
+            },
+        }])),
+    );
+
+    assert!(
+        matches!(c.siguiente(&raiz), Proximo::Nada),
+        "sin sweepId no hay cierre que armar: esto ya daba `Nada` antes del arreglo"
+    );
+    assert_eq!(
+        c.hechos_pendientes(&raiz),
+        0,
+        "y esto NO: el segmento quedaba parqueado con su hecho contado para siempre"
+    );
+}
+
+#[test]
+fn dos_barridos_sin_entregar_la_apertura_dejan_un_solo_barrido() {
+    // IMPORTA PORQUE: sin superar, cada barrido cuya apertura no se entrega deja un
+    // `Barrido` atascado esperando su `sweep.open` para siempre, uno por vuelta —la fuga
+    // de detencion medida en produccion. `total` distinto entre 1 y 7 sirve de
+    // discriminador: si algo mezclara los dos segmentos, el que sobrevive tendria el
+    // `total` equivocado.
+    use savia_folder_estado::colas::{Colas, Desenlace};
+    let mut c = Colas::nuevas(ParametrosDeCola {
+        max_intentos: None,
+        max_entradas_por_lote: None,
+    });
+    let raiz = raiz();
+    let s1 = c.abrir_barrido(&raiz, BarridoId::nuevo("b1"), 1);
+    c.cerrar_barrido(s1, EstadoDelBarrido::Completo);
+    // La apertura de b1 NUNCA se entrega: se abre b2 directo, como hace `ciclo::barrer`
+    // vuelta tras vuelta mientras el dispositivo esta detenido.
+    let s2 = c.abrir_barrido(&raiz, BarridoId::nuevo("b2"), 7);
+    c.cerrar_barrido(s2, EstadoDelBarrido::Completo);
+
+    let mut aperturas = 0;
+    let mut totales = Vec::new();
+    while let Proximo::Trabajo(t) = c.siguiente(&raiz) {
+        match *t {
+            Trabajo::AbrirBarrido { id, total, .. } => {
+                aperturas += 1;
+                totales.push(total);
+                c.resolver(
+                    &id,
+                    Desenlace::Entregado(Recibido::Barrido {
+                        sweep: savia_folder_contrato::colas::SweepId("s".into()),
+                        padron_requerido: false,
+                    }),
+                );
+            }
+            Trabajo::CerrarBarrido { id, .. } => {
+                c.resolver(
+                    &id,
+                    Desenlace::Entregado(Recibido::Retirados {
+                        rutas: Vec::new(),
+                        congelada: false,
+                    }),
+                );
+            }
+            otro => panic!("sin hechos ni padron no puede salir otro trabajo: {otro:?}"),
+        }
+    }
+    assert_eq!(
+        aperturas, 1,
+        "el primer barrido quedo superado: solo abre el segundo"
+    );
+    assert_eq!(
+        totales,
+        vec![7],
+        "y es el segundo el que sobrevive, con su propio total"
+    );
+}
+
+#[test]
+fn superar_un_barrido_no_pierde_ninguno_de_sus_hechos() {
+    // IMPORTA PORQUE: es el guardian contra la alternativa obvia y equivocada — fundir
+    // el barrido superado en el vecino en vez de solo cambiarle el `origen`. Fundir
+    // pisaria por upsert el hecho de la ruta compartida y el drenaje entregaria UN solo
+    // `Observar` con el hash mas nuevo; superar entrega DOS, uno por segmento, en el
+    // orden en que se abrieron — exactamente lo que
+    // `la_compactacion_no_cruza_un_borde_de_barrido` exige de un borde de barrido comun.
+    use savia_folder_estado::colas::{Colas, Desenlace};
+    let mut c = Colas::nuevas(ParametrosDeCola {
+        max_intentos: None,
+        max_entradas_por_lote: None,
+    });
+    let raiz = raiz();
+    let s1 = c.abrir_barrido(&raiz, BarridoId::nuevo("b1"), 1);
+    let h1 = savia_folder_contrato::hash::sha256(b"v1");
+    c.encolar(&raiz, aparicion(r("x.txt"), h1));
+    c.cerrar_barrido(s1, EstadoDelBarrido::Completo);
+    // b1 nunca entrega su apertura: b2 lo supera.
+    let s2 = c.abrir_barrido(&raiz, BarridoId::nuevo("b2"), 1);
+    let h2 = savia_folder_contrato::hash::sha256(b"v2");
+    c.encolar(&raiz, aparicion(r("x.txt"), h2));
+    c.cerrar_barrido(s2, EstadoDelBarrido::Completo);
+
+    let mut hashes = Vec::new();
+    while let Proximo::Trabajo(t) = c.siguiente(&raiz) {
+        match *t {
+            Trabajo::AbrirBarrido { id, .. } => c.resolver(
+                &id,
+                Desenlace::Entregado(Recibido::Barrido {
+                    sweep: savia_folder_contrato::colas::SweepId("s".into()),
+                    padron_requerido: false,
+                }),
+            ),
+            Trabajo::Observar { id, entradas, .. } => {
+                assert_eq!(
+                    entradas.len(),
+                    1,
+                    "cada segmento entrega su PROPIO lote: fundir los habria dejado en uno"
+                );
+                let (ruta, afirmado) = entradas[0].clone();
+                hashes.push(afirmado);
+                c.resolver(
+                    &id,
+                    Desenlace::Entregado(Recibido::Decisiones(vec![Veredicto {
+                        ruta,
+                        afirmado,
+                        decision: Decision::Known {
+                            verificado: HashVerificado::rehidratar_del_inventario(
+                                *afirmado.bytes(),
+                            ),
+                        },
+                    }])),
+                )
+            }
+            Trabajo::CerrarBarrido { id, .. } => c.resolver(
+                &id,
+                Desenlace::Entregado(Recibido::Retirados {
+                    rutas: Vec::new(),
+                    congelada: false,
+                }),
+            ),
+            otro => panic!("no se espera otro trabajo en este escenario: {otro:?}"),
+        };
+    }
+    assert_eq!(
+        hashes,
+        vec![h1, h2],
+        "los dos hashes salen enteros, en el orden en que sus segmentos se abrieron"
+    );
+}
+
+#[test]
+fn un_barrido_que_savia_ya_abrio_no_lo_supera_el_siguiente() {
+    // IMPORTA PORQUE: rompe en el instante en que alguien saque `!apertura_entregada`
+    // del predicado de `superar_los_barridos_que_nunca_abrieron`. Un barrido cuya
+    // apertura SI se entrego tiene un `sweepId` real que Savia esta esperando cerrar —
+    // degradarlo a `Eventos` le sacaria el cierre para siempre y lo dejaria colgado del
+    // otro lado.
+    use savia_folder_estado::colas::{Colas, Desenlace};
+    let mut c = Colas::nuevas(ParametrosDeCola {
+        max_intentos: None,
+        max_entradas_por_lote: None,
+    });
+    let raiz = raiz();
+    let s1 = c.abrir_barrido(&raiz, BarridoId::nuevo("b1"), 1);
+    c.encolar(
+        &raiz,
+        aparicion(r("a.txt"), savia_folder_contrato::hash::sha256(b"a")),
+    );
+    c.cerrar_barrido(s1, EstadoDelBarrido::Completo);
+
+    // La apertura de b1 SI se entrega, antes de que empiece b2.
+    let Proximo::Trabajo(t) = c.siguiente(&raiz) else {
+        panic!("falta la apertura")
+    };
+    let Trabajo::AbrirBarrido { id, .. } = *t else {
+        panic!("el primero es sweep.open")
+    };
+    c.resolver(
+        &id,
+        Desenlace::Entregado(Recibido::Barrido {
+            sweep: savia_folder_contrato::colas::SweepId("sweep-de-b1".into()),
+            padron_requerido: false,
+        }),
+    );
+
+    // Y recien ahi arranca b2, sin haber drenado el resto de b1 (observar y cerrar).
+    let s2 = c.abrir_barrido(&raiz, BarridoId::nuevo("b2"), 1);
+    c.cerrar_barrido(s2, EstadoDelBarrido::Completo);
+
+    // b1 SIGUE siendo un barrido de verdad: el proximo trabajo es su `Observar`
+    // pendiente, no uno de b2.
+    let Proximo::Trabajo(t) = c.siguiente(&raiz) else {
+        panic!("b1 sigue teniendo un observado pendiente")
+    };
+    let Trabajo::Observar { id, entradas, .. } = *t else {
+        panic!("b1 no se convirtio en `Eventos`: sigue debiendo su Observar")
+    };
+    let (ruta, afirmado) = entradas[0].clone();
+    c.resolver(
+        &id,
+        Desenlace::Entregado(Recibido::Decisiones(vec![Veredicto {
+            ruta,
+            afirmado,
+            decision: Decision::Known {
+                verificado: HashVerificado::rehidratar_del_inventario(*afirmado.bytes()),
+            },
+        }])),
+    );
+
+    // Y su `CerrarBarrido` real sale despues, con el sweepId que ya tenia.
+    let Proximo::Trabajo(t) = c.siguiente(&raiz) else {
+        panic!("b1 todavia debe su cierre")
+    };
+    assert!(
+        matches!(*t, Trabajo::CerrarBarrido { .. }),
+        "si `superar_` lo hubiera degradado a `Eventos`, este marcador no existiria mas"
     );
 }

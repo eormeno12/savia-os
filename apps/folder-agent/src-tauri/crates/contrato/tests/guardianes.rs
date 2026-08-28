@@ -11,8 +11,18 @@ fn fuente(rel: &str) -> String {
     std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("no se pudo leer {}: {e}", p.display()))
 }
 
+/// El `#[derive(...)]` mas cercano ANTES de `marcador_de_tipo` (p. ej. `"pub struct
+/// Foo"`) en `src`. Dos tests de este archivo lo usan para afirmar que un tipo NO
+/// deriva cierto trait — factorizado para que un futuro endurecimiento (derives en
+/// mas de una linea, atributos apilados) se arregle en un solo lugar y no deje uno de
+/// los dos tests silenciosamente mas debil que el otro.
+fn derive_de<'a>(src: &'a str, marcador_de_tipo: &str) -> &'a str {
+    let i = src.find(marcador_de_tipo).expect("falta el tipo");
+    src[..i].rsplit("#[derive(").next().unwrap_or("")
+}
+
 #[test]
-fn los_cuatro_numeros_del_canal_estan_sin_valor() {
+fn los_cinco_numeros_del_canal_estan_sin_valor() {
     // IMPORTA PORQUE: si alguno se completara con un numero inventado, el modulo
     // funciona, los tests pasan y el banco reporta cifras — y nadie se entera de que
     // estan calibradas contra un valor que nadie midio.
@@ -22,6 +32,7 @@ fn los_cuatro_numeros_del_canal_estan_sin_valor() {
         ("MAX_INTENTOS", ()),
         ("VENTANA_DE_CUARENTENA", ()),
         ("FRACCION_DEL_CORTE", ()),
+        ("VENTANA_DEL_OBSERVADOR", ()),
     ] {
         let linea = src
             .lines()
@@ -29,7 +40,7 @@ fn los_cuatro_numeros_del_canal_estan_sin_valor() {
             .unwrap_or_else(|| panic!("falta el parametro {nombre}"));
         assert!(
             linea.contains("= None;"),
-            "{nombre} tiene valor: {linea}. Ninguno de los cuatro se inventa."
+            "{nombre} tiene valor: {linea}. Ninguno de los cinco se inventa."
         );
     }
     // Y cada uno lleva unidad, que decide y como se mediria.
@@ -48,10 +59,7 @@ fn el_id_de_archivo_no_puede_ser_clave_de_un_mapa() {
     // colapsan en una fila: el documento viejo no se retira NUNCA y el contenido nuevo no
     // se sube NUNCA.
     let src = fuente("dominio.rs");
-    let i = src
-        .find("pub struct IdDeArchivoDelSO")
-        .expect("falta el tipo");
-    let derive = src[..i].rsplit("#[derive(").next().unwrap_or("");
+    let derive = derive_de(&src, "pub struct IdDeArchivoDelSO");
     assert!(
         !derive.contains("Hash"),
         "`IdDeArchivoDelSO` deriva `Hash`: es una pista que se verifica, nunca una identidad"
@@ -65,8 +73,7 @@ fn la_id_de_volumen_no_deriva_partial_eq() {
     // «coincidiria», y un directorio suplente sobre otro volumen sin UUID pasaria la
     // salvaguarda 2 entera.
     let src = fuente("plataforma.rs");
-    let i = src.find("pub enum IdDeVolumen").expect("falta el tipo");
-    let derive = src[..i].rsplit("#[derive(").next().unwrap_or("");
+    let derive = derive_de(&src, "pub enum IdDeVolumen");
     assert!(
         !derive.contains("PartialEq"),
         "`IdDeVolumen` deriva `PartialEq`: la comparacion tiene que ser de TRES valores"

@@ -135,6 +135,31 @@ impl RutaRelativa {
     }
 }
 
+/// Si un nombre de archivo o carpeta empieza con "." no es un documento: es la
+/// convencion universal —Unix, macOS, Windows con "mostrar ocultos" apagado, git,
+/// rsync— para "esto no es para mostrar". `.git`, `.DS_Store`, `.env`, cachés de
+/// editor, todo cae bajo la misma regla, y es a proposito UNA regla y no una lista de
+/// nombres: una lista se queda corta el dia que aparece un nombre nuevo, y el usuario
+/// no eligio ver esa carpeta cuando eligio la suya para mirar.
+///
+/// **No es parte de `RutaRelativa::canonica`.** `canonica` decide si una ruta esta bien
+/// formada (no absoluta, no se escapa, no vacia); esto decide si, estando bien
+/// formada, es candidata a documento. Son preguntas distintas — `.git/config` es una
+/// ruta perfectamente valida, solo que no es la clase de archivo que este agente
+/// enumera.
+pub fn nombre_excluido_por_convencion(nombre: &str) -> bool {
+    nombre.starts_with('.')
+}
+
+/// La misma regla sobre una ruta ENTERA: alcanza con que UN segmento este excluido
+/// para excluir el subarbol completo — `sub/.git/objects/ab/cdef` nunca llega a fila
+/// aunque `objects`/`ab`/`cdef` no empiecen con ".". Quien recorre el disco de verdad
+/// (`recorrer` en `plataforma-adaptadores`) corta ANTES, sin descender a `.git/`; esto
+/// es para quien ya tiene la ruta completa en la mano (`Falsa`, el banco).
+pub fn ruta_excluida_por_convencion(ruta: &str) -> bool {
+    ruta.split('/').any(nombre_excluido_por_convencion)
+}
+
 /// La composicion parcial del punto 4 de arriba. Se llama por lo que hace y no `a_nfc`,
 /// justamente para que nadie la lea como la normalizacion completa que no es.
 fn componer_latino(s: &str) -> String {
@@ -483,4 +508,28 @@ pub enum EstadoDelBarrido {
     /// Un barrido interrumpido y un borrado masivo producen el mismo conjunto de
     /// desapariciones. Este valor es lo unico que los separa.
     Interrumpido,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn un_nombre_con_punto_al_frente_esta_excluido() {
+        assert!(nombre_excluido_por_convencion(".git"));
+        assert!(nombre_excluido_por_convencion(".DS_Store"));
+        assert!(nombre_excluido_por_convencion(".env"));
+        assert!(!nombre_excluido_por_convencion("contrato.docx"));
+        assert!(!nombre_excluido_por_convencion("informe.final.docx"));
+    }
+
+    #[test]
+    fn un_segmento_excluido_en_cualquier_profundidad_excluye_la_ruta_entera() {
+        assert!(ruta_excluida_por_convencion(".DS_Store"));
+        assert!(ruta_excluida_por_convencion(".git/HEAD"));
+        assert!(ruta_excluida_por_convencion(".git/objects/ab/cdef"));
+        assert!(ruta_excluida_por_convencion("sub/carpeta/.env"));
+        assert!(!ruta_excluida_por_convencion("contrato.docx"));
+        assert!(!ruta_excluida_por_convencion("sub/carpeta/informe.xlsx"));
+    }
 }

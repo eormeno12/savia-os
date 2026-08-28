@@ -37,8 +37,20 @@ use savia_folder_politica::salvaguardas::{EstadoDeRaiz, PorQueAusente, raiz_viva
 pub enum EstadoDeCarpeta {
     /// El ultimo barrido cerro completo y no hay nada retenido.
     Sincronizado,
-    /// Hay un barrido abierto sobre esta raiz.
-    Barriendo,
+    /// Hay un barrido ABIERTO sobre esta raiz: el agente esta recorriendo el disco local
+    /// todavia, sin haber hablado con Savia sobre este barrido. Dura segundos, no lo que
+    /// tarde la red.
+    Leyendo,
+    /// El recorrido local ya cerro, pero todavia no hay NINGUN documento confirmado
+    /// (`indexados == 0`) mientras algo sigue en vuelo hacia Savia — altas, bajas, o
+    /// bytes subiendose. Existe por `de_una_carpeta`: sin esta rama, una carpeta recien
+    /// enrolada pasa por «Al dia» en la ventana entre que el recorrido local termina y
+    /// Savia confirma el primer archivo — al dia sobre CERO documentos es la frase que
+    /// menos hay que decir ahi. No alcanza a cualquier archivo en vuelo: una carpeta ya
+    /// sincronizada con un archivo recien editado sigue diciendo `Sincronizado` (ver
+    /// `escenario_al_dia`/`en_vuelo` en `tests/panel.rs`) porque ahi si hay algo
+    /// confirmado que respalda la frase.
+    Actualizando,
     /// La raiz no esta, o no se puede leer, o la que esta no es la que se enrolo. **No es
     /// un error: es desconexion**, y lo que el usuario tiene que hacer es reconectar el
     /// disco — por eso viaja el motivo y no un booleano.
@@ -153,16 +165,20 @@ pub struct Carpeta {
     /// devolveria el tope en vez del total. Un contador que se topea es un contador que
     /// miente justo cuando mas hay que contar.
     pub fallos: usize,
-    /// El «128 de 412» del primer barrido (plan, Fase 4). **Hoy siempre `None`, y no es
-    /// un placeholder cualquiera: es la unica respuesta honesta.** El total que
-    /// `Almacen::abrir_barrido` guarda es `Inventario::vivos`, pensado para el corte por
-    /// volumen — se mide ANTES de abrir el barrido, y en el primer barrido de una carpeta
-    /// nueva vale cero, que es justo el caso que este campo tendria que mostrar. El total
-    /// real (`ResumenDelBarrido::enumeradas`, en `ciclo::barrer`) se conoce al abrir, pero
-    /// es el valor de retorno de una funcion: `Almacen` no lo guarda, y `panel::vista` no
-    /// tiene forma de leerlo sin inventar un numero. El campo queda reservado con la forma
-    /// que va a tener — lo llena el canal de progreso de la Fase 7, que lee directo del
-    /// recorrido en vez de por esta foto.
+    /// El «128 de 412» del primer barrido (plan, Fase 4). **Siempre `None`, y no es un
+    /// placeholder cualquiera: es la unica respuesta honesta desde ESTA foto.** El total
+    /// que `Almacen::abrir_barrido` guarda es `Inventario::vivos`, pensado para el corte
+    /// por volumen — se mide ANTES de abrir el barrido, y en el primer barrido de una
+    /// carpeta nueva vale cero, que es justo el caso que este campo tendria que mostrar.
+    ///
+    /// **El progreso en vivo de `Leyendo` Y de `Actualizando` no llega por acá, y no
+    /// puede llegar por acá.** `panel::vista` toma el mismo candado que `trabajar()`
+    /// sostiene durante todo el barrido y el drenaje (ver `main.rs`), asi que
+    /// estructuralmente no puede observar ningun trabajo en curso: solo la foto de antes
+    /// o la de despues. El canal de la Fase 7 —`ciclo::barrer_reportando` y
+    /// `ciclo::drenar_reportando`— emite un evento `"progreso"` aparte, directo desde el
+    /// recorrido/drenaje, en vez de llenar este campo. Este campo se queda reservado, con
+    /// la forma que en algun momento podria tener, pero por otro camino que no es este.
     pub progreso: Option<Progreso>,
 }
 
@@ -250,7 +266,11 @@ fn agregado(carpetas: &[Carpeta]) -> EstadoDeCarpeta {
 fn peso(e: &EstadoDeCarpeta) -> u8 {
     match e {
         EstadoDeCarpeta::Sincronizado => 0,
-        EstadoDeCarpeta::Barriendo => 1,
+        // `Leyendo` y `Actualizando` ocupan el mismo lugar que antes ocupaba `Barriendo`:
+        // no cambia la precedencia frente a `Congelado`/`CarpetaAusente`, y entre si no
+        // compiten nunca — son mutuamente excluyentes por construccion (ver
+        // `de_una_carpeta`).
+        EstadoDeCarpeta::Leyendo | EstadoDeCarpeta::Actualizando => 1,
         EstadoDeCarpeta::Congelado => 2,
         EstadoDeCarpeta::CarpetaAusente { .. } => 3,
     }
@@ -292,7 +312,7 @@ fn de_una_carpeta(
             },
         },
         EstadoDeRaiz::Viva if colas.congelada(raiz) => EstadoDeCarpeta::Congelado,
-        EstadoDeRaiz::Viva if colas.barriendo(raiz) => EstadoDeCarpeta::Barriendo,
+        EstadoDeRaiz::Viva if colas.barriendo(raiz) => EstadoDeCarpeta::Leyendo,
         EstadoDeRaiz::Viva => EstadoDeCarpeta::Sincronizado,
     };
 
@@ -338,6 +358,45 @@ fn de_una_carpeta(
         .iter()
         .filter(|f| matches!(f.estado, EstadoDeArchivo::Fallo(_)))
         .count();
+
+    // **«Al dia» sobre CERO documentos confirmados es la frase equivocada.** El match
+    // de arriba mira si hay un barrido ABIERTO (`colas.barriendo`), pero el barrido —el
+    // recorrido local— cierra en segundos; que Savia CONFIRME cada archivo tarda lo que
+    // tarde la subida, y esa espera pasa con el barrido ya cerrado. Una carpeta recien
+    // enrolada cae justo ahi: recorrido listo, `indexados == 0`, y el badge diria
+    // `Sincronizado` mientras cada fila individual todavia dice «Guardando…». Ver el doc
+    // de `EstadoDeCarpeta::Actualizando`.
+    //
+    // **Y HAY UNA VENTANA TODAVIA MAS TEMPRANA QUE `procesando` SOLO NO CUBRE:** el
+    // instante entre «la carpeta se enrolo» y «corrio su primer barrido», donde `filas`
+    // esta vacia — ni un candidato todavia — por las MISMAS razones que una carpeta
+    // genuinamente vacia. `filas.iter().any(...)` sobre una lista vacia da `false` en los
+    // dos casos, y sin distinguirlos una carpeta recien agregada muestra «Al dia» antes de
+    // que el agente haya mirado un solo archivo. `colas.completo_un_barrido(raiz)` es la
+    // diferencia: una carpeta vacia de verdad SI cerro su primer barrido (encontro cero
+    // archivos y lo dijo), una recien enrolada todavia no.
+    //
+    // **Y ESA VENTANA DICE `Leyendo`, NO `Actualizando`** — son mutuamente excluyentes, no
+    // dos ramas de un mismo caso: `barrer_interno` abre y cierra su propio segmento DENTRO
+    // de la misma llamada (`ciclo.rs`, el cierre corre cerca del final), asi que ninguna
+    // fila puede existir todavia sin que ese barrido ya haya cerrado. `procesando` en
+    // `true` implica `completo_un_barrido` en `true` siempre; nunca hace falta un `||`.
+    let estado = if estado == EstadoDeCarpeta::Sincronizado && indexados == 0 {
+        if !colas.completo_un_barrido(raiz) {
+            EstadoDeCarpeta::Leyendo
+        } else {
+            let procesando = filas
+                .iter()
+                .any(|f| f.estado == EstadoDeArchivo::Procesando);
+            if procesando {
+                EstadoDeCarpeta::Actualizando
+            } else {
+                estado
+            }
+        }
+    } else {
+        estado
+    };
 
     // `sort_by` y no `sort_unstable_by`: dentro de la misma prioridad el orden que
     // quedo es el del inventario, que esta ordenado por ruta. Un orden inestable haria

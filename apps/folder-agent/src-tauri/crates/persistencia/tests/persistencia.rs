@@ -176,6 +176,145 @@ fn la_detencion_por_credenciales_tambien_sobrevive() {
 }
 
 #[test]
+fn diez_barridos_sin_drenar_no_pesan_mas_que_cuatro() {
+    // IMPORTA PORQUE: es el UNICO test que puede acreditar `padron = None` y `cierre =
+    // None` en `superar_los_barridos_que_nunca_abrieron`, porque esos dos campos no
+    // tienen observable de comportamiento propio -- nada mas en el protocolo depende de
+    // su valor. Sin `superar_los_barridos_que_nunca_abrieron`, cada barrido sin drenar
+    // deja un segmento `Barrido` atascado con su padron completo —156 MB de eso en el
+    // deposito real medido— y el tamano en disco crece LINEAL con la cantidad de vueltas.
+    //
+    // DOS asserts, por dos razones distintas:
+    //
+    // 1. El de BYTES, al final, mide el CRECIMIENTO: compara la vuelta 4 contra la 8 (no
+    //    contra la 10 -- ver la nota sobre `proximo_id` mas abajo).
+    // 2. El ESTRUCTURAL, dentro del lazo, mide el VALOR: en cada vuelta desde la 3 en
+    //    mas, inspecciona el segmento superado y exige `padron: null` y `cierre: null`.
+    //    Hace falta el segundo porque el primero es CIEGO a un CORRIMIENTO CONSTANTE:
+    //    dos puntos dentro de la misma meseta siguen siendo iguales entre si aunque el
+    //    segmento superado cargue su padron entero -- solo cambia DONDE se estabiliza la
+    //    meseta, no que se estabilice. Verificado a mano: comentando `s.padron = None;`
+    //    o `s.cierre = None;` en `colas.rs`, el assert de bytes de abajo sigue en verde
+    //    -- unicamente el assert estructural lo detecta.
+    //
+    // DIAGNOSTICO (bytes exactos sobre este mismo fixture, tomados del propio `println!`
+    // que sigue mas abajo -- `cargo test -p savia-folder-persistencia --test persistencia
+    // diez_barridos -- --nocapture`):
+    //
+    //   vuelta:  1     2     3     4     5     6     7     8     9     10
+    //   bytes:   1605  1882  2181  2181  2181  2181  2181  2181  2182  2183
+    //
+    // El peso se estabiliza en la VUELTA 3 —la primera vez que un barrido supera al
+    // anterior, en cuanto se abre b3— y se mantiene CONSTANTE de ahi en mas: queda un
+    // `Eventos` superado con los dos hechos del asentamiento (nunca se drena nada en
+    // este test, asi que ese segmento no se puede podar) mas el barrido actual, recien
+    // cerrado y sin hechos propios (el corpus no vuelve a cambiar).
+    //
+    // Las vueltas 9 y 10 SUBEN un byte cada una, y no es la fuga: es `Colas::proximo_id`
+    // —un contador de proposito general, ajeno a este arreglo— cruzando de un digito a
+    // dos (9 -> 10 -> 11) en el JSON. Por eso la comparacion de bytes usa la vuelta 4 y
+    // la vuelta 8: las dos caen DENTRO de la meseta y ninguna cruza ese borde de digitos,
+    // asi que la igualdad exacta prueba la fuga de segmentos y no un artefacto de
+    // formato de otro contador.
+    let p = Falsa::como_macos();
+    p.poner(
+        "contrato.docx",
+        b"el contrato marco",
+        1_700_000_000,
+        Some(1),
+    );
+    p.poner("sub/informe.xlsx", b"el informe q3", 1_700_000_000, Some(2));
+    let mut a = Almacen::nuevo(ParametrosDeCola {
+        max_intentos: None,
+        max_entradas_por_lote: None,
+    });
+    a.enrolar(RaizRegistrada {
+        id: raiz(),
+        huella: Falsa::huella_del_banco(),
+        ruta_absoluta: std::path::PathBuf::from("/no/se/toca"),
+        sensibilidad: SensibilidadAMayusculas::Distingue,
+    });
+    let pol = Politica::con_asentamiento(ASENTAMIENTO).unwrap();
+
+    // `{n:02}` para que "b04" y "b10" pesen lo MISMO en JSON: sin el padding, comparar
+    // la vuelta 4 contra la 10 fallaria por un byte que no tiene nada que ver con la
+    // fuga que este test mide.
+    let mut peso_en = std::collections::BTreeMap::new();
+    for n in 1..=10u32 {
+        ciclo::barrer(
+            &raiz(),
+            BarridoId::nuevo(format!("b{n:02}")),
+            &p,
+            &mut a,
+            &pol,
+        );
+        p.avanzar(ASENTAMIENTO + Duration::from_secs(1));
+        let peso = serde_json::to_string(&a.para_guardar()).unwrap().len();
+        println!("vuelta {n}: {peso} bytes"); // diagnostico: confirma la meseta en la 3
+        peso_en.insert(n, peso);
+
+        if n >= 3 {
+            // Estructural: desde la vuelta en que el primer barrido queda superado,
+            // tiene que haber EXACTAMENTE dos segmentos -- el `Eventos` superado (con
+            // los hechos del asentamiento, que por eso no se poda) y el barrido de esta
+            // vuelta -- y el superado tiene que tener `padron` y `cierre` en `null`.
+            let valor = serde_json::to_value(a.para_guardar()).unwrap();
+            let segmentos = valor["colas"]["segmentos"]
+                .as_array()
+                .expect("colas.segmentos tiene que ser un arreglo");
+            assert_eq!(
+                segmentos.len(),
+                2,
+                "vuelta {n}: se esperaban 2 segmentos (el Eventos superado + el \
+                 barrido de esta vuelta), quedaron {}: {segmentos:#?}",
+                segmentos.len()
+            );
+            let superado = segmentos
+                .iter()
+                .find(|s| s["origen"] == serde_json::json!("Eventos"))
+                .unwrap_or_else(|| {
+                    panic!("vuelta {n}: no hay ningun segmento Eventos: {segmentos:#?}")
+                });
+            assert!(
+                superado["padron"].is_null(),
+                "vuelta {n}: el segmento superado tiene que liberar su padron \
+                 (`s.padron = None`), y no lo hizo: {superado:#?}"
+            );
+            assert!(
+                superado["cierre"].is_null(),
+                "vuelta {n}: el segmento superado tiene que perder su `cierre` \
+                 (`s.cierre = None`) -- es evidencia de un borde que Savia nunca vio: \
+                 {superado:#?}"
+            );
+            assert_eq!(
+                superado["apertura_entregada"],
+                serde_json::json!(true),
+                "vuelta {n}: un segmento superado no espera mas su apertura: {superado:#?}"
+            );
+            assert_eq!(
+                superado["cierre_entregado"],
+                serde_json::json!(true),
+                "vuelta {n}: un segmento superado no espera mas su cierre: {superado:#?}"
+            );
+            assert!(
+                !superado["hechos"]
+                    .as_object()
+                    .expect("hechos tiene que ser un objeto")
+                    .is_empty(),
+                "vuelta {n}: el segmento superado tiene que conservar los hechos del \
+                 asentamiento -- supersesion no puede perder trabajo: {superado:#?}"
+            );
+        }
+    }
+
+    assert_eq!(
+        peso_en[&4], peso_en[&8],
+        "sin drenar nada, el peso tiene que quedar CONSTANTE desde que el primer \
+         barrido supera al anterior, no crecer uno por vuelta: {peso_en:?}"
+    );
+}
+
+#[test]
 fn un_deposito_vacio_es_none_y_no_error() {
     let ruta = archivo_temporal("vacio");
     let d = Deposito::abrir(&ruta).unwrap();

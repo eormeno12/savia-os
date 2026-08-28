@@ -21,6 +21,14 @@
 //! cinco veces sin conexion, los bytes de las cuatro intermedias YA NO EXISTEN en ningun
 //! lado.
 //!
+//! Y hay que decir DONDE se sostiene esa barrera: en el borde que Savia VIO, y Savia solo
+//! ve un borde cuando su `sweep.open` se entrego. Un barrido cuya apertura nunca salio no
+//! dejo ese borde del otro lado —no tiene `sweepId`, no hay nada que cerrar— asi que puede
+//! dejar de SER un barrido en cuanto arranca el siguiente de la misma raiz (ver
+//! `superar_los_barridos_que_nunca_abrieron`). Eso no mueve un solo hecho de segmento: sus
+//! `hechos` y su `orden` quedan exactamente donde estaban, en el mismo segmento y en el
+//! mismo orden. Lo que cambia es de que ES ese segmento, no lo que contiene.
+//!
 //! Y una consecuencia de esa compactacion que hay que escribir: **la baja no puede
 //! viajar con el ultimo hash OBSERVADO, sino con el ultimo CONFIRMADO**. Por eso una
 //! `Desaparicion` se construye con un `HashVerificado` y no con uno afirmado (ver
@@ -333,6 +341,19 @@ pub struct Colas {
     congeladas: BTreeSet<RaizId>,
     detenido: Option<MotivoDeDetencion>,
     proximo_id: u64,
+    /// Las raices que cerraron AL MENOS UN barrido alguna vez —`Completo` o
+    /// `Interrumpido`, cualquiera cuenta, porque los dos significan que el ciclo entero
+    /// (recorrido local + ida y vuelta con Savia) corrio de verdad—. Sin esto, una carpeta
+    /// recien enrolada que todavia no tuvo su primer barrido tiene `filas` vacia por las
+    /// mismas razones que una carpeta genuinamente vacia, y el panel no puede distinguir
+    /// «no se sabe nada todavia» de «se sabe que no hay nada» — ver `panel::de_una_carpeta`.
+    /// `#[serde(default)]` a proposito, mismo motivo que `Entrada::fallo`
+    /// (`contrato::inventario`): un deposito ya persistido de antes de esta version no
+    /// tiene esta clave, y su ausencia significa exactamente «ningun conjunto todavia».
+    /// `skip_serializing_if` para que el caso de HOY (nadie cerro un barrido en el fixture
+    /// del golden) serialice byte-identico al formato anterior.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    completaron_barrido: BTreeSet<RaizId>,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -357,6 +378,7 @@ impl Colas {
             congeladas: BTreeSet::new(),
             detenido: None,
             proximo_id: 1,
+            completaron_barrido: BTreeSet::new(),
         }
     }
 
@@ -370,6 +392,11 @@ impl Colas {
     /// denominador. El `total` es lo que el corte por volumen compara contra algo.
     pub fn abrir_barrido(&mut self, raiz: &RaizId, barrido: BarridoId, total: u64) -> SegmentoId {
         self.cerrar_segmento_de_eventos(raiz);
+        // EN ESTE ORDEN: `superar` deja al `Eventos` degradado sin trabajo pendiente
+        // ANTES de que `podar_terminados` lo evalue, o el segmento superado sobreviviria
+        // una vuelta de mas.
+        self.superar_los_barridos_que_nunca_abrieron(raiz);
+        self.podar_terminados();
         let id = SegmentoId(self.id());
         self.segmentos.push(Segmento {
             id,
@@ -393,9 +420,13 @@ impl Colas {
     }
 
     pub fn cerrar_barrido(&mut self, segmento: SegmentoId, cierre: EstadoDelBarrido) {
-        if let Some(s) = self.segmentos.iter_mut().find(|s| s.id == segmento) {
+        let raiz = self.segmento_mut(segmento).map(|s| {
             s.abierto = false;
             s.cierre = Some(cierre);
+            s.raiz.clone()
+        });
+        if let Some(raiz) = raiz {
+            self.completaron_barrido.insert(raiz);
         }
     }
 
@@ -416,7 +447,7 @@ impl Colas {
         segmento: SegmentoId,
         entradas: Vec<(RutaRelativa, Option<HashVerificado>)>,
     ) {
-        if let Some(s) = self.segmentos.iter_mut().find(|s| s.id == segmento) {
+        if let Some(s) = self.segmento_mut(segmento) {
             s.padron = Some(entradas);
         }
     }
@@ -543,6 +574,93 @@ impl Colas {
         Proximo::Nada
     }
 
+    /// Saca de la cola los segmentos que ya no tienen nada pendiente. **El predicado es
+    /// ESTRUCTURAL, no de banderas, y eso es lo que lo hace correcto.** Podar por
+    /// `cierre_entregado == true` seria peor que inutil:
+    ///
+    /// - Un segmento de **`Eventos` NACE con `cierre_entregado = true`**
+    ///   (`segmento_abierto`, un poco mas abajo) porque no emite marcadores — podarlo por
+    ///   esa bandera borraria segmentos VIVOS con hechos todavia sin transmitir.
+    /// - `observados_entregados` se queda en `false` PARA SIEMPRE si el segmento nunca
+    ///   tuvo un `Aparecio` (`trabajo_de` solo emite `Observar` con el lote no vacio);
+    ///   `desvanecidos_entregados` igual, sin una sola baja, que es el caso de casi todos
+    ///   los barridos.
+    /// - `cierre_entregado` se queda en `false` para siempre si `sweep.open` salio
+    ///   Ambiguo o Rechazado: el segmento queda con `sweep = None`, y la rama de cierre de
+    ///   `trabajo_de` exige `sweep.is_some()` — asi que ese marcador nunca se va a poder
+    ///   entregar, y no es un defecto, es correcto que no se entregue nada que Savia no
+    ///   pidio.
+    ///
+    /// `!abierto && trabajo_de().is_none()` es EXACTAMENTE lo que `siguiente` ya calcula
+    /// para saltear un segmento sin nada que ofrecer: si `siguiente` ya lo consideraria
+    /// vacio, sacarlo de `segmentos` no cambia lo que la raiz puede drenar. El `&&`
+    /// corto-circuita, asi que `trabajo_de` nunca se llama sobre un segmento abierto — es
+    /// lo que protege el `SegmentoId` que `ciclo::barrer` sostiene desde que abre el
+    /// barrido hasta que lo cierra.
+    fn podar_terminados(&mut self) -> usize {
+        let terminados: BTreeSet<SegmentoId> = self
+            .segmentos
+            .iter()
+            .filter(|s| !s.abierto && self.trabajo_de(s).is_none())
+            .map(|s| s.id)
+            .collect();
+        if terminados.is_empty() {
+            return 0;
+        }
+        self.segmentos.retain(|s| !terminados.contains(&s.id));
+        terminados.len()
+    }
+
+    /// Los barridos de esta raiz cuya apertura NUNCA salio de la cola, justo cuando
+    /// arranca el barrido siguiente. Un `sweep.open` que no se entrego es un barrido que
+    /// no existio para Savia —sin `sweepId` no hay nada que cerrar del otro lado— asi que
+    /// en cuanto empieza el recorrido siguiente ese barrido queda SUPERADO: pasa a ser,
+    /// exactamente, un segmento de `Eventos` — hechos sueltos ocurridos entre dos barridos
+    /// que Savia si vio.
+    ///
+    /// **No mueve un solo hecho de segmento, y esa es la diferencia con fundirlo en el
+    /// vecino.** `hechos` y `orden` quedan intactos, en su propio segmento y en su propio
+    /// orden: fundir ROMPERIA `la_compactacion_no_cruza_un_borde_de_barrido` —verificado a
+    /// mano contra ese fixture— y ademas arriesgaria pisar, via el upsert de `encolar`,
+    /// una baja ya comprometida en el inventario que ningun barrido futuro puede volver a
+    /// derivar.
+    fn superar_los_barridos_que_nunca_abrieron(&mut self, raiz: &RaizId) -> usize {
+        let mut superados = 0;
+        for s in self.segmentos.iter_mut().filter(|s| {
+            &s.raiz == raiz
+                && !s.abierto
+                && !s.apertura_entregada
+                && matches!(s.origen, OrigenDeSegmento::Barrido { .. })
+        }) {
+            debug_assert!(
+                s.sweep.is_none(),
+                "sin apertura entregada no puede haber sweepId: `entregado` es el unico \
+                 lugar que lo persiste, y corre despues de `AperturaDe`"
+            );
+            debug_assert!(
+                !s.padron_requerido && !s.padron_entregado,
+                "los dos salen de la RESPUESTA a `sweep.open`, que en este segmento nunca \
+                 llego"
+            );
+            debug_assert!(
+                !s.observados_entregados && !s.desvanecidos_entregados,
+                "`AbrirBarrido` va primero en `trabajo_de`: sin el, ningun otro trabajo de \
+                 este segmento pudo entregarse todavia"
+            );
+            s.origen = OrigenDeSegmento::Eventos;
+            // No porque se haya entregado: porque ya no se va a entregar. Son los mismos
+            // dos valores con los que nace un `Eventos` en `segmento_abierto`.
+            s.apertura_entregada = true;
+            s.cierre_entregado = true;
+            // Evidencia de nivel-raiz sobre un barrido que Savia no llego a conocer.
+            s.cierre = None;
+            // ACA se liberan los MB: el padron de un barrido entero que nunca se pidio.
+            s.padron = None;
+            superados += 1;
+        }
+        superados
+    }
+
     fn trabajo_de(&self, s: &Segmento) -> Option<Trabajo> {
         let es_barrido = matches!(s.origen, OrigenDeSegmento::Barrido { .. });
         if es_barrido && !s.apertura_entregada {
@@ -652,7 +770,7 @@ impl Colas {
     /// rama «descartar». Devuelve lo que el inventario tiene que anotar, para que el
     /// llamador lo escriba EN ESTA MISMA TRANSACCION.
     pub fn resolver(&mut self, trabajo: &TrabajoId, desenlace: Desenlace) -> Vec<Confirmacion> {
-        match desenlace {
+        let confirmaciones = match desenlace {
             Desenlace::Entregado(r) => self.entregado(trabajo, r),
             Desenlace::Reintentable(_) => {
                 // `intentos += 1` y nada se mueve de lugar. El tope NO descarta: solo
@@ -694,7 +812,12 @@ impl Colas {
                 Vec::new()
             }
             Desenlace::Ambiguo => self.ambiguo(trabajo),
-        }
+        };
+        // AL FINAL, DESPUES del match y no antes: la rama `(ObservadosDe, Decisiones)` de
+        // `entregado` busca el segmento por id para copiarle la `raiz` al `BytePendiente`
+        // que crea, y podar antes de esa busqueda lo perderia en silencio.
+        self.podar_terminados();
+        confirmaciones
     }
 
     /// AMBIGUO: no se sabe si el efecto ocurrio, y cada trabajo paga esa duda distinto.
@@ -712,7 +835,7 @@ impl Colas {
             // la ruta EN DUDA, para que el proximo barrido la re-observe y el `known` la
             // re-confirme.
             TrabajoId::Byte(id) => {
-                if let Some(b) = self.bytes.iter().find(|b| b.id == *id) {
+                if let Some(b) = self.byte(*id) {
                     out.push(Confirmacion::HashEnDuda {
                         ruta: b.ruta.clone(),
                     });
@@ -725,7 +848,7 @@ impl Colas {
             // lo que el cierre de ese segmento no se emite —no hay barrido que nombrar— y
             // los hechos, que no lo referencian, siguen viajando.
             TrabajoId::AperturaDe(sid) => {
-                if let Some(s) = self.segmentos.iter_mut().find(|s| s.id == *sid) {
+                if let Some(s) = self.segmento_mut(*sid) {
                     s.apertura_entregada = true;
                 }
             }
@@ -733,7 +856,7 @@ impl Colas {
             // quedan EN DUDA: el proximo barrido las vuelve a observar sin leer un byte, y
             // el `known` cierra la pregunta. Es el mismo camino de cura del ACK perdido.
             TrabajoId::ObservadosDe(sid) => {
-                if let Some(s) = self.segmentos.iter_mut().find(|s| s.id == *sid) {
+                if let Some(s) = self.segmento_mut(*sid) {
                     for (r, h) in s.hechos.iter() {
                         if matches!(h, Hecho::Aparecio(_)) {
                             out.push(Confirmacion::HashEnDuda { ruta: r.clone() });
@@ -758,14 +881,14 @@ impl Colas {
             // barrido queda abierto del otro lado, y la cuarentena nunca recibe el
             // barrido completo que exige—.
             TrabajoId::PadronDe(sid) => {
-                if let Some(s) = self.segmentos.iter_mut().find(|s| s.id == *sid) {
+                if let Some(s) = self.segmento_mut(*sid) {
                     s.padron_entregado = true;
                 }
             }
             // El barrido ya no existe del otro lado. Reintentar da la misma respuesta para
             // siempre y bloquea todos los segmentos posteriores de la raiz.
             TrabajoId::CierreDe(sid) => {
-                if let Some(s) = self.segmentos.iter_mut().find(|s| s.id == *sid) {
+                if let Some(s) = self.segmento_mut(*sid) {
                     s.cierre_entregado = true;
                 }
             }
@@ -780,27 +903,27 @@ impl Colas {
     fn dar_por_terminado(&mut self, trabajo: &TrabajoId) {
         match trabajo {
             TrabajoId::AperturaDe(sid) => {
-                if let Some(s) = self.segmentos.iter_mut().find(|s| s.id == *sid) {
+                if let Some(s) = self.segmento_mut(*sid) {
                     s.apertura_entregada = true;
                 }
             }
             TrabajoId::ObservadosDe(sid) => {
-                if let Some(s) = self.segmentos.iter_mut().find(|s| s.id == *sid) {
+                if let Some(s) = self.segmento_mut(*sid) {
                     s.observados_entregados = true;
                 }
             }
             TrabajoId::DesvanecidosDe(sid) => {
-                if let Some(s) = self.segmentos.iter_mut().find(|s| s.id == *sid) {
+                if let Some(s) = self.segmento_mut(*sid) {
                     s.desvanecidos_entregados = true;
                 }
             }
             TrabajoId::PadronDe(sid) => {
-                if let Some(s) = self.segmentos.iter_mut().find(|s| s.id == *sid) {
+                if let Some(s) = self.segmento_mut(*sid) {
                     s.padron_entregado = true;
                 }
             }
             TrabajoId::CierreDe(sid) => {
-                if let Some(s) = self.segmentos.iter_mut().find(|s| s.id == *sid) {
+                if let Some(s) = self.segmento_mut(*sid) {
                     s.cierre_entregado = true;
                 }
             }
@@ -821,7 +944,7 @@ impl Colas {
                     padron_requerido,
                 },
             ) => {
-                if let Some(s) = self.segmentos.iter_mut().find(|s| s.id == *sid) {
+                if let Some(s) = self.segmento_mut(*sid) {
                     s.apertura_entregada = true;
                     s.padron_requerido = padron_requerido;
                     // Se PERSISTE el `sweepId`: si el proceso muere entre el
@@ -834,7 +957,7 @@ impl Colas {
                 }
             }
             (TrabajoId::PadronDe(sid), Recibido::Nada) => {
-                if let Some(s) = self.segmentos.iter_mut().find(|s| s.id == *sid) {
+                if let Some(s) = self.segmento_mut(*sid) {
                     s.padron_entregado = true;
                     s.intentos = 0;
                 }
@@ -868,13 +991,13 @@ impl Colas {
                         }
                     }
                 }
-                if let Some(s) = self.segmentos.iter_mut().find(|s| s.id == *sid) {
+                if let Some(s) = self.segmento_mut(*sid) {
                     s.observados_entregados = true;
                     s.intentos = 0;
                 }
             }
             (TrabajoId::DesvanecidosDe(sid), _) => {
-                if let Some(s) = self.segmentos.iter_mut().find(|s| s.id == *sid) {
+                if let Some(s) = self.segmento_mut(*sid) {
                     for (r, h) in s.hechos.clone() {
                         if let Hecho::Desaparecio(_) = h {
                             out.push(Confirmacion::BajaEntregada { ruta: r });
@@ -886,7 +1009,7 @@ impl Colas {
             }
             (TrabajoId::CierreDe(sid), Recibido::Retirados { rutas, congelada }) => {
                 out.push(Confirmacion::Retirados { rutas });
-                let raiz = self.segmentos.iter_mut().find(|s| s.id == *sid).map(|s| {
+                let raiz = self.segmento_mut(*sid).map(|s| {
                     s.cierre_entregado = true;
                     s.intentos = 0;
                     s.raiz.clone()
@@ -903,12 +1026,12 @@ impl Colas {
                 }
             }
             (TrabajoId::CierreDe(sid), _) => {
-                if let Some(s) = self.segmentos.iter_mut().find(|s| s.id == *sid) {
+                if let Some(s) = self.segmento_mut(*sid) {
                     s.cierre_entregado = true;
                 }
             }
             (TrabajoId::Byte(id), Recibido::Verificado(h)) => {
-                if let Some(b) = self.bytes.iter().find(|b| b.id == *id) {
+                if let Some(b) = self.byte(*id) {
                     // Se escribe el hash VERIFICADO sobre el afirmado. Aca se cierra la
                     // divergencia.
                     out.push(Confirmacion::HashConfirmado {
@@ -922,7 +1045,7 @@ impl Colas {
             (TrabajoId::Byte(id), _) => {
                 // El PUT termino. La confirmacion es otra fase, para que un ACK perdido
                 // no cueste re-subir el archivo entero.
-                if let Some(b) = self.bytes.iter_mut().find(|b| b.id == *id) {
+                if let Some(b) = self.byte_mut(*id) {
                     b.subido = true;
                     b.intentos = 0;
                 }
@@ -939,12 +1062,12 @@ impl Colas {
             | TrabajoId::DesvanecidosDe(s)
             | TrabajoId::PadronDe(s)
             | TrabajoId::CierreDe(s) => {
-                if let Some(x) = self.segmentos.iter_mut().find(|x| x.id == *s) {
+                if let Some(x) = self.segmento_mut(*s) {
                     x.intentos += 1;
                 }
             }
             TrabajoId::Byte(id) => {
-                if let Some(b) = self.bytes.iter_mut().find(|b| b.id == *id) {
+                if let Some(b) = self.byte_mut(*id) {
                     b.intentos += 1;
                 }
             }
@@ -985,31 +1108,43 @@ impl Colas {
         });
     }
 
+    /// **LOS UNICOS CUATRO LUGARES QUE SABEN BUSCAR POR ID.** `segmentos`/`bytes` son
+    /// `Vec`, no `HashMap` — el orden de insercion ES el orden de entrega (`siguiente`)
+    /// — asi que "encontrar por id" es un scan lineal en toda esta cola, y antes cada
+    /// llamador lo escribia de nuevo. Un cambio futuro a como se indexa (p. ej. un
+    /// `HashMap` una vez que una raiz acumule miles de segmentos) toca estas cuatro
+    /// firmas y no las ~25 llamadas.
+    fn segmento(&self, id: SegmentoId) -> Option<&Segmento> {
+        self.segmentos.iter().find(|s| s.id == id)
+    }
+
+    fn segmento_mut(&mut self, id: SegmentoId) -> Option<&mut Segmento> {
+        self.segmentos.iter_mut().find(|s| s.id == id)
+    }
+
+    fn byte(&self, id: u64) -> Option<&BytePendiente> {
+        self.bytes.iter().find(|b| b.id == id)
+    }
+
+    fn byte_mut(&mut self, id: u64) -> Option<&mut BytePendiente> {
+        self.bytes.iter_mut().find(|b| b.id == id)
+    }
+
     fn raiz_de(&self, trabajo: &TrabajoId) -> Option<RaizId> {
         match trabajo {
             TrabajoId::AperturaDe(s)
             | TrabajoId::ObservadosDe(s)
             | TrabajoId::DesvanecidosDe(s)
             | TrabajoId::PadronDe(s)
-            | TrabajoId::CierreDe(s) => self
-                .segmentos
-                .iter()
-                .find(|x| x.id == *s)
-                .map(|x| x.raiz.clone()),
-            TrabajoId::Byte(id) => self
-                .bytes
-                .iter()
-                .find(|b| b.id == *id)
-                .map(|b| b.raiz.clone()),
+            | TrabajoId::CierreDe(s) => self.segmento(*s).map(|x| x.raiz.clone()),
+            TrabajoId::Byte(id) => self.byte(*id).map(|b| b.raiz.clone()),
         }
     }
 
     fn rutas_de(&self, trabajo: &TrabajoId) -> Vec<RutaRelativa> {
         match trabajo {
             TrabajoId::ObservadosDe(s) | TrabajoId::DesvanecidosDe(s) => self
-                .segmentos
-                .iter()
-                .find(|x| x.id == *s)
+                .segmento(*s)
                 .map(|x| x.orden.clone())
                 .unwrap_or_default(),
             TrabajoId::Byte(id) => self
@@ -1066,8 +1201,24 @@ impl Colas {
         self.congeladas.contains(raiz)
     }
 
+    /// Si esta raiz cerro alguna vez un barrido — ver el campo `completaron_barrido`.
+    pub fn completo_un_barrido(&self, raiz: &RaizId) -> bool {
+        self.completaron_barrido.contains(raiz)
+    }
+
     pub fn detenido(&self) -> Option<MotivoDeDetencion> {
         self.detenido
+    }
+
+    /// **EL UNICO camino por el que el dispositivo vuelve a trabajar** despues de
+    /// `Desenlace::Credenciales`. `detenido` no se limpia solo — ni con el tiempo, ni con
+    /// un intento que por casualidad sale bien, porque mientras esta en `Some` `siguiente`
+    /// ni siquiera intenta nada nuevo. La unica causa legitima para llamar esto es que el
+    /// dispositivo adopto una credencial nueva: onboarding, "Volver a vincular", o el
+    /// reinicio de sesion, todos el mismo caso — un token que reemplaza al que Savia
+    /// rechazo.
+    pub fn reanudar(&mut self) {
+        self.detenido = None;
     }
 
     /// Derivado de `max_intentos`, no guardado. Con el parametro en `None` es siempre
@@ -1111,6 +1262,11 @@ impl Colas {
             .collect()
     }
 
+    /// Los hechos que TODAVIA no salieron de esta raiz. Antes de `podar_terminados`, un
+    /// segmento entregado entero se quedaba para siempre en `segmentos` con sus `hechos`
+    /// puestos, asi que este numero contaba tambien los que ya estaban entregados —sin
+    /// techo, un segmento mas por barrido—. Ahora ese segmento se poda apenas deja de
+    /// tener trabajo pendiente, y esto cuenta solo lo que de verdad falta drenar.
     pub fn hechos_pendientes(&self, raiz: &RaizId) -> u64 {
         self.segmentos
             .iter()

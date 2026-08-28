@@ -3,28 +3,71 @@
 // (`ui`) y los dibuja. Fase 5: el panel real, sobre papel claro — no el onboarding.
 //
 // **`vista` sigue sin derivarse: viene tal cual de Rust.** Lo único que este
-// archivo agrega es `ui` (`subview`, `carpetaId`, `toast`), y esos tres campos
-// NO sacan nada del núcleo — son navegación pura (list → menu → confirmUnlink →
-// doneUnlink → files) que `bandeja.js` gobierna y le pasa acá para dibujar. Ver
-// el comentario de cabecera de `bandeja.js` para el porqué de que viva allá.
+// archivo agrega es `ui` (`subview`, `carpetaId`, `contieneOtra`, `vinculacion`,
+// `toast`), y esos campos NO sacan nada del núcleo — son navegación pura
+// (list → menu → confirmUnlink → doneUnlink → files, list → contieneOtra al
+// agregar una carpeta que contiene otra ya enrolada, list → vincular al pedir
+// "Volver a vincular" desde el aviso de credenciales) que `bandeja.js`
+// gobierna y le pasa acá para dibujar. Ver el comentario de cabecera de
+// `bandeja.js` para el porqué de que viva allá.
 //
 // Los textos viven en `textos.js` — el único archivo con frases en español. Este
 // módulo pide una clave, nunca inventa una palabra.
 // ────────────────────────────────────────────────────────────────────────────
 
 import { TEXTOS } from "./textos.js";
+import { esc } from "./dom.js";
 
-const esc = (s) =>
-  String(s).replace(
-    /[&<>"]/g,
-    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c],
-  );
+/** El "confirmar" genérico: título, cuerpo, cancelar + una acción de riesgo
+ * variable (tono y destino cambian). Antes copiado byte-a-byte en
+ * `vistaVincular` (denegado/vencido/sinConexion), `vistaConfirmarCerrarSesion`,
+ * `vistaConfirmUnlink` y `vistaContieneOtra` — solo el texto, el tono del
+ * botón de aceptar y a qué comando/nav apunta cada uno cambiaba. */
+function atributos(attrs) {
+  return Object.entries(attrs ?? {})
+    .map(([k, v]) => `${k}="${esc(v)}"`)
+    .join(" ");
+}
+
+function confirmarShell({ titulo, cuerpo, cancelar, aceptar }) {
+  return `
+    <div class="confirmar">
+      <div class="confirmar__titulo">${esc(titulo)}</div>
+      <div class="confirmar__cuerpo">${esc(cuerpo)}</div>
+      <div class="confirmar__acciones">
+        <button class="btn btn--secundario" type="button" ${atributos(cancelar.attrs)}>${esc(cancelar.texto)}</button>
+        <button class="btn ${aceptar.tono}" type="button" ${atributos(aceptar.attrs)}>${esc(aceptar.texto)}</button>
+      </div>
+    </div>`;
+}
+
+// El check de 15×15 se repetía idéntico en las dos pantallas "hecho" — una
+// sola vez acá.
+const ICONO_CHECK =
+  '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 12.5L9.5 18L20 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+/** El "hecho" genérico: ícono de check, título, cuerpo, un botón de volver.
+ * Antes copiado byte-a-byte en `vistaVincular` (aprobado) y `vistaDoneUnlink`. */
+function hechoShell({ titulo, cuerpo, volver }) {
+  return `
+    <div class="hecho">
+      <div class="hecho__cabecera">
+        <span class="hecho__icono" aria-hidden="true">${ICONO_CHECK}</span>
+        <div class="hecho__textos">
+          <div class="hecho__titulo">${esc(titulo)}</div>
+          <div class="hecho__cuerpo">${esc(cuerpo)}</div>
+        </div>
+      </div>
+      <button class="btn btn--secundario hecho__volver" type="button" ${atributos(volver.attrs)}>${esc(volver.texto)}</button>
+    </div>`;
+}
 
 // El tono del badge por estado de carpeta — mismo mapeo que el mockup
 // (`folderToneKind`), pero leído del vocabulario del núcleo y no adivinado.
 const TONO_DE_ESTADO = {
   sincronizado: "success",
-  barriendo: "info",
+  leyendo: "info",
+  actualizando: "info",
   carpetaAusente: "danger",
   congelado: "warning",
 };
@@ -80,25 +123,30 @@ function motivoDeFallo(fila) {
   return null;
 }
 
-function badgeHtml(carpeta) {
+// `enVivo` es la entrada del `Map` de progreso que `bandeja.js` arma desde el
+// evento `"progreso"` (canal de la Fase 7) — NO `carpeta.progreso`, que sigue
+// siendo siempre `null` (ver el doc de `Carpeta::progreso` en panel.rs:
+// `panel::vista` toma el mismo candado que el barrido/drenaje sostienen, así
+// que estructuralmente no puede ver ninguno en curso). Solo se usa si su
+// `fase` coincide con el `estado` actual de la carpeta — una entrada de
+// `"leyendo"` que sobrevivió mientras la carpeta ya pasó a `"actualizando"`
+// no es progreso de lo que se está mostrando.
+function badgeHtml(carpeta, enVivo) {
   const tono = TONO_DE_ESTADO[carpeta.estado];
   if (!tono) throw new Error(`estado de carpeta desconocido: ${carpeta.estado}`);
   const texto = TEXTOS.panel.estado[carpeta.estado];
   let extra = "";
-  // `carpeta.progreso` HOY siempre es `null` (ver el doc de `Carpeta::progreso`
-  // en panel.rs) — así que "no mostrar nada" es el camino normal, y esta rama
-  // queda escrita mirando hacia adelante, sin ejercitar todavía. La frase es
-  // literal y no sale de `textos.js`: esa clave no existe aún porque el campo
-  // nunca tuvo un valor real que la pidiera — anotado para cuando la Fase 7
-  // llene `progreso` de verdad.
-  if (carpeta.estado === "barriendo" && carpeta.progreso) {
-    const { procesados, total } = carpeta.progreso;
-    extra = `<span class="carpeta-card__progreso">${esc(procesados)} de ${esc(total)} documentos</span>`;
+  if (
+    (carpeta.estado === "leyendo" || carpeta.estado === "actualizando") &&
+    enVivo &&
+    enVivo.fase === carpeta.estado
+  ) {
+    extra = `<span class="carpeta-card__progreso">${esc(TEXTOS.panel.progreso(enVivo.procesados, enVivo.total))}</span>`;
   }
   return `<span class="badge" data-tono="${esc(tono)}">${esc(texto)}</span>${extra}`;
 }
 
-function tarjetaDeCarpeta(carpeta) {
+function tarjetaDeCarpeta(carpeta, progreso) {
   const nombre = nombreAmigable(carpeta.rutaAbsoluta);
   const ausente = carpeta.estado === "carpetaAusente";
   const congelada = carpeta.estado === "congelado";
@@ -117,7 +165,7 @@ function tarjetaDeCarpeta(carpeta) {
         <button class="carpeta-card__menu-btn" type="button" data-nav="menu" data-carpeta="${esc(carpeta.id)}" aria-label="${esc(TEXTOS.folders.accesibilidad.masOpciones)}">⋯</button>
       </div>
       <div class="carpeta-card__docs">${esc(TEXTOS.panel.documentos.enSavia(carpeta.indexados))}</div>
-      <div class="carpeta-card__badges">${badgeHtml(carpeta)}</div>
+      <div class="carpeta-card__badges">${badgeHtml(carpeta, progreso.get(carpeta.id))}</div>
       ${
         motivo
           ? `<div class="carpeta-card__motivo" data-tono="${ausente ? "danger" : "warning"}">${esc(motivo)}</div>`
@@ -127,26 +175,20 @@ function tarjetaDeCarpeta(carpeta) {
     </div>`;
 }
 
-function bloqueAgregarCarpeta(activo) {
+// **SIEMPRE UN BOTÓN DE VERDAD.** Antes había una variante informativa
+// (`aria-disabled`, sin `data-accion`) cuando ya había una carpeta en la
+// lista — D4, "por ahora Savia mira una sola a la vez". Esa restricción se
+// levantó: el núcleo siempre aguantó más de una (`Almacen`/`trabajar()` ya
+// recorren N raíces), así que "agregar" se ata sin condición —haya cero
+// carpetas o varias— al mismo comando que usa la pantalla 4 del onboarding
+// (`elegir_carpeta_con_advertencia`, ver `COMANDOS` en `bandeja.js`).
+function bloqueAgregarCarpeta() {
   const t = TEXTOS.folders.agregarCarpeta;
-  if (activo) {
-    // Sin carpetas todavía (lista vacía, o recién se dejó de mirar la única
-    // que había): acá sí hace falta poder agregar, así que el bloque es un
-    // botón de verdad y se ata a `agregar_carpeta`.
-    return `
-      <button class="agregar-carpeta agregar-carpeta--activo" type="button" data-accion="agregarCarpeta">
-        <div class="agregar-carpeta__titulo">${esc(t.titulo)}</div>
-        <div class="agregar-carpeta__subtitulo">${esc(t.subtitulo)}</div>
-      </button>`;
-  }
-  // D4: el núcleo aguanta más de una carpeta, la interfaz muestra una sola —
-  // así que con una carpeta ya en la lista, este bloque es informativo, no
-  // interactivo (igual que en el mockup: opacidad reducida, sin `onClick`).
   return `
-    <div class="agregar-carpeta" aria-disabled="true">
+    <button class="agregar-carpeta agregar-carpeta--activo" type="button" data-accion="agregarCarpeta">
       <div class="agregar-carpeta__titulo">${esc(t.titulo)}</div>
       <div class="agregar-carpeta__subtitulo">${esc(t.subtitulo)}</div>
-    </div>`;
+    </button>`;
 }
 
 /**
@@ -170,36 +212,131 @@ function bannerDetenido() {
       <div class="aviso-detenido__cuerpo"><strong>${esc(t.avisoTitulo)}</strong> ${esc(t.avisoCuerpo)}</div>
       <div class="aviso-detenido__acciones">
         <button class="btn btn--secundario" type="button" data-accion="salir">${esc(a.salir)}</button>
-        <!-- "vincular" todavía no tiene comando (ver bandeja.js: COMANDOS no lo
-             lista) — el botón se dibuja igual y NO se ata: un botón que no
-             responde dice la verdad; uno que responde sin hacer nada, no. -->
+        <!-- Lleva a la subvista "vincular" — bandeja.js la intercepta ANTES
+             de mirar COMANDOS, porque arrancar la vinculación necesita el
+             código que devuelve iniciar_vinculacion, y eso no entra en el
+             patrón genérico "invoke y repintar". -->
         <button class="btn btn--primario" type="button" data-accion="vincular">${esc(a.volverAVincular)}</button>
       </div>
     </div>`;
 }
 
+// ── Subvista: vincular ───────────────────────────────────────────────────────
+// "Volver a vincular" desde el aviso de credenciales. Mismo mecanismo que la
+// pantalla 2 del onboarding (`iniciar_vinculacion`/`sondear_vinculacion`,
+// sondeados ahora por `bandeja.js`) — pero la carpeta ya está enrolada, así
+// que no hay pantallas 3-6 que repetir: al aprobar, vuelve directo a la lista.
+function vistaVincular(vista, vinculacion, progreso) {
+  // Defensivo, mismo patrón que `vistaContieneOtra`: sin el estado que
+  // `bandeja.js` arma al arrancar el flujo, no hay nada que mostrar acá.
+  if (!vinculacion) return vistaLista(vista, progreso);
+  const t = TEXTOS.folders.vincular;
+  if (vinculacion.estado === "aprobado") {
+    const s = t.aprobado;
+    return hechoShell({
+      titulo: s.titulo,
+      cuerpo: s.cuerpo(vinculacion.usuario),
+      volver: { texto: s.boton, attrs: { "data-accion": "vincularVolver" } },
+    });
+  }
+  if (vinculacion.estado === "denegado" || vinculacion.estado === "vencido" || vinculacion.estado === "sinConexion") {
+    const clave = vinculacion.estado === "denegado" ? "rechazado" : vinculacion.estado;
+    const s = t[clave];
+    // `sinConexion` no gastó el código pendiente (ver `sondear_vinculacion` en
+    // Rust) — reanuda el sondeo en vez de pedir uno nuevo, mismo criterio que
+    // `onboarding.js` (`q2-reintentar` vs. `q2-pedir-otro`). Antes las tres
+    // ramas caían al mismo botón y "Reintentar" en un blip de red quemaba un
+    // código todavía válido.
+    const accion = vinculacion.estado === "sinConexion" ? "vincularResumir" : "vincularReintentar";
+    return confirmarShell({
+      titulo: s.titulo,
+      cuerpo: s.cuerpo,
+      cancelar: { texto: t.cancelar, attrs: { "data-accion": "vincularVolver" } },
+      aceptar: { texto: s.boton, tono: "btn--primario", attrs: { "data-accion": accion } },
+    });
+  }
+  // cargando / esperando: mismo bloque, el código pasa de "······" al valor
+  // real apenas `iniciar_vinculacion` contesta — igual que `codigoQuieto` en
+  // la pantalla 2 del onboarding.
+  const codigoQuieto = vinculacion.estado === "esperando";
+  return `
+    <div class="confirmar">
+      <div class="confirmar__titulo">${esc(t.eyebrow)}</div>
+      <div class="confirmar__cuerpo">${esc(t.cuerpo)}</div>
+      <div class="vincular__panel">
+        <div class="vincular__codigo ${codigoQuieto ? "" : "vincular__codigo--apagado"}">
+          <div class="vincular__codigo-etiqueta">${esc(t.etiquetaCodigo)}</div>
+          <div class="vincular__codigo-valor">${esc(vinculacion.codigo || "······")}</div>
+          ${codigoQuieto ? `<div class="vincular__vence">${esc(t.vence)}</div>` : ""}
+        </div>
+        <div class="vincular__separador"></div>
+        <div class="confirmar__titulo" style="font-size:var(--texto-fila);">${esc(t.esperando.titulo)}</div>
+        <div class="confirmar__cuerpo">${esc(t.esperando.cuerpo)}</div>
+      </div>
+      <div class="confirmar__acciones">
+        <button class="btn btn--secundario" type="button" data-accion="vincularVolver">${esc(t.cancelar)}</button>
+      </div>
+    </div>`;
+}
+
+// ── Subvista: confirmarCerrarSesion ──────────────────────────────────────────
+// "Cerrar sesión" es más destructivo que "Dejar de mirar" una sola carpeta —
+// desenrola TODAS a la vez y pide una cuenta de nuevo en el próximo arranque —
+// así que pide la misma confirmación explícita que `confirmUnlink`, mismo
+// markup, mismo verbo de D7 para lo que le pasa a los documentos.
+function vistaConfirmarCerrarSesion(vista) {
+  const t = TEXTOS.panel.legado.confirmarCerrarSesion;
+  return confirmarShell({
+    titulo: t.titulo,
+    cuerpo: t.cuerpo(vista.indexados),
+    cancelar: { texto: t.cancelar, attrs: { "data-nav": "list" } },
+    aceptar: { texto: t.aceptar, tono: "btn--peligro", attrs: { "data-accion": "cerrarSesion" } },
+  });
+}
+
+// ── Subvista: cerrandoSesion ─────────────────────────────────────────────────
+// `cerrar_sesion` ya corrió — falta que el hilo de trabajo lo persista y
+// cierre la app (hasta `demo::INTERVALO`, ver `Compartido::cerrar_sesion_pendiente`
+// en `main.rs`). No hay nada más que ofrecer mientras tanto: ni "Cancelar" (ya
+// se pidió, no hay vuelta atrás) ni ningún dato que mostrar.
+function vistaCerrandoSesion() {
+  const t = TEXTOS.panel.legado.cerrandoSesion;
+  return `
+    <div class="confirmar">
+      <div class="confirmar__titulo">${esc(t.titulo)}</div>
+      <div class="confirmar__cuerpo">${esc(t.cuerpo)}</div>
+    </div>`;
+}
+
 // ── Subvista: list ──────────────────────────────────────────────────────────
-function vistaLista(vista) {
+function vistaLista(vista, progreso) {
   const banner = vista.detenido === "credenciales" ? bannerDetenido() : "";
   const carpetas = vista.carpetas;
-  const cuerpo = carpetas.length
-    ? `${carpetas.map(tarjetaDeCarpeta).join("")}${bloqueAgregarCarpeta(false)}`
-    : bloqueAgregarCarpeta(true);
+  // **Las tarjetas van adentro de su propio scroll; el título y "Agregar
+  // carpeta" no.** Sin esto la bandeja crece con cada carpeta que se agrega —
+  // sin techo — hasta tapar la pantalla. El límite lo pone
+  // `.carpetas-lista__cuerpo` en `panel.css`; acá solo hace falta no meter el
+  // título ni el botón adentro de esa caja, para que sigan siempre visibles.
+  const tarjetas = carpetas.map((c) => tarjetaDeCarpeta(c, progreso)).join("");
   return `
     ${banner}
     <div class="carpetas-lista">
       <div class="carpetas-lista__titulo">${esc(TEXTOS.folders.titulo)}</div>
-      ${cuerpo}
+      ${tarjetas ? `<div class="carpetas-lista__cuerpo">${tarjetas}</div>` : ""}
+      ${bloqueAgregarCarpeta()}
     </div>
-    <button class="pie-salir" type="button" data-accion="salir">${esc(TEXTOS.panel.legado.acciones.salir)}</button>`;
+    <div class="pie">
+      <button class="pie-accion" type="button" data-nav="confirmarCerrarSesion">${esc(TEXTOS.panel.legado.acciones.cerrarSesion)}</button>
+      <button class="pie-accion" type="button" data-accion="salir">${esc(TEXTOS.panel.legado.acciones.salir)}</button>
+    </div>`;
 }
 
 // ── Subvista: menu (⋯) ──────────────────────────────────────────────────────
-function vistaMenu(vista, carpetaId) {
+function vistaMenu(vista, carpetaId, progreso) {
   const c = vista.carpetas.find((x) => x.id === carpetaId);
   // Defensivo: sin una carpeta que identificar no hay menú que mostrar — se
   // cae a la lista en vez de inventar un título vacío.
-  if (!c) return vistaLista(vista);
+  if (!c) return vistaLista(vista, progreso);
   const nombre = nombreAmigable(c.rutaAbsoluta);
   const finder = TEXTOS.folders.menu.finder;
   const dejar = TEXTOS.folders.menu.dejarDeMirar;
@@ -227,37 +364,55 @@ function vistaMenu(vista, carpetaId) {
 }
 
 // ── Subvista: confirmUnlink ─────────────────────────────────────────────────
-function vistaConfirmUnlink(vista, carpetaId) {
+function vistaConfirmUnlink(vista, carpetaId, progreso) {
   const c = vista.carpetas.find((x) => x.id === carpetaId);
-  if (!c) return vistaLista(vista);
+  if (!c) return vistaLista(vista, progreso);
   const nombre = nombreAmigable(c.rutaAbsoluta);
   const t = TEXTOS.folders.confirmarDejarDeMirar;
-  return `
-    <div class="confirmar">
-      <div class="confirmar__titulo">${esc(t.titulo(nombre))}</div>
-      <div class="confirmar__cuerpo">${esc(t.cuerpo(c.indexados))}</div>
-      <div class="confirmar__acciones">
-        <button class="btn btn--secundario" type="button" data-nav="list">${esc(t.cancelar)}</button>
-        <button class="btn btn--peligro" type="button" data-accion="desvincular" data-carpeta="${esc(c.id)}">${esc(t.aceptar)}</button>
-      </div>
-    </div>`;
+  return confirmarShell({
+    titulo: t.titulo(nombre),
+    cuerpo: t.cuerpo(c.indexados),
+    cancelar: { texto: t.cancelar, attrs: { "data-nav": "list" } },
+    aceptar: {
+      texto: t.aceptar,
+      tono: "btn--peligro",
+      attrs: { "data-accion": "desvincular", "data-carpeta": c.id },
+    },
+  });
+}
+
+// ── Subvista: contieneOtra ───────────────────────────────────────────────────
+// La candidata elegida contiene una raíz que ya se mira — mismo resultado que
+// clasifica la pantalla 4 del onboarding (`clasificar_y_actuar` en Rust, el
+// mismo comando para las dos superficies). Reusa el markup de `confirmar`:
+// es la misma forma (título, cuerpo, cancelar/aceptar) que ya tiene el CSS.
+function vistaContieneOtra(vista, datos, progreso) {
+  // Defensivo, mismo patrón que `vistaMenu`/`vistaConfirmUnlink`/`vistaArchivos`:
+  // sin la candidata que identificar no hay nada que mostrar acá.
+  if (!datos) return vistaLista(vista, progreso);
+  const t = TEXTOS.folders.elegirCarpeta.resultados.contieneOtra;
+  const nombre = nombreAmigable(datos.ruta);
+  return confirmarShell({
+    titulo: t.titulo,
+    cuerpo: t.cuerpo(nombre),
+    cancelar: { texto: TEXTOS.folders.elegirCarpeta.cancelar, attrs: { "data-nav": "list" } },
+    aceptar: {
+      texto: t.botonPrimario,
+      tono: "btn--primario",
+      attrs: { "data-accion": "reemplazarCarpeta", "data-carpeta": datos.id },
+    },
+  });
 }
 
 // ── Subvista: doneUnlink ────────────────────────────────────────────────────
 // No necesita datos de la carpeta — ya se desvinculó y ya no está en `vista`.
 function vistaDoneUnlink() {
   const t = TEXTOS.folders.dejarDeMirarHecho;
-  return `
-    <div class="hecho">
-      <div class="hecho__cabecera">
-        <span class="hecho__icono" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 12.5L9.5 18L20 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-        <div class="hecho__textos">
-          <div class="hecho__titulo">${esc(t.titulo)}</div>
-          <div class="hecho__cuerpo">${esc(t.cuerpo)}</div>
-        </div>
-      </div>
-      <button class="btn btn--secundario hecho__volver" type="button" data-nav="list">${esc(t.volver)}</button>
-    </div>`;
+  return hechoShell({
+    titulo: t.titulo,
+    cuerpo: t.cuerpo,
+    volver: { texto: t.volver, attrs: { "data-nav": "list" } },
+  });
 }
 
 function filaDeArchivo(fila, carpetaId) {
@@ -284,23 +439,30 @@ function filaDeArchivo(fila, carpetaId) {
 }
 
 // ── Subvista: files ──────────────────────────────────────────────────────────
-function vistaArchivos(vista, carpetaId) {
+function vistaArchivos(vista, carpetaId, progreso) {
   const c = vista.carpetas.find((x) => x.id === carpetaId);
-  if (!c) return vistaLista(vista);
+  if (!c) return vistaLista(vista, progreso);
   const nombre = nombreAmigable(c.rutaAbsoluta);
+  const enVivo = progreso.get(c.id);
+  // Sin fila y todavia trabajando (`leyendo`/`actualizando`) es un caso distinto de
+  // vacia de verdad: la primera es "espera, esto sigue"; la segunda es un hecho
+  // permanente. Confundirlas es lo que se ve como "se demora en cargar".
+  const trabajando = c.estado === "leyendo" || c.estado === "actualizando";
   return `
     <div class="archivos-vista">
       <div class="archivos-vista__cabecera">
         <button class="archivos-vista__atras" type="button" data-nav="list" aria-label="${esc(TEXTOS.folders.accesibilidad.volver)}">←</button>
         <div class="archivos-vista__nombre" title="${esc(c.rutaAbsoluta)}">${esc(nombre)}</div>
       </div>
-      <div class="archivos-vista__badges">${badgeHtml(c)}</div>
+      <div class="archivos-vista__badges">${badgeHtml(c, enVivo)}</div>
       <div class="archivos-vista__divisor"></div>
       <div class="archivos-vista__lista">
         ${
           c.filas.length
             ? c.filas.map((f) => filaDeArchivo(f, c.id)).join("")
-            : `<div class="archivos-vista__vacio">Sin archivos todavía.</div>`
+            : trabajando
+              ? `<div class="archivos-vista__cargando">${esc(TEXTOS.folders.archivos.cargando(c.estado, enVivo))}</div>`
+              : `<div class="archivos-vista__vacio">${esc(TEXTOS.folders.archivos.vacio)}</div>`
         }
         ${
           // El "y N más" nunca se omite cuando hay ocultas — mismo principio
@@ -315,28 +477,48 @@ function vistaArchivos(vista, carpetaId) {
 
 /**
  * El punto de entrada. `ui` es navegación local, gobernada por `bandeja.js`:
- *   - `ui.subview`: "list" | "menu" | "confirmUnlink" | "doneUnlink" | "files"
+ *   - `ui.subview`: "list" | "menu" | "confirmUnlink" | "doneUnlink" | "files" | "contieneOtra"
  *   - `ui.carpetaId`: qué carpeta está en foco (menu / confirmUnlink / files)
+ *   - `ui.contieneOtra`: `{id, ruta}` de la raíz que quedaría adentro de la
+ *     candidata — la respuesta `contieneOtra` de `elegir_carpeta_con_advertencia`
  *   - `ui.toast`: mensaje efímero, o `null`
+ *
+ * `progreso` es el `Map<raizId, {fase, procesados, total}>` que `bandeja.js`
+ * arma desde el evento `"progreso"` — vive fuera de `vista` por el mismo
+ * motivo que `Carpeta.progreso` (en Rust) se queda en `null` para siempre: el
+ * candado que protege `vista()` no puede ver un barrido/drenaje en curso, así
+ * que el progreso en vivo tiene que llegar por un canal aparte.
  */
-export function bandeja(vista, ui = {}) {
+export function bandeja(vista, ui = {}, progreso = new Map()) {
   const subview = ui.subview ?? "list";
   let inner;
   switch (subview) {
     case "list":
-      inner = vistaLista(vista);
+      inner = vistaLista(vista, progreso);
       break;
     case "menu":
-      inner = vistaMenu(vista, ui.carpetaId);
+      inner = vistaMenu(vista, ui.carpetaId, progreso);
       break;
     case "confirmUnlink":
-      inner = vistaConfirmUnlink(vista, ui.carpetaId);
+      inner = vistaConfirmUnlink(vista, ui.carpetaId, progreso);
+      break;
+    case "contieneOtra":
+      inner = vistaContieneOtra(vista, ui.contieneOtra, progreso);
+      break;
+    case "vincular":
+      inner = vistaVincular(vista, ui.vinculacion, progreso);
+      break;
+    case "confirmarCerrarSesion":
+      inner = vistaConfirmarCerrarSesion(vista);
+      break;
+    case "cerrandoSesion":
+      inner = vistaCerrandoSesion();
       break;
     case "doneUnlink":
       inner = vistaDoneUnlink();
       break;
     case "files":
-      inner = vistaArchivos(vista, ui.carpetaId);
+      inner = vistaArchivos(vista, ui.carpetaId, progreso);
       break;
     default:
       throw new Error(`subvista desconocida: ${subview}`);

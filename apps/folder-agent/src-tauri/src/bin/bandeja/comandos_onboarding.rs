@@ -34,8 +34,7 @@
 //! - **Ningún comando recibe lo que puede resolver** (plan §3, regla 5): `abrir_archivo`
 //!   valida `ruta` contra el inventario antes de construir el path absoluto, igual que
 //!   `abrir_carpeta` en `main.rs`. `elegir_carpeta_con_advertencia` no recibe una ruta
-//!   del webview en absoluto — la saca del diálogo nativo, mismo patrón que
-//!   `agregar_carpeta`.
+//!   del webview en absoluto — la saca del diálogo nativo.
 //! - **Ningún número inventado**: `UMBRAL_DE_ARCHIVOS_PARA_ADVERTIR` es `None` — ver su
 //!   comentario. El intervalo de sondeo del código de vinculación (`sondear_vinculacion`
 //!   la llama el JS, no este módulo) es una decisión de UX, no del núcleo, y se
@@ -113,7 +112,12 @@ pub(crate) enum ReclamoParaLaPantalla {
 
 /// `POST /enroll/begin`, una vez. La pantalla llama esto al entrar y cuando la persona
 /// pide un código nuevo (rechazado / vencido).
-#[tauri::command]
+///
+/// **`(async)` PORQUE HACE UNA LLAMADA DE RED BLOQUEANTE**, y sin eso corre en el hilo
+/// principal: hasta 5 s de conexión más 15 s de lectura (`TIEMPO_DE_CONEXION`/
+/// `TIEMPO_POR_LLAMADA`, arriba) con la ventana congelada. Ver el bloque sobre `(async)`
+/// en `main.rs`.
+#[tauri::command(async)]
 pub(crate) fn iniciar_vinculacion(
     estado: State<'_, Arc<Compartido>>,
     vinculacion: State<'_, EstadoDeVinculacion>,
@@ -138,7 +142,18 @@ pub(crate) fn iniciar_vinculacion(
 /// `FalloDeProtocolo`— dejar la vinculación viva Y NO se ramifica sobre el motivo: es
 /// la regla R2 del plan, aguas abajo se lee la clase (acá, ambas clases posibles caen
 /// al mismo `SinConexion`) y nunca el código crudo.
-#[tauri::command]
+///
+/// **`(async)` POR LO MISMO QUE `iniciar_vinculacion`**, y acá pesa más: el panel lo
+/// sondea cada 2 s mientras dura la espera, así que cada sondeo era una pausa del hilo
+/// principal. Ver el bloque sobre `(async)` en `main.rs`.
+///
+/// **Y ES SEGURO QUE DOS SE PISEN**, que es lo único que `(async)` habilita acá: si el
+/// `setInterval` dispara otro sondeo antes de que el anterior vuelva, los dos reclaman el
+/// mismo trámite — y `enroll.claim` es idempotente A PROPÓSITO (el simulador lo documenta:
+/// *"si la respuesta que traia el token se pierde en la red, el agente vuelve a reclamar y
+/// tiene que recibir EL MISMO token"*). El peor caso es escribir dos veces el mismo
+/// `Secreto` en `token_pendiente`, y ese buzón se vacía entero de una vez.
+#[tauri::command(async)]
 pub(crate) fn sondear_vinculacion(
     estado: State<'_, Arc<Compartido>>,
     vinculacion: State<'_, EstadoDeVinculacion>,
@@ -159,9 +174,9 @@ pub(crate) fn sondear_vinculacion(
             // Buzón para el hilo de trabajo — ver `Compartido::token_pendiente` en
             // `main.rs`. Este comando no persiste nada él mismo: el depósito vive en
             // `trabajar()`, no acá.
-            if let Ok(mut buzon) = estado.token_pendiente.lock() {
-                *buzon = Some(secreto);
-            }
+            estado
+                .token_pendiente
+                .escribir(|buzon| *buzon = Some(secreto));
             *vinculacion.0.lock().expect("no se envenena") = None;
             ReclamoParaLaPantalla::Aprobado { usuario }
         }
@@ -196,7 +211,15 @@ pub(crate) fn sondear_vinculacion(
 // muestra `no_puede_leer` y manda de vuelta acá. Este comando solo adelanta el caso
 // común para no hacerle abrir el diálogo nativo a alguien que todavía no tiene el
 // permiso general.
-#[tauri::command]
+//
+// **`(async)` AUNQUE NO TOME NINGUN CANDADO NI TOQUE LA RED**, que es el criterio del
+// bloque en `main.rs`: este `read_dir` es exactamente el que puede disparar el dialogo de
+// TCC de macOS, y mientras ese dialogo esta arriba la llamada NO VUELVE. En el hilo
+// principal eso congela la ventana de onboarding justo en la pantalla que le esta
+// explicando a la persona que conceda el permiso — el peor momento posible. La regla real
+// es «todo lo que pueda esperar», y esperar a que una persona conteste un dialogo del
+// sistema cuenta.
+#[tauri::command(async)]
 pub(crate) fn permiso_de_disco_concedido() -> bool {
     #[cfg(target_os = "macos")]
     {
@@ -268,21 +291,47 @@ pub(crate) enum ResultadoDeEleccion {
     MuyGrande,
 }
 
-/// Nombre del evento que `onboarding.js` escucha para saber en qué terminó el diálogo.
-/// Aparte de `"cambio"` (que ya usa el panel de hoy) para que la pantalla 4 no tenga
-/// que filtrar payloads de dos formas distintas en el mismo canal.
+/// Nombre del evento que `onboarding.js` (pantalla 4) Y `bandeja.js` (el botón
+/// "+ Agregar carpeta" del panel) escuchan para saber en qué terminó el diálogo —
+/// las dos superficies llaman al mismo comando de abajo, así que las dos
+/// necesitan el mismo resultado. Aparte de `"cambio"` (que ya usa el panel de
+/// hoy) para que ninguna de las dos tenga que filtrar payloads de dos formas
+/// distintas en el mismo canal.
 pub(crate) const EVENTO_RESULTADO_DE_ELECCION: &str = "resultado-carpeta";
 
 /// Abre el diálogo NATIVO de directorio y clasifica lo elegido — **nunca enrola a
-/// ciegas**. Mismo patrón que `agregar_carpeta` en `main.rs`: devuelve en el acto,
-/// resuelve en la devolución de llamada, y el resultado viaja por evento porque
-/// `pick_folder` puede tardar lo que tarde la persona en elegir.
+/// ciegas**. **El único comando para agregar una carpeta, en el panel y en el
+/// onboarding** (DRY: una sola clasificación de "ya la miro / esta contiene una
+/// que ya miro / no se puede leer", no dos implementaciones que puedan
+/// divergir) — devuelve en el acto, resuelve en la devolución de llamada, y el
+/// resultado viaja por evento porque `pick_folder` puede tardar lo que tarde la
+/// persona en elegir.
+///
+/// **SIN `(async)`, Y NO PORQUE ESTE A SALVO: PORQUE `(async)` NO ARREGLARIA NADA ACA.**
+/// El cuerpo de este comando es rapido —baja una bandera y registra una devolucion de
+/// llamada— asi que no es el que bloquea. El que puede bloquear es `clasificar_y_actuar`,
+/// que toma `almacen.lock()` y corre ADENTRO del callback de `pick_folder`, no en el
+/// cuerpo del comando; ponerle `(async)` al comando deja ese callback exactamente donde
+/// estaba. Sacarlo de ahi es lanzar un hilo adentro del callback, que es otro cambio y
+/// necesita decidir que hacer si la carpeta deja de existir entre medio. **Queda como
+/// exposicion conocida**, no como algo ya resuelto — ver el bloque sobre `(async)` en
+/// `main.rs`.
 #[tauri::command]
 pub(crate) fn elegir_carpeta_con_advertencia(app: AppHandle, estado: State<'_, Arc<Compartido>>) {
     use tauri_plugin_dialog::DialogExt;
     let c = Arc::clone(&estado);
     let app2 = app.clone();
+    // Puesta en `true` ANTES de abrir el diálogo, no adentro de la devolución de
+    // llamada: entre esta línea y que la persona haga el primer clic no hay ventana de
+    // carrera posible (el diálogo todavía ni se dibujó), pero si se pusiera adentro del
+    // callback llegaría demasiado tarde para el primer clic que sí importa. Ver
+    // `Compartido::dialogo_de_carpeta_abierto`.
+    *c.dialogo_de_carpeta_abierto.lock().expect("no se envenena") = true;
     app.dialog().file().pick_folder(move |elegida| {
+        // Primera línea del callback, ANTES del `return` de cancelar: los dos caminos
+        // —cancelada y elegida— tienen que bajar la bandera, o cancelar el diálogo la
+        // deja en `true` para siempre y el popover no vuelve a cerrarse solo.
+        *c.dialogo_de_carpeta_abierto.lock().expect("no se envenena") = false;
         let Some(ruta) = elegida.and_then(|r| r.into_path().ok()) else {
             // La persona cerró el diálogo sin elegir. No es un resultado — no hay nada
             // que la pantalla tenga que mostrar distinto de lo que ya estaba mostrando.
@@ -296,7 +345,9 @@ pub(crate) fn elegir_carpeta_con_advertencia(app: AppHandle, estado: State<'_, A
 /// Confirma el «Reemplazar» de la pantalla `contieneOtra`: encola la vieja para
 /// sacarla —mismo mecanismo que `desvincular`, el punto seguro es el hilo de trabajo—
 /// y enrola la que estaba esperando en `CandidataPendiente`.
-#[tauri::command]
+///
+/// `(async)` porque toma `almacen.lock()` — ver el bloque sobre `(async)` en `main.rs`.
+#[tauri::command(async)]
 pub(crate) fn reemplazar_carpeta(
     app: AppHandle,
     estado: State<'_, Arc<Compartido>>,
@@ -309,9 +360,9 @@ pub(crate) fn reemplazar_carpeta(
         .expect("no se envenena")
         .take()
         .ok_or("no hay una carpeta candidata esperando confirmacion")?;
-    if let Ok(mut cola) = estado.por_quitar.lock() {
-        cola.push(RaizId::nueva(id_a_reemplazar));
-    }
+    estado
+        .por_quitar
+        .escribir(|cola| cola.push(RaizId::nueva(id_a_reemplazar)));
     {
         let mut almacen = estado.almacen.lock().expect("no se envenena");
         almacen.enrolar(pendiente);
@@ -372,6 +423,10 @@ fn clasificar_y_actuar(c: &Arc<Compartido>, app: &AppHandle, ruta: PathBuf) -> R
     // conteo, no para que el guardián de mutación lo encuentre muerto sin explicación.
     let _ = UMBRAL_DE_ARCHIVOS_PARA_ADVERTIR;
 
+    // Ver `Compartido::cancelar_baja_pendiente` en `main.rs`: un enrolamiento fresco tiene
+    // que ganarle a un retiro que haya quedado pendiente de un `desvincular` anterior sobre
+    // esta misma raiz.
+    c.cancelar_baja_pendiente(&candidata_id);
     {
         let mut almacen = c.almacen.lock().expect("no se envenena");
         almacen.enrolar(RaizRegistrada {
@@ -397,6 +452,13 @@ fn clasificar_y_actuar(c: &Arc<Compartido>, app: &AppHandle, ruta: PathBuf) -> R
 
 // ═══════════════════════════════ Pantalla 6 · listo ══════════════════════════════════
 
+/// Puesta en `true` por `terminar_onboarding` ANTES de cerrar la ventana. `.close()`
+/// dispara `WindowEvent::CloseRequested` igual que la cruz nativa o Cmd+W — Tauri lo
+/// documenta así: *"emits CloseRequested first like a user-initiated close request"* —
+/// así que sin esta bandera, `main.rs` no puede distinguir terminar el onboarding de la
+/// forma normal de abandonarlo a mitad de camino (ver el handler en `.setup()`).
+pub(crate) struct OnboardingTerminado(pub Mutex<bool>);
+
 /// Cierra la ventana de onboarding y muestra el popover real. Dos límites que quedan
 /// anotados y no resueltos acá:
 ///
@@ -417,8 +479,15 @@ fn clasificar_y_actuar(c: &Arc<Compartido>, app: &AppHandle, ruta: PathBuf) -> R
 pub(crate) fn terminar_onboarding(app: AppHandle) -> Result<(), String> {
     use tauri_plugin_autostart::ManagerExt;
     if let Err(e) = app.autolaunch().enable() {
-        eprintln!("no se pudo activar el inicio automatico: {e}");
+        log::warn!("no se pudo activar el inicio automatico: {e}");
     }
+    // **ANTES del `w.close()` de acá abajo, no después.** Es la bandera que el handler de
+    // `main.rs` lee para no confundir este cierre —el del camino de éxito— con la cruz
+    // nativa o Cmd+W a mitad de onboarding. Ver `OnboardingTerminado`.
+    *app.state::<OnboardingTerminado>()
+        .0
+        .lock()
+        .expect("no se envenena") = true;
     if let Some(w) = app.get_webview_window("onboarding") {
         let _ = w.close();
     }

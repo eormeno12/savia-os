@@ -4,16 +4,24 @@
 [package]
 name = "savia-folder-plataforma-adaptadores"
 version = "0.0.0"
-edition = "2024"
-rust-version = "1.97"
-publish = false
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
 
 [lib]
 name = "savia_folder_plataforma_adaptadores"
 path = "src/lib.rs"
 
 [dependencies]
+# A diferencia de `libc`, `notify` resuelve sus propios backends de macOS (FSEvents) y
+# Windows (ReadDirectoryChangesW) por dentro del crate, así que va llano acá y no bajo
+# `[target.'cfg(...)'.dependencies]`.
+notify = "8.2.0"
 savia-folder-contrato = { path = "../contrato" }
+# El facade de logging — `observador.rs` lo usa para las fallas de `watch`/`unwatch` por
+# raiz (candado envenenado, permiso denegado, ruta rara) que hoy son `eprintln!` crudo.
+# Sin backend instalado no hacen nada — el backend real vive en `src/bin/bandeja/main.rs`.
+log.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 libc = "0.2"

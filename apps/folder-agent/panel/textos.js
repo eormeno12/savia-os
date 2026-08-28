@@ -29,10 +29,14 @@ const conMiles = (n) => n.toLocaleString("es-AR");
 
 // ── El panel ─────────────────────────────────────────────────────────────
 const panel = {
-  // Los cuatro estados de carpeta. Tabla D7, primera mitad.
+  // Los cinco estados de carpeta. Tabla D7, primera mitad — `barriendo` se separó
+  // en dos: mientras el agente recorre el disco local (`leyendo`) y mientras ya
+  // está subiendo/confirmando con Savia (`actualizando`). Antes era un solo
+  // rótulo cubriendo los dos momentos.
   estado: {
     sincronizado: "Al día",
-    barriendo: "Actualizando",
+    leyendo: "Leyendo",
+    actualizando: "Actualizando",
     carpetaAusente: "No está",
     congelado: "En pausa",
   },
@@ -66,19 +70,31 @@ const panel = {
     enSavia: (n) => `${conMiles(n)} ${n === 1 ? "documento" : "documentos"} en Savia`,
   },
 
-  // «Dejar de mirar»: D1 cerró que es SOLO la mitad de dejar de revisar, nunca
-  // ocultar lo ya guardado — así que las tres frases dicen eso, explícito, en
-  // los tres momentos (el ítem de menú, la confirmación, el resultado). Tabla
-  // de §1.7 "El copy de «dejar de mirar», ya con D1 cerrado".
+  // El contador en vivo del badge, mientras la carpeta está `leyendo` o
+  // `actualizando` (canal de progreso, Fase 7). Antes vivía literal en
+  // `panel.js` —fuera de este archivo, un punto ciego ya documentado del
+  // guardián `palabras.mjs`— porque `Carpeta.progreso` nunca traía un valor
+  // real que lo pidiera. "Archivos" y no "documentos": es la misma cuenta que
+  // `onboarding.q5.progreso` ya usa para el mismo concepto (progreso del
+  // primer barrido), no una segunda palabra para lo mismo.
+  progreso: (procesados, total) => `${conMiles(procesados)} de ${conMiles(total)} archivos`,
+
+  // «Dejar de mirar»: la lectura de D1 en el plan (nunca ocultar lo ya
+  // guardado) no es lo que pasa de verdad — el servidor SÍ oculta los
+  // documentos de la carpeta al dejar de mirarla: quedan sin usar, guardados
+  // solo para no tener que volver a subirlos si la agregas otra vez. Las tres
+  // frases dicen eso, explícito, en los tres momentos (el ítem de menú, la
+  // confirmación, el resultado) — corregido contra el texto anterior, que
+  // decía que seguían disponibles.
   dejarDeMirar: {
     menu: {
       titulo: "Dejar de mirar esta carpeta",
-      subtitulo: "Savia deja de revisarla. Lo que ya guardó sigue en tu memoria.",
+      subtitulo: "Savia deja de revisarla. Lo que ya guardó queda oculto, no disponible.",
     },
     confirmar: {
       titulo: (carpeta) => `¿Dejar de mirar «${carpeta}»?`,
       cuerpo: (n) =>
-        `Savia no vuelve a revisarla. Los ${conMiles(n)} documentos que ya guardó siguen en tu memoria — y si la agregas otra vez, sigue desde donde quedó.`,
+        `Savia no vuelve a revisarla. Los ${conMiles(n)} documentos que ya guardó quedan ocultos — no vas a poder verlos ni buscarlos — y se guardan solo para no tener que subirlos de nuevo si la agregas otra vez.`,
       cancelar: "Cancelar",
       // El mockup dice "Desvincular" acá — la acción ya no se llama así (D1/D7),
       // así que el botón usa el mismo verbo que el ítem de menú que lo abrió.
@@ -86,7 +102,7 @@ const panel = {
     },
     hecho: {
       titulo: "Listo, Savia dejó de mirarla",
-      cuerpo: "Sus documentos siguen en tu memoria. Puedes agregarla de nuevo cuando quieras.",
+      cuerpo: "Sus documentos quedan ocultos. Si la agregas de nuevo, Savia no tiene que volver a subirlos.",
       volver: "Volver a la lista",
     },
   },
@@ -106,8 +122,7 @@ const panel = {
 
   agregarCarpeta: {
     titulo: "+ Agregar carpeta",
-    // D4: el núcleo aguanta más de una, la interfaz muestra una sola.
-    subtitulo: "Por ahora, Savia mira una sola carpeta a la vez.",
+    subtitulo: "Puedes mirar más de una a la vez.",
   },
 
   // ── Lo que sigue en pie del panel de hoy y el mockup no cubre ────────────
@@ -128,10 +143,26 @@ const panel = {
       salir: "Salir",
       abrirCarpeta: "Abrir carpeta",
       volverAVincular: "Volver a vincular",
+      cerrarSesion: "Cerrar sesión",
     },
     // Prefijo del aviso cuando `vista()` falla y no hay nada dibujado todavía;
     // el mensaje de la excepción se concatena aparte, no es texto traducible.
     errorDePintado: "El panel no pudo dibujarse.",
+    // "Cerrar sesión" generaliza "Dejar de mirar" (arriba) a TODAS las
+    // carpetas a la vez, mismo criterio de D7: mismas palabras ("ocultos, no
+    // disponibles", "se guardan solo para no subirlos de nuevo") para el
+    // mismo hecho, ahora sobre el dispositivo entero en vez de una carpeta.
+    confirmarCerrarSesion: {
+      titulo: "¿Cerrar sesión?",
+      cuerpo: (n) =>
+        `Savia deja de mirar todas tus carpetas y vas a tener que conectar tu cuenta de nuevo la próxima vez que la abras. Los ${conMiles(n)} documentos que ya guardó quedan ocultos — no vas a poder verlos ni buscarlos — y se guardan solo para no tener que subirlos de nuevo si agregas las mismas carpetas otra vez.`,
+      cancelar: "Cancelar",
+      aceptar: "Cerrar sesión",
+    },
+    cerrandoSesion: {
+      titulo: "Cerrando sesión…",
+      cuerpo: "Savia se cierra en unos segundos. Al volver a abrirla, te va a pedir que conectes tu cuenta de nuevo.",
+    },
   },
 };
 
@@ -313,6 +344,15 @@ const folders = {
   confirmarDejarDeMirar: panel.dejarDeMirar.confirmar,
   dejarDeMirarHecho: panel.dejarDeMirar.hecho,
 
+  // Los resultados de `elegir_carpeta_con_advertencia` — el mismo comando que
+  // usa la pantalla 4 del onboarding (`yaMirando`, `contieneOtra`,
+  // `noPuedeLeer`, `muyGrande`). Mismo mecanismo, mismas frases: no hay una
+  // segunda redacción de "ya estás mirando esta carpeta" escondida acá.
+  elegirCarpeta: {
+    resultados: onboarding.q4.resultados,
+    cancelar: "Cancelar",
+  },
+
   // La vista de archivos de una carpeta.
   archivos: {
     // El mockup usa "Pendiente" acá para el archivo en vuelo, distinto de
@@ -321,11 +361,47 @@ const folders = {
     estado: panel.archivo,
     motivo: panel.motivoDeFallo,
     tocarParaAbrir: panel.archivoSuelto.tocarParaAbrir,
+    vacio: "Sin archivos todavía.",
+    // Reemplaza a `vacio` mientras la carpeta esta en `leyendo`/`actualizando` sin
+    // ninguna fila confirmada todavia — sin esto, una carpeta grande recien agregada se
+    // ve identica a una vacia de verdad mientras trabaja, y "se demora en cargar" es
+    // indistinguible de "esta roto". `enVivo` es la entrada del Map de progreso
+    // (`{procesados, total}` o `undefined` si el primer aviso todavia no llego).
+    cargando: (estado, enVivo) =>
+      enVivo
+        ? `${panel.estado[estado]}… ${panel.progreso(enVivo.procesados, enVivo.total)}`
+        : `${panel.estado[estado]}…`,
   },
 
   toasts: {
     abriendoEnFinder: panel.finder.abriendoToast,
     abriendoArchivo: panel.archivoSuelto.abriendoToast,
+    carpetaAgregada: "Carpeta agregada",
+  },
+
+  // "Volver a vincular" desde el aviso de credenciales — mismo mecanismo que
+  // la pantalla 2 del onboarding (`iniciar_vinculacion`/`sondear_vinculacion`,
+  // el mismo código de un solo uso, el mismo sondeo), disparado ahora por
+  // perder el acceso en vez de por instalar por primera vez. Los estados que
+  // no cambian de sentido se reusan tal cual — DRY, misma razón que
+  // `elegirCarpeta` reusa `onboarding.q4.resultados` más arriba. Los que SÍ
+  // cambian de sentido ("conectar por primera vez" vs. "reconectar") se
+  // reescriben acá.
+  vincular: {
+    eyebrow: "Reconectar Savia",
+    cuerpo: "Aprueba este código desde tu cuenta de Savia, en el navegador o el teléfono.",
+    etiquetaCodigo: onboarding.q2.etiquetaCodigo,
+    vence: onboarding.q2.vence,
+    esperando: onboarding.q2.esperando,
+    aprobado: {
+      titulo: "Reconectado",
+      cuerpo: (nombre) => `Reconectado a la cuenta de ${nombre}.`,
+      boton: "Volver a mis carpetas",
+    },
+    rechazado: onboarding.q2.rechazado,
+    vencido: onboarding.q2.vencido,
+    sinConexion: onboarding.q2.sinConexion,
+    cancelar: "Cancelar",
   },
 };
 

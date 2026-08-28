@@ -46,7 +46,7 @@ use std::path::Path;
 /// abra un deposito nuevo tiene que negarse igual que uno nuevo con un deposito viejo:
 /// leer con la version equivocada no es un error que se pueda absorber, es una fila que
 /// se interpreta mal en silencio.
-pub const FORMATO: u32 = 2;
+pub const FORMATO: u32 = 3;
 
 // ── Historia del formato ────────────────────────────────────────────────────
 //
@@ -56,6 +56,12 @@ pub const FORMATO: u32 = 2;
 //           todavia (no hay instalador ni firma). Un deposito 1 solo puede ser el de una
 //           corrida de desarrollo, y para ese caso `FormatoAjeno` es la respuesta
 //           correcta: se borra y se vuelve a barrer.
+//
+//   2 → 3   `Colas` gana `completaron_barrido`: las raices que cerraron al menos un
+//           barrido alguna vez — sin esto el panel no puede distinguir «carpeta recien
+//           enrolada, todavia no se sabe nada» de «carpeta genuinamente vacia» (ver
+//           `panel::de_una_carpeta`). Misma excusa que 1 → 2, todavia vigente: **no
+//           lleva migracion** porque el agente sigue sin instalarse en ninguna maquina.
 //
 //           **Esta excusa se agota el dia que el agente se instale en la primera
 //           maquina.** A partir de ahi, subir este numero sin escribir la conversion
@@ -114,6 +120,74 @@ impl Deposito {
     pub fn abrir(ruta: &Path) -> Result<Self, FalloDePersistencia> {
         let db = Database::create(ruta).map_err(|e| FalloDePersistencia::Disco(e.to_string()))?;
         Ok(Self { db })
+    }
+
+    /// Reescribe el deposito entero en un archivo nuevo y lo deja en lugar del viejo.
+    /// Devuelve `(bytes antes, bytes despues)`. Un deposito vacio o ilegible se deja
+    /// intacto y devuelve el mismo tamano dos veces.
+    ///
+    /// # Por que existe, y por que NO es `Database::compact`
+    ///
+    /// `redb` reutiliza sus paginas libres —comprobado: con el agente guardando cada
+    /// 30 s el archivo no crece— pero **nunca baja de su marca de agua historica**. Basta
+    /// un periodo indexando algo que despues se excluyo para dejar esa marca puesta, y
+    /// nada la vuelve a bajar.
+    ///
+    /// **Las mediciones que llevaron a esta forma y no a la otra**, sobre el deposito de
+    /// desarrollo de esta rama:
+    ///
+    /// | | |
+    /// |---|---|
+    /// | archivo encontrado | 1216 MB |
+    /// | JSON de estado adentro (`K_ESTADO`, volcado y pesado) | 170 MB |
+    /// | `Database::compact()`, 1ra pasada | 1216 MB -> 864 MB en 451 ms |
+    /// | `Database::compact()`, 5 pasadas mas | 864 MB -> 864 MB, sin mover un byte |
+    /// | deposito RECONSTRUIDO con el mismo contenido | **513 MB** |
+    ///
+    /// O sea: la compactacion de `redb` recupero el 29% y despues se planto —devuelve
+    /// `Ok(true)` cada vez, pero el archivo no baja—, mientras que reescribir el mismo
+    /// contenido de cero baja a 513 MB. El sobrante de 1216 sobre 170 es sobre todo que
+    /// `redb` conserva la version anterior de un valor de ese tamano ademas de la nueva;
+    /// reescribir deja una sola.
+    ///
+    /// **Lo que esto NO arregla, y hay que decirlo aca para que nadie lo confunda:** de
+    /// esos 170 MB, 169 son `colas.segmentos` y 156 son padrones de segmentos que ya se
+    /// entregaron. El estado que de verdad sirve —el inventario— pesa 0,68 MB. Esto
+    /// achica el envase; el contenido lo infla una fuga aparte, en `Colas`, donde cada
+    /// barrido hace `push` de un segmento que nadie saca nunca.
+    ///
+    /// # Por que es seguro
+    ///
+    /// El nuevo se escribe en un archivo TEMPORAL y recien al final se hace `rename`
+    /// sobre el viejo, que en POSIX es atomico. Un corte de luz a mitad deja el deposito
+    /// viejo intacto: o esta el viejo entero, o esta el nuevo entero, nunca una mezcla.
+    /// Es el mismo criterio de «las dos mitades entran juntas o no entran» que sostiene
+    /// `guardar`.
+    pub fn reconstruir(ruta: &Path) -> Result<(u64, u64), FalloDePersistencia> {
+        let pesa = |p: &Path| std::fs::metadata(p).map(|m| m.len()).unwrap_or(0);
+        let antes = pesa(ruta);
+
+        let rescatado = {
+            let viejo = Self::abrir(ruta)?;
+            match viejo.cargar()? {
+                // Deposito vacio: no hay nada que reconstruir, y crear un archivo nuevo
+                // solo para dejarlo igual de vacio es trabajo sin ganancia.
+                None => return Ok((antes, antes)),
+                Some(r) => r,
+            }
+        }; // el `Database` viejo se cierra ACA — antes de tocar el archivo.
+
+        let temporal = ruta.with_extension("reconstruyendo");
+        // Un temporal de una reconstruccion anterior interrumpida no es un error: es
+        // basura, y lo unico correcto es pisarla.
+        let _ = std::fs::remove_file(&temporal);
+        {
+            let nuevo = Self::abrir(&temporal)?;
+            nuevo.guardar(&rescatado.almacen, rescatado.credencial.as_ref())?;
+        } // y el nuevo se cierra ACA, para que el `rename` no mueva un archivo abierto.
+
+        std::fs::rename(&temporal, ruta).map_err(|e| FalloDePersistencia::Disco(e.to_string()))?;
+        Ok((antes, pesa(ruta)))
     }
 
     /// **UNA SOLA TRANSACCION PARA LAS TRES CLAVES.** El estado, la cola y la credencial

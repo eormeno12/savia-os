@@ -35,11 +35,11 @@
       }
     },
     {
-      "nombre": "Barriendo",
+      "nombre": "Leyendo",
       "vista": {
         "carpetas": [
           {
-            "estado": "barriendo",
+            "estado": "leyendo",
             "fallos": 0,
             "filas": [
               {
@@ -63,7 +63,7 @@
           }
         ],
         "detenido": null,
-        "estado": "barriendo",
+        "estado": "leyendo",
         "fallos": 0,
         "indexados": 3
       }

@@ -157,9 +157,24 @@
   transition: background var(--savia-duration-fast) var(--savia-easing-savia);
 }
 
-.carpeta-card + .carpeta-card,
-.carpeta-card + .agregar-carpeta,
-.carpeta-card + button.agregar-carpeta {
+.carpeta-card + .carpeta-card {
+  margin-top: 12px;
+}
+
+/* El techo para que la bandeja no crezca sin límite. `bandeja.js` ajusta la
+   ventana a `document.body.scrollHeight` en cada render — sin este límite,
+   agregar carpetas hace que el popover crezca sin techo hasta tapar la
+   pantalla. ~3 tarjetas visibles antes de necesitar scroll, misma técnica que
+   `.archivos-vista__lista` usa para los archivos de una carpeta. El título y
+   "Agregar carpeta" quedan AFUERA de esta caja a propósito — ver el
+   comentario de `vistaLista` en `panel.js` — así que siguen siempre a la
+   vista aunque la lista scrollee. */
+.carpetas-lista__cuerpo {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.carpetas-lista__cuerpo + .agregar-carpeta {
   margin-top: 12px;
 }
 
@@ -289,9 +304,9 @@
   color: var(--savia-color-danger-fg);
 }
 
-/* ── "+ Agregar carpeta" — D4: el núcleo aguanta más de una, la interfaz
-   muestra una sola. Con `button` (activo, lista vacía) o `div` (informativo,
-   ya hay una carpeta) según lo decide `panel.js`. ── */
+/* ── "+ Agregar carpeta" — siempre `button`, siempre activo (ver `panel.js`).
+   `.agregar-carpeta--activo` queda como modificador aunque hoy se aplique
+   siempre: es la base para el estilo, no un estado condicional. ── */
 .agregar-carpeta {
   display: block;
   width: 100%;
@@ -331,22 +346,29 @@
   color: var(--savia-color-fg-muted);
 }
 
-.pie-salir {
-  display: block;
-  width: 100%;
-  padding: 9px 4px 0;
+/* Envuelve "Cerrar sesión" y "Salir" — antes era un solo botón (`.pie-salir`)
+   con el borde de arriba puesto en él mismo; con dos, el borde pasa al
+   contenedor para no duplicarlo. */
+.pie {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
   margin-top: 16px !important;
+  padding-top: 9px;
+  border-top: 1px solid var(--savia-color-border-subtle);
+}
+
+.pie-accion {
+  padding: 0 4px;
   font: inherit;
   font-size: var(--texto-pequeno);
-  text-align: center;
   color: var(--savia-color-fg-subtle);
   background: none;
   border: 0;
-  border-top: 1px solid var(--savia-color-border-subtle);
   cursor: pointer;
 }
 
-.pie-salir:hover {
+.pie-accion:hover {
   color: var(--savia-color-fg-muted);
 }
 
@@ -457,6 +479,57 @@
   display: flex;
   gap: 10px;
   margin-top: 16px;
+}
+
+/* ══════════════════════════ VOLVER A VINCULAR ══════════════════════════════ */
+/* Mismo patrón visual que `.q2__panel` de `onboarding.css` (mismos tokens de
+   color, mismo layout) — la tarjeta del código, escalada a los 340px del
+   popover en vez de a los ~900px del lienzo de onboarding. No es una
+   redacción nueva, es la misma tarjeta más chica. */
+.vincular__panel {
+  margin-top: 14px;
+  padding: 16px;
+  background: var(--savia-color-bg-subtle);
+  border-radius: var(--radio-tarjeta);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.vincular__codigo {
+  transition: opacity var(--savia-duration-soft) var(--savia-easing-savia);
+}
+
+.vincular__codigo--apagado {
+  opacity: 0.35;
+}
+
+.vincular__codigo-etiqueta {
+  font-size: var(--texto-etiqueta);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--savia-color-fg-muted);
+  margin-bottom: 6px;
+}
+
+.vincular__codigo-valor {
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--savia-color-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.vincular__vence {
+  margin-top: 6px;
+  font-size: var(--texto-pequeno);
+  color: var(--savia-color-fg-muted);
+}
+
+.vincular__separador {
+  height: 1px;
+  background: var(--savia-color-border);
 }
 
 /* ══════════════════════════════ BOTONES ════════════════════════════════════ */
@@ -606,6 +679,29 @@
   color: var(--savia-color-fg-subtle);
 }
 
+.archivos-vista__cargando {
+  padding: 12px 2px;
+  font-size: var(--texto-pequeno);
+  color: var(--savia-color-fg-muted);
+  animation: archivos-vista-pulso 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .archivos-vista__cargando {
+    animation: none;
+  }
+}
+
+@keyframes archivos-vista-pulso {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
 .archivos-vista__mas {
   padding: 8px 2px 0;
   font-size: var(--texto-etiqueta);
@@ -703,7 +799,7 @@
 .carpeta-card:focus-visible,
 .carpeta-card__menu-btn:focus-visible,
 .agregar-carpeta--activo:focus-visible,
-.pie-salir:focus-visible,
+.pie-accion:focus-visible,
 .menu__opcion:focus-visible,
 .menu__cancelar:focus-visible,
 .archivos-vista__atras:focus-visible,

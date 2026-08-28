@@ -15,8 +15,8 @@ fn fuente(rel: &str) -> String {
 
 #[test]
 fn los_modulos_puros_no_tocan_el_mundo() {
-    // IMPORTA PORQUE: si la maquina leyera el disco o el reloj, dejaria de ser
-    // determinista y el banco no podria ejercer «pasaron seis horas y cinco la laptop
+    // IMPORTA PORQUE: si las salvaguardas leyeran el disco o el reloj, dejarian de ser
+    // deterministas y el banco no podria ejercer «pasaron seis horas y cinco la laptop
     // estuvo dormida» sin dormir la laptop.
     const PROHIBIDOS: [&str; 7] = [
         "std::fs",

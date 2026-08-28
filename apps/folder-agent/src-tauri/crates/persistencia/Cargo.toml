@@ -3,9 +3,9 @@
 [package]
 name = "savia-folder-persistencia"
 version = "0.0.0"
-edition = "2024"
-rust-version = "1.97"
-publish = false
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
 
 [lib]
 name = "savia_folder_persistencia"
@@ -15,7 +15,7 @@ path = "src/lib.rs"
 savia-folder-contrato = { path = "../contrato" }
 savia-folder-estado = { path = "../estado" }
 redb = "2"
-serde_json = "1"
+serde_json.workspace = true
 
 # Solo para tests: `estado_con_dos_filas()` arma su fixture pasando por `ciclo::barrer`
 # contra la plataforma falsa, para no duplicar en este crate la logica que ya prueba

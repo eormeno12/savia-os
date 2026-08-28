@@ -506,6 +506,26 @@ body {
   letter-spacing: -0.01em;
 }
 
+.q5__cifra--activo {
+  animation: q5-cifra-pulso 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .q5__cifra--activo {
+    animation: none;
+  }
+}
+
+@keyframes q5-cifra-pulso {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
 .q5__subiendo {
   font-size: 13px;
   color: var(--savia-color-fg-muted);

@@ -61,9 +61,9 @@ use crate::Compartido;
 /// que lo comprueba, y ahi ya hay un solo escritor.
 #[tauri::command]
 pub fn desvincular(estado: State<'_, Arc<Compartido>>, id: String) {
-    if let Ok(mut cola) = estado.por_quitar.lock() {
-        cola.push(RaizId::nueva(id));
-    }
+    estado
+        .por_quitar
+        .escribir(|cola| cola.push(RaizId::nueva(id)));
 }
 
 /// Las dos mitades de la comprobacion, extraidas de `abrir_archivo` para que se puedan
@@ -110,7 +110,11 @@ fn ruta_absoluta_valida(
 /// El candado del almacen se suelta ANTES de lanzar el proceso: `spawn` no bloquea, pero
 /// tampoco tiene nada que hacer adentro de la seccion critica, y el hilo de trabajo pide
 /// ese mismo `Mutex` en cada vuelta.
-#[tauri::command]
+///
+/// `(async)` porque ese `Mutex` es justamente el que el hilo de trabajo sostiene durante
+/// todo el barrido: tomarlo desde el hilo principal congela la ventana mientras dura. Ver
+/// el bloque sobre `(async)` en `main.rs`.
+#[tauri::command(async)]
 pub fn abrir_archivo(
     estado: State<'_, Arc<Compartido>>,
     raiz_id: String,

@@ -100,6 +100,12 @@ impl Almacen {
         &self.colas
     }
 
+    /// Delegacion directa a `Colas::reanudar` — ver su doc. El unico llamador legitimo es
+    /// el hilo de trabajo, en el mismo punto donde adopta una credencial nueva.
+    pub fn reanudar(&mut self) {
+        self.colas.reanudar();
+    }
+
     pub fn enrolar(&mut self, r: RaizRegistrada) {
         self.inventario.enrolar(r);
     }

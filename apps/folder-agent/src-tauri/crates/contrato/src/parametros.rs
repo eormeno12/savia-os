@@ -16,7 +16,7 @@ use std::time::Duration;
 /// Un parametro que hay que medir y que nadie midio. Es el `Pending<T>` de `ir`.
 pub type Pendiente<T> = Option<T>;
 
-// ─────────────────── 1 de 4 · del AGENTE, y de la maquina ───────────────────
+// ─────────────────── 1 de 5 · del AGENTE, y de la maquina ───────────────────
 
 /// **milisegundos** — cuanto tiene que llevar una ruta con la MISMA tripleta
 /// (`tamano`, `mtime`, `idDeArchivoDelSO`) antes de que valga hashearla.
@@ -39,7 +39,7 @@ pub type Pendiente<T> = Option<T>;
 /// hoy es precision falsa.
 pub const ASENTAMIENTO: Pendiente<Duration> = None;
 
-// ─────────────────── 2 de 4 · del AGENTE, y de la cola ──────────────────────
+// ─────────────────── 2 de 5 · del AGENTE, y de la cola ──────────────────────
 
 /// **intentos consecutivos fallidos sobre la misma entrada**.
 ///
@@ -59,7 +59,7 @@ pub const ASENTAMIENTO: Pendiente<Duration> = None;
 /// contacto, que dice lo mismo sin un umbral inventado.
 pub const MAX_INTENTOS: Pendiente<u32> = None;
 
-// ────────── 3 y 4 de 4 · de SAVIA. Aca solo se NOMBRAN, no se evaluan ───────
+// ────────── 3 y 4 de 5 · de SAVIA. Aca solo se NOMBRAN, no se evaluan ───────
 
 /// **milisegundos** — cuanto espera una ausencia antes de poder volverse retiro.
 ///
@@ -80,6 +80,30 @@ pub const VENTANA_DE_CUARENTENA: Pendiente<Duration> = None;
 /// denominador exista y signifique siempre lo mismo.
 pub const FRACCION_DEL_CORTE: Pendiente<f64> = None;
 
+// ─────────────────── 5 de 5 · del AGENTE, y del observador ──────────────────
+
+/// **milisegundos** — cuanto tiene que pasar sin que lleguen mas eventos crudos del
+/// sistema de archivos sobre la MISMA `(RaizId, RutaRelativa)` antes de que el
+/// observador (`plataforma-adaptadores/src/observador.rs::Asentador`) la de por quieta
+/// y agende una verificacion.
+///
+/// DECIDE: cuando un CHORRO de eventos crudos del SO —FSEvents en macOS,
+/// `ReadDirectoryChangesW` en Windows— se considera terminado, ANTES incluso de llegar
+/// a `decidir()`. **No es lo mismo que `ASENTAMIENTO`**, y hay que nombrarlo para no
+/// confundirlos: `ASENTAMIENTO` decide cuando `decidir()` confia en que una tripleta
+/// (`tamano`, `mtime`, `idDeArchivoDelSO`) dejo de cambiar; este numero decide cuando
+/// el `Asentador` deja de esperar mas eventos crudos del SO sobre la misma ruta y la
+/// manda a verificar. Son dos preguntas distintas, en dos capas distintas, aunque las
+/// dos midan «¿ya se quedo quieto?».
+///
+/// COMO SE MEDIRIA: instrumentando el `Contadores` de `Asentador` en produccion y
+/// midiendo la distribucion real de toques-por-asentamiento — cuantos eventos crudos
+/// llega a acumular una ruta, en promedio, antes de que el debounce la de por quieta.
+/// Un numero sostenido alto indica que la ventana es corta para el patron real de
+/// escritura del SO; uno cercano a 1 indica que hay margen para acortarla y bajar la
+/// latencia hasta la primera verificacion.
+pub const VENTANA_DEL_OBSERVADOR: Pendiente<Duration> = None;
+
 // ─────────────────────────── El quinto, y no lo es ──────────────────────────
 
 /// LA TOLERANCIA DE `mtime` NO ENTRA A ESTA LISTA, Y ES UNA RESOLUCION ENTRE DISENOS.
@@ -93,7 +117,7 @@ pub const FRACCION_DEL_CORTE: Pendiente<f64> = None;
 /// aca.
 pub const _TOLERANCIA_DE_MTIME_NO_VIVE_ACA: () = ();
 
-// ────────────────────── 4 de 4 · de la BANDEJA ──────────────────────────────
+// ────────────────────────── de la BANDEJA, aparte ────────────────────────────
 
 /// **filas** — cuantos archivos muestra el panel por carpeta antes de resumir el resto
 /// en «y N mas».

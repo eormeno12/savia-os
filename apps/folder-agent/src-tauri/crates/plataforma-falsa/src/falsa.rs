@@ -11,6 +11,7 @@
 
 use savia_folder_contrato::dominio::{
     HashAfirmado, IdDeArchivoDelSO, Instante, Mtime, Observacion, RutaRelativa,
+    ruta_excluida_por_convencion,
 };
 use savia_folder_contrato::plataforma::{
     Clase, CursorDurable, EntradaEnumerada, EvidenciaDeRaiz, FalloDeEnumeracion, FalloDeLectura,
@@ -255,6 +256,11 @@ impl Plataforma for Falsa {
             .lock()
             .unwrap()
             .iter()
+            // Mismo corte que `recorrer` en `plataforma-adaptadores` (macOS de verdad):
+            // un `.git`/`.DS_Store` puesto con `poner()` tiene que desaparecer de la
+            // enumeracion igual que en un disco real, o los tests de este banco
+            // estarian probando un mundo mas permisivo que el que corre en produccion.
+            .filter(|(ruta, _)| !ruta_excluida_por_convencion(ruta.como_str()))
             .map(|(ruta, a)| EntradaEnumerada {
                 ruta: ruta.clone(),
                 clase: Clase::Archivo,

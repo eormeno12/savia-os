@@ -4,9 +4,9 @@
 [package]
 name = "savia-folder-aplicacion"
 version = "0.0.0"
-edition = "2024"
-rust-version = "1.97"
-publish = false
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
 
 [lib]
 name = "savia_folder_aplicacion"
@@ -18,8 +18,13 @@ savia-folder-estado = { path = "../estado" }
 savia-folder-maquina = { path = "../maquina" }
 savia-folder-politica = { path = "../politica" }
 savia-folder-protocolo = { path = "../protocolo" }
-serde = { version = "1", features = ["derive"] }
+serde.workspace = true
+# El facade de logging — `a_desenlace` (`ciclo.rs`) lo usa para no dejar en silencio un
+# `Desenlace::Credenciales`/`Reintentable`/`Rechazado`, que hasta ahora no dejaba ningun
+# rastro. Sin backend instalado (nadie en este crate ni en sus tests lo instala) estas
+# llamadas no hacen nada — el backend real vive en `src/bin/bandeja/main.rs`.
+log.workspace = true
 
 [dev-dependencies]
 savia-folder-plataforma-falsa = { path = "../plataforma-falsa" }
-serde_json = "1"
+serde_json.workspace = true

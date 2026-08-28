@@ -7,9 +7,9 @@
 [package]
 name = "savia-folder-guardianes"
 version = "0.0.0"
-edition = "2024"
-rust-version = "1.97"
-publish = false
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
 
 # SOLO PARA `tests/canal_de_savia.rs`, el guardian de FASE 2(a) que prueba por tipos
 # —no por texto— que `ciclo::drenar` acepta cualquier `CanalDeSavia`, no el struct

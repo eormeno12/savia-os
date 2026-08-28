@@ -8,16 +8,16 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import { TEXTOS } from "../textos.js";
+import { esc } from "../dom.js";
+import {
+  INTERVALO_DE_SONDEO_DE_VINCULACION_MS,
+  pedirCodigoNuevo as pedirCodigoDeVinculacion,
+  unSondeo,
+} from "../vinculacion.js";
 
 const raiz = document.getElementById("raiz");
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
-
-const esc = (s) =>
-  String(s).replace(
-    /[&<>"]/g,
-    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c],
-  );
 
 /** «Proyectos/Cliente X» a partir de una ruta absoluta — los últimos dos
  * segmentos, igual que el mockup los muestra. Es presentación pura (recorta
@@ -48,6 +48,11 @@ let q4 = { vista: "advertencia", resultado: null, contieneOtra: null };
 /** La única carpeta que el onboarding conoce — D4 dice que la interfaz
  * muestra una sola aunque el núcleo aguante más. */
 let q5 = { carpeta: null };
+
+/** El progreso en vivo de la ÚNICA carpeta del onboarding — `{fase, procesados, total}`
+ * o `null` si el primer aviso todavía no llegó. Mismo motivo que `progresoEnVivo` en
+ * `bandeja.js`: nunca persiste, se arma solo con el evento `"progreso"`. */
+let progresoQ5 = null;
 
 // ═══════════════════════════════ Navegación ═════════════════════════════════
 
@@ -132,14 +137,10 @@ function manejarAccion(nombre, dataset) {
 }
 
 // ═══════════════════════════ Pantalla 2 · vincular ═══════════════════════════
-
-/** Cadencia del sondeo de `enroll.claim`. Decisión de UX, no del canal — no
- * aplica la disciplina de `contrato::parametros` (esos son números que
- * deciden comportamiento del protocolo; este decide cuán seguido esta
- * VENTANA pregunta). 2s: bastante rápido para que aprobar desde el teléfono
- * se sienta instantáneo, bastante lento para no convertir cada segundo de
- * espera en un POST contra la API. */
-const INTERVALO_DE_SONDEO_DE_VINCULACION_MS = 2000;
+// El cliente del circuito (`iniciar_vinculacion`/`sondear_vinculacion`) vive
+// en `../vinculacion.js`, compartido con "Volver a vincular" en `bandeja.js` —
+// mismo servidor, mismo protocolo, mismo sondeo. Acá solo queda gobernar `q2`
+// y el repintado.
 
 async function entrarQ2() {
   q2 = { estado: "cargando", codigo: "", usuario: "" };
@@ -148,13 +149,7 @@ async function entrarQ2() {
 }
 
 async function pedirCodigoNuevo() {
-  try {
-    const r = await invoke("iniciar_vinculacion");
-    q2 = { estado: "esperando", codigo: r.codigo, usuario: "" };
-  } catch (e) {
-    console.error("no se pudo iniciar la vinculacion", e);
-    q2 = { estado: "sinConexion", codigo: "", usuario: "" };
-  }
+  q2 = await pedirCodigoDeVinculacion(invoke);
   actualizar();
   if (q2.estado === "esperando") iniciarSondeoDeVinculacion();
 }
@@ -167,17 +162,17 @@ function iniciarSondeoDeVinculacion() {
 async function sondear() {
   let r;
   try {
-    r = await invoke("sondear_vinculacion");
+    r = await unSondeo(invoke);
   } catch (e) {
     console.error("fallo el sondeo de vinculacion", e);
     return;
   }
-  if (r.estado === "pendiente") return; // nada que repintar
+  if (!r) return; // pendiente, nada que repintar
   if (q2Temporizador) {
     clearInterval(q2Temporizador);
     q2Temporizador = null;
   }
-  q2 = { ...q2, estado: r.estado, usuario: r.usuario ?? "" };
+  q2 = { ...q2, ...r };
   actualizar();
 }
 
@@ -398,10 +393,12 @@ async function reemplazarCarpeta(id) {
   }
 }
 
-// El diálogo nativo resuelve por evento, no por valor de retorno — mismo
-// motivo que `agregar_carpeta` en `main.rs`: `pick_folder` puede tardar lo
-// que tarde la persona en elegir, y un comando que espera eso deja la
-// ventana colgada.
+// El diálogo nativo resuelve por evento, no por valor de retorno: `pick_folder`
+// puede tardar lo que tarde la persona en elegir, y un comando que espera eso
+// deja la ventana colgada. **El mismo evento que escucha `bandeja.js`** — es
+// el mismo comando (`elegir_carpeta_con_advertencia`) para las dos superficies,
+// así que acá hace falta filtrar por pantalla: un resultado que llega mientras
+// la persona ya avanzó a otra pantalla de onboarding no es para esta vista.
 await listen("resultado-carpeta", (evento) => {
   if (pantalla !== "q4") return;
   const payload = evento.payload;
@@ -437,7 +434,20 @@ async function actualizarQ5() {
 // trabajo avisa cuando terminó una vuelta. Acá solo importa mientras la
 // pantalla 5 está activa.
 await listen("cambio", () => {
+  // La vuelta que este "cambio" cierra ya terminó — cualquier progreso que
+  // quedara es de una vuelta que ya no está en curso. Mismo motivo que
+  // `progresoEnVivo.clear()` en `pintar()` (`bandeja.js`).
+  progresoQ5 = null;
   if (pantalla === "q5") actualizarQ5();
+});
+
+// El mismo evento "progreso" que ya usa el panel de hoy (`bandeja.js`) — nunca llega
+// por `vista()` (ver el comentario en `vistaQ5`), así que sin este listener acá la
+// pantalla 5 se queda muda mientras el barrido/drenaje está en curso.
+await listen("progreso", (evento) => {
+  if (pantalla !== "q5" || !q5.carpeta || evento.payload.raiz !== q5.carpeta.id) return;
+  progresoQ5 = evento.payload;
+  actualizar();
 });
 
 function vistaQ5() {
@@ -445,21 +455,29 @@ function vistaQ5() {
   const carpeta = q5.carpeta;
   const filas = carpeta ? carpeta.filas : [];
   const enProceso = filas.find((f) => f.estado === "procesando");
-  // `carpeta.progreso` (aplicacion::panel::Carpeta) es SIEMPRE `null` hoy —
-  // no hay canal de progreso todavía (Fase 7). Mientras sea `null`, se
-  // muestra lo que SÍ hay: cuántos ya quedaron en Savia. El día que el canal
-  // exista, esta rama se activa sola.
-  const cifra =
-    carpeta && carpeta.progreso
-      ? esc(t.progreso(carpeta.progreso.procesados, carpeta.progreso.total))
-      : `${esc(carpeta ? String(carpeta.indexados) : "0")} ${carpeta && carpeta.indexados === 1 ? "archivo" : "archivos"} en Savia`;
+  // `carpeta.progreso` (aplicacion::panel::Carpeta) es SIEMPRE `null` — no por
+  // faltar el canal, sino porque `vista()` jamás puede ver un barrido/drenaje en
+  // curso (el candado que lo protege está tomado durante TODO el ciclo, ver
+  // `panel.rs`). Por eso el progreso en vivo llega aparte, por el evento
+  // "progreso" (`progresoQ5`, arriba) — la misma vía que ya usa `bandeja.js`.
+  const enVivo = progresoQ5 && carpeta && progresoQ5.fase === carpeta.estado ? progresoQ5 : null;
+  const cifra = enVivo
+    ? esc(t.progreso(enVivo.procesados, enVivo.total))
+    : `${esc(carpeta ? String(carpeta.indexados) : "0")} ${carpeta && carpeta.indexados === 1 ? "archivo" : "archivos"} en Savia`;
+  // El aviso de porcentaje (`main.rs`) es correcto pero grueso a propósito — como mucho
+  // ~101 eventos por fase, sin importar el tamaño de la carpeta — y esta pantalla se
+  // mira de cerca, no de reojo como el badge del panel: entre dos avisos, una carpeta
+  // grande puede pasar un buen rato sin que la CIFRA cambie, y sin nada más ahí se lee
+  // como "no está pasando nada" en vez de "está trabajando". El pulso da esa segunda
+  // señal —hay actividad— independiente de cuándo llegue el próximo número real.
+  const trabajando = carpeta && (carpeta.estado === "leyendo" || carpeta.estado === "actualizando");
   return `
     <div class="pantalla__contenido">
       <div class="pantalla__cuerpo" style="display:flex;flex-direction:column;flex:1;min-height:0;">
         <div class="eyebrow">${esc(t.eyebrow)}</div>
         <div class="titulo">${esc(t.titulo)}</div>
         <div class="q5__progreso">
-          <div class="q5__cifra">${cifra}</div>
+          <div class="q5__cifra${trabajando ? " q5__cifra--activo" : ""}">${cifra}</div>
           ${enProceso ? `<div class="q5__subiendo">${esc(t.subiendo(enProceso.ruta))}</div>` : ""}
         </div>
         <div class="q5__aviso">

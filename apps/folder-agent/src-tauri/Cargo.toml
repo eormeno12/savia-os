@@ -16,15 +16,39 @@
 [package]
 name = "savia-folder-host"
 version = "0.0.0"
-edition = "2024"
-rust-version = "1.97"
-publish = false
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
 # CUAL DE LOS DOS EMPAQUETA TAURI. `folder-agent` es el de linea de comandos y no abre
 # ninguna ventana: empaquetarlo daria un `.app` que arranca, no muestra nada y se queda.
 default-run = "bandeja"
 
 [workspace]
 members = ["crates/*"]
+
+# `edition`/`rust-version`/`publish` son identicos en los doce manifiestos del workspace
+# (el host mas las once crates), y `serde`/`serde_json` se repetian en seis y cuatro
+# respectivamente — sin ningun comentario que lo justificara, a diferencia de cada otra
+# decision de este repo. Un bump de version de Rust o de serde pasa de tocar N archivos
+# a tocar uno solo.
+[workspace.package]
+edition = "2024"
+rust-version = "1.97"
+publish = false
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# El facade de logging — NO un backend. Lo usan tres manifiestos (este, `aplicacion`,
+# `plataforma-adaptadores`), de ahi que este centralizado con los otros dos de arriba.
+# Es deliberadamente inerte sin un backend que lo escuche: las crates de biblioteca
+# llaman `log::info!`/`log::warn!`/etc. sin saber ni les importa si alguien esta
+# mirando, exactamente el mismo principio que ya regia `traza: &mut Vec<String>` en
+# `ciclo.rs` (bajar la decision de COMO mostrar algo lejos de quien lo genera). El unico
+# backend real —`tauri-plugin-log`— se instala en `src/bin/bandeja/main.rs`, el unico
+# archivo que conoce Tauri; por eso `log` en si no aparece en la lista de palabras
+# prohibidas de `el_nucleo_no_conoce_la_ventana`: no tiene nada que ver con Tauri.
+log = "0.4"
 
 # **`required-features = ["demo"]`, Y NO ESTA EN `default`.** Sin esto el empaquetador
 # de Tauri mete ESTE binario adentro del `.app` junto con la bandeja — se comprobo:
@@ -64,12 +88,17 @@ savia-folder-protocolo = { path = "crates/protocolo" }
 # `tauri::generate_context!()` expande a codigo que espera `serde_json` en el crate
 # root de quien la invoca (`src/bin/bandeja/main.rs`) — no alcanza con que sea
 # dependencia transitiva de las crates de arriba.
-serde_json = "1"
+serde_json.workspace = true
 # Igual que `serde_json` arriba: los DTOs de `comandos_onboarding.rs`
 # (`VinculacionParaLaPantalla`, `ReclamoParaLaPantalla`, `ResultadoDeEleccion`) derivan
 # `serde::Serialize`, y un derive-macro necesita el nombre `serde` resoluble en el
 # propio crate — no alcanza con que llegue transitivo por `contrato`/`protocolo`.
-serde = { version = "1", features = ["derive"] }
+serde.workspace = true
+# Mismo motivo que `serde`/`serde_json` arriba: `src/bin/bandeja/main.rs` y
+# `comandos_onboarding.rs` llaman `log::info!`/`log::warn!`/`log::error!` directo, y una
+# macro necesita el nombre `log` resoluble en el propio crate — no alcanza con que
+# llegue transitivo por las crates de biblioteca de abajo (que tambien lo declaran).
+log.workspace = true
 
 # SOLO PARA EL BINARIO `bandeja`. Ninguna crate de biblioteca lo nombra —lo comprueba
 # `el_nucleo_no_conoce_la_ventana` en `crates/guardianes/tests/guardianes.rs`, caminando
@@ -108,8 +137,23 @@ tauri = { version = "2", features = [
   "macos-private-api",
   "image-png",
 ], optional = true }
-# El selector nativo de directorio. Ver `agregar_carpeta`: el dialogo tiene que ser del
-# sistema, que ademas es lo que en macOS concede el acceso a esa carpeta.
+# El backend real del facade `log` de arriba — el plugin oficial de Tauri v2
+# (`tauri-docs/plugin/logging.mdx`, vendorizado en `~/.local/share/savia-fuentes`). Sin
+# esto, cada `log::info!`/`log::warn!`/`log::error!` de este binario no va a ningun
+# lado: un facade sin backend descarta todo. Se instala como el PRIMER `.plugin(...)` de
+# `main.rs`, antes de `.setup()`, para que ya este activo cuando arranca el resto.
+# Targets elegidos: `Stdout` (lo que ya se leia hoy en la terminal) + `LogDir` (nuevo —
+# persiste a `~/Library/Logs/uno.savia.agente/` en macOS, que es exactamente lo que
+# hizo falta y no habia la sesion que un 401 del simulador dejo el drenaje en silencio
+# sin que quedara ningun rastro despues de que la terminal se perdiera). Deliberadamente
+# SIN el target `Webview` ni los bindings de JS (`@tauri-apps/plugin-log`): esta mejora
+# es para quien opera el agente desde la terminal, no para el panel — agregar eso es
+# una superficie nueva (permiso `log:default` en las dos capabilities, codigo JS) que
+# nadie pidio todavia.
+tauri-plugin-log = { version = "2", optional = true }
+# El selector nativo de directorio. Ver `elegir_carpeta_con_advertencia` en
+# `comandos_onboarding.rs`: el dialogo tiene que ser del sistema, que ademas es
+# lo que en macOS concede el acceso a esa carpeta.
 tauri-plugin-dialog = { version = "2", optional = true }
 # Arrancar al iniciar sesion, por `LaunchAgent`. Se REGISTRA y no se enciende.
 tauri-plugin-autostart = { version = "2", optional = true }
@@ -177,6 +221,7 @@ savia-folder-plataforma-falsa = { path = "crates/plataforma-falsa" }
 default = ["ventana"]
 ventana = [
   "dep:tauri",
+  "dep:tauri-plugin-log",
   "dep:tauri-plugin-dialog",
   "dep:tauri-plugin-autostart",
   "dep:tauri-plugin-updater",

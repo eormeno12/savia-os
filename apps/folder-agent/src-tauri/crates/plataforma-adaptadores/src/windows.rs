@@ -33,34 +33,12 @@
 
 use savia_folder_contrato::dominio::{HashAfirmado, Instante, Observacion, RutaRelativa};
 use savia_folder_contrato::plataforma::{
-    CursorDurable, EvidenciaDeRaiz, FalloDeEnumeracion, FalloDeLectura, Ficha, HuellaDeRaiz,
-    MotivoDeBarrido, PlanDeArranque, Plataforma, PoliticaDeDeshidratacion, RaizRegistrada,
+    CursorDurable, ErrorDePlataforma, EvidenciaDeRaiz, FalloDeEnumeracion, FalloDeLectura, Ficha,
+    HuellaDeRaiz, MotivoDeBarrido, PlanDeArranque, Plataforma, PoliticaDeDeshidratacion,
+    RaizRegistrada,
 };
 use std::path::Path;
 use std::time::Duration;
-
-#[derive(Debug)]
-pub enum ErrorDePlataforma {
-    RelojSinBase,
-}
-
-// LO MISMO QUE SU HERMANO DE macOS, y que faltara es el hallazgo que destapo el
-// cross-check. Son DOS TIPOS DISTINTOS con el mismo nombre —uno por plataforma— asi que
-// la simetria entre los dos brazos no la impone nada: el de macOS implementaba `Display`
-// y `Error` y el de Windows era un enum pelado, y nadie podia notarlo porque este
-// archivo NUNCA SE COMPILABA. Sin estos dos `impl`, `PlataformaLocal::nueva()?` no
-// convierte a `Box<dyn Error>` y el binario no cruza.
-impl std::fmt::Display for ErrorDePlataforma {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ErrorDePlataforma::RelojSinBase => f.write_str(
-                "no se pudo tomar la base del reloj monotonico que avanza durante la suspension",
-            ),
-        }
-    }
-}
-
-impl std::error::Error for ErrorDePlataforma {}
 
 pub struct Windows {
     _privado: (),

@@ -5,6 +5,7 @@
   "type": "module",
   "description": "El agente del canal `folder`: observa una carpeta, hashea y reporta. Nucleo en Rust (src-tauri), cara en webview, y un servidor simulado para construirlo antes de que Savia tenga API.",
   "scripts": {
+    "dev": "node scripts/dev.mjs",
     "sim": "node sim/server.ts",
     "sim:ejercicio": "node sim/ejercicio.ts",
     "nucleo:fmt": "cargo fmt --manifest-path src-tauri/Cargo.toml --all --check",

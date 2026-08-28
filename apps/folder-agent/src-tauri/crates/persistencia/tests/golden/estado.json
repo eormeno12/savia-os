@@ -162,38 +162,6 @@
     },
     "segmentos": [
       {
-        "id": 1,
-        "raiz": "root-1",
-        "origen": {
-          "Barrido": {
-            "total": 0,
-            "barrido": "b1"
-          }
-        },
-        "hechos": {},
-        "orden": [],
-        "abierto": false,
-        "cierre": "Completo",
-        "sweep": null,
-        "apertura_entregada": false,
-        "observados_entregados": false,
-        "desvanecidos_entregados": false,
-        "cierre_entregado": false,
-        "padron": [
-          [
-            "contrato.docx",
-            null
-          ],
-          [
-            "sub/informe.xlsx",
-            null
-          ]
-        ],
-        "padron_requerido": false,
-        "padron_entregado": false,
-        "intentos": 0
-      },
-      {
         "id": 2,
         "raiz": "root-1",
         "origen": {
@@ -313,6 +281,9 @@
     "envenenadas": [],
     "congeladas": [],
     "detenido": null,
-    "proximo_id": 3
+    "proximo_id": 3,
+    "completaron_barrido": [
+      "root-1"
+    ]
   }
 }

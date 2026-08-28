@@ -24,17 +24,25 @@
 //! una baja— y el sintoma es visible en el panel, que es lo que lo hace aceptable como
 //! provisional y no como definitivo.
 //!
-//! Tampoco hay FSEvents todavia: `plan_de_arranque` devuelve SIEMPRE
-//! `BarridoCompleto`, o sea el mismo brazo que Windows. Es correcto y es caro, no es
-//! incorrecto y barato.
+//! Sigue sin haber un CURSOR de FSEvents para `plan_de_arranque` (el replay de
+//! arranque): esa funcion devuelve SIEMPRE `BarridoCompleto`, o sea el mismo brazo que
+//! Windows. Es correcto y es caro, no es incorrecto y barato.
+//!
+//! **LO QUE YA NO ES CIERTO, Y HAY QUE DECIRLO PARA NO CONFLAR LAS DOS COSAS**: FSEvents
+//! para SEÑALES EN VIVO —detectar que algo cambio mientras el agente ya esta corriendo,
+//! no reconstruir que paso mientras estuvo apagado— ya existe, vive en el modulo
+//! hermano `observador.rs`, vía `notify`. Son dos preguntas distintas: "¿que perdi
+//! mientras no miraba?" (`plan_de_arranque`, sigue sin cursor, sigue barriendo entero)
+//! y "¿que esta pasando ahora?" (`observador.rs`, ya resuelta).
 
 use savia_folder_contrato::dominio::{
     HashAfirmado, IdDeArchivoDelSO, Instante, Mtime, Observacion, RutaRelativa,
 };
 use savia_folder_contrato::plataforma::{
-    Clase, CursorDurable, EntradaEnumerada, EvidenciaDeRaiz, FalloDeEnumeracion, FalloDeLectura,
-    Ficha, Hidratacion, HuellaDeRaiz, IdDeVolumen, MotivoDeBarrido, MotivoIndeterminado,
-    PlanDeArranque, Plataforma, PoliticaDeDeshidratacion, RaizRegistrada, ResultadoDeEnumeracion,
+    Clase, CursorDurable, EntradaEnumerada, ErrorDePlataforma, EvidenciaDeRaiz, FalloDeEnumeracion,
+    FalloDeLectura, Ficha, Hidratacion, HuellaDeRaiz, IdDeVolumen, MotivoDeBarrido,
+    MotivoIndeterminado, PlanDeArranque, Plataforma, PoliticaDeDeshidratacion, RaizRegistrada,
+    ResultadoDeEnumeracion,
 };
 use std::fs;
 use std::io::Read;
@@ -71,25 +79,6 @@ struct MachTimebase {
     denom: u32,
 }
 
-#[derive(Debug)]
-pub enum ErrorDePlataforma {
-    RelojSinBase,
-}
-
-// `Display` a mano y no `thiserror`: son cuatro lineas, y hoy el crate no tiene ninguna
-// dependencia de proc-macro fuera de `serde`, que la necesita para las formas del cable.
-impl std::fmt::Display for ErrorDePlataforma {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ErrorDePlataforma::RelojSinBase => {
-                f.write_str("mach_timebase_info fallo: sin el, los tics no son nanosegundos")
-            }
-        }
-    }
-}
-
-impl std::error::Error for ErrorDePlataforma {}
-
 pub struct Macos {
     /// Los tics de `mach_continuous_time` no son nanosegundos en todas las maquinas: en
     /// Intel la base es 125/3. Convertir aca y no en el llamador es lo que permite que
@@ -111,7 +100,9 @@ impl Macos {
         let mut base = MachTimebase { numer: 0, denom: 0 };
         let ok = unsafe { mach_timebase_info(&mut base) };
         if ok != 0 || base.denom == 0 {
-            return Err(ErrorDePlataforma::RelojSinBase);
+            return Err(ErrorDePlataforma::RelojSinBase {
+                motivo: "mach_timebase_info fallo: sin el, los tics no son nanosegundos",
+            });
         }
         Self::proteger_el_hilo();
         Ok(Self {
@@ -198,6 +189,14 @@ impl Macos {
             };
             let nombre = entrada.file_name();
             let nombre = nombre.to_string_lossy().to_string();
+            // `.git`, `.DS_Store`, `.env`, cachés de editor: ni se enumeran ni se
+            // recuerdan (ver `nombre_excluido_por_convencion`). Corta ACA, antes del
+            // `lstat` de mas abajo y antes de descender si es carpeta — un `.git`
+            // adentro de la raiz vigilada puede tener miles de objetos sueltos, y
+            // recorrerlos para descartarlos despues es I/O que nadie pidio.
+            if savia_folder_contrato::dominio::nombre_excluido_por_convencion(&nombre) {
+                continue;
+            }
             let relativa = if prefijo.is_empty() {
                 nombre.clone()
             } else {
@@ -264,20 +263,18 @@ impl Plataforma for Macos {
         _raiz: &RaizRegistrada,
         _cursor: Option<&CursorDurable>,
     ) -> PlanDeArranque {
-        // Sin FSEvents todavia, macOS toma el MISMO brazo que Windows. Es una de las
-        // situaciones que el propio enum contempla, no una excepcion: el llamador es un
-        // `match` total y no se entera.
+        // Sin cursor de FSEvents para el arranque todavia, macOS toma el MISMO brazo
+        // que Windows (ver el encabezado del modulo: esto es distinto de las señales en
+        // vivo, que si existen desde `observador.rs`). Es una de las situaciones que el
+        // propio enum contempla, no una excepcion: el llamador es un `match` total y no
+        // se entera.
         PlanDeArranque::BarridoCompleto {
             porque: MotivoDeBarrido::SinInventario,
         }
     }
 
     fn huella_de_raiz(&self, ruta: &Path) -> Result<HuellaDeRaiz, FalloDeEnumeracion> {
-        let m = fs::metadata(ruta).map_err(|e| match e.kind() {
-            std::io::ErrorKind::NotFound => FalloDeEnumeracion::NoMontado,
-            std::io::ErrorKind::PermissionDenied => FalloDeEnumeracion::PermisoDenegado,
-            _ => FalloDeEnumeracion::ErrorDeEs,
-        })?;
+        let m = fs::metadata(ruta).map_err(|e| mapear_enumeracion(&e))?;
         if !m.is_dir() {
             return Err(FalloDeEnumeracion::NoEsDirectorio);
         }
@@ -291,13 +288,8 @@ impl Plataforma for Macos {
         let m = match fs::metadata(&raiz.ruta_absoluta) {
             Ok(m) => m,
             Err(e) => {
-                let f = match e.kind() {
-                    std::io::ErrorKind::NotFound => FalloDeEnumeracion::NoMontado,
-                    std::io::ErrorKind::PermissionDenied => FalloDeEnumeracion::PermisoDenegado,
-                    _ => FalloDeEnumeracion::ErrorDeEs,
-                };
                 return EvidenciaDeRaiz {
-                    enumeracion: ResultadoDeEnumeracion::Fallo(f),
+                    enumeracion: ResultadoDeEnumeracion::Fallo(mapear_enumeracion(&e)),
                     volumen: None,
                     directorio: None,
                 };
@@ -413,5 +405,13 @@ fn mapear_lectura(e: std::io::Error) -> FalloDeLectura {
         std::io::ErrorKind::NotFound => FalloDeLectura::YaNoEsta,
         std::io::ErrorKind::PermissionDenied => FalloDeLectura::PermisoDenegado,
         _ => FalloDeLectura::ErrorDeEntradaSalida,
+    }
+}
+
+fn mapear_enumeracion(e: &std::io::Error) -> FalloDeEnumeracion {
+    match e.kind() {
+        std::io::ErrorKind::NotFound => FalloDeEnumeracion::NoMontado,
+        std::io::ErrorKind::PermissionDenied => FalloDeEnumeracion::PermisoDenegado,
+        _ => FalloDeEnumeracion::ErrorDeEs,
     }
 }

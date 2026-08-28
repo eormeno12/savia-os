@@ -338,7 +338,10 @@ pub fn atender_evento(
     nodo
 }
 
-#[derive(Debug)]
+/// **`PartialEq` esta para lo mismo que en `ResumenDelBarrido` (ver su doc, arriba):
+/// que un test pueda afirmar que `drenar_reportando` y `drenar` devuelven el MISMO
+/// resultado sobre el mismo escenario.**
+#[derive(Debug, PartialEq, Eq)]
 pub enum ResultadoDelDrenaje {
     Vacia,
     Detenida(savia_folder_estado::colas::MotivoDeDetencion),
@@ -347,12 +350,51 @@ pub enum ResultadoDelDrenaje {
 /// Drena una raiz hasta que no queda trabajo o hasta que un error de credenciales la
 /// detiene. **Un trabajo en vuelo por vez**: dos en paralelo reordenan, y el orden ES el
 /// significado.
+///
+/// **La firma no se toca.** Igual que `barrer`, quien quiera ver el avance tiene
+/// `drenar_reportando` — la misma vuelta con un testigo enchufado.
 pub fn drenar(
     raiz: &RaizId,
     plataforma: &dyn Plataforma,
     almacen: &mut Almacen,
     canal: &dyn CanalDeSavia,
     traza: &mut Vec<String>,
+) -> ResultadoDelDrenaje {
+    drenar_interno(raiz, plataforma, almacen, canal, traza, None)
+}
+
+/// La MISMA vuelta que `drenar`, con un testigo que se llama **una vez por trabajo que
+/// avanzo** —no por intento: un `Reintentable` no completo nada y no cuenta— con
+/// `(procesados, total)`.
+///
+/// A diferencia de `barrer_reportando`, `total` **no es una constante**: `drenar` no
+/// enumera nada por adelantado, así que no hay ningun conjunto fijo contra el que medir.
+/// En cambio se recalcula en cada aviso como `procesados + lo que la cola dice que
+/// falta` — `Colas::hechos_pendientes` (altas y bajas encoladas sin transmitir) mas
+/// `Colas::bytes_pendientes` (subida/confirmacion en vuelo), los dos ya publicos y ya
+/// usados por los tests de `Colas`. Ese "lo que falta" puede SUBIR de una llamada a la
+/// siguiente —`Observar` recien descubre cuantos bytes hacen falta cuando Savia
+/// contesta— y es lo esperado: es la cola misma diciendo que encontro mas trabajo, no un
+/// error del testigo.
+pub fn drenar_reportando(
+    raiz: &RaizId,
+    plataforma: &dyn Plataforma,
+    almacen: &mut Almacen,
+    canal: &dyn CanalDeSavia,
+    traza: &mut Vec<String>,
+    on_progreso: &mut dyn FnMut(usize, usize),
+) -> ResultadoDelDrenaje {
+    drenar_interno(raiz, plataforma, almacen, canal, traza, Some(on_progreso))
+}
+
+/// El cuerpo, uno solo — mismo motivo que `barrer_interno`.
+fn drenar_interno(
+    raiz: &RaizId,
+    plataforma: &dyn Plataforma,
+    almacen: &mut Almacen,
+    canal: &dyn CanalDeSavia,
+    traza: &mut Vec<String>,
+    mut on_progreso: Option<&mut dyn FnMut(usize, usize)>,
 ) -> ResultadoDelDrenaje {
     // EL LAZO NO PUEDE GIRAR EN VACIO, Y LA GARANTIA ES ESTRUCTURAL, NO UNA LISTA DE
     // VARIANTES. La lista de abajo dice cuando VALE LA PENA seguir; esto dice cuando la
@@ -363,6 +405,7 @@ pub fn drenar(
     // «sincronizando». Comparar el trabajo —no su id, que `Subir` y `ConfirmarSubida`
     // comparten— es lo que hace que ninguna variante futura pueda reintroducirlo.
     let mut anterior: Option<Trabajo> = None;
+    let mut procesados = 0usize;
     loop {
         let proximo = almacen.siguiente(raiz);
         let trabajo = match proximo {
@@ -383,6 +426,14 @@ pub fn drenar(
             Desenlace::Entregado(_) | Desenlace::IlegibleEnDisco | Desenlace::Ambiguo
         );
         almacen.resolver(raiz, &id, desenlace);
+        if avanza {
+            procesados += 1;
+            if let Some(avisar) = on_progreso.as_deref_mut() {
+                let colas = almacen.colas();
+                let restante = colas.hechos_pendientes(raiz) + colas.bytes_pendientes(raiz);
+                avisar(procesados, procesados + restante as usize);
+            }
+        }
         if !avanza {
             return ResultadoDelDrenaje::Vacia;
         }
@@ -587,26 +638,41 @@ fn reconstruir_bajas(
 /// La traduccion de `FalloDeProtocolo` a `Desenlace`, y es el unico lugar donde ocurre.
 /// Aguas abajo se lee `clase()` y **nunca** el codigo HTTP crudo: la cola no debe saber
 /// que existe un 403.
+///
+/// **CADA RAMA QUE CORTA EL DRENAJE DEJA UN RASTRO EN EL LOG.** Hasta ahora ninguna lo
+/// hacia: un 401 (`Credenciales`) y una red caida (`Reintentable`) eran indistinguibles,
+/// en la traza, de "la cola simplemente no tenia nada que hacer" — la unica manera de
+/// distinguirlos era adivinar. `Ambiguo` no loggea a proposito: `drenar` lo trata como
+/// avance (ver su `matches!`), no como un corte.
 fn a_desenlace(r: Result<Recibido, FalloDeProtocolo>) -> Desenlace {
     match r {
         Ok(v) => Desenlace::Entregado(v),
         Err(e) => match e.clase() {
-            Clase::Reintentable => Desenlace::Reintentable(format!("{e:?}")),
-            Clase::Credenciales => Desenlace::Credenciales(format!("{e:?}")),
+            Clase::Reintentable => {
+                log::warn!("fallo reintentable, se corta el drenaje esta vuelta: {e:?}");
+                Desenlace::Reintentable(format!("{e:?}"))
+            }
+            Clase::Credenciales => {
+                log::error!("credenciales rechazadas, la raiz se detiene: {e:?}");
+                Desenlace::Credenciales(format!("{e:?}"))
+            }
             Clase::Ambiguo => Desenlace::Ambiguo,
-            Clase::ColaMuerta => Desenlace::Rechazado {
-                // El codigo real, y SOLO para la alerta que una persona va a leer: una
-                // entrada muerta que dice `0` obliga a buscar el 404 adentro del texto de
-                // debug. Aguas abajo se sigue ramificando por `clase()` y nunca por este
-                // numero, que es la regla que el modulo declara.
-                status: e.codigo_http().unwrap_or(0),
-                cuerpo: format!("{e:?}"),
-                // Vacio = el lote entero. Aislar por biseccion cual entrada provoca el
-                // `400` cuesta hasta log2(n) llamadas y compra una alerta que nombra LA
-                // ruta culpable en vez de las cuarenta del barrido; es una decision de
-                // costo y todavia no se tomo.
-                culpables: Vec::new(),
-            },
+            Clase::ColaMuerta => {
+                log::error!("cola muerta, hace falta una persona: {e:?}");
+                Desenlace::Rechazado {
+                    // El codigo real, y SOLO para la alerta que una persona va a leer: una
+                    // entrada muerta que dice `0` obliga a buscar el 404 adentro del texto de
+                    // debug. Aguas abajo se sigue ramificando por `clase()` y nunca por este
+                    // numero, que es la regla que el modulo declara.
+                    status: e.codigo_http().unwrap_or(0),
+                    cuerpo: format!("{e:?}"),
+                    // Vacio = el lote entero. Aislar por biseccion cual entrada provoca el
+                    // `400` cuesta hasta log2(n) llamadas y compra una alerta que nombra LA
+                    // ruta culpable en vez de las cuarenta del barrido; es una decision de
+                    // costo y todavia no se tomo.
+                    culpables: Vec::new(),
+                }
+            }
         },
     }
 }
