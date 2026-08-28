@@ -1,0 +1,76 @@
+name: folder-agent-build
+
+# Arma los instaladores de `apps/folder-agent` (macOS universal + Windows) sin
+# necesitar una máquina Windows: la compilación cruzada desde macOS ya se probó
+# y choca con un hueco de toolchain en la dependencia `ring` (ver el crate
+# `plataforma-adaptadores`), así que cada plataforma se compila en su propio
+# runner. Todavía sin firma en ninguna de las dos — Gatekeeper y SmartScreen van
+# a avisar la primera vez que alguien lo abra, hasta que haya cuenta de Apple
+# Developer y certificado de Windows.
+on:
+  workflow_dispatch: {}
+  push:
+    tags:
+      - "folder-agent-v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            # Universal: los runners de `macos-latest` son ARM64 solos, y sin
+            # esto el .dmg no abre en un Mac Intel.
+            rust_targets: "aarch64-apple-darwin,x86_64-apple-darwin"
+            build_args: "--target universal-apple-darwin"
+            bundle_dir: "universal-apple-darwin/release/bundle/dmg"
+            bundle_glob: "*.dmg"
+            artifact_name: "savia-folder-agent-macos"
+          - platform: windows-latest
+            rust_targets: ""
+            build_args: ""
+            bundle_dir: "release/bundle/nsis"
+            bundle_glob: "*.exe"
+            artifact_name: "savia-folder-agent-windows"
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_targets }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "apps/folder-agent/src-tauri -> target"
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      - name: Compilar instalador
+        run: pnpm --filter @savia-os/folder-agent exec tauri build ${{ matrix.build_args }}
+
+      - name: Subir artefacto del run
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: apps/folder-agent/src-tauri/target/${{ matrix.bundle_dir }}/${{ matrix.bundle_glob }}
+          if-no-files-found: error
+
+      - name: Publicar release (borrador)
+        if: startsWith(github.ref, 'refs/tags/folder-agent-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: apps/folder-agent/src-tauri/target/${{ matrix.bundle_dir }}/${{ matrix.bundle_glob }}

@@ -361,6 +361,22 @@ fn debe_mostrar_onboarding(token: &Option<Secreto>) -> bool {
     token.is_none()
 }
 
+/// Corta el arranque con un mensaje legible en el log, en vez de dejar que un `Err`
+/// se propague fuera de `.setup()` con `?`. Tauri convierte ese `Err` en un panic
+/// propio ("Failed to setup app: ..."), y `.setup()` corre todavia dentro del mismo
+/// cuadro de pila que `did_finish_launching` — un `extern "C"` de tao —, asi que ese
+/// panic no desenrolla: aborta con SIGABRT y sin mensaje visible para quien lo
+/// instalo (tauri-apps/tao#1247). `process::exit` no desenrolla nada, asi que no le
+/// importa ese limite: el mensaje queda en el log y el proceso termina limpio.
+///
+/// Esto NO hace fatal nada que hoy no lo fuera — cada llamador de abajo ya decidio
+/// que ese fallo detiene el arranque (ver el comentario en cada sitio). Solo cambia
+/// COMO se detiene.
+fn fallo_fatal_de_arranque(mensaje: &str) -> ! {
+    log::error!("{mensaje}");
+    std::process::exit(1);
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // **UN SOLO OVERRIDE, Y ES DE DESARROLLO.** La ruta ya no entra por acá — el arranque
     // la resuelve solo, ver `.setup()`. `base` sigue siendo posicional para poder apuntar
@@ -463,8 +479,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // disponible con un `App`/`AppHandle` de verdad, y ese directorio es fijo y
             // separado de cualquier carpeta que la persona pueda elegir — la colision que
             // el chequeo viejo prevenia ya no puede pasar por construccion.
-            let carpeta_de_datos = app.path().app_data_dir()?;
-            std::fs::create_dir_all(&carpeta_de_datos)?;
+            let carpeta_de_datos = app.path().app_data_dir().unwrap_or_else(|e| {
+                fallo_fatal_de_arranque(&format!("no se encontro el directorio de datos de la app: {e}"))
+            });
+            if let Err(e) = std::fs::create_dir_all(&carpeta_de_datos) {
+                fallo_fatal_de_arranque(&format!(
+                    "no se pudo crear el directorio de datos ({}): {e}",
+                    carpeta_de_datos.display()
+                ));
+            }
             let deposito_ruta = carpeta_de_datos.join("savia-folder-agent.redb");
             // **RECONSTRUIR ANTES DE ABRIR, Y EN CADA ARRANQUE.** Ver
             // `Deposito::reconstruir` para las mediciones: el archivo de `redb` nunca baja
@@ -491,12 +514,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Ok(_) => {}
                 Err(e) => log::warn!("no se pudo reconstruir el deposito, se sigue con el que hay: {e}"),
             }
-            let deposito = Deposito::abrir(&deposito_ruta).map_err(|e| e.to_string())?;
+            let deposito = Deposito::abrir(&deposito_ruta).unwrap_or_else(|e| {
+                fallo_fatal_de_arranque(&format!(
+                    "el deposito en {} no se pudo abrir: {e}",
+                    deposito_ruta.display()
+                ))
+            });
 
             // Un deposito ilegible detiene el arranque. Absorberlo como «empiezo de
             // cero» pierde todas las lapidas, y lo borrado mientras el agente estuvo
             // apagado no lo ve faltar ningun barrido posterior.
-            let (almacen, token) = match deposito.cargar().map_err(|e| e.to_string())? {
+            let (almacen, token) = match deposito.cargar().unwrap_or_else(|e| {
+                fallo_fatal_de_arranque(&format!(
+                    "el deposito en {} no se pudo leer: {e}",
+                    deposito_ruta.display()
+                ))
+            }) {
                 Some(r) => {
                     log::info!("deposito  {} (recuperado)", deposito_ruta.display());
                     (r.almacen, r.credencial)
@@ -650,9 +683,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // la bandeja despues lo bajaba a 22 pt, o sea DOS remuestreos encima del
                 // otro. El sintoma era «se ve ultra borroso». `iconTemplate.png` mide
                 // 44x44 —22 pt @2x— asi que en un Retina cae pixel a pixel.
-                .icon(tauri::image::Image::from_bytes(include_bytes!(
-                    "../../../icons/iconTemplate.png"
-                ))?)
+                .icon(
+                    tauri::image::Image::from_bytes(include_bytes!(
+                        "../../../icons/iconTemplate.png"
+                    ))
+                    .unwrap_or_else(|e| {
+                        fallo_fatal_de_arranque(&format!("el icono de la bandeja esta corrupto: {e}"))
+                    }),
+                )
                 // **`icon_as_template` es lo que hace que se vea.** Sin esto, macOS pinta
                 // el PNG tal cual: negro sobre una barra oscura. Con esto, el SO usa el
                 // alfa como forma y lo tine segun el modo.
@@ -671,7 +709,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         alternar(&w, rect);
                     }
                 })
-                .build(app)?;
+                .build(app)
+                .unwrap_or_else(|e| {
+                    fallo_fatal_de_arranque(&format!("no se pudo crear el icono de bandeja: {e}"))
+                });
 
             // ── EL HILO QUE TRABAJA ──────────────────────────────────────────
             //
