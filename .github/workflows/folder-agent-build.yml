@@ -8,8 +8,14 @@ name: folder-agent-build
 # a avisar la primera vez que alguien lo abra, hasta que haya cuenta de Apple
 # Developer y certificado de Windows.
 on:
+  # `workflow_dispatch` (el botón "Run workflow") solo aparece cuando el archivo
+  # ya está en la rama por defecto — es una restricción de GitHub, no de acá.
+  # Hasta que esto llegue a `main`, la rama de abajo queda en `branches` para
+  # poder validar el pipeline; se saca de ahí en cuanto se mergee.
   workflow_dispatch: {}
   push:
+    branches:
+      - "b2b/canal-folder"
     tags:
       - "folder-agent-v*.*.*"
 
